@@ -1,9 +1,9 @@
 // Wires the engine, the world, the racers, the rules and the HUD together.
 //
 // Three ways to play, all on the same four crafts:
-//   solo    one rider here, three bots
-//   split   two riders on one keyboard (WASD + arrows), two viewports, two bots
-//   online  one rider here, up to three on other machines (see net/), bots run by the host in the empty seats
+//   solo    one driver here, three bots
+//   split   two drivers on one keyboard (WASD + arrows), two viewports, two bots
+//   online  one driver here, up to three on other machines (see net/), bots run by the host in the empty seats
 
 import * as THREE from 'three';
 import { Engine } from '../engine/Engine.js';
@@ -20,20 +20,22 @@ import { Race } from './Race.js';
 import { Hud } from './Hud.js';
 import { Spray, WakeField } from './effects.js';
 import { LensDrops } from './LensDrops.js';
-import { RULES } from './config.js';
+import { HULL, RULES } from './config.js';
+import { ReflectionProbe } from '../engine/ReflectionProbe.js';
+import { WaterMirror } from '../engine/WaterMirror.js';
 import { OnlinePlay } from '../net/OnlinePlay.js';
 
 // Bots: how much power they can build, base pace, and their habits.
 const BOTS = [
   { powerCap: 5, pace: 0.958, bias: 0.0, wobble: 0.6, sharpness: 2.5 },
-  { powerCap: 4, pace: 0.968, bias: -3.4, wobble: 1.0, sharpness: 2.2 },
-  { powerCap: 4, pace: 0.945, bias: 3.4, wobble: 1.4, sharpness: 2.0 },
+  { powerCap: 4, pace: 0.968, bias: -4.2, wobble: 1.0, sharpness: 2.2 },
+  { powerCap: 4, pace: 0.945, bias: 4.2, wobble: 1.4, sharpness: 2.0 },
 ];
 
 export class Game {
   /**
    * @param {HTMLElement} root
-   * @param {{ pixelRatio?: number, manual?: boolean, draw?: boolean, autopilot?: boolean, laps?: number, seaScale?: number, drops?: boolean, online?: boolean, playUrl?: string, net?: { lag: number, jitter: number, loss: number } }} [options]
+   * @param {{ pixelRatio?: number, manual?: boolean, draw?: boolean, autopilot?: boolean, laps?: number, seaScale?: number, drops?: boolean, reflections?: boolean, online?: boolean, playUrl?: string, net?: { lag: number, jitter: number, loss: number } }} [options]
    */
   constructor(root, options = {}) {
     this.options = options;
@@ -61,6 +63,16 @@ export class Game {
     world.env.water.userData.setWake(this.wake.uniforms);
     this.spray = new Spray(coarse ? 1500 : 2200);
     engine.scene.add(this.spray.points);
+    // what the boats' paintwork mirrors: a small picture of the surroundings, redrawn a side at a time
+    this.probe = options.reflections === false ? null : new ReflectionProbe(engine.renderer, coarse ? 128 : 256);
+    if (this.probe) engine.onContextRestored(() => this.probe.reset());
+    this._probeEvery = coarse ? 2 : 1; // phones redraw it every other frame
+    this._probeTick = 0;
+    // and what the water mirrors: one picture per view, see engine/WaterMirror.js
+    this._mirrorScale = options.reflections === false ? 0 : coarse ? 0.4 : 0.5;
+    this._mirrorHidden = [world.env.water, world.env.sky, this.spray.points];
+    // (the sea's low-detail stand-in is hidden anyway, except while the paintwork's map is drawn)
+    this._mirrors = []; // one per view, kept from race to race
 
     this.input = new Input(hud.touchLayer);
     this.crafts = TEAMS.slice(0, RULES.racers).map((team, i) => {
@@ -69,7 +81,7 @@ export class Game {
       return craft;
     });
 
-    /** One per rider on this machine: { racer, camera, chase, hud, rect, pan, emphasis, human, auto, lens, wet }. */
+    /** One per driver on this machine: { racer, camera, chase, hud, rect, pan, emphasis, human, auto, lens, wet }. */
     this.views = [];
     /** Water on each view's camera lens (kept from race to race). */
     this.lenses = [];
@@ -82,7 +94,7 @@ export class Game {
     this._mapTimer = 0;
     this._resultsTimer = 0;
     this._settledShown = false;
-    this._emitAcc = this.crafts.map(() => ({ tail: 0, bow: 0 }));
+    this._emitAcc = this.crafts.map(() => ({ tail: 0, bow: 0, skirt: 0 }));
 
     this.setupRace('solo');
 
@@ -95,7 +107,7 @@ export class Game {
     };
 
     // browsers may suspend audio (tab switch, phone call): any touch brings it back.
-    // It also starts it for a rider who was put into a race without tapping Start
+    // It also starts it for a driver who was put into a race without tapping Start
     // (the guest of an online race).
     const resumeAudio = () => (this.audio.ctx || this.phase !== 'title') && this.audio.unlock();
     window.addEventListener('pointerdown', resumeAudio, true);
@@ -164,7 +176,7 @@ export class Game {
     this.race = new Race({ track: world.track, entries, on: this._raceEvents() });
     const race = this.race;
 
-    // one view per rider on this machine
+    // one view per driver on this machine
     const locals = race.players;
     this.views = locals.map((racer, n) => {
       const camera = new THREE.PerspectiveCamera(62, 1, 0.3, 9000);
@@ -182,7 +194,8 @@ export class Game {
         pan: 0,
         emphasis: new Float32Array(world.buoys.length),
         human: racer.driver,
-        auto: new BotDriver(world.track, { bias: racer.index ? 1.5 : 0, wobble: 0.4, sharpness: 2.6, phase: 1.1 + racer.index }),
+        // the autopilot (demos, tests, cruising home after the flag): two of them keep a lane each
+        auto: new BotDriver(world.track, { bias: locals.length > 1 ? (n ? 2.3 : -2.3) : 0, wobble: 0.4, sharpness: 2.6, phase: 1.1 + racer.index }),
       };
     });
     for (const v of this.views) if (auto) v.racer.driver = v.auto;
@@ -194,7 +207,7 @@ export class Game {
     this.layout();
     for (const v of this.views) {
       v.hud.setStandings(race.racers, v.racer);
-      // with friends in the race, every other rider carries a name tag
+      // with friends in the race, every other driver carries a name tag
       v.hud.setTags(mode === 'solo' ? [] : race.racers.filter((r) => r !== v.racer));
       v.hud.hush();
       v.chase.mode = this.phase === 'race' ? 'chase' : 'orbit';
@@ -220,13 +233,13 @@ export class Game {
       v.camera.aspect = aspect;
       v.camera.updateProjectionMatrix();
       v.chase.setAspect(aspect);
-      // sound: a rider is heard from their side of the screen (left / right halves only)
+      // sound: a driver is heard from their side of the screen (left / right halves only)
       v.pan = two ? clamp((v.rect.left + v.rect.width / 2 - 0.5) * 2.4, -0.6, 0.6) : 0;
     });
     const huds = hud.setViews(views.map((v) => v.rect));
     views.forEach((v, i) => (v.hud = huds[i]));
-    /** What the audio follows: one voice per rider on this machine. */
-    this.riders = views.map((v) => ({ craft: v.racer.craft, pan: v.pan }));
+    /** What the audio follows: one voice per driver on this machine. */
+    this.locals = views.map((v) => ({ craft: v.racer.craft, pan: v.pan }));
   }
 
   viewOf(racer) {
@@ -236,7 +249,7 @@ export class Game {
 
   /**
    * Online, only the host can start the next race: while the link is up, and
-   * once the other rider is home too (a rematch would cut their race short).
+   * once the other driver is home too (a rematch would cut their race short).
    */
   get canRestart() {
     if (this.mode !== 'online') return true;
@@ -252,7 +265,7 @@ export class Game {
     let note = '';
     if (!canRestart) {
       if (!o.connected) note = 'Everyone else has left. Go back to the menu to play again.';
-      else if (o.isHost) note = 'Other riders are still racing…';
+      else if (o.isHost) note = 'Other drivers are still racing…';
       else note = 'Waiting for the host to start the next race…';
     }
     this.hud.showResults(this.race, true, { canRestart, note, toLobby: hosting });
@@ -298,7 +311,7 @@ export class Game {
         v.hud.flash('FINISH', 'go small');
         audio.finish(v.pan);
         r.driver = v.auto; // cruise while the others come in
-        if (this.race.humans.some((h) => h !== r && !h.finished && !h.retired)) v.hud.say('Finished · waiting for the other rider', 'good', 0);
+        if (this.race.humans.some((h) => h !== r && !h.finished && !h.retired)) v.hud.say('Finished · waiting for the other driver', 'good', 0);
       },
       retire: (r) => {
         const v = this.viewOf(r);
@@ -368,7 +381,7 @@ export class Game {
   }
 
   /**
-   * Same riders, new race.
+   * Same drivers, new race.
    */
   restart() {
     const { race, hud } = this;
@@ -430,7 +443,7 @@ export class Game {
     }
     race.preStep(dt, time);
 
-    // riders simulated on the other machine are placed from what it last told us
+    // drivers simulated on the other machine are placed from what it last told us
     this.online.applyRemote(time, dt);
     for (const r of racers) if (r.control !== 'remote') r.craft.step(dt, time);
 
@@ -484,11 +497,11 @@ export class Game {
     }
   }
 
-  /** Spray that reaches a camera all the time: the rider's own at speed, and a rooster tail followed too closely. */
+  /** Spray that reaches a camera all the time: the driver's own at speed, and a rooster tail followed too closely. */
   _wetLenses(dt) {
     for (const v of this.views) {
       const me = v.racer.craft;
-      let rate = me.grip > 0.3 ? 0.8 * clamp01((me.speed - 14) / 12) : 0;
+      let rate = me.grip > 0.3 ? 0.9 * clamp01((me.speed - 14) / 12) : 0;
       for (const c of this.crafts) {
         if (c === me || c.grip < 0.3 || c.speed < 8) continue;
         const dx = me.pos.x - c.pos.x;
@@ -497,7 +510,7 @@ export class Game {
         const fz = Math.cos(c.yaw);
         const behind = -(dx * fx + dz * fz);
         const side = Math.abs(dx * fz - dz * fx);
-        if (behind > 1 && behind < 10 && side < 2.4) rate += 13 * (1 - behind / 10) * (1 - side / 2.4) * c.throttle;
+        if (behind > 2.5 && behind < 16 && side < 3) rate += 13 * (1 - behind / 16) * (1 - side / 3) * c.throttle;
       }
       v.wet += rate * dt;
       while (v.wet >= 1) {
@@ -537,39 +550,58 @@ export class Game {
 
       if (near && c.grip > 0.3) {
         const acc = this._emitAcc[i];
-        // rooster tail from the jet
-        acc.tail += dt * 210 * c.throttle * (0.35 + 0.65 * speedK);
+        // rooster tails thrown up by the two propellers
+        acc.tail += dt * 250 * c.throttle * (0.35 + 0.65 * speedK);
         while (acc.tail >= 1) {
           acc.tail -= 1;
-          const side = (Math.random() - 0.5) * 1.6;
+          const engine = Math.random() < 0.5 ? 0.36 : -0.36;
+          const side = (Math.random() - 0.5) * 1.8;
           this.spray.emit(
-            c.pos.x - fx * 1.55 + lx * side * 0.2,
-            c.pos.y + 0.12,
-            c.pos.z - fz * 1.55 + lz * side * 0.2,
-            c.vel.x * 0.5 - fx * (2 + Math.random() * 3) + lx * side,
-            2.6 + Math.random() * 4.2 * (0.4 + c.throttle),
-            c.vel.z * 0.5 - fz * (2 + Math.random() * 3) + lz * side,
-            0.03 + Math.random() * Math.random() * 0.09,
-            0.4 + Math.random() * 0.55,
+            c.pos.x - fx * HULL.engines + lx * (engine + side * 0.15),
+            c.pos.y + 0.05,
+            c.pos.z - fz * HULL.engines + lz * (engine + side * 0.15),
+            c.vel.x * 0.45 - fx * (2 + Math.random() * 3.5) + lx * side,
+            2.8 + Math.random() * 4.6 * (0.4 + c.throttle),
+            c.vel.z * 0.45 - fz * (2 + Math.random() * 3.5) + lz * side,
+            0.04 + Math.random() * Math.random() * 0.12,
+            0.45 + Math.random() * 0.6,
           );
         }
-        // sheets of spray peeling off the bow, heavier on the outside of a turn
+        // white water torn off the tails of the two hulls
+        acc.skirt += dt * 130 * speedK;
+        while (acc.skirt >= 1) {
+          acc.skirt -= 1;
+          const sideSign = Math.random() < 0.5 ? 1 : -1;
+          const across = sideSign * (0.5 + Math.random() * 0.55);
+          this.spray.emit(
+            c.pos.x - fx * 2.7 + lx * across,
+            c.pos.y + 0.02,
+            c.pos.z - fz * 2.7 + lz * across,
+            c.vel.x * 0.6 - fx * Math.random() * 1.5 + lx * sideSign * Math.random() * 1.3,
+            0.7 + Math.random() * 2.1,
+            c.vel.z * 0.6 - fz * Math.random() * 1.5 + lz * sideSign * Math.random() * 1.3,
+            0.06 + Math.random() * 0.11,
+            0.22 + Math.random() * 0.3,
+          );
+        }
+        // sheets of spray peeling off the two hulls, heavier on the outside of a turn
         if (c.speed > 8) {
-          acc.bow += dt * 150 * speedK;
+          acc.bow += dt * 190 * speedK;
           while (acc.bow >= 1) {
             acc.bow -= 1;
             const turn = Math.max(-1, Math.min(1, c.yawRate));
             const sideSign = Math.random() < 0.5 - turn * 0.3 ? 1 : -1; // +1 = port
-            const out = 2.2 + Math.random() * 2.8;
+            const out = 2.4 + Math.random() * 3.2;
+            const along = -0.6 + Math.random() * 1.6; // where the hulls meet the water at speed
             this.spray.emit(
-              c.pos.x + fx * 0.55 + lx * sideSign * 0.5,
-              c.pos.y + 0.1,
-              c.pos.z + fz * 0.55 + lz * sideSign * 0.5,
-              c.vel.x * 0.72 + lx * sideSign * out,
-              1.5 + Math.random() * 2.4,
-              c.vel.z * 0.72 + lz * sideSign * out,
+              c.pos.x + fx * along + lx * sideSign * 1.02,
+              c.pos.y + 0.06,
+              c.pos.z + fz * along + lz * sideSign * 1.02,
+              c.vel.x * 0.74 + lx * sideSign * out,
+              1.4 + Math.random() * 2.6,
+              c.vel.z * 0.74 + lz * sideSign * out,
               0.03 + Math.random() * Math.random() * 0.085,
-              0.3 + Math.random() * 0.4,
+              0.3 + Math.random() * 0.42,
             );
           }
         }
@@ -578,13 +610,25 @@ export class Game {
       // one-shot events
       for (const ev of c.events) {
         if (ev.type === 'land') {
-          this.wake.splash(c.undisplacedX + fx * 1.0, c.undisplacedZ + fz * 1.0, time, 2.4 + ev.strength * 3.2, 0.6 + 0.4 * ev.strength);
+          this.wake.splash(c.undisplacedX + fx * HULL.stern, c.undisplacedZ + fz * HULL.stern, time, 3.4 + ev.strength * 3.8, 0.6 + 0.4 * ev.strength);
           if (near) {
-            const n = Math.round(18 + ev.strength * 46);
+            // a sheet of water thrown out from under both hulls, all along their length
+            const n = Math.round(24 + ev.strength * 60);
             for (let k = 0; k < n; k++) {
-              const a = Math.random() * Math.PI * 2;
-              const sp = 2.5 + Math.random() * 5 * (0.5 + ev.strength);
-              this.spray.emit(c.pos.x + Math.cos(a) * 0.8, c.pos.y + 0.1, c.pos.z + Math.sin(a) * 0.8, c.vel.x * 0.6 + Math.cos(a) * sp, 2.5 + Math.random() * 5.5 * (0.4 + ev.strength), c.vel.z * 0.6 + Math.sin(a) * sp, 0.04 + Math.random() * Math.random() * 0.13, 0.55 + Math.random() * 0.5);
+              const sideSign = Math.random() < 0.5 ? 1 : -1;
+              const along = (Math.random() - 0.5) * 4.6;
+              const out = (1.5 + Math.random() * 5 * (0.5 + ev.strength)) * sideSign;
+              const fore = (Math.random() - 0.5) * 3;
+              this.spray.emit(
+                c.pos.x + fx * along + lx * sideSign * 0.95,
+                c.pos.y + 0.08,
+                c.pos.z + fz * along + lz * sideSign * 0.95,
+                c.vel.x * 0.6 + lx * out + fx * fore,
+                2.5 + Math.random() * 5.5 * (0.4 + ev.strength),
+                c.vel.z * 0.6 + lz * out + fz * fore,
+                0.04 + Math.random() * Math.random() * 0.13,
+                0.55 + Math.random() * 0.5,
+              );
             }
           }
           if (view) {
@@ -597,7 +641,7 @@ export class Game {
           for (const v of this.views) {
             if (v === view) continue;
             const d = Math.hypot(c.pos.x - v.racer.craft.pos.x, c.pos.z - v.racer.craft.pos.z);
-            if (d < 6) v.lens.splash((2 + 12 * ev.strength) * (1 - d / 6), ev.strength * 0.4);
+            if (d < 8) v.lens.splash((2 + 12 * ev.strength) * (1 - d / 8), ev.strength * 0.4);
           }
         } else if (ev.type === 'bump' && view) {
           view.chase.kick(0.2 + ev.strength * 0.6);
@@ -624,7 +668,7 @@ export class Game {
       const fx = Math.sin(c.yaw);
       const fz = Math.cos(c.yaw);
       const wash = c.grip > 0.2 ? 0.16 + 0.42 * clamp01(c.speed / 16) : 0;
-      this.wake.stampCraft(c.undisplacedX + fx * 1.05, c.undisplacedZ + fz * 1.05, fx, fz, wash, Math.max(0, c.pos.y - c.waterY));
+      this.wake.stampCraft(c.undisplacedX + fx * HULL.stern, c.undisplacedZ + fz * HULL.stern, fx, fz, wash, Math.max(0, c.pos.y - c.waterY));
     }
     this.wake.update(time);
 
@@ -632,7 +676,7 @@ export class Game {
     for (const v of this.views) {
       v.chase.update(frameDt, v.racer.craft, time);
       v.lens.update(frameDt, clamp01(v.racer.craft.speed / 26));
-      // each rider's next mark stands out in their own view
+      // each driver's next mark stands out in their own view
       const next = racing ? v.racer.nextGate : -1;
       const k = Math.min(1, frameDt * 6);
       for (let i = 0; i < v.emphasis.length; i++) v.emphasis[i] += ((i === next ? 1 : 0) - v.emphasis[i]) * k;
@@ -652,7 +696,7 @@ export class Game {
       }
     }
 
-    this.audio.update(this.riders, racing && race.state !== 'grid');
+    this.audio.update(this.locals, racing && race.state !== 'grid');
 
     if (this.phase === 'results' && !this._settledShown) {
       this._resultsTimer -= frameDt;
@@ -665,18 +709,39 @@ export class Game {
     }
   }
 
-  /** Draw every rider's viewport. */
+  /** Draw every driver's viewport. */
   draw(time) {
     const { engine, world } = this;
     const renderer = engine.renderer;
     const W = engine.width;
     const H = engine.height;
     const split = this.views.length > 1;
-    renderer.setScissorTest(split);
-    for (const v of this.views) {
-      const p = v.racer.craft.object.position;
-      // the foam field and the dense part of the ocean mesh sit under this view's rider
+
+    // the reflections first: one side of the map per frame, seen from the first view's boat
+    // (left alone on devices that are already struggling to keep up)
+    let wakeDrawn = false;
+    if (this.probe && engine._qualitySteps < 2 && (this.probe.drawn < 6 || this._probeTick++ % this._probeEvery === 0)) {
+      const v = this.views[0];
+      const boat = v.racer.craft.object;
+      const p = boat.position;
       this.wake.render(p.x, p.z);
+      wakeDrawn = true;
+      world.prepareView(time, this.probe.camera, p.x, p.z);
+      for (let i = 0; i < world.buoys.length; i++) world.buoys[i].userData.pose(time, v.emphasis[i]);
+      this.spray.points.visible = false;
+      world.env.coarseWater(true);
+      this.probe.update(engine.scene, p.x, p.y + 0.9, p.z, [boat]);
+      world.env.coarseWater(false);
+      this.spray.points.visible = true;
+    }
+
+    renderer.setScissorTest(split);
+    for (let n = 0; n < this.views.length; n++) {
+      const v = this.views[n];
+      const p = v.racer.craft.object.position;
+      // the foam field and the dense part of the ocean mesh sit under this view's boat
+      if (!wakeDrawn) this.wake.render(p.x, p.z);
+      wakeDrawn = false;
       world.prepareView(time, v.camera, p.x, p.z);
       const w = Math.round(v.rect.width * W);
       const h = Math.round(v.rect.height * H);
@@ -684,6 +749,14 @@ export class Game {
       const y = H - Math.round(v.rect.top * H) - h; // GL's origin is bottom-left
       this.spray.setProjection(h * engine.pixelRatio, v.camera.fov);
       for (let i = 0; i < world.buoys.length; i++) world.buoys[i].userData.pose(time, v.emphasis[i]);
+      // boats, marks and land mirrored in the water (not on devices that are struggling)
+      if (this._mirrorScale > 0 && engine._qualitySteps < 1) {
+        const mirror = this._mirrors[n] || (this._mirrors[n] = new WaterMirror(renderer, this._mirrorScale));
+        mirror.setSize(w * engine.pixelRatio, h * engine.pixelRatio);
+        v.camera.updateMatrixWorld();
+        mirror.render(engine.scene, v.camera, v.racer.craft.waterY, this._mirrorHidden);
+        mirror.use();
+      } else WaterMirror.off();
       renderer.setViewport(x, y, w, h);
       renderer.setScissor(x, y, w, h);
       renderer.render(engine.scene, v.camera);

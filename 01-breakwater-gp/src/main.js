@@ -1,13 +1,14 @@
 // Entry point. Query options (all optional, mostly for testing):
 //   ?auto      start the race straight away
-//   ?ap        let a bot ride the player's craft
-//   ?mode=split  two riders on one keyboard
+//   ?ap        let a bot drive the player's boat
+//   ?mode=split  two drivers on one keyboard
 //   ?laps=1    shorter race
 //   ?dpr=1     force the canvas pixel ratio
 //   ?sea=0.8   scale the wave height
 //   ?manual    do not run the frame loop (step with __bw.advance)
 //   ?nodraw    run the frame loop without rendering
 //   ?drops=0   no water on the camera lens
+//   ?reflect=0 no live reflections on the boats
 //   ?netlag=80&netjitter=30&netloss=5
 //              online play: hold back (ms) and drop (%) what this page receives
 
@@ -31,6 +32,7 @@ try {
     seaScale: num('sea'),
     draw: !q.has('nodraw'),
     drops: q.get('drops') !== '0',
+    reflections: q.get('reflect') !== '0',
     net: { lag: (num('netlag') || 0) / 1000, jitter: (num('netjitter') || 0) / 1000, loss: (num('netloss') || 0) / 100 },
   });
   if (q.get('mode') === 'split') game.setupRace('split');

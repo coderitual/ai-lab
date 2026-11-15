@@ -4,7 +4,7 @@
 //
 // Track frame at arc length s:
 //   tangent  = direction of travel
-//   right    = (-tz, tx)  -> "lateral" > 0 is to the rider's right
+//   right    = (-tz, tx)  -> "lateral" > 0 is to the driver's right
 
 import * as THREE from 'three';
 import { DEG, smoothstep } from '../engine/math.js';
@@ -137,7 +137,7 @@ export function createTrack() {
   // ---- slalom marks
   const gates = GATES.map(([frac, pass], i) => {
     const s = frac * length;
-    const side = pass === 'right' ? 1 : -1; // +1: rider must end up right of the mark
+    const side = pass === 'right' ? 1 : -1; // +1: driver must end up right of the mark
     const lateral = side * BUOY_LATERAL;
     const p = pointAt(s, lateral);
     return { index: i, s, pass, side, lateral, x: p.x, z: p.z, heading: p.heading, lineOffset: lateral + side * LINE_CLEARANCE };

@@ -21,7 +21,7 @@ export function createEnvironment(engine, { waterSegments = 256 } = {}) {
   scene.add(sky);
 
   const water = createWater({ normalTex, noiseTex, causticTex, segments: waterSegments });
-  scene.add(water);
+  scene.add(water, water.userData.coarse);
 
   // Key light from the sun, soft fill from the sky.
   const sun = new THREE.DirectionalLight(PALETTE.sunColor, 3.2);
@@ -50,6 +50,11 @@ export function createEnvironment(engine, { waterSegments = 256 } = {}) {
     noiseTex,
     normalTex,
     anisotropy,
+    /** Swap the sea for its low-detail stand-in (and back) round a picture that only sees it small. */
+    coarseWater(on) {
+      water.visible = !on;
+      water.userData.coarse.visible = on;
+    },
     /** Call every rendered frame. */
     update(time, camera, focusX = camera.position.x, focusZ = camera.position.z) {
       sky.material.uniforms.uTime.value = time;

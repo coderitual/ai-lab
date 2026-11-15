@@ -237,19 +237,3 @@ export function makeCanvasTexture(w, h, draw, anisotropy = 4) {
   tex.anisotropy = anisotropy;
   return tex;
 }
-
-/** Race number on a rounded plate (used as the bib on a rider's back). */
-export function makeNumberTexture(number, ink, plate = '#fbfaf5') {
-  return makeCanvasTexture(128, 96, (ctx, w, h) => {
-    ctx.fillStyle = plate;
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(2, 2, w - 4, h - 4, 14);
-    else ctx.rect(2, 2, w - 4, h - 4);
-    ctx.fill();
-    ctx.fillStyle = ink;
-    ctx.font = 'italic 900 84px "Avenir Next Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(number), w / 2 - 3, h / 2 + 5);
-  });
-}

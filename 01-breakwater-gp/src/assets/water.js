@@ -1,12 +1,14 @@
-// The ocean: a camera-centred radial grid (dense near the rider, sparse toward
+// The ocean: a camera-centred radial grid (dense near the driver, sparse toward
 // the horizon) displaced by the shared Gerstner waves in the vertex shader and
 // shaded per pixel: analytic normals, a deep body that sunlight shines through
 // (most where a wave is thin and where you look sunward into its face),
-// caustics inside the waves and on the sand in the shallows, sky reflection,
-// sun glitter, and foam that trails behind breaking waves.
+// caustics inside the waves and on the sand in the shallows, the reflection of
+// the sky and of whatever stands on the water (see engine/WaterMirror.js), sun
+// glitter, and foam that trails behind breaking waves.
 
 import * as THREE from 'three';
 import { SEA_HEIGHT, WAVE_GLSL, setWaveMeshDensity, waveUniforms, waves } from '../engine/waves.js';
+import { mirrorUniforms } from '../engine/WaterMirror.js';
 import { SKY_GLSL, atmosphereUniforms } from './sky.js';
 import { PALETTE } from './palette.js';
 
@@ -101,6 +103,9 @@ uniform vec3 uFoam;           // crest steepening, threshold low, threshold high
 uniform vec4 uGlint;          // texture scale, normal spread, exponent, strength
 uniform sampler2D uWakeTex;   // r: water churned by crafts, g: their shadows, b: how fresh the churn is
 uniform vec3 uWake;           // centre x, centre z, 1 / extent
+uniform sampler2D uMirrorTex; // boats, marks and land as the water mirrors them (a: something is there)
+uniform mat4 uMirrorMatrix;   // a point on the mirror plane -> where it is in that picture
+uniform vec3 uMirror;         // height of the plane, how much shows, how far ripples push it about
 varying vec3 vWorldPos;
 varying vec2 vBase;
 
@@ -188,7 +193,7 @@ void main() {
   float foam = smoothstep(1.25 - mask * 1.05, 1.5 - mask * 1.05, churn);
 
   // ---- a craft's wake
-  // Fresh from the jet it is solid white water. As the air escapes, the same
+  // Fresh from the propellers it is solid white water. As the air escapes, the same
   // bubble pattern is cut by a rising threshold: it opens into lace, then
   // flecks, then it is gone. Two layers sliding against each other keep it alive.
   float cells = texture2D(uNoiseTex, vBase * 0.19 + t * vec2(0.013, -0.009)).g;
@@ -255,6 +260,21 @@ void main() {
   R.y = abs(R.y) + 0.12;
   vec3 refl = skyGradient(normalize(R)) * mix(1.0, shade, 0.6);
 
+  // ---- and of what stands on the water. The picture was drawn for a flat sea;
+  //      ripples tilt the mirror, which slides the image up and down the screen
+  //      far more than sideways: that is what draws reflections out into streaks.
+  float mirrored = 0.0;
+  if (uMirror.y > 0.0) {
+    vec4 mc = uMirrorMatrix * vec4(vWorldPos.x, uMirror.x, vWorldPos.z, 1.0);
+    vec2 camRight = normalize(vec2(viewMatrix[0][0], viewMatrix[2][0]));
+    vec2 camAhead = -normalize(vec2(viewMatrix[0][2], viewMatrix[2][2]) + 1.0e-5);
+    vec2 muv = mc.xy / max(mc.w, 1.0e-4) + vec2(dot(Nr.xz, camRight), dot(Nr.xz, camAhead) * 2.2) * uMirror.z;
+    vec4 mirror = texture2D(uMirrorTex, muv, 1.2);
+    vec2 inside = smoothstep(vec2(0.0), vec2(0.03), muv) * smoothstep(vec2(0.0), vec2(0.03), 1.0 - muv);
+    mirrored = mirror.a * inside.x * inside.y * uMirror.y;
+    refl = mix(refl, mirror.rgb * mix(1.0, shade, 0.6), mirrored);
+  }
+
   // ---- sun glitter: tiny facets (a normal-map lookup kept at a constant
   //      size on screen) flash when they happen to mirror the sun
   vec3 H = normalize(uSunDir + V);
@@ -270,7 +290,8 @@ void main() {
   // and a broad soft glare under the sun
   float sheen = pow(max(dot(Nr, H), 0.0), 48.0) * 0.3;
 
-  vec3 col = mix(body, refl, fresnel);
+  // (a painted hull a few metres away shows in the water more than bare physics allows: it is the point of having it)
+  vec3 col = mix(body, refl, min(1.0, fresnel + mirrored * 0.38));
   col += uSunColor * (glint + sheen) * shade * shade * (1.0 - foam);
 
   // the veil is aerated water: pale turquoise rather than white
@@ -322,6 +343,7 @@ export function createWater({ normalTex, noiseTex, causticTex, segments = 192 })
       uGlint: { value: new THREE.Vector4(2.2, 1.45, 1000, 18) },
       uWakeTex: { value: getBlackTexture() },
       uWake: { value: new THREE.Vector3(0, 0, 0.001) },
+      ...mirrorUniforms,
     },
   });
   const mesh = new THREE.Mesh(createRadialGridGeometry({ segments }), material);
@@ -329,6 +351,16 @@ export function createWater({ normalTex, noiseTex, causticTex, segments = 192 })
   mesh.frustumCulled = false;
   mesh.matrixAutoUpdate = false;
   mesh.renderOrder = 10; // after opaque scenery so hidden pixels are skipped early
+
+  // A stand-in with a small fraction of the triangles, for pictures in which the
+  // sea is only ever seen small (the map the boats' paintwork mirrors).
+  const coarse = new THREE.Mesh(createRadialGridGeometry({ segments: 48, innerStep: 1.1 }), material);
+  coarse.name = 'water-coarse';
+  coarse.frustumCulled = false;
+  coarse.matrixAutoUpdate = false;
+  coarse.renderOrder = 10;
+  coarse.visible = false;
+  mesh.userData.coarse = coarse;
 
   /** Keep the dense part of the grid under the action. */
   mesh.userData.follow = (x, z) => material.uniforms.uCenter.value.set(x, z);

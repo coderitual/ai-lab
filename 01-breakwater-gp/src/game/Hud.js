@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import css from './hud.css?inline';
 import { formatTime, ordinal } from '../engine/math.js';
-import { KMH, RULES } from './config.js';
+import { HULL, KMH, RULES } from './config.js';
 
 const el = (tag, cls, html) => {
   const e = document.createElement(tag);
@@ -73,7 +73,7 @@ export class ViewHud {
     this.mapCtx = this.map.getContext('2d');
     this.banner = el('div', 'bw-banner');
     this.toast = el('div', 'bw-toast');
-    /** Name tags that float over the other riders (multiplayer). */
+    /** Name tags that float over the other drivers (multiplayer). */
     this.tagHost = el('div', 'bw-tags');
     this.tags = [];
     root.append(this.tagHost, top, this.standings, this.map, this.banner, this.toast);
@@ -134,8 +134,8 @@ export class ViewHud {
   }
 
   /**
-   * Which riders get a name tag in this view (none in solo play).
-   * @param {object[]} racers the riders to tag
+   * Which drivers get a name tag in this view (none in solo play).
+   * @param {object[]} racers the drivers to tag
    */
   setTags(racers) {
     this.tagHost.textContent = '';
@@ -153,17 +153,17 @@ export class ViewHud {
   }
 
   /**
-   * Keep the tags over their riders.
+   * Keep the tags over their drivers.
    * @param {THREE.Camera} camera this view's camera
    * @param {number} w  @param {number} h size of this view in CSS pixels
-   * @param {(racer: object) => string} infoOf extra line per rider (connection quality online)
+   * @param {(racer: object) => string} infoOf extra line per driver (connection quality online)
    */
   updateTags(camera, w, h, infoOf) {
     const placed = this._placed || (this._placed = []);
     placed.length = 0;
     for (const tag of this.tags) {
       const p = tag.racer.craft.object.position;
-      _tagPos.set(p.x, p.y + 2.25, p.z);
+      _tagPos.set(p.x, p.y + HULL.top + 0.9, p.z);
       const dist = _tagPos.distanceTo(camera.position);
       _tagPos.project(camera);
       const visible = _tagPos.z < 1 && dist < 170 && Math.abs(_tagPos.x) < 1.02 && _tagPos.y > -1 && _tagPos.y < 0.98;
@@ -177,7 +177,7 @@ export class ViewHud {
       tag.dist = dist;
       placed.push(tag);
     }
-    // riders bunched together: the nearer one keeps its place, tags behind it step up out of the way
+    // drivers bunched together: the nearer one keeps its place, tags behind it step up out of the way
     placed.sort((a, b) => a.dist - b.dist);
     for (let i = 0; i < placed.length; i++) {
       const tag = placed[i];
@@ -316,7 +316,7 @@ export class ViewHud {
         c.stroke();
       }
     }
-    // racers (this view's rider last so it is on top)
+    // racers (this view's driver last so it is on top)
     for (let pass = 0; pass < 2; pass++) {
       for (const r of race.racers) {
         const mine = r === me;
@@ -375,10 +375,10 @@ export class Hud {
     this.title.innerHTML = `
       <div class="bw-panel" role="dialog" aria-label="Breakwater GP">
         <h1 class="bw-title">BREAKWATER <span>GP</span></h1>
-        <p class="bw-sub">${RULES.laps} laps · ${RULES.racers} riders · one island</p>
+        <p class="bw-sub">${RULES.laps} laps · ${RULES.racers} boats · one island</p>
         <ul class="bw-rules">
-          <li><i class="bw-ico can"></i><span><b>Red can</b> — ride past on its <b>right</b></span></li>
-          <li><i class="bw-ico cone"></i><span><b>Green cone</b> — ride past on its <b>left</b></span></li>
+          <li><i class="bw-ico can"></i><span><b>Red can</b> — pass on its <b>right</b></span></li>
+          <li><i class="bw-ico cone"></i><span><b>Green cone</b> — pass on its <b>left</b></span></li>
           <li><i class="bw-ico bolt"></i><span>Each clean pass adds <b>power</b>. A miss resets it; ${RULES.maxMisses} misses and you are out.</span></li>
           <li class="bw-ctl-keys"><i class="bw-ico key">←→</i><span>steer</span><i class="bw-ico key">↑</i><span>throttle</span><i class="bw-ico key">↓</i><span>brake</span></li>
           <li class="bw-ctl-touch" hidden><span><b>Touch anywhere</b> and drag sideways to steer · <b>pull down</b> to brake. One thumb is enough; throttle is automatic.</span></li>
@@ -569,7 +569,7 @@ export class Hud {
     }
   }
 
-  /** A line of help for touch riders until their first touch of a race. */
+  /** A line of help for touch drivers until their first touch of a race. */
   showTouchHint(show) {
     this.touchHint.hidden = !show;
   }
@@ -651,7 +651,7 @@ export class Hud {
         this.rNote.innerHTML = `${p.rank === 1 ? 'Winner' : 'Finished'}<br>best lap ${formatTime(best)}`;
       }
     } else {
-      // two riders: say who came out ahead
+      // two drivers: say who came out ahead
       const done = humans.filter((r) => r.finished).sort((a, b) => a.finishTime - b.finishTime);
       const racing = humans.some((r) => !r.finished && !r.retired);
       if (done.length) this.rPos.textContent = `${done[0].name} ${done[0].rank === 1 ? 'wins' : 'leads'}`;

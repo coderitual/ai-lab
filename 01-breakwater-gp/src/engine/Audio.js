@@ -3,19 +3,19 @@
 // that is created on the first user gesture, as browsers (iOS Safari
 // especially) require.
 //
-// Every rider on this machine has a voice of their own (engine + water). In
-// split screen the two voices sit on their rider's side of the stereo picture,
-// and so do that rider's chimes and splashes: you can hear who did what.
+// Every driver on this machine has a voice of their own (engine + water). In
+// split screen the two voices sit on their driver's side of the stereo picture,
+// and so do that driver's chimes and splashes: you can hear who did what.
 
 import { clamp01 } from './math.js';
 
 const MASTER = 1.2;
 
-/** One rider's engine and the water rushing past their hull. */
+/** One driver's engine and the water rushing past their hull. */
 class Voice {
   /**
    * @param {GameAudio} audio
-   * @param {number} index 0 for the first rider on this machine, 1 for the second
+   * @param {number} index 0 for the first driver on this machine, 1 for the second
    */
   constructor(audio, index) {
     const { ctx } = audio;
@@ -76,8 +76,8 @@ class Voice {
     const t = this.audio.ctx.currentTime;
     const speedK = clamp01(craft.speed / 28);
     let revs = 0.16 + 0.5 * craft.throttle + 0.34 * speedK;
-    if (craft.airborne) revs += 0.22; // the pump unloads and the engine races
-    const f = (46 + 118 * revs) * this.pitch;
+    if (craft.airborne) revs += 0.22; // the propellers come out of the water and the engines race
+    const f = (41 + 106 * revs) * this.pitch; // two big outboards: a deeper note than a small engine's
     for (const o of this.oscs) o.osc.frequency.setTargetAtTime(f * o.ratio, t, 0.05);
     this.engineFilter.frequency.setTargetAtTime(260 + 1900 * revs * revs, t, 0.06);
     this.engineGain.gain.setTargetAtTime((active ? 0.035 + 0.075 * revs : 0.02) * level, t, 0.08);
@@ -86,7 +86,7 @@ class Voice {
     if (this.panner) this.panner.pan.setTargetAtTime(pan, t, 0.1);
   }
 
-  /** Fade out and stop (the rider is gone: back from split screen to one view). */
+  /** Fade out and stop (the driver is gone: back from split screen to one view). */
   dispose() {
     const t = this.audio.ctx.currentTime;
     this.out.gain.setTargetAtTime(0, t, 0.05);
@@ -99,7 +99,7 @@ export class GameAudio {
   constructor() {
     this.ctx = null;
     this.muted = false;
-    /** @type {Voice[]} one per rider on this machine */
+    /** @type {Voice[]} one per driver on this machine */
     this.voices = [];
     try {
       this.muted = localStorage.getItem('bw-muted') === '1';
@@ -165,17 +165,17 @@ export class GameAudio {
 
   /**
    * Per-frame update from the crafts ridden on this machine.
-   * @param {Array<{ craft: import('../game/Craft.js').Craft, pan: number }>} riders
+   * @param {Array<{ craft: import('../game/Craft.js').Craft, pan: number }>} players
    * @param {boolean} active a race is under way
    */
-  update(riders, active) {
+  update(players, active) {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return;
-    while (this.voices.length > riders.length) this.voices.pop().dispose();
-    while (this.voices.length < riders.length) this.voices.push(new Voice(this, this.voices.length));
+    while (this.voices.length > players.length) this.voices.pop().dispose();
+    while (this.voices.length < players.length) this.voices.push(new Voice(this, this.voices.length));
     // two engines at once: each a little quieter, so the pair is only slightly louder than one alone
-    const level = riders.length > 1 ? 0.78 : 1;
-    for (let i = 0; i < riders.length; i++) this.voices[i].update(riders[i].craft, active, riders[i].pan, level);
+    const level = players.length > 1 ? 0.78 : 1;
+    for (let i = 0; i < players.length; i++) this.voices[i].update(players[i].craft, active, players[i].pan, level);
   }
 
   /** Where a one-off sound goes: straight to the mix, or through a panner of its own. */
@@ -206,8 +206,8 @@ export class GameAudio {
     osc.stop(t + duration + 0.05);
   }
 
-  // The start signals are for everyone; the rest belong to one rider and are
-  // heard on that rider's side (`pan`).
+  // The start signals are for everyone; the rest belong to one driver and are
+  // heard on that driver's side (`pan`).
 
   countdown() {
     this._tone(440, 0.22, { type: 'triangle', gain: 0.22 });

@@ -1,4 +1,4 @@
-// Who is holding the handlebars.
+// Who is at the helm.
 
 import { angleDiff, clamp } from '../engine/math.js';
 
@@ -6,7 +6,7 @@ import { angleDiff, clamp } from '../engine/math.js';
 export class PlayerDriver {
   /**
    * @param {import('../engine/Input.js').Input} input
-   * @param {'all'|'wasd'|'arrows'} [scheme] which keys this rider uses
+   * @param {'all'|'wasd'|'arrows'} [scheme] which keys this driver uses
    */
   constructor(input, scheme = 'all') {
     this.input = input;
@@ -53,9 +53,9 @@ export class BotDriver {
       const dx = other.craft.pos.x - craft.pos.x;
       const dz = other.craft.pos.z - craft.pos.z;
       const ahead = dx * fx + dz * fz;
-      if (ahead < 0.5 || ahead > 11) continue;
-      const side = dx * fz - dz * fx; // > 0: the other craft is to our left (port)
-      if (Math.abs(side) < 2.8) avoid += side > 0 ? 3.6 : -3.6; // lateral > 0 is to the right
+      if (ahead < 0.5 || ahead > 14) continue;
+      const side = dx * fz - dz * fx; // > 0: the other boat is to our left (port)
+      if (Math.abs(side) < 3.3) avoid += side > 0 ? 4.2 : -4.2; // lateral > 0 is to the right
     }
     this._avoid += (avoid - this._avoid) * Math.min(1, dt * 3);
 

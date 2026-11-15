@@ -1,8 +1,8 @@
-// Third-person camera for the watercraft.
+// Third-person camera, close behind the boat.
 //
 // The feel comes from what the camera does *not* follow: it trails the
 // direction of travel more than the hull's heading (so slides read as slides),
-// it follows height lazily (so the craft visibly rises and falls on the swell
+// it follows height lazily (so the boat visibly rises and falls on the swell
 // and floats up the frame on a jump), and it widens the lens with speed.
 
 import * as THREE from 'three';
@@ -72,24 +72,26 @@ export class ChaseCamera {
     if (craft.speed > 4) travel = Math.atan2(craft.vel.x, craft.vel.z);
     const want = craft.yaw + angleDiff(craft.yaw, travel) * 0.55;
     this.yaw = dampAngle(this.yaw, want, 4.6, dt);
-    this.baseY = damp(this.baseY, p.y, craft.airborne ? 1.3 : 2.4, dt);
-    // lazy, but never so lazy that the craft leaves the frame in a deep trough or a big jump
-    this.baseY = clamp(this.baseY, p.y - 1.7, p.y + 1.0);
+    this.baseY = damp(this.baseY, p.y, craft.airborne ? 1.6 : 3.0, dt);
+    // lazy, but this close to the boat never so lazy that it slides out of the frame
+    this.baseY = clamp(this.baseY, p.y - 1.0, p.y + 0.45);
     this.lookY = damp(this.lookY, p.y, 5, dt);
 
-    const dist = (portrait ? 7.2 : 5.3) + 1.3 * speedK;
-    const height = portrait ? 3.0 : 2.3;
+    // low and close: the boat fills the lower middle of the frame, and backs off a little at speed
+    const dist = (portrait ? 7.4 : 6.3) + 0.7 * speedK;
+    const height = portrait ? 1.9 : 1.7;
     const bx = Math.sin(this.yaw);
     const bz = Math.cos(this.yaw);
     this._pos.set(p.x - bx * dist, this.baseY + height, p.z - bz * dist);
-    this._chaseLook.set(p.x + bx * 9, this.lookY + (portrait ? 1.6 : 1.1), p.z + bz * 9);
+    // looking slightly down: the stern near the bottom of the frame, the horizon above the middle
+    this._chaseLook.set(p.x + bx * 7, this.lookY + (portrait ? 0.3 : 0.2), p.z + bz * 7);
 
     // --- orbit pose (title screen, after the finish)
     this.orbitAngle += dt * 0.22;
     const oa = craft.yaw + Math.PI * 0.8 + this.orbitAngle;
-    const orad = portrait ? 12.5 : 9.5;
-    this._orbitPos.set(p.x + Math.sin(oa) * orad, this.baseY + 2.4 + Math.sin(this.orbitAngle * 0.7) * 0.5, p.z + Math.cos(oa) * orad);
-    this._orbitLook.set(p.x, this.lookY + 0.8, p.z);
+    const orad = portrait ? 13.5 : 10.5;
+    this._orbitPos.set(p.x + Math.sin(oa) * orad, this.baseY + 2.3 + Math.sin(this.orbitAngle * 0.7) * 0.6, p.z + Math.cos(oa) * orad);
+    this._orbitLook.set(p.x, this.lookY + 0.6, p.z);
 
     this._blend = damp(this._blend, this.mode === 'chase' ? 1 : 0, 2.6, dt);
     const b = this._blend * this._blend * (3 - 2 * this._blend);
@@ -112,7 +114,7 @@ export class ChaseCamera {
     this.roll = damp(this.roll, (craft.yawRate * 0.045 - craft.roll * 0.1) * b, 4, dt);
     cam.rotateZ(this.roll);
 
-    const fov = this._fovFor(lerp(58, 70, speedK * speedK) + (craft.power >= 5 ? 1.5 : 0));
+    const fov = this._fovFor(lerp(54, 64, speedK * speedK) + (craft.power >= 5 ? 1.5 : 0));
     this.fov = damp(this.fov, fov, 3, dt);
     if (Math.abs(cam.fov - this.fov) > 0.01) {
       cam.fov = this.fov;

@@ -181,7 +181,8 @@ export class Engine {
   }
 
   /**
-   * If the device cannot hold ~45 fps, trade resolution for smoothness.
+   * If the device cannot hold ~45 fps, trade resolution (where there is more
+   * than one canvas pixel per CSS pixel to give) and effects for smoothness.
    * Bounded to two steps: a browser that caps the frame rate itself (iOS Low
    * Power Mode runs at 30 fps) should not be driven down to a blurry picture.
    */
@@ -189,11 +190,13 @@ export class Engine {
     if (this.options.pixelRatio != null || this.frame < 90 || this._qualitySteps >= 2) return;
     if (dt > 1 / 42) this._slowFrames++;
     else this._slowFrames = Math.max(0, this._slowFrames - 2);
-    if (this._slowFrames > 75 && this.maxPixelRatio > 1) {
-      this.maxPixelRatio = Math.max(1, this.maxPixelRatio * 0.82);
+    if (this._slowFrames > 75) {
       this._slowFrames = 0;
-      this._qualitySteps++;
-      this.resize();
+      this._qualitySteps++; // the game sheds its costlier effects at each step as well
+      if (this.maxPixelRatio > 1) {
+        this.maxPixelRatio = Math.max(1, this.maxPixelRatio * 0.82);
+        this.resize();
+      }
     }
   }
 }

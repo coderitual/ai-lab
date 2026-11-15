@@ -1,8 +1,7 @@
 // Dev viewer registry: name -> factory returning an Object3D.
 import * as THREE from 'three';
 import { TEAMS } from './palette.js';
-import { createWatercraft } from './watercraft.js';
-import { createRider } from './rider.js';
+import { createBoat } from './boat.js';
 import { makeSurfaceSample, sampleSurface } from '../engine/waves.js';
 
 const sample = makeSurfaceSample();
@@ -23,28 +22,23 @@ function floatOnWater(obj, { tilt = 1 } = {}) {
   return obj;
 }
 
-function craftWithRider(i, q) {
+function boat(i, q) {
   const team = TEAMS[i % TEAMS.length];
-  const craft = createWatercraft(team);
-  const rider = createRider(team, i + 1);
-  craft.userData.riderMount.add(rider);
-  const lean = parseFloat(q.get('lean') || '0');
+  const b = createBoat(team, i + 1);
   const steer = parseFloat(q.get('steer') || '0');
-  const stand = parseFloat(q.get('stand') || '0');
-  rider.userData.pose({ lean, steer, stand });
-  craft.userData.handlebar.rotation.y = -steer * 0.5;
-  if (q.has('norider')) rider.visible = false;
-  return craft;
+  for (const engine of b.userData.engines) engine.rotation.y = steer * 0.45;
+  return b;
 }
 
 export const VIEWER_ASSETS = {
-  craft: (env, q) => floatOnWater(craftWithRider(parseInt(q.get('team') || '0', 10), q)),
+  // `flat` holds the boat level on a calm patch, to study the model itself
+  craft: (env, q) => (q.has('flat') ? boat(parseInt(q.get('team') || '0', 10), q) : floatOnWater(boat(parseInt(q.get('team') || '0', 10), q), { tilt: 0.5 })),
   crafts: (env, q) => {
     const g = new THREE.Group();
     for (let i = 0; i < 4; i++) {
-      const c = craftWithRider(i, q);
-      c.position.set((i - 1.5) * 2.6, 0, 0);
-      g.add(floatOnWater(c));
+      const c = boat(i, q);
+      c.position.set((i - 1.5) * 3.4, 0, 0);
+      g.add(floatOnWater(c, { tilt: 0.5 }));
     }
     return g;
   },

@@ -5,9 +5,9 @@
 //   stills:  node tools/capture.cjs --url "http://localhost:5173/?auto&ap&manual&dpr=1" --at 1,4.5,9,20 --out shots/race
 //   video:   node tools/capture.cjs --url "…" --from 3 --seconds 8 --fps 30 --out shots/clip   (then ffmpeg -i clip_%04d.jpg)
 //   with sound, straight to a file (needs ffmpeg):
-//            node tools/capture.cjs --url "http://localhost:4173/?mode=split&manual&dpr=1" --ride --seconds 30 --out clip/f --sound --mp4 clip/split.mp4
+//            node tools/capture.cjs --url "http://localhost:4173/?mode=split&manual&dpr=1" --drive --seconds 30 --out clip/f --sound --mp4 clip/split.mp4
 //   options: --w 1280 --h 720 --dpr 1 --mobile --landscape/--portrait handled by w/h, --stats
-//            --ride        bots ride every craft on this machine (riders keep their names) and the race starts
+//            --drive       bots drive every boat on this machine (drivers keep their names) and the race starts
 //            --sound       also write <out>.wav: the game's own sound, in step with the frames
 //            --sound-only  the sound without the frames (quick)
 //            --mp4 FILE    join the frames and the sound into an H.264 / AAC file
@@ -112,7 +112,7 @@ const STATS = `(() => {
   await page.goto(a.url, { waitUntil: 'load' });
   await page.waitForFunction('window.__ready === true && !!window.__bw', null, { timeout: 90000 });
   if (a.eval) await page.evaluate(a.eval);
-  if (a.ride) {
+  if (a.drive || a.ride) {
     await page.evaluate(`(() => {
       const g = window.__bw.game;
       for (const v of g.views) v.racer.driver = v.auto;

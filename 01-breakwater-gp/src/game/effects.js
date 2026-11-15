@@ -28,7 +28,7 @@ void main() {
 `;
 
 // What the field holds: r = how much air is churned into the water (foam),
-// g = craft shadows, b = how fresh the churn is (1 at the jet, 0 when gone).
+// g = craft shadows, b = how fresh the churn is (1 at the stern, 0 when gone).
 const trailFragment = /* glsl */ `
 precision highp float;
 varying vec3 vData;
@@ -36,7 +36,7 @@ void main() {
   float x = vData.x;
   float age = vData.y;
   float life = clamp(1.0 - age / ${TRAIL_LIFE.toFixed(1)}, 0.0, 1.0);
-  // straight behind the jet: solid white water for the first second or so
+  // straight behind the propellers: solid white water for the first second or so
   float core = exp(-x * x * 9.0) * clamp(1.0 - age / 1.5, 0.0, 1.0);
   // the turbulent band that spreads out behind it and thins as the air escapes
   float band = (1.0 - smoothstep(0.3, 0.8, abs(x))) * pow(life, 1.35) * 0.6;
@@ -263,7 +263,7 @@ export class WakeField {
 
   stampCraft(x, z, dirX, dirZ, washStrength, altitude) {
     if (this._blobCount + 2 > this.maxBlobs) return;
-    this._writeQuad(this.blobGeo, this._blobCount++, x - dirX * 0.35, z - dirZ * 0.35, dirX, dirZ, 3.1, 1.75, washStrength);
+    this._writeQuad(this.blobGeo, this._blobCount++, x - dirX * 0.9, z - dirZ * 0.9, dirX, dirZ, 4.7, 2.5, washStrength);
     // soft shadow thrown away from the sun; it slides out and fades as the craft leaves the water
     const sx = -SUN_DIR.x;
     const sz = -SUN_DIR.z;
@@ -271,7 +271,7 @@ export class WakeField {
     const perMetre = sl / Math.max(SUN_DIR.y, 0.15); // shadow travel per metre of height
     const reach = (0.45 + altitude) * perMetre;
     const fade = Math.max(0.15, 1 - altitude * 0.22);
-    this._writeQuad(this.blobGeo, this._blobCount++, x + (sx / sl) * reach, z + (sz / sl) * reach, sx / sl, sz / sl, 1.9 + 0.75 * perMetre, 1.5, -0.62 * fade);
+    this._writeQuad(this.blobGeo, this._blobCount++, x + (sx / sl) * reach, z + (sz / sl) * reach, sx / sl, sz / sl, 3.1 + 0.75 * perMetre, 2.5, -0.66 * fade);
   }
 
   /** Once per frame, after emit()/stampCraft(): rebuild the strips and stamps. */
@@ -284,7 +284,7 @@ export class WakeField {
       let k = c * this.stripVerts * 3;
       const write = (x, z, dx, dz, age, strength) => {
         // half-width: a craft's beam at the stern, spreading as the churn drifts apart
-        const w = 0.5 + 3.3 * (1 - Math.exp(-age * 0.5));
+        const w = 1.05 + 3.6 * (1 - Math.exp(-age * 0.5));
         const nx = -dz * w;
         const nz = dx * w;
         pos[k] = x - nx;
@@ -352,7 +352,7 @@ export class WakeField {
     this.ringGeo.attributes.aData.needsUpdate = true;
   }
 
-  /** Per view: draw the field around that view's rider (cx, cz). */
+  /** Per view: draw the field around that view's driver (cx, cz). */
   render(cx, cz) {
     const texel = this.extent / this.size;
     cx = Math.round(cx / texel) * texel;

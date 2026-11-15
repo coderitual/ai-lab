@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "displayName": "Breakwater GP",
-  "description": "An original jet-ski slalom race on simulated waves, built with three.js. Solo, split screen, or online for up to four; keyboard or touch.",
+  "description": "An original powerboat slalom race on simulated waves, built with three.js. Solo, split screen, or online for up to four; keyboard or touch.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

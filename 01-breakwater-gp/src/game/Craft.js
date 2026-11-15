@@ -1,15 +1,14 @@
-// One watercraft: arcade physics on top of the simulated sea, plus the model.
+// One race boat: arcade physics on top of the simulated sea, plus the model.
 //
 // Conventions: yaw = rotation about +Y, forward = (sin yaw, 0, cos yaw);
 // +yaw turns to port (left). pitch > 0 = bow up, roll > 0 = starboard down.
 // Controls: steer -1 (left) .. +1 (right), throttle 0..1, brake 0..1.
 
 import * as THREE from 'three';
-import { createWatercraft } from '../assets/watercraft.js';
-import { createRider } from '../assets/rider.js';
+import { createBoat } from '../assets/boat.js';
 import { approach, clamp, clamp01, damp, lerp, smoothstep } from '../engine/math.js';
 import { makeSurfaceSample, sampleSurface } from '../engine/waves.js';
-import { CRAFT_TUNE as T } from './config.js';
+import { CRAFT_TUNE as T, HULL } from './config.js';
 
 const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
 const sBow = makeSurfaceSample();
@@ -19,16 +18,13 @@ const sStbd = makeSurfaceSample();
 const sMid = makeSurfaceSample();
 
 const FLOAT_DEPTH = T.gravity / T.buoyancy; // how far below the float line gravity is balanced
-const VISUAL_LIFT = 0.06; // draw the hull a touch high so short chop does not swallow the deck
 
 export class Craft {
   constructor({ team, number }) {
     this.team = team;
     this.number = number;
 
-    this.object = createWatercraft(team);
-    this.rider = createRider(team, number);
-    this.object.userData.riderMount.add(this.rider);
+    this.object = createBoat(team, number);
 
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();
@@ -58,12 +54,7 @@ export class Craft {
     this.waterY = 0;
     this.undisplacedX = 0; // sea-space coordinates under the stern (for wakes)
     this.undisplacedZ = 0;
-    this.heave = 0; // smoothed vertical kick, for the rider's legs
-
-    // rider animation state
-    this._lean = 0;
-    this._stand = 0;
-    this._tuck = 0;
+    this.heave = 0; // smoothed vertical kick
 
     /** One-shot events for effects / audio: 'land' (strength), 'bump' (strength). */
     this.events = [];
@@ -125,10 +116,10 @@ export class Craft {
 
     // ---- the sea under the hull
     sampleSurface(p.x, p.z, time, sMid);
-    sampleSurface(p.x + fx * 1.15, p.z + fz * 1.15, time, sBow);
-    sampleSurface(p.x - fx * 1.05, p.z - fz * 1.05, time, sStern);
-    sampleSurface(p.x + lx * 0.5, p.z + lz * 0.5, time, sPort);
-    sampleSurface(p.x - lx * 0.5, p.z - lz * 0.5, time, sStbd);
+    sampleSurface(p.x + fx * HULL.bow, p.z + fz * HULL.bow, time, sBow);
+    sampleSurface(p.x - fx * HULL.stern, p.z - fz * HULL.stern, time, sStern);
+    sampleSurface(p.x + lx * HULL.beam, p.z + lz * HULL.beam, time, sPort);
+    sampleSurface(p.x - lx * HULL.beam, p.z - lz * HULL.beam, time, sStbd);
     const waterY = sMid.y * 0.4 + (sBow.y + sStern.y) * 0.2 + (sPort.y + sStbd.y) * 0.1;
     this.waterY = waterY;
     this.undisplacedX = sStern.px;
@@ -137,7 +128,7 @@ export class Craft {
     // ---- heave: a one-sided spring (water pushes up, only gravity pulls down)
     const forward = v.x * fx + v.z * fz;
     const lateral = v.x * lx + v.z * lz;
-    const planing = 0.1 * clamp01(Math.abs(forward) / 18);
+    const planing = T.planing * clamp01(Math.abs(forward) / 18);
     const depth = waterY + planing + FLOAT_DEPTH - p.y;
     const wasAir = this.airborne;
     let grip = 0;
@@ -199,20 +190,21 @@ export class Craft {
     this.yawRate = damp(this.yawRate, wantYawRate, grip > 0 ? 9 : 2, dt);
     this.yaw += this.yawRate * dt;
 
-    // ---- attitude: follow the water, bank into turns, squat under power
+    // ---- attitude: follow the water, lean a little into turns, lift the bows under power
     if (grip > 0) {
-      const slopePitch = Math.atan2(sBow.y - sStern.y, 2.2);
-      const slopeRoll = Math.atan2(sPort.y - sStbd.y, 1.0);
+      const slopePitch = Math.atan2(sBow.y - sStern.y, HULL.bow + HULL.stern);
+      const slopeRoll = Math.atan2(sPort.y - sStbd.y, 2 * HULL.beam);
       const speedK = clamp01(this.speed / 20);
-      const wantRoll = slopeRoll * 0.8 - this.yawRate * 0.46 * speedK;
-      const wantPitch = slopePitch * 0.92 + 0.07 * this.throttle * (1 - clamp01(fwdAbs / vmax)) + 0.03 * clamp01(fwdAbs / 12) - 0.05 * this.brake * speedK;
+      const wantRoll = slopeRoll * 0.8 - this.yawRate * T.bank * speedK;
+      const wantPitch = slopePitch * 0.92 + 0.06 * this.throttle * (1 - clamp01(fwdAbs / vmax)) + 0.045 * clamp01(fwdAbs / 12) - 0.04 * this.brake * speedK;
       this.rollRate += (T.rollStiffness * (wantRoll - this.roll) - T.rollDamping * this.rollRate) * dt * grip;
       this.pitchRate += (T.pitchStiffness * (wantPitch - this.pitch) - T.pitchDamping * this.pitchRate) * dt * grip;
     }
     if (grip < 1) {
-      // in the air the bow slowly drops and the hull levels out
+      // in the air the hull levels out and flies a little bow-up, on the air packed
+      // under the tunnel: it comes down on its tails first
       const air = 1 - grip;
-      this.pitchRate += (-0.55 - 0.9 * this.pitchRate) * dt * air;
+      this.pitchRate += (2.6 * (0.07 - this.pitch) - 1.8 * this.pitchRate) * dt * air;
       this.rollRate += (-3.0 * this.roll - 1.6 * this.rollRate) * dt * air;
     }
     this.roll = clamp(this.roll + this.rollRate * dt, -1.0, 1.0);
@@ -229,15 +221,26 @@ export class Craft {
 
   /** Push out of a static circle; returns true on contact. */
   collideCircle(cx, cz, radius, bounce, soft) {
-    const dx = this.pos.x - cx;
-    const dz = this.pos.z - cz;
+    // the hull is a row of circles: take the one that is deepest in
+    const fx = Math.sin(this.yaw);
+    const fz = Math.cos(this.yaw);
     const min = radius + T.radius;
-    const d2 = dx * dx + dz * dz;
-    if (d2 >= min * min || d2 < 1e-6) return false;
-    const d = Math.sqrt(d2);
-    const nx = dx / d;
-    const nz = dz / d;
-    const push = min - d;
+    let push = 0;
+    let nx = 0;
+    let nz = 0;
+    for (const along of HULL.circles) {
+      const dx = this.pos.x + fx * along - cx;
+      const dz = this.pos.z + fz * along - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= min * min || d2 < 1e-6) continue;
+      const d = Math.sqrt(d2);
+      if (min - d > push) {
+        push = min - d;
+        nx = dx / d;
+        nz = dz / d;
+      }
+    }
+    if (push <= 0) return false;
     this.pos.x += nx * push * (soft ? 0.5 : 1);
     this.pos.z += nz * push * (soft ? 0.5 : 1);
     const vn = this.vel.x * nx + this.vel.z * nz;
@@ -257,11 +260,26 @@ export class Craft {
   /** Keep off the beach: slide along the shore where the sea bed gets shallow. */
   collideTerrain(heightAt) {
     const limit = -0.55;
-    const h = heightAt(this.pos.x, this.pos.z);
+    // whichever part of the hull is over the shallowest water
+    const fx = Math.sin(this.yaw);
+    const fz = Math.cos(this.yaw);
+    let h = -Infinity;
+    let x = 0;
+    let z = 0;
+    for (const along of HULL.circles) {
+      const px = this.pos.x + fx * along * 1.4;
+      const pz = this.pos.z + fz * along * 1.4;
+      const here = heightAt(px, pz);
+      if (here > h) {
+        h = here;
+        x = px;
+        z = pz;
+      }
+    }
     if (h <= limit) return false;
     const e = 0.6;
-    const gx = heightAt(this.pos.x + e, this.pos.z) - heightAt(this.pos.x - e, this.pos.z);
-    const gz = heightAt(this.pos.x, this.pos.z + e) - heightAt(this.pos.x, this.pos.z - e);
+    const gx = heightAt(x + e, z) - heightAt(x - e, z);
+    const gz = heightAt(x, z + e) - heightAt(x, z - e);
     const g = Math.hypot(gx, gz);
     if (g < 1e-5) return false;
     const nx = -gx / g; // downhill = back toward deep water
@@ -281,35 +299,54 @@ export class Craft {
     return true;
   }
 
-  /** Apply the interpolated pose to the model and animate the rider. */
-  render(alpha, frameDt) {
+  /** Apply the interpolated pose to the model and swing the outboards with the helm. */
+  render(alpha) {
     const o = this.object;
     o.position.lerpVectors(this.prevPos, this.pos, alpha);
-    o.position.y += VISUAL_LIFT;
     o.quaternion.slerpQuaternions(this.prevQuat, this.quat, alpha);
-
-    o.userData.handlebar.rotation.y = -this.steer * 0.5;
-    const speedK = clamp01(this.speed / 22);
-    this._lean = damp(this._lean, this.steer * (0.35 + 0.65 * speedK), 7, frameDt);
-    const wantStand = this.airborne ? 1 : clamp01(Math.abs(this.heave - 1) * 0.5 - 0.1) * 0.8;
-    this._stand = damp(this._stand, wantStand, this.airborne ? 9 : 4, frameDt);
-    this._tuck = damp(this._tuck, this.throttle * speedK, 4, frameDt);
-    this.rider.userData.pose({ lean: this._lean, steer: this.steer, stand: this._stand, tuck: this._tuck });
+    // turning right swings the propellers to starboard
+    for (const engine of o.userData.engines) engine.rotation.y = this.steer * 0.42;
   }
+}
+
+const _hit = { push: 0, nx: 0, nz: 0 };
+
+/** Where two hulls (rows of circles) overlap most: how far, and the direction from a to b. */
+function overlap(a, b, out) {
+  const ax = Math.sin(a.yaw);
+  const az = Math.cos(a.yaw);
+  const bx = Math.sin(b.yaw);
+  const bz = Math.cos(b.yaw);
+  const min = T.radius * 2;
+  out.push = 0;
+  for (const i of HULL.circles) {
+    for (const j of HULL.circles) {
+      const dx = b.pos.x + bx * j - (a.pos.x + ax * i);
+      const dz = b.pos.z + bz * j - (a.pos.z + az * i);
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= min * min || d2 < 1e-6) continue;
+      const d = Math.sqrt(d2);
+      if (min - d > out.push) {
+        out.push = min - d;
+        out.nx = dx / d;
+        out.nz = dz / d;
+      }
+    }
+  }
+  return out.push > 0;
 }
 
 /** Elastic-ish shove between two crafts. */
 export function collideCrafts(a, b) {
   const dx = b.pos.x - a.pos.x;
   const dz = b.pos.z - a.pos.z;
-  const min = T.radius * 2;
-  const d2 = dx * dx + dz * dz;
-  if (d2 >= min * min || d2 < 1e-6) return false;
+  const reach = T.radius * 2 + 2 * HULL.circles[HULL.circles.length - 1];
+  if (dx * dx + dz * dz >= reach * reach) return false;
   if (Math.abs(a.pos.y - b.pos.y) > 1.6) return false; // one is jumping over the other
-  const d = Math.sqrt(d2);
-  const nx = dx / d;
-  const nz = dz / d;
-  const push = (min - d) * 0.5;
+  if (!overlap(a, b, _hit)) return false;
+  const nx = _hit.nx;
+  const nz = _hit.nz;
+  const push = _hit.push * 0.5;
   a.pos.x -= nx * push;
   a.pos.z -= nz * push;
   b.pos.x += nx * push;
@@ -337,15 +374,14 @@ export function collideCrafts(a, b) {
 export function collideWithGhost(a, ghost) {
   const dx = a.pos.x - ghost.pos.x;
   const dz = a.pos.z - ghost.pos.z;
-  const min = T.radius * 2;
-  const d2 = dx * dx + dz * dz;
-  if (d2 >= min * min || d2 < 1e-6) return false;
+  const reach = T.radius * 2 + 2 * HULL.circles[HULL.circles.length - 1];
+  if (dx * dx + dz * dz >= reach * reach) return false;
   if (Math.abs(a.pos.y - ghost.pos.y) > 1.6) return false;
-  const d = Math.sqrt(d2);
-  const nx = dx / d;
-  const nz = dz / d;
-  a.pos.x += nx * (min - d);
-  a.pos.z += nz * (min - d);
+  if (!overlap(ghost, a, _hit)) return false;
+  const nx = _hit.nx; // from the ghost toward us
+  const nz = _hit.nz;
+  a.pos.x += nx * _hit.push;
+  a.pos.z += nz * _hit.push;
   const rel = (a.vel.x - ghost.vel.x) * nx + (a.vel.z - ghost.vel.z) * nz;
   if (rel < 0) {
     const j = -(1 + 0.35) * rel * 0.5;

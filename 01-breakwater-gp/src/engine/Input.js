@@ -3,7 +3,7 @@
 // Touch (throttle is automatic while touch is in use):
 //   - touch anywhere: a stick appears under the thumb. Drag sideways to steer,
 //     pull down to brake. One hand is enough.
-//   - a second finger anywhere is the brake as well, for two-thumb riders.
+//   - a second finger anywhere is the brake as well, for two-thumb drivers.
 
 import { clamp } from './math.js';
 
@@ -14,7 +14,7 @@ const BRAKE_RANGE = 44; // px from there to full brake
 /** Key presses that belong to a text field (the online invite boxes) are not for the game. */
 const isTyping = (e) => e.target instanceof HTMLElement && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
 
-// Which keys a rider uses. Solo: both sets work. Split screen: one set each.
+// Which keys a driver uses. Solo: both sets work. Split screen: one set each.
 const KEYS = {
   all: { left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'], up: ['ArrowUp', 'KeyW'], down: ['ArrowDown', 'KeyS', 'Space'] },
   wasd: { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'] },

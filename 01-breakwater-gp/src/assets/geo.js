@@ -9,7 +9,6 @@ const _e = new THREE.Euler();
 const _d = new THREE.Vector3();
 const _p = new THREE.Vector3();
 const _s = new THREE.Vector3();
-const UP = new THREE.Vector3(0, 1, 0);
 
 export const asColor = (c) => (c && c.isColor ? c : new THREE.Color(c));
 
@@ -152,32 +151,4 @@ export function fan(points, color, { flip = false } = {}) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.computeVertexNormals();
   return paint(g, color);
-}
-
-/**
- * Stretch a unit cylinder mesh (height 1 along +Y, centred) between two points.
- */
-export function setLimb(mesh, a, b) {
-  _d.subVectors(b, a);
-  const len = Math.max(_d.length(), 1e-5);
-  mesh.position.addVectors(a, b).multiplyScalar(0.5);
-  mesh.quaternion.setFromUnitVectors(UP, _d.multiplyScalar(1 / len));
-  mesh.scale.set(1, len, 1);
-}
-
-/**
- * Two-bone IK: where is the middle joint (elbow / knee) for a chain rooted at
- * `a` reaching for `c`, with bone lengths l1 and l2, bending toward `hint`?
- */
-export function solveJoint(a, c, l1, l2, hint, out) {
-  _d.subVectors(c, a);
-  let d = _d.length();
-  _d.multiplyScalar(1 / Math.max(d, 1e-6));
-  d = Math.min(Math.max(d, Math.abs(l1 - l2) + 1e-4), l1 + l2 - 1e-4);
-  const cosA = (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d);
-  const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
-  _p.copy(hint).addScaledVector(_d, -hint.dot(_d));
-  if (_p.lengthSq() < 1e-8) _p.set(0, 1, 0).addScaledVector(_d, -_d.y);
-  _p.normalize();
-  return out.copy(a).addScaledVector(_d, l1 * cosA).addScaledVector(_p, l1 * sinA);
 }

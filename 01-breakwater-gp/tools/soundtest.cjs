@@ -3,10 +3,10 @@
 //   node tools/soundtest.cjs http://localhost:4173/ [outDir]
 //
 // The game's own audio code is rendered offline against the game clock (see
-// soundcap.cjs) while bots ride. Every sound the game asks for is written down
+// soundcap.cjs) while bots drive. Every sound the game asks for is written down
 // with its time and its side, and then looked for in the rendered soundtrack:
 // is the tone there, at that moment, on that side? It also checks the overall
-// level, that nothing clips, that each split-screen rider's engine sits on
+// level, that nothing clips, that each split-screen driver's engine sits on
 // their side, that solo play stays centred, and that mute is silent.
 //
 // What it cannot tell is whether any of it sounds *good*.
@@ -74,7 +74,7 @@ function decimate(sig) {
   const problems = [];
 
   /**
-   * Bots ride for `seconds` of game time; returns the soundtrack and the list
+   * Bots drive for `seconds` of game time; returns the soundtrack and the list
    * of cues the game asked for: { name, t, args }.
    */
   const record = async (label, { query, width, height, seconds, during = '' }) => {
@@ -93,6 +93,9 @@ function decimate(sig) {
       for (const v of g.views) v.racer.driver = v.auto;
       g.engine.onDraw = () => {}; // nothing on the canvas: the per-frame logic is what feeds the audio
       g.start(false);
+      // Two bots of the same skill take every mark and every wave together, and
+      // then their sounds cannot be told apart: hold the second one back a little.
+      if (g.views[1]) g.views[1].racer.craft.speedFactor = 0.9;
     })()`);
     await soundcap.start(page);
     const info = await page.evaluate(`(() => {
@@ -124,7 +127,7 @@ function decimate(sig) {
   console.log('\n— split screen, side by side —');
   const split = await record('split', { query: '?mode=split&manual&dpr=1', width: 1280, height: 720, seconds: 45 });
   const { left: L, right: R, cues } = split;
-  check('two riders, two voices, one on each side', split.voices === 2 && split.pans[0] < -0.3 && split.pans[1] > 0.3, `pans ${split.pans.map((p) => p.toFixed(2)).join(' / ')}`);
+  check('two drivers, two voices, one on each side', split.voices === 2 && split.pans[0] < -0.3 && split.pans[1] > 0.3, `pans ${split.pans.map((p) => p.toFixed(2)).join(' / ')}`);
 
   const go = cues.find((c) => c.name === 'go');
   const raceFrom = go ? go.t + 2 : 5;
@@ -135,7 +138,7 @@ function decimate(sig) {
   for (let t = Math.ceil(raceFrom); t + 1 <= split.seconds; t++) if (dB(rms(L, t, t + 1)) < -40 || dB(rms(R, t, t + 1)) < -40) quiet.push(t);
   check('racing: no second falls silent on either side', quiet.length === 0, quiet.length ? `quiet at ${quiet.join(', ')} s` : '');
 
-  // the start signals belong to both riders: centred
+  // the start signals belong to both drivers: centred
   const counts = cues.filter((c) => c.name === 'countdown');
   const beeps = counts.map((c) => ({ l: tone(L, c.t + 0.01, c.t + 0.11, 440), r: tone(R, c.t + 0.01, c.t + 0.11, 440), t: c.t }));
   check('start: three count beeps are heard, the same on both sides', beeps.length === 3 && beeps.every((b) => b.l > 0.04 && Math.abs(dB(b.l) - dB(b.r)) < 1), beeps.map((b) => `${b.t.toFixed(2)} s ${dB(b.l).toFixed(0)}/${dB(b.r).toFixed(0)} dB`).join(', '));
@@ -143,7 +146,7 @@ function decimate(sig) {
   const goR = go ? tone(R, go.t + 0.01, go.t + 0.25, 880) : 0;
   check('start: GO is heard, the same on both sides, an octave up', goL > 0.06 && Math.abs(dB(goL) - dB(goR)) < 1, go ? `${go.t.toFixed(2)} s ${dB(goL).toFixed(0)}/${dB(goR).toFixed(0)} dB` : 'no GO cue');
 
-  // each rider's engine on their side: on the grid both idle at the same revs,
+  // each driver's engine on their side: on the grid both idle at the same revs,
   // so the two notes differ only by the second engine's higher pitch
   {
     const l = decimate(L);
@@ -161,7 +164,7 @@ function decimate(sig) {
     check('engines: player 1 idles on the left, player 2 a little higher on the right', leanLow > 6 && leanHigh > 6 && high.f / low.f > 1.03 && high.f / low.f < 1.12, `${low.f.toFixed(1)} Hz is ${leanLow.toFixed(1)} dB stronger on the left, ${high.f.toFixed(1)} Hz is ${leanHigh.toFixed(1)} dB stronger on the right`);
   }
 
-  // each rider's mark chimes on their side
+  // each driver's mark chimes on their side
   const passes = cues.filter((c) => c.name === 'pass');
   const alone = passes.filter((c) => !passes.some((o) => o !== c && Math.abs(o.t - c.t) < 0.4));
   let leftOk = 0;
@@ -184,10 +187,10 @@ function decimate(sig) {
       if (heard && lean > 6) rightOk++;
     }
   }
-  check('chimes: there are clean passes by both riders to listen for', leftN >= 2 && rightN >= 2, `${passes.length} passes, ${alone.length} not overlapping (${leftN} player 1, ${rightN} player 2)`);
-  check('chimes: each is heard, on the side of the rider who made the pass', leftOk === leftN && rightOk === rightN, `player 1 ${leftOk}/${leftN} left, player 2 ${rightOk}/${rightN} right; weakest lean ${worst.lean.toFixed(1)} dB at ${worst.t === undefined ? '-' : worst.t.toFixed(1)} s`);
+  check('chimes: there are clean passes by both drivers to listen for', leftN >= 2 && rightN >= 2, `${passes.length} passes, ${alone.length} not overlapping (${leftN} player 1, ${rightN} player 2)`);
+  check('chimes: each is heard, on the side of the driver who made the pass', leftOk === leftN && rightOk === rightN, `player 1 ${leftOk}/${leftN} left, player 2 ${rightOk}/${rightN} right; weakest lean ${worst.lean.toFixed(1)} dB at ${worst.t === undefined ? '-' : worst.t.toFixed(1)} s`);
 
-  // landings: a burst of noise and a thump, on the side of the rider who landed.
+  // landings: a burst of noise and a thump, on the side of the driver who landed.
   // Judged on the hard ones that have the moment to themselves, by how the
   // balance between the sides shifts when they hit.
   {
@@ -205,7 +208,7 @@ function decimate(sig) {
       if ((c.args[1] < 0 ? shift : -shift) > 2 && rise > 3) ok++;
     }
     check('splashes: there are hard landings to listen for', hard.length >= 3, `${splashes.length} splashes, ${hard.length} hard and alone`);
-    check('splashes: a hard landing stands out over the engine, on the side of the rider who landed', hard.length > 0 && ok >= Math.ceil(hard.length * 0.8), `${ok} of ${hard.length}; the quietest still ${quietest.toFixed(1)} dB over what was playing`);
+    check('splashes: a hard landing stands out over the engine, on the side of the driver who landed', hard.length > 0 && ok >= Math.ceil(hard.length * 0.8), `${ok} of ${hard.length}; the quietest still ${quietest.toFixed(1)} dB over what was playing`);
   }
 
   // ==================================================================== solo
@@ -215,7 +218,7 @@ function decimate(sig) {
   for (let i = 0; i < solo.left.length; i++) apart = Math.max(apart, Math.abs(solo.left[i] - solo.right[i]));
   const soloGo = solo.cues.find((c) => c.name === 'go');
   const soloLevel = dB(rms(solo.left, (soloGo ? soloGo.t : 3) + 2, solo.seconds));
-  check('one rider, one voice, in the middle', solo.voices === 1 && solo.pans[0] === 0 && apart < 1e-4, `left and right differ by at most ${apart.toExponential(1)}`);
+  check('one driver, one voice, in the middle', solo.voices === 1 && solo.pans[0] === 0 && apart < 1e-4, `left and right differ by at most ${apart.toExponential(1)}`);
   check('solo is about as loud as split screen', Math.abs(soloLevel - level) < 3 && solo.peak < 0.89, `${soloLevel.toFixed(1)} dBFS average (split screen ${level.toFixed(1)}), loudest sample ${dB(solo.peak).toFixed(1)} dBFS`);
 
   // ================================================ split screen, upright phone
@@ -223,7 +226,7 @@ function decimate(sig) {
   const stacked = await record('stacked', { query: '?mode=split&manual&dpr=1', width: 720, height: 1280, seconds: 12 });
   apart = 0;
   for (let i = 0; i < stacked.left.length; i++) apart = Math.max(apart, Math.abs(stacked.left[i] - stacked.right[i]));
-  check('no left and right to speak of: both riders in the middle', stacked.voices === 2 && stacked.pans.every((p) => p === 0) && apart < 1e-4, `pans ${stacked.pans.join(' / ')}, sides differ by at most ${apart.toExponential(1)}`);
+  check('no left and right to speak of: both drivers in the middle', stacked.voices === 2 && stacked.pans.every((p) => p === 0) && apart < 1e-4, `pans ${stacked.pans.join(' / ')}, sides differ by at most ${apart.toExponential(1)}`);
 
   // ==================================================================== mute
   console.log('\n— mute —');

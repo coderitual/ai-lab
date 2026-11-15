@@ -21,8 +21,9 @@
 import { PeerLink, rtcSupported } from './PeerLink.js';
 import { makeSurfaceSample, sampleSurface } from '../engine/waves.js';
 import { angleDiff, clamp } from '../engine/math.js';
+import { HULL } from '../game/config.js';
 
-const PROTOCOL = 2;
+const PROTOCOL = 3;
 const SEATS = 4;
 const SEND_HZ = 20;
 const REPLAY_DELAY = 0.08; // attitude is replayed this far behind now, between the last two reports
@@ -56,7 +57,7 @@ export class OnlinePlay {
     this.roster = [];
     /** Guest: round trips of the other guests to the host, ms (for the name tags). */
     this.pings = [];
-    /** Seats whose rider left mid-race. */
+    /** Seats whose driver left mid-race. */
     this.gone = new Set();
     /** true while a race is being played over an open link */
     this.active = false;
@@ -301,7 +302,7 @@ export class OnlinePlay {
       return;
     }
     if (!this.active) return;
-    // mid-race: their rider drops out, and the others are told
+    // mid-race: their driver drops out, and the others are told
     this._dropRacer(peer.seat, peer.name);
     this._broadcast({ k: 'left', seat: peer.seat }, true);
     if (!this.peers.length) this.broken = true;
@@ -349,7 +350,7 @@ export class OnlinePlay {
       return;
     }
     if (!this.active) return;
-    // mid-race: carry on alone; everyone who was riding elsewhere drops out
+    // mid-race: carry on alone; everyone who was racing elsewhere drops out
     this.active = false;
     this.broken = true;
     for (const r of game.race.racers) if (r.control === 'remote') this._dropRacer(r.index, '');
@@ -362,7 +363,7 @@ export class OnlinePlay {
 
   // ---- both
 
-  /** A rider on another machine is gone: stop their craft where it is. */
+  /** A driver on another machine is gone: stop their craft where it is. */
   _dropRacer(seat, name) {
     const { game } = this;
     const r = game.race.racers[seat];
@@ -414,11 +415,11 @@ export class OnlinePlay {
       const friends = this.peers.filter((p) => p.hello).length;
       hud.l.start.disabled = friends === 0;
       const bots = SEATS - 1 - friends;
-      hud.l.start.textContent = friends === 0 ? 'Start race' : `Start race · ${friends + 1} riders${bots ? ` + ${bots} bot${bots > 1 ? 's' : ''}` : ''}`;
+      hud.l.start.textContent = friends === 0 ? 'Start race' : `Start race · ${friends + 1} drivers${bots ? ` + ${bots} bot${bots > 1 ? 's' : ''}` : ''}`;
     }
   }
 
-  /** Round trip between here and the rider in `seat`, ms (null if unknown). */
+  /** Round trip between here and the driver in `seat`, ms (null if unknown). */
   _pingOf(seat) {
     if (this.isHost) {
       const p = this.peers.find((q) => q.seat === seat);
@@ -430,7 +431,7 @@ export class OnlinePlay {
     return Number.isFinite(this.pings[seat]) ? mine + Math.round(this.pings[seat]) : null;
   }
 
-  /** The line under a rider's name tag: how far away they are on the wire. */
+  /** The line under a driver's name tag: how far away they are on the wire. */
   tagInfo(racer) {
     if (!racer.isRemote || this.gone.has(racer.index)) return '';
     const ms = this._pingOf(racer.index);
@@ -502,7 +503,7 @@ export class OnlinePlay {
       // free to jump while nothing depends on it yet (or when badly out)
       if (Math.abs(offset) > 0.002) this.game.engine.simTime += offset;
     } else {
-      // mid-race the sea must not lurch under the rider: trim a little per ping
+      // mid-race the sea must not lurch under the driver: trim a little per ping
       this.game.engine.simTime += clamp(offset * 0.5, -0.012, 0.012);
     }
     this._synced = true;
@@ -718,7 +719,7 @@ export class OnlinePlay {
     this.active = true;
     this.broken = false;
     this._sendAcc = 0;
-    // the riders can differ from race to race (somebody left, somebody joined): build it afresh
+    // the drivers can differ from race to race (somebody left, somebody joined): build it afresh
     game.setupRace('online', { seat: this.seat, roster: this.roster, isHost: this.isHost });
     game.startOnline(fromGesture, at);
   }
@@ -865,7 +866,7 @@ export class OnlinePlay {
       const k = span > 1e-6 ? clamp((at - P.t) / span, 0, 1) : 1;
       const lerp = (j) => P.d[j] + (N.d[j] - P.d[j]) * k;
 
-      sampleSurface(x - Math.sin(yaw) * 1.05, z - Math.cos(yaw) * 1.05, time, sStern);
+      sampleSurface(x - Math.sin(yaw) * HULL.stern, z - Math.cos(yaw) * HULL.stern, time, sStern);
       c.undisplacedX = sStern.px;
       c.undisplacedZ = sStern.pz;
       sampleSurface(x, z, time, sStern);

@@ -211,7 +211,7 @@
 .bw-toast.warn { background: rgba(232, 52, 63, 0.9); }
 .bw-toast.good { background: rgba(23, 150, 90, 0.9); }
 
-/* ------------------------------------------------- name tags over riders */
+/* ------------------------------------------------- name tags over drivers */
 .bw-tags { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .bw-tag {
   position: absolute;
@@ -322,6 +322,10 @@
   pointer-events: none;
 }
 .bw:not(.touch) .bw-stick, .bw:not(.touch) .bw-finger, .bw:not(.touch) .bw-touchhint { display: none; }
+/* held sideways there is little height: the hint sits just above where the messages come up */
+@media (orientation: landscape) {
+  .bw.touch .bw-touchhint { bottom: calc(var(--pad-b) + 2% + 46px); }
+}
 
 /* ---------------------------------------------------------------- panels */
 .bw-overlay {

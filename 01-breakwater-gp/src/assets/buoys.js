@@ -2,8 +2,8 @@
 // start/finish arch.
 //
 // The slalom marks follow real-world lateral marks: a red flat-topped "can" is
-// left to port (ride past on its right), a green pointed "cone" is left to
-// starboard (ride past on its left). A chevron sign above each one points to
+// left to port (pass on its right), a green pointed "cone" is left to
+// starboard (pass on its left). A chevron sign above each one points to
 // the side you have to take.
 
 import * as THREE from 'three';
@@ -66,7 +66,7 @@ function sharedAssets() {
 }
 
 /**
- * @param {'right'|'left'} passSide which side the rider must take
+ * @param {'right'|'left'} passSide which side the driver must take
  * Local axes once placed by the track: +Z = direction of travel, +X = port.
  * userData: body (tilts with the water), sign (stays level), pose(time, emphasis)
  */
@@ -96,7 +96,7 @@ export function createSlalomBuoy(passSide) {
   group.userData.radius = 0.85;
   /**
    * Pose the sign for one view. `emphasis` (0..1) is how strongly this mark is
-   * that view's next target; the caller smooths it per rider.
+   * that view's next target; the caller smooths it per driver.
    */
   group.userData.pose = (time, emphasis) => {
     const nudge = Math.sin(time * 5.5) * 0.5 + 0.5;

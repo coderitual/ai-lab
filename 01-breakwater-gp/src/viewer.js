@@ -7,6 +7,8 @@ import { Engine } from './engine/Engine.js';
 import { createEnvironment } from './assets/environment.js';
 import { createWorld } from './game/World.js';
 import { DEG } from './engine/math.js';
+import { sea } from './engine/waves.js';
+import { ReflectionProbe } from './engine/ReflectionProbe.js';
 import { VIEWER_ASSETS } from './assets/registry.js';
 
 const q = new URLSearchParams(location.search);
@@ -18,6 +20,7 @@ const engine = new Engine(document.getElementById('app'), {
 const { scene, camera } = engine;
 
 const asset = q.get('asset') || 'sea';
+if (q.has('sea')) sea.scale = num('sea', 1); // ?sea=0.1 for a near-calm patch
 const az = num('az', 35) * DEG;
 const el = num('el', 10) * DEG;
 const dist = num('dist', 10);
@@ -51,17 +54,28 @@ function placeCamera(extraAz = 0) {
   camera.updateProjectionMatrix();
 }
 
+// live reflections, as in the game: the map is drawn from the subject's position
+const probe = q.has('noprobe') ? null : new ReflectionProbe(engine.renderer, num('probe', 256));
+
 engine.onRender = (frameDt) => {
   time += frameDt;
   subject.traverse((c) => c.userData.update && c.userData.update(time, frameDt));
   // a floating subject rides the swell: keep the camera on it
-  if (asset === 'craft' && subject.children.length) target.y = targetY + subject.children[0].position.y;
+  const first = subject.children[0];
+  if (asset === 'craft' && first) target.y = targetY + first.position.y;
   placeCamera(spin * time * DEG);
   if (world) {
     world.update(time, frameDt);
     world.buoys.forEach((b) => b.userData.pose(time, 0));
-    world.prepareView(time, camera, camera.position.x, camera.position.z);
   }
+  if (probe && first && asset.startsWith('craft')) {
+    const from = asset === 'craft' ? first : first.children[0] || first;
+    env.update(time, probe.camera, from.position.x, from.position.z);
+    env.coarseWater(true);
+    probe.update(engine.scene, from.position.x, from.position.y + 0.9, from.position.z, asset === 'craft' ? [first] : []);
+    env.coarseWater(false);
+  }
+  if (world) world.prepareView(time, camera, camera.position.x, camera.position.z);
   else env.update(time, camera, target.x, target.z);
 };
 

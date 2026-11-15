@@ -36,9 +36,9 @@ export class Race {
       name: e.name,
       team: e.craft.team,
       control: e.control,
-      /** a human riding on this machine (has a view and plays by the strict rules) */
+      /** a human driving on this machine (has a view and plays by the strict rules) */
       isPlayer: e.control === 'local',
-      /** a human riding on the other machine */
+      /** a human driving on another machine */
       isRemote: e.control === 'remote' && !!e.human,
       powerCap: e.powerCap ?? RULES.maxPower,
       pace: e.pace ?? 1,
