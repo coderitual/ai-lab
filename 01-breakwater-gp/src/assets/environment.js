@@ -8,7 +8,7 @@ import { createWater } from './water.js';
 import { PALETTE, SUN_DIR } from './palette.js';
 import { updateWaveUniforms } from '../engine/waves.js';
 
-export function createEnvironment(engine, { waterSegments = 192 } = {}) {
+export function createEnvironment(engine, { waterSegments = 256 } = {}) {
   const { renderer, scene } = engine;
   const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
@@ -21,22 +21,22 @@ export function createEnvironment(engine, { waterSegments = 192 } = {}) {
   const water = createWater({ normalTex, noiseTex, segments: waterSegments });
   scene.add(water);
 
-  // Key light from the low sun, soft fill from the sky.
-  const sun = new THREE.DirectionalLight(PALETTE.sunColor, 3.1);
+  // Key light from the sun, soft fill from the sky.
+  const sun = new THREE.DirectionalLight(PALETTE.sunColor, 3.2);
   sun.position.copy(SUN_DIR).multiplyScalar(100);
   scene.add(sun);
   scene.add(sun.target);
 
   // Image-based light from the sky needs half-float render targets.
   const canPmrem = renderer.extensions.has('EXT_color_buffer_half_float') || renderer.extensions.has('EXT_color_buffer_float');
-  const fill = new THREE.HemisphereLight('#cfe6ff', '#2e6f78', 1.5);
+  const fill = new THREE.HemisphereLight('#cfe6ff', '#1f6f9a', 1.5);
   scene.add(fill);
   function buildEnvironment() {
     const envMap = canPmrem ? createSkyEnvironment(renderer, sky) : null;
     if (scene.environment) scene.environment.dispose();
     scene.environment = envMap;
-    scene.environmentIntensity = 0.85;
-    fill.intensity = envMap ? 0.35 : 1.5;
+    scene.environmentIntensity = 1.0;
+    fill.intensity = envMap ? 0.7 : 1.7;
   }
   buildEnvironment();
   if (engine.onContextRestored) engine.onContextRestored(buildEnvironment);

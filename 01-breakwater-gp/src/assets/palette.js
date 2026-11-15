@@ -1,14 +1,15 @@
-// Colour script for the whole game: a late, golden afternoon over a teal sea.
-// Everything visual reads its colours from here so the look stays coherent.
+// Colour script for the whole game: a bright trade-wind afternoon over a deep
+// blue sea. Everything visual reads its colours from here so the look stays
+// coherent.
 
 import * as THREE from 'three';
 import { DEG } from '../engine/math.js';
 
 const c = (hex) => new THREE.Color(hex);
 
-// The sun sits low over the open ocean. (Unit vector pointing *toward* the sun.)
+// The sun stands fairly high over the open ocean. (Unit vector *toward* the sun.)
 const SUN_AZIMUTH = 55 * DEG; // 0 = +X, 90 = +Z
-const SUN_ELEVATION = 17 * DEG;
+const SUN_ELEVATION = 40 * DEG;
 export const SUN_DIR = new THREE.Vector3(
   Math.cos(SUN_ELEVATION) * Math.cos(SUN_AZIMUTH),
   Math.sin(SUN_ELEVATION),
@@ -17,19 +18,20 @@ export const SUN_DIR = new THREE.Vector3(
 
 export const PALETTE = {
   // sky
-  skyZenith: c('#2f6db5'),
-  skyMid: c('#8fc4e4'),
-  skyHorizonSun: c('#ffd596'),
-  skyHorizonAway: c('#f2c3b4'),
-  sunColor: c('#ffe2ae'),
-  cloudLit: c('#fff4e0'),
-  cloudShade: c('#b49bb0'),
+  skyZenith: c('#1a5fc2'),
+  skyMid: c('#58a3e6'),
+  skyHorizonSun: c('#e4f0f1'),
+  skyHorizonAway: c('#c4e1f3'),
+  sunColor: c('#fff4dc'),
+  cloudLit: c('#ffffff'),
+  cloudShade: c('#a9c0da'),
 
   // sea
-  waterDeep: c('#0b5872'),
-  waterShallow: c('#2fc2b4'),
-  waterScatter: c('#35c9b2'),
-  foam: c('#fbfdff'),
+  waterDeep: c('#06305c'), // troughs, looking down into deep water
+  waterMid: c('#0a5f96'), // the lit body of a wave
+  waterShallow: c('#34d3c4'), // over sand near the islands
+  waterScatter: c('#2fdcc8'), // light coming through thin crests
+  foam: c('#f6fcff'),
 
   // land
   sand: c('#f0d7a2'),

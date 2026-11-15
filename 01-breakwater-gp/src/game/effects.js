@@ -261,13 +261,14 @@ export class WakeField {
   stampCraft(x, z, dirX, dirZ, washStrength, altitude) {
     if (this._blobCount + 2 > this.maxBlobs) return;
     this._writeQuad(this.blobGeo, this._blobCount++, x - dirX * 0.35, z - dirZ * 0.35, dirX, dirZ, 3.1, 1.75, washStrength);
-    // long soft shadow thrown away from the low sun
+    // soft shadow thrown away from the sun; it slides out and fades as the craft leaves the water
     const sx = -SUN_DIR.x;
     const sz = -SUN_DIR.z;
     const sl = Math.hypot(sx, sz) || 1;
-    const reach = 2.0 + altitude * 3.2;
+    const perMetre = sl / Math.max(SUN_DIR.y, 0.15); // shadow travel per metre of height
+    const reach = (0.45 + altitude) * perMetre;
     const fade = Math.max(0.15, 1 - altitude * 0.22);
-    this._writeQuad(this.blobGeo, this._blobCount++, x + (sx / sl) * reach, z + (sz / sl) * reach, sx / sl, sz / sl, 3.6, 1.6, -0.62 * fade);
+    this._writeQuad(this.blobGeo, this._blobCount++, x + (sx / sl) * reach, z + (sz / sl) * reach, sx / sl, sz / sl, 1.9 + 0.75 * perMetre, 1.5, -0.62 * fade);
   }
 
   /** Rebuild the strips and draw the field around (cx, cz). */
@@ -382,8 +383,8 @@ void main() {
   vViewDir = position - cameraPosition;
   gl_Position = projectionMatrix * mv;
   float px = aInfo.x * uPixelsPerUnit / max(-mv.z, 0.5);
-  gl_PointSize = clamp(px, 1.5, 40.0);
-  vAlpha *= clamp(46.0 / px, 0.2, 1.0);      // droplets right at the lens fade instead of ballooning
+  gl_PointSize = clamp(px, 1.5, 24.0);
+  vAlpha *= clamp(22.0 / px, 0.0, 1.0);      // droplets right at the lens fade out instead of ballooning
 }
 `;
 

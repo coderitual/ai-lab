@@ -19,6 +19,7 @@ const sStbd = makeSurfaceSample();
 const sMid = makeSurfaceSample();
 
 const FLOAT_DEPTH = T.gravity / T.buoyancy; // how far below the float line gravity is balanced
+const VISUAL_LIFT = 0.06; // draw the hull a touch high so short chop does not swallow the deck
 
 export class Craft {
   constructor({ team, number, isPlayer = false }) {
@@ -144,9 +145,13 @@ export class Craft {
     let ay = -T.gravity;
     if (depth > 0) {
       grip = clamp01(depth / (FLOAT_DEPTH * 0.9));
-      // linear near the float line, much stiffer once the deck starts going under
-      const deep = Math.max(0, depth - FLOAT_DEPTH - 0.12);
-      ay += T.buoyancy * Math.min(depth, 1.2) + T.deepBuoyancy * deep * deep - T.heaveDamping * (v.y - sMid.vy) * grip;
+      // linear near the float line, stiffer once the deck starts going under
+      const deep = Math.max(0, depth - FLOAT_DEPTH - 0.04);
+      const vRel = v.y - sMid.vy;
+      ay += T.buoyancy * Math.min(depth, 1.2) + T.deepBuoyancy * deep * deep - T.heaveDamping * vRel * grip;
+      // slamming into the water sheds speed fast (drag ~ v²), so a hard landing
+      // stops the hull near the surface instead of bouncing it back out
+      if (vRel < 0 && depth > FLOAT_DEPTH) ay += T.slamDrag * vRel * vRel * clamp01((depth - FLOAT_DEPTH) / 0.12);
     }
     this.grip = grip;
     const vyBefore = v.y;
@@ -281,6 +286,7 @@ export class Craft {
   render(alpha, frameDt) {
     const o = this.object;
     o.position.lerpVectors(this.prevPos, this.pos, alpha);
+    o.position.y += VISUAL_LIFT;
     o.quaternion.slerpQuaternions(this.prevQuat, this.quat, alpha);
 
     o.userData.handlebar.rotation.y = -this.steer * 0.5;

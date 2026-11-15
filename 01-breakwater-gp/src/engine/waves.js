@@ -1,32 +1,45 @@
 // The sea state. One definition drives both the GPU (vertex + fragment shader
-// of the ocean, wakes, …) and the CPU (buoyancy for crafts and buoys), so what
-// you see is exactly what the physics rides on.
+// of the ocean) and the CPU (buoyancy for crafts and buoys), so what you see
+// is what the physics rides on.
 //
 // The surface is a sum of trochoidal (Gerstner) waves:
 //   P.xz = p + Σ dir_i * H_i * cos(θ_i)
 //   P.y  =     Σ      A_i * sin(θ_i)        θ_i = k_i * dot(dir_i, p) - ω_i t + φ_i
 // scaled by a slowly varying "amplitude field" that calms the water in the lee
 // of the main island and close to any shore.
+//
+// Two tiers:
+//   - PHYSICS waves: the swell and chop that carry the crafts (CPU + GPU).
+//   - DETAIL waves: short, steep chop that only the GPU draws. It is under
+//     ten centimetres high, so leaving it out of the physics goes unnoticed,
+//     but it gives the surface its sharp, confused look.
 
 import * as THREE from 'three';
 import { DEG, smoothstep } from './math.js';
 
-export const WAVE_COUNT = 6;
-export const ISLAND_COUNT = 6;
 const G = 9.81;
+const coarsePointer = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
 // dir: travel direction in degrees (0 = +X, 90 = +Z), len: wavelength (m),
 // amp: amplitude (m), steep: horizontal sharpening (1 = physical trochoid).
-const WAVE_DEFS = [
-  { dir: 218, len: 58.0, amp: 0.8, steep: 1.2 }, // main ocean swell
-  { dir: 250, len: 37.0, amp: 0.55, steep: 1.2 },
+const PHYSICS_DEFS = [
+  { dir: 218, len: 58.0, amp: 0.8, steep: 1.25 }, // main ocean swell
+  { dir: 250, len: 37.0, amp: 0.55, steep: 1.25 },
   { dir: 188, len: 24.0, amp: 0.33, steep: 1.25 },
   { dir: 290, len: 15.0, amp: 0.16, steep: 1.25 }, // wind chop
   { dir: 150, len: 9.5, amp: 0.085, steep: 1.2 },
   { dir: 325, len: 5.8, amp: 0.04, steep: 1.1 },
 ];
+const DETAIL_DEFS = [
+  { dir: 238, len: 4.3, amp: 0.072, steep: 1.15 },
+  { dir: 172, len: 3.3, amp: 0.056, steep: 1.15 },
+  { dir: 281, len: 2.6, amp: 0.047, steep: 1.1 },
+  { dir: 199, len: 2.05, amp: 0.034, steep: 1.1 },
+  { dir: 318, len: 1.6, amp: 0.024, steep: 1.0 },
+  { dir: 133, len: 1.25, amp: 0.017, steep: 1.0 },
+].slice(0, coarsePointer ? 4 : 6); // phones draw a little less
 
-export const waves = WAVE_DEFS.map((w, i) => {
+const build = (w, i) => {
   const k = (Math.PI * 2) / w.len;
   return {
     dx: Math.cos(w.dir * DEG),
@@ -38,7 +51,18 @@ export const waves = WAVE_DEFS.map((w, i) => {
     phase: i * 1.7 + 0.4,
     len: w.len,
   };
-});
+};
+
+/** The waves the physics rides on. */
+export const waves = PHYSICS_DEFS.map(build);
+const detailWaves = DETAIL_DEFS.map((w, i) => build(w, i + PHYSICS_DEFS.length));
+const allWaves = [...waves, ...detailWaves];
+
+export const PHYSICS_WAVES = waves.length;
+export const WAVE_COUNT = allWaves.length;
+export const ISLAND_COUNT = 6;
+/** Rough crest-to-trough range of the open sea (m), for height-based shading. */
+export const SEA_HEIGHT = 2 * Math.sqrt(waves.reduce((s, w) => s + w.amp * w.amp, 0)) * 1.25;
 
 /** Mutable sea configuration shared with the shaders. */
 export const sea = {
@@ -57,15 +81,25 @@ export const sea = {
 const FAR = 1e6;
 
 export const waveUniforms = {
-  uWaveA: { value: waves.map((w) => new THREE.Vector4(w.dx, w.dz, w.k, w.omega)) },
-  // amp, horizontal amp, phase, geometric LOD fade distance
-  uWaveB: { value: waves.map((w) => new THREE.Vector4(w.amp, w.hAmp, w.phase, w.len * 6.0)) },
+  uWaveA: { value: allWaves.map((w) => new THREE.Vector4(w.dx, w.dz, w.k, w.omega)) },
+  // amp, horizontal amp, phase, geometric LOD fade distance (see setWaveMeshDensity)
+  uWaveB: { value: allWaves.map((w) => new THREE.Vector4(w.amp, w.hAmp, w.phase, w.len * 6.0)) },
   // shading fade distance per wave (updated from camera height)
-  uWaveC: { value: waves.map((w) => Math.sqrt(1700 * w.len)) },
+  uWaveC: { value: allWaves.map((w) => Math.sqrt(1700 * w.len)) },
   uWaveTime: { value: 0 },
   uIslands: { value: Array.from({ length: ISLAND_COUNT }, () => new THREE.Vector3(FAR, FAR, 0)) },
   uShelter: { value: new THREE.Vector4(sea.shelterDirX, sea.shelterDirZ, sea.shelterCalm, sea.scale) },
 };
+
+/**
+ * Tell the waves how fine the ocean mesh is (angular segments of the radial
+ * grid). A wave is only displaced where the mesh has ~5 vertices per
+ * wavelength; further out it lives on in the per-pixel normals.
+ */
+export function setWaveMeshDensity(segments) {
+  const k = segments / 32;
+  waveUniforms.uWaveB.value.forEach((v, i) => (v.w = allWaves[i].len * k));
+}
 
 /** Register the island circles (also used for shallow-water tint and shore foam). */
 export function setSeaIslands(list) {
@@ -83,13 +117,14 @@ export function updateWaveUniforms(time, cameraHeight = 3) {
   waveUniforms.uShelter.value.set(sea.shelterDirX, sea.shelterDirZ, sea.shelterCalm, sea.scale);
   const h = Math.max(cameraHeight, 1.5);
   const c = waveUniforms.uWaveC.value;
-  for (let i = 0; i < WAVE_COUNT; i++) c[i] = Math.sqrt(570 * h * waves[i].len);
+  for (let i = 0; i < WAVE_COUNT; i++) c[i] = Math.sqrt(570 * h * allWaves[i].len);
 }
 
 // -------------------------------------------------------------------- GLSL
 
 export const WAVE_GLSL = /* glsl */ `
 #define WAVE_COUNT ${WAVE_COUNT}
+#define SWELL_COUNT 4
 #define ISLAND_COUNT ${ISLAND_COUNT}
 uniform vec4 uWaveA[WAVE_COUNT];
 uniform vec4 uWaveB[WAVE_COUNT];
@@ -158,6 +193,24 @@ void waveNormal(vec2 p, float ampScale, float dist, out vec3 n, out float jac) {
   n = normalize(vec3(-slope.x, 1.0 - ny, -slope.y));
   jac = (1.0 - jxx) * (1.0 - jzz) - jxz * jxz;
 }
+
+// How hard the big swells were bunching up at p, "lag" seconds ago
+// (0 = flat, towards 1 = breaking). Used to leave foam behind passing crests.
+float swellCrest(vec2 p, float ampScale, float lag, float steepen) {
+  float jxx = 0.0;
+  float jzz = 0.0;
+  float jxz = 0.0;
+  for (int i = 0; i < SWELL_COUNT; i++) {
+    vec4 A = uWaveA[i];
+    vec4 B = uWaveB[i];
+    float s = sin(A.z * dot(A.xy, p) - A.w * (uWaveTime - lag) + B.z);
+    float kh = A.z * B.y * ampScale * steepen;
+    jxx += kh * A.x * A.x * s;
+    jzz += kh * A.y * A.y * s;
+    jxz += kh * A.x * A.y * s;
+  }
+  return 1.0 - ((1.0 - jxx) * (1.0 - jzz) - jxz * jxz);
+}
 `;
 
 // --------------------------------------------------------------------- CPU
@@ -196,7 +249,7 @@ export function sampleSurface(x, z, t, out) {
   for (let it = 0; it < 3; it++) {
     let ox = 0;
     let oz = 0;
-    for (let i = 0; i < WAVE_COUNT; i++) {
+    for (let i = 0; i < PHYSICS_WAVES; i++) {
       const w = waves[i];
       const c = Math.cos(w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase);
       ox += w.dx * w.hAmp * c;
@@ -211,7 +264,7 @@ export function sampleSurface(x, z, t, out) {
   let sz = 0;
   let ny = 0;
   let vy = 0;
-  for (let i = 0; i < WAVE_COUNT; i++) {
+  for (let i = 0; i < PHYSICS_WAVES; i++) {
     const w = waves[i];
     const th = w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase;
     const s = Math.sin(th);

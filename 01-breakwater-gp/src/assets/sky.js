@@ -32,10 +32,10 @@ vec3 skyGradient(vec3 dir) {
   float y = max(dir.y, 0.0);
   float toward = dot(normalize(dir.xz + vec2(1.0e-5)), normalize(uSunDir.xz)) * 0.5 + 0.5;
   vec3 horizon = mix(uSkyHorizonAway, uSkyHorizonSun, toward * toward);
-  vec3 col = mix(horizon, uSkyMid, smoothstep(0.0, 0.3, pow(y, 0.8)));
-  col = mix(col, uSkyZenith, smoothstep(0.1, 0.8, y));
+  vec3 col = mix(horizon, uSkyMid, smoothstep(0.0, 0.26, pow(y, 0.75)));
+  col = mix(col, uSkyZenith, smoothstep(0.08, 0.85, y));
   float sd = max(dot(dir, uSunDir), 0.0);
-  col += uSunColor * (0.22 * pow(sd, 6.0) + 0.55 * pow(sd, 48.0));
+  col += uSunColor * (0.10 * pow(sd, 5.0) + 0.45 * pow(sd, 40.0));
   return col;
 }
 
@@ -88,15 +88,15 @@ void main() {
   // one high layer of streaky clouds, projected on a plane above the camera
   float up = max(dir.y, 0.0);
   vec2 plane = dir.xz / (up + 0.09);
-  vec2 uv = plane * vec2(0.055, 0.11) + vec2(uTime * 0.0016, uTime * 0.0006);
+  vec2 uv = plane * vec2(0.06, 0.095) + vec2(uTime * 0.0016, uTime * 0.0006);
   float d = cloudField(uv);
-  float cover = smoothstep(0.50, 0.72, d);
+  float cover = smoothstep(0.52, 0.7, d);
   // light the side facing the sun
   vec2 toSun = normalize(uSunDir.xz) * 0.02;
   float lit = clamp((d - cloudField(uv + toSun)) * 9.0 + 0.55, 0.0, 1.0);
   vec3 cloudCol = mix(uCloudShade, uCloudLit, lit);
   float sunNear = pow(max(sd, 0.0), 10.0);
-  cloudCol += uSunColor * sunNear * 0.55;
+  cloudCol += uSunColor * sunNear * 0.35;
   float horizonFade = smoothstep(0.015, 0.14, up);
   col = mix(col, cloudCol, cover * horizonFade * 0.9);
 
@@ -121,7 +121,7 @@ export function createSky(noiseTex) {
       uTime: { value: 0 },
       uCloudLit: { value: PALETTE.cloudLit.clone() },
       uCloudShade: { value: PALETTE.cloudShade.clone() },
-      uBelow: { value: new THREE.Color('#1c5a66') },
+      uBelow: { value: new THREE.Color('#0a4a78') },
       uSunDisc: { value: 1 },
     },
     side: THREE.BackSide,

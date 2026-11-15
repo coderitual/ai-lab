@@ -46,7 +46,7 @@ export class Game {
 
     const engine = new Engine(hud.canvasHost, { pixelRatio: options.pixelRatio, manual: options.manual });
     this.engine = engine;
-    const world = createWorld(engine, { waterSegments: coarse ? 160 : 192 });
+    const world = createWorld(engine, { waterSegments: coarse ? 176 : 256 });
     this.world = world;
 
     this.wake = new WakeField(engine.renderer, { size: coarse ? 512 : 1024, extent: 176, maxCrafts: RULES.racers });

@@ -53,7 +53,7 @@ src/
     palette.js      colour script + sun direction + team colours
     textures.js     tileable noise / ripple / label textures (CPU generated)
     sky.js          sky dome shader, shared sky-fog GLSL, PMREM environment
-    water.js        ocean mesh (radial grid) + shader
+    water.js        ocean mesh (radial grid) + shader (scattering, foam trails, glitter)
     watercraft.js   lofted hull + trim            rider.js   IK-posed rider
     buoys.js        slalom marks, course floats, start arch
     island.js       analytic low-poly islands     scenery.js palms, rocks, lighthouse, pier, sailboats
@@ -78,9 +78,17 @@ A few choices worth knowing about:
 
 - **One sea, two consumers.** `engine/waves.js` defines six trochoidal waves and
   an amplitude field (calm near shores and behind the island). The same
-  numbers feed the GLSL (vertex displacement, per-pixel analytic normals and
-  whitecaps) and `sampleSurface()` on the CPU (buoyancy, pitch/roll, floating
-  props, camera clearance). What you see is what the physics rides.
+  numbers feed the GLSL (vertex displacement, per-pixel analytic normals) and
+  `sampleSurface()` on the CPU (buoyancy, pitch/roll, floating props, camera
+  clearance). What you see is what the physics rides. A second tier of short,
+  steep chop (under 10 cm high) is drawn by the GPU only: it sharpens the
+  surface without touching the handling.
+- **Water shading** (`assets/water.js`): a deep-blue body that lightens with
+  wave height; sunlight scattering through thin crests and through faces
+  turned toward the viewer (the turquoise glow); foam that is laid where the
+  swell bunches up and then lingers behind the moving crest, drawn as lacy
+  threads over a veil of aerated water; and sun glitter from a normal-map
+  lookup held at constant size on screen, so facets sparkle near and far.
 - **Craft physics** (`game/Craft.js`) is a one-sided buoyancy spring — water
   pushes up, only gravity pulls down — so jumps fall out of the simulation
   instead of being scripted. Wave faces push the hull downhill, grip and
