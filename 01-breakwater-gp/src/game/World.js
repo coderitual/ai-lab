@@ -12,9 +12,9 @@ import { createTrack } from './track.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
-export function createWorld(engine, { waterSegments } = {}) {
+export function createWorld(engine, { waterSegments, shadows } = {}) {
   const { scene } = engine;
-  const env = createEnvironment(engine, { waterSegments });
+  const env = createEnvironment(engine, { waterSegments, shadows });
   const track = createTrack();
   const rng = makeRng(42);
 

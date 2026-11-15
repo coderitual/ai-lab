@@ -18,7 +18,7 @@ import { Craft, collideCrafts, collideWithGhost } from './Craft.js';
 import { BotDriver, PlayerDriver } from './drivers.js';
 import { Race } from './Race.js';
 import { Hud } from './Hud.js';
-import { Spray, WakeField } from './effects.js';
+import { Mist, Spray, WakeField } from './effects.js';
 import { LensDrops } from './LensDrops.js';
 import { HULL, RULES } from './config.js';
 import { ReflectionProbe } from '../engine/ReflectionProbe.js';
@@ -32,10 +32,13 @@ const BOTS = [
   { powerCap: 4, pace: 0.945, bias: 4.2, wobble: 1.4, sharpness: 2.0 },
 ];
 
+/** Where each seat's autopilot runs relative to the racing line when the others are human too (m). */
+const AUTO_LANES = [-3.6, -1.2, 1.2, 3.6];
+
 export class Game {
   /**
    * @param {HTMLElement} root
-   * @param {{ pixelRatio?: number, manual?: boolean, draw?: boolean, autopilot?: boolean, laps?: number, seaScale?: number, drops?: boolean, reflections?: boolean, online?: boolean, playUrl?: string, net?: { lag: number, jitter: number, loss: number } }} [options]
+   * @param {{ pixelRatio?: number, manual?: boolean, draw?: boolean, autopilot?: boolean, laps?: number, seaScale?: number, drops?: boolean, reflections?: boolean, shadows?: boolean, online?: boolean, playUrl?: string, net?: { lag: number, jitter: number, loss: number } }} [options]
    */
   constructor(root, options = {}) {
     this.options = options;
@@ -56,13 +59,19 @@ export class Game {
 
     const engine = new Engine(hud.canvasHost, { pixelRatio: options.pixelRatio, manual: options.manual, draw: options.draw });
     this.engine = engine;
-    const world = createWorld(engine, { waterSegments: coarse ? 176 : 256 });
+    const world = createWorld(engine, { waterSegments: coarse ? 176 : 256, shadows: options.shadows !== false });
     this.world = world;
 
     this.wake = new WakeField(engine.renderer, { size: coarse ? 512 : 1024, extent: 176, maxCrafts: RULES.racers });
     world.env.water.userData.setWake(this.wake.uniforms);
     this.spray = new Spray(coarse ? 1500 : 2200);
     engine.scene.add(this.spray.points);
+    // and the plumes: few, big and soft (smaller and thinner on phones, where they would cost the most)
+    const gl = engine.renderer.getContext();
+    const pointLimit = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64;
+    this.mist = new Mist(world.env.noiseTex, coarse ? 220 : 420, Math.min(pointLimit, coarse ? 150 : 300));
+    this._mistRate = coarse ? 0.55 : 1;
+    engine.scene.add(this.mist.points);
     // what the boats' paintwork mirrors: a small picture of the surroundings, redrawn a side at a time
     this.probe = options.reflections === false ? null : new ReflectionProbe(engine.renderer, coarse ? 128 : 256);
     if (this.probe) engine.onContextRestored(() => this.probe.reset());
@@ -70,7 +79,7 @@ export class Game {
     this._probeTick = 0;
     // and what the water mirrors: one picture per view, see engine/WaterMirror.js
     this._mirrorScale = options.reflections === false ? 0 : coarse ? 0.4 : 0.5;
-    this._mirrorHidden = [world.env.water, world.env.sky, this.spray.points];
+    this._mirrorHidden = [world.env.water, world.env.sky, this.spray.points, this.mist.points];
     // (the sea's low-detail stand-in is hidden anyway, except while the paintwork's map is drawn)
     this._mirrors = []; // one per view, kept from race to race
 
@@ -94,7 +103,7 @@ export class Game {
     this._mapTimer = 0;
     this._resultsTimer = 0;
     this._settledShown = false;
-    this._emitAcc = this.crafts.map(() => ({ tail: 0, bow: 0, skirt: 0 }));
+    this._emitAcc = this.crafts.map(() => ({ tail: 0, bow: 0, skirt: 0, plume: 0 }));
 
     this.setupRace('solo');
 
@@ -194,8 +203,9 @@ export class Game {
         pan: 0,
         emphasis: new Float32Array(world.buoys.length),
         human: racer.driver,
-        // the autopilot (demos, tests, cruising home after the flag): two of them keep a lane each
-        auto: new BotDriver(world.track, { bias: locals.length > 1 ? (n ? 2.3 : -2.3) : 0, wobble: 0.4, sharpness: 2.6, phase: 1.1 + racer.index }),
+        // the autopilot (demos, tests, cruising home after the flag). Where several humans race, each
+        // one's keeps to a lane of its own, or they would all want the same water
+        auto: new BotDriver(world.track, { bias: mode === 'online' ? AUTO_LANES[racer.index] : locals.length > 1 ? (n ? 2.3 : -2.3) : 0, wobble: 0.4, sharpness: 2.6, phase: 1.1 + racer.index }),
       };
     });
     for (const v of this.views) if (auto) v.racer.driver = v.auto;
@@ -203,6 +213,7 @@ export class Game {
     race.reset(this.engine.simTime);
     this.wake.reset();
     this.spray.reset();
+    this.mist.reset();
     world.arch.userData.setLights(0);
     this.layout();
     for (const v of this.views) {
@@ -394,6 +405,7 @@ export class Game {
     race.reset(this.engine.simTime);
     this.wake.reset();
     this.spray.reset();
+    this.mist.reset();
     this.world.arch.userData.setLights(0);
     hud.showResults(race, false);
     hud.showRace(true);
@@ -476,6 +488,7 @@ export class Game {
     this._effects(dt, time);
     this._wetLenses(dt);
     this.spray.update(dt, time);
+    this.mist.update(dt);
 
     if (this._lightsOff > 0) {
       this._lightsOff -= dt;
@@ -567,6 +580,31 @@ export class Game {
             0.45 + Math.random() * 0.6,
           );
         }
+        // plumes: fine spray thrown up and out from the tail of each hull, and a third
+        // from the propellers, which hangs in the air behind the boat and drifts apart
+        acc.plume += dt * 62 * speedK * speedK * this._mistRate * (0.4 + 0.6 * c.throttle);
+        while (acc.plume >= 1) {
+          acc.plume -= 1;
+          const pick = Math.random();
+          const sideSign = pick < 0.38 ? 1 : pick < 0.76 ? -1 : 0;
+          // the side plumes start where the hulls meet the water, from amidships aft
+          const back = sideSign ? -0.5 + Math.random() * 2.9 : HULL.engines + Math.random() * 0.6;
+          const across = sideSign ? sideSign * (0.95 + Math.random() * 0.25) : (Math.random() - 0.5) * 0.7;
+          const out = sideSign * (1.4 + Math.random() * 3.2);
+          const carry = sideSign ? 0.62 : 0.45; // how much of the boat's speed the spray keeps
+          this.mist.emit(
+            c.pos.x - fx * back + lx * across,
+            c.pos.y + 0.1 + Math.random() * 0.25,
+            c.pos.z - fz * back + lz * across,
+            c.vel.x * carry + lx * out - fx * Math.random() * 2,
+            (sideSign ? 2.4 : 3.6) + Math.random() * 3.6 * (0.4 + speedK),
+            c.vel.z * carry + lz * out - fz * Math.random() * 2,
+            0.55 + Math.random() * 0.5,
+            2.8 + Math.random() * 1.8,
+            0.6 + Math.random() * 0.3,
+            0.9 + Math.random() * 0.8,
+          );
+        }
         // white water torn off the tails of the two hulls
         acc.skirt += dt * 130 * speedK;
         while (acc.skirt >= 1) {
@@ -628,6 +666,26 @@ export class Game {
                 c.vel.z * 0.6 + lz * out + fz * fore,
                 0.04 + Math.random() * Math.random() * 0.13,
                 0.55 + Math.random() * 0.5,
+              );
+            }
+          }
+          if (near) {
+            // and a cloud of it hangs where the boat came down
+            const puffs = Math.round((5 + ev.strength * 12) * this._mistRate);
+            for (let k = 0; k < puffs; k++) {
+              const a = Math.random() * Math.PI * 2;
+              const reach = 0.6 + Math.random() * 1.6;
+              this.mist.emit(
+                c.pos.x + Math.cos(a) * reach,
+                c.pos.y + 0.2 + Math.random() * 0.4,
+                c.pos.z + Math.sin(a) * reach,
+                c.vel.x * 0.55 + Math.cos(a) * (1.5 + Math.random() * 3),
+                1.5 + Math.random() * 3.5 * (0.5 + ev.strength),
+                c.vel.z * 0.55 + Math.sin(a) * (1.5 + Math.random() * 3),
+                0.7 + Math.random() * 0.6,
+                2.4 + Math.random() * 1.4,
+                0.5 + 0.3 * ev.strength,
+                0.9 + Math.random() * 0.7,
               );
             }
           }
@@ -728,26 +786,29 @@ export class Game {
       wakeDrawn = true;
       world.prepareView(time, this.probe.camera, p.x, p.z);
       for (let i = 0; i < world.buoys.length; i++) world.buoys[i].userData.pose(time, v.emphasis[i]);
-      this.spray.points.visible = false;
+      this.spray.points.visible = this.mist.points.visible = false;
       world.env.coarseWater(true);
       this.probe.update(engine.scene, p.x, p.y + 0.9, p.z, [boat]);
       world.env.coarseWater(false);
-      this.spray.points.visible = true;
+      this.spray.points.visible = this.mist.points.visible = true;
     }
 
     renderer.setScissorTest(split);
+    world.env.setShadows(engine._qualitySteps < 1);
     for (let n = 0; n < this.views.length; n++) {
       const v = this.views[n];
       const p = v.racer.craft.object.position;
-      // the foam field and the dense part of the ocean mesh sit under this view's boat
+      // the foam field, the dense part of the ocean mesh and the patch of sun shadow sit under this view's boat
       if (!wakeDrawn) this.wake.render(p.x, p.z);
       wakeDrawn = false;
       world.prepareView(time, v.camera, p.x, p.z);
+      world.env.shadowAt(p.x, p.y, p.z);
       const w = Math.round(v.rect.width * W);
       const h = Math.round(v.rect.height * H);
       const x = Math.round(v.rect.left * W);
       const y = H - Math.round(v.rect.top * H) - h; // GL's origin is bottom-left
       this.spray.setProjection(h * engine.pixelRatio, v.camera.fov);
+      this.mist.setProjection(h * engine.pixelRatio, v.camera.fov);
       for (let i = 0; i < world.buoys.length; i++) world.buoys[i].userData.pose(time, v.emphasis[i]);
       // boats, marks and land mirrored in the water (not on devices that are struggling)
       if (this._mirrorScale > 0 && engine._qualitySteps < 1) {

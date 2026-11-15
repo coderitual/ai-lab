@@ -6,6 +6,9 @@
 // drifts with it) instead of being geometry floating on top.
 //
 // Spray: a pooled point cloud for the rooster tail, bow spray and landings.
+//
+// Mist: the same idea with far fewer, far bigger, soft-edged puffs: the white
+// plumes a fast hull throws up, which hang in the air and drift apart.
 
 import * as THREE from 'three';
 import { SUN_DIR } from '../assets/palette.js';
@@ -493,6 +496,169 @@ export class Spray {
       if (life[i] <= 0 || (vel[k + 1] < 0 && pos[k + 1] < waterHeight(pos[k], pos[k + 2], time) - 0.1)) {
         life[i] = 0;
         info[i * 2 + 1] = 0;
+        pos[k + 1] = -1000;
+      }
+    }
+    this.points.geometry.attributes.position.needsUpdate = true;
+    this.points.geometry.attributes.aInfo.needsUpdate = true;
+  }
+}
+
+// ---------------------------------------------------------------------- mist
+
+const mistVertex = /* glsl */ `
+attribute vec4 aInfo;       // size (m), alpha, turn, seed
+uniform float uPixelsPerUnit;
+uniform float uMaxPx;
+varying float vAlpha;
+varying vec2 vTurn;
+varying float vSeed;
+varying vec3 vViewDir;
+varying float vDist;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vDist = length(mv.xyz);
+  vViewDir = position - cameraPosition;
+  gl_Position = projectionMatrix * mv;
+  float px = aInfo.x * uPixelsPerUnit / max(-mv.z, 0.6);
+  gl_PointSize = min(px, uMaxPx);
+  // a puff that would fill the screen (it is on top of the lens) thins out instead
+  vAlpha = aInfo.y * clamp((uMaxPx * 1.6 - px) / (uMaxPx * 0.6), 0.0, 1.0);
+  vTurn = vec2(cos(aInfo.z), sin(aInfo.z));
+  vSeed = aInfo.w;
+}
+`;
+
+const mistFragment = /* glsl */ `
+precision highp float;
+${SKY_GLSL}
+uniform sampler2D uNoiseTex;
+uniform vec3 uLit;
+uniform vec3 uShade;
+varying float vAlpha;
+varying vec2 vTurn;
+varying float vSeed;
+varying vec3 vViewDir;
+varying float vDist;
+void main() {
+  vec2 p = gl_PointCoord * 2.0 - 1.0;
+  float r2 = dot(p, p);
+  if (r2 > 1.0) discard;
+  // each puff looks at its own turned patch of the noise: no two billow alike
+  vec2 q = vec2(p.x * vTurn.x - p.y * vTurn.y, p.x * vTurn.y + p.y * vTurn.x);
+  vec4 n = texture2D(uNoiseTex, q * 0.19 + vec2(vSeed, vSeed * 1.7));
+  float billow = n.r * 0.65 + n.b * 0.35;
+  // dense in the middle, ragged at the rim
+  float body = (1.0 - r2) * (1.0 - r2);
+  float a = clamp(body * (0.12 + 2.1 * billow) - 0.2, 0.0, 1.0) * vAlpha;
+  // lit from above, grey-blue underneath and in its folds
+  vec3 col = mix(uShade, uLit, clamp(0.5 - p.y * 0.34 + (billow - 0.5) * 0.9, 0.0, 1.0));
+  col = applySkyFog(col, normalize(vViewDir), vDist);
+  gl_FragColor = vec4(col, a);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`;
+
+export class Mist {
+  /**
+   * @param {THREE.Texture} noiseTex the tiling noise the sea uses
+   * @param {number} max puffs alive at once
+   * @param {number} maxPx the largest a puff may be drawn, in device pixels
+   */
+  constructor(noiseTex, max = 400, maxPx = 220) {
+    this.max = max;
+    this.pos = new Float32Array(max * 3);
+    this.vel = new Float32Array(max * 3);
+    this.info = new Float32Array(max * 4);
+    this.life = new Float32Array(max);
+    this.maxLife = new Float32Array(max);
+    this.size0 = new Float32Array(max);
+    this.alpha0 = new Float32Array(max);
+    this.grow = new Float32Array(max);
+    this.cursor = 0;
+    for (let i = 0; i < max; i++) this.pos[i * 3 + 1] = -1000;
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aInfo', new THREE.BufferAttribute(this.info, 4).setUsage(THREE.DynamicDrawUsage));
+    this.material = new THREE.ShaderMaterial({
+      name: 'Mist',
+      vertexShader: mistVertex,
+      fragmentShader: mistFragment,
+      uniforms: {
+        ...atmosphereUniforms,
+        uNoiseTex: { value: noiseTex },
+        uLit: { value: new THREE.Color('#ffffff').multiplyScalar(1.04) },
+        uShade: { value: new THREE.Color('#a9c6dc') },
+        uPixelsPerUnit: { value: 600 },
+        uMaxPx: { value: maxPx },
+      },
+      transparent: true,
+      depthWrite: false,
+    });
+    this.points = new THREE.Points(g, this.material);
+    this.points.frustumCulled = false;
+    this.points.renderOrder = 19; // under the droplets
+    this.points.name = 'mist';
+  }
+
+  /** Keep puff sizes right for the current viewport + lens. */
+  setProjection(viewportHeightPx, fovDeg) {
+    this.material.uniforms.uPixelsPerUnit.value = viewportHeightPx / (2 * Math.tan((fovDeg * Math.PI) / 360));
+  }
+
+  /**
+   * @param {number} size diameter when it appears (m)
+   * @param {number} grow how many times that it has grown by the time it is gone
+   * @param {number} alpha how thick it is at its thickest
+   */
+  emit(x, y, z, vx, vy, vz, size, grow, alpha, life) {
+    const i = this.cursor;
+    this.cursor = (this.cursor + 1) % this.max;
+    this.pos[i * 3] = x;
+    this.pos[i * 3 + 1] = y;
+    this.pos[i * 3 + 2] = z;
+    this.vel[i * 3] = vx;
+    this.vel[i * 3 + 1] = vy;
+    this.vel[i * 3 + 2] = vz;
+    this.life[i] = life;
+    this.maxLife[i] = life;
+    this.size0[i] = size;
+    this.grow[i] = grow;
+    this.alpha0[i] = alpha;
+    this.info[i * 4 + 2] = Math.random() * 6.283;
+    this.info[i * 4 + 3] = Math.random();
+  }
+
+  reset() {
+    this.life.fill(0);
+    for (let i = 0; i < this.max; i++) {
+      this.pos[i * 3 + 1] = -1000;
+      this.info[i * 4 + 1] = 0;
+    }
+  }
+
+  update(dt) {
+    const { pos, vel, life, maxLife, info, size0, grow, alpha0 } = this;
+    // fine droplets are stopped by the air within a metre or two, and then hang
+    const drag = Math.exp(-2.2 * dt);
+    for (let i = 0; i < this.max; i++) {
+      if (life[i] <= 0) continue;
+      life[i] -= dt;
+      const k = i * 3;
+      vel[k] *= drag;
+      vel[k + 1] = vel[k + 1] * drag - 1.6 * dt;
+      vel[k + 2] *= drag;
+      pos[k] += vel[k] * dt;
+      pos[k + 1] += vel[k + 1] * dt;
+      pos[k + 2] += vel[k + 2] * dt;
+      const age = 1 - Math.max(life[i] / maxLife[i], 0);
+      info[i * 4] = size0[i] * (1 + (grow[i] - 1) * Math.sqrt(age));
+      info[i * 4 + 1] = alpha0[i] * Math.min(1, age * 10) * Math.pow(1 - age, 1.5);
+      info[i * 4 + 2] += dt * 0.5;
+      if (life[i] <= 0) {
+        info[i * 4 + 1] = 0;
         pos[k + 1] = -1000;
       }
     }

@@ -101,6 +101,12 @@ export class ReflectionProbe {
 
 /**
  * Give a lit material a glossy top coat that mirrors the live map.
+ *
+ * The coat follows the material's own roughness (a rough patch, such as a
+ * non-slip pad, mirrors nothing) and its occlusion map (a tucked-away corner
+ * sees little of the world). On a see-through material it works as on glass:
+ * what shows through is dimmed by the tint, what is mirrored is not.
+ *
  * @param {THREE.Material} material a built-in lit material (Standard / Physical)
  * @param {{ strength?: number, base?: number, edge?: number, blur?: number }} [o] how bright the mirror
  *   image is, how much of it shows face-on and how much at a glancing angle, and how soft it is
@@ -120,8 +126,22 @@ export function withLiveReflections(material, { strength = 1, base = 0.04, edge 
           vec3 coatView = normalize(vViewPosition);
           vec3 coatDir = inverseTransformDirection(reflect(-coatView, normal), viewMatrix);
           float coatFresnel = mix(uLiveCoat.y, uLiveCoat.w, pow(1.0 - clamp(dot(normal, coatView), 0.0, 1.0), 5.0));
+          float coatGloss = 1.0 - smoothstep(0.45, 0.8, roughnessFactor);
+          #ifdef USE_AOMAP
+            coatGloss *= mix(1.0, ambientOcclusion, 0.85);
+          #endif
+          coatFresnel *= coatGloss;
           // the sun in the mirror is very bright: let it glint, not bleach the whole panel
-          outgoingLight += min(textureCube(uLiveEnv, coatDir, uLiveCoat.z).rgb, vec3(24.0)) * coatFresnel * uLiveCoat.x;
+          vec3 coat = min(textureCube(uLiveEnv, coatDir, uLiveCoat.z + roughnessFactor * 2.5).rgb, vec3(24.0)) * coatFresnel * uLiveCoat.x;
+          #ifdef OPAQUE
+            // light the coat sends back does not reach the paint underneath
+            outgoingLight = outgoingLight * (1.0 - 0.5 * coatFresnel) + coat;
+          #else
+            float coatThrough = diffuseColor.a;
+            float coatCover = coatThrough + (1.0 - coatThrough) * coatFresnel;
+            outgoingLight = (outgoingLight * coatThrough + coat) / max(coatCover, 1.0e-3);
+            diffuseColor.a = coatCover;
+          #endif
         }
         #include <opaque_fragment>`,
       );

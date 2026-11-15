@@ -9,6 +9,7 @@
 //   ?nodraw    run the frame loop without rendering
 //   ?drops=0   no water on the camera lens
 //   ?reflect=0 no live reflections on the boats
+//   ?shadows=0 no sun shadows on the boats
 //   ?netlag=80&netjitter=30&netloss=5
 //              online play: hold back (ms) and drop (%) what this page receives
 
@@ -33,6 +34,7 @@ try {
     draw: !q.has('nodraw'),
     drops: q.get('drops') !== '0',
     reflections: q.get('reflect') !== '0',
+    shadows: q.get('shadows') !== '0',
     net: { lag: (num('netlag') || 0) / 1000, jitter: (num('netjitter') || 0) / 1000, loss: (num('netloss') || 0) / 100 },
   });
   if (q.get('mode') === 'split') game.setupRace('split');

@@ -8,7 +8,7 @@ import { createWater } from './water.js';
 import { PALETTE, SUN_DIR } from './palette.js';
 import { updateWaveUniforms } from '../engine/waves.js';
 
-export function createEnvironment(engine, { waterSegments = 256 } = {}) {
+export function createEnvironment(engine, { waterSegments = 256, shadows = true } = {}) {
   const { renderer, scene } = engine;
   const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
@@ -28,6 +28,27 @@ export function createEnvironment(engine, { waterSegments = 256 } = {}) {
   sun.position.copy(SUN_DIR).multiplyScalar(100);
   scene.add(sun);
   scene.add(sun.target);
+
+  // Shadows from the sun, for the boats alone (they opt in; nothing else casts
+  // or receives): the canopy on the deck, the engines on the transom. One
+  // square patch of sea is covered, moved to wherever the picture is about to
+  // be taken (see shadowAt), and the map is only redrawn when asked.
+  const shadowReach = coarse ? 20 : 26; // metres from the middle of the patch to its edge
+  if (shadows) {
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.autoUpdate = false;
+    sun.castShadow = true;
+    sun.shadow.mapSize.setScalar(coarse ? 1024 : 2048);
+    const cam = sun.shadow.camera;
+    cam.left = cam.bottom = -shadowReach;
+    cam.right = cam.top = shadowReach;
+    cam.near = 1;
+    cam.far = 240;
+    cam.updateProjectionMatrix();
+    sun.shadow.bias = -0.0008;
+    sun.shadow.normalBias = 0.035;
+  }
 
   // Image-based light from the sky needs half-float render targets.
   const canPmrem = renderer.extensions.has('EXT_color_buffer_half_float') || renderer.extensions.has('EXT_color_buffer_float');
@@ -50,6 +71,20 @@ export function createEnvironment(engine, { waterSegments = 256 } = {}) {
     noiseTex,
     normalTex,
     anisotropy,
+    /** Put the patch of sun shadow round (x, y, z), to be redrawn with the next picture. */
+    shadowAt(x, y, z) {
+      if (!sun.castShadow) return;
+      sun.target.position.set(x, y, z);
+      sun.position.copy(SUN_DIR).multiplyScalar(120).add(sun.target.position);
+      sun.target.updateMatrixWorld();
+      renderer.shadowMap.needsUpdate = true;
+    },
+    /** Give the shadows up (a device that is struggling), or take them back. */
+    setShadows(on) {
+      if (!shadows || sun.castShadow === on) return;
+      sun.castShadow = on;
+      renderer.shadowMap.needsUpdate = on;
+    },
     /** Swap the sea for its low-detail stand-in (and back) round a picture that only sees it small. */
     coarseWater(on) {
       water.visible = !on;

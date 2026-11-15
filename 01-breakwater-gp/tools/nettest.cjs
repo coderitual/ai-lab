@@ -475,10 +475,18 @@ const fmt = (st, unit = 'm') => `mean ${st.mean.toFixed(2)} ${unit}, 95% under $
     await guests[2].close();
     pages.pop();
     await host.waitForFunction('window.__bw.game.online.peers.length === 2', null, { timeout: 20000 });
+    const before = [];
+    for (const page of pages) before.push(await probe(page));
     await all(1);
     st = [];
     for (const page of pages) st.push(await probe(page));
-    check('leaving: when one friend goes, the other three are told and race on', st.every((x) => x.racers[3].retired && x.gone.join() === '3' && x.active && !x.broken && x.racers.slice(0, 3).every((r) => r.kmh > 30)), st.map((x) => `${x.racers[3].retired}/${x.gone}/${x.active}/${x.broken}`).join(' | '));
+    // "race on" = still making ground a second later (a speed at one instant can be a boat mid-bump)
+    const ground = st.map((x, i) => x.racers.slice(0, 3).map((r, k) => r.total - before[i].racers[k].total));
+    check(
+      'leaving: when one friend goes, the other three are told and race on',
+      st.every((x, i) => x.racers[3].retired && x.gone.join() === '3' && x.active && !x.broken && ground[i].every((m) => m > 4)),
+      st.map((x, i) => `${x.racers[3].retired}/${x.gone}/${x.active}/${x.broken}, +${ground[i].map((m) => m.toFixed(0)).join('/')} m at ${x.racers.slice(0, 3).map((r) => Math.round(r.kmh)).join('/')} km/h`).join(' | '),
+    );
 
     for (let i = 0; i < 50; i++) {
       await all(2.5);

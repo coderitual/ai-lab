@@ -300,12 +300,17 @@ export class Craft {
   }
 
   /** Apply the interpolated pose to the model and swing the outboards with the helm. */
-  render(alpha) {
+  render(alpha, frameDt = 0) {
     const o = this.object;
     o.position.lerpVectors(this.prevPos, this.pos, alpha);
     o.quaternion.slerpQuaternions(this.prevQuat, this.quat, alpha);
     // turning right swings the propellers to starboard
     for (const engine of o.userData.engines) engine.rotation.y = this.steer * 0.42;
+    // and they turn: slowly at idle, a blur at full throttle
+    const spin = (4 + 34 * this.throttle) * frameDt;
+    const props = o.userData.propellers;
+    props[0].rotation.z += spin;
+    props[1].rotation.z -= spin; // the two turn opposite ways, as on a real pair
   }
 }
 

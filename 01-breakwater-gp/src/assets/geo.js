@@ -135,6 +135,69 @@ export function loft(rows, colorAt, { flip = false } = {}) {
   return g.toNonIndexed();
 }
 
+/**
+ * A lofted surface that carries a picture: like loft(), plus texture
+ * coordinates. `uvAt(point, i, j)` returns [u, v] for each vertex; `colorAt(i, j)`
+ * tints it (white, i.e. no tint, by default).
+ */
+export function skin(rows, { uvAt, colorAt = null, flip = false } = {}) {
+  const nr = rows.length;
+  const nc = rows[0].length;
+  const positions = new Float32Array(nr * nc * 3);
+  const colors = new Float32Array(nr * nc * 3).fill(1);
+  const uvs = new Float32Array(nr * nc * 2);
+  for (let i = 0; i < nr; i++) {
+    for (let j = 0; j < nc; j++) {
+      const k = i * nc + j;
+      const v = rows[i][j];
+      positions[k * 3] = v.x;
+      positions[k * 3 + 1] = v.y;
+      positions[k * 3 + 2] = v.z;
+      if (colorAt) {
+        const c = asColor(colorAt(i, j));
+        colors[k * 3] = c.r;
+        colors[k * 3 + 1] = c.g;
+        colors[k * 3 + 2] = c.b;
+      }
+      const uv = uvAt(v, i, j);
+      uvs[k * 2] = uv[0];
+      uvs[k * 2 + 1] = uv[1];
+    }
+  }
+  const index = [];
+  for (let i = 0; i < nr - 1; i++) {
+    for (let j = 0; j < nc - 1; j++) {
+      const a = i * nc + j;
+      const b = a + 1;
+      const c = a + nc;
+      const d = c + 1;
+      if (flip) index.push(a, c, b, b, c, d);
+      else index.push(a, b, c, b, d, c);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  g.setIndex(index);
+  g.computeVertexNormals();
+  return g.toNonIndexed();
+}
+
+/** Give a geometry texture coordinates: one spot for all of it, or `uvAt(point)` per vertex. */
+export function mapUv(geometry, uvAt) {
+  const pos = geometry.attributes.position;
+  const uvs = new Float32Array(pos.count * 2);
+  const p = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    const uv = typeof uvAt === 'function' ? uvAt(p.fromBufferAttribute(pos, i)) : uvAt;
+    uvs[i * 2] = uv[0];
+    uvs[i * 2 + 1] = uv[1];
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  return geometry;
+}
+
 /** Flat polygon fan (convex-ish outline), single colour. */
 export function fan(points, color, { flip = false } = {}) {
   const centre = new THREE.Vector3();
