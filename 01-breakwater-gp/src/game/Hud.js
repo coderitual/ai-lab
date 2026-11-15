@@ -336,7 +336,7 @@ export class Hud {
         </div>
         <table class="bw-table"><tbody id="bw-rbody"></tbody></table>
         <button class="bw-btn" id="bw-again" type="button">Race again</button>
-        <p class="bw-wait" id="bw-rwait" hidden>Waiting for the host to start the next race…</p>
+        <p class="bw-wait" id="bw-rwait" hidden></p>
         <button class="bw-link" id="bw-menu" type="button">Back to menu</button>
         <button class="bw-link bw-soundbtn" type="button">Sound: on</button>
       </div>`;
@@ -351,29 +351,41 @@ export class Hud {
     this.lobby = el('div', 'bw-overlay');
     this.lobby.hidden = true;
     this.lobby.innerHTML = `
-      <div class="bw-panel" role="dialog" aria-label="Play online">
+      <div class="bw-panel bw-panel-wide" role="dialog" aria-label="Play online">
         <h2 class="bw-h2">Play online</h2>
         <p class="bw-note" id="bw-lnote">Two players, connected straight from browser to browser. There is no game server: you swap an invite and a reply by any chat app.</p>
         <div class="bw-lstep" id="bw-lchoose">
           <button class="bw-btn" id="bw-host" type="button">Invite a friend</button>
           <button class="bw-btn2" id="bw-join" type="button">I have an invite</button>
         </div>
-        <div class="bw-lstep" id="bw-lhost" hidden>
-          <label for="bw-invite">1 · Send this invite link to your friend</label>
-          <textarea id="bw-invite" class="bw-code" readonly rows="3"></textarea>
-          <button class="bw-btn2" id="bw-copy-invite" type="button">Copy invite link</button>
-          <label for="bw-reply-in">2 · Paste the reply code they send back</label>
-          <textarea id="bw-reply-in" class="bw-code" rows="3" placeholder="Reply code" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-          <button class="bw-btn" id="bw-connect" type="button">Connect</button>
+        <div class="bw-lstep bw-lsplit" id="bw-lhost" hidden>
+          <div class="bw-lcol">
+            <label for="bw-invite">1 · Send this invite link to your friend</label>
+            <textarea id="bw-invite" class="bw-code" readonly rows="3"></textarea>
+            <div class="bw-pair">
+              <button class="bw-btn2" id="bw-copy-invite" type="button">Copy link</button>
+              <button class="bw-btn2" id="bw-share-invite" type="button" hidden>Share…</button>
+            </div>
+          </div>
+          <div class="bw-lcol">
+            <label for="bw-reply-in">2 · Paste the reply code they send back</label>
+            <textarea id="bw-reply-in" class="bw-code" rows="3" placeholder="Reply code" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+            <button class="bw-btn" id="bw-connect" type="button">Connect</button>
+          </div>
         </div>
-        <div class="bw-lstep" id="bw-ljoin" hidden>
-          <label for="bw-invite-in">1 · Paste the invite link or code</label>
-          <textarea id="bw-invite-in" class="bw-code" rows="3" placeholder="Invite link or code" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-          <button class="bw-btn2" id="bw-make-reply" type="button">Make reply code</button>
-          <div id="bw-ljoin2" hidden>
+        <div class="bw-lstep bw-lsplit" id="bw-ljoin" hidden>
+          <div class="bw-lcol">
+            <label for="bw-invite-in">1 · Paste the invite link or code</label>
+            <textarea id="bw-invite-in" class="bw-code" rows="3" placeholder="Invite link or code" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+            <button class="bw-btn2" id="bw-make-reply" type="button">Make reply code</button>
+          </div>
+          <div class="bw-lcol" id="bw-ljoin2" hidden>
             <label for="bw-reply">2 · Send this reply code back to your friend</label>
             <textarea id="bw-reply" class="bw-code" readonly rows="3"></textarea>
-            <button class="bw-btn2" id="bw-copy-reply" type="button">Copy reply code</button>
+            <div class="bw-pair">
+              <button class="bw-btn2" id="bw-copy-reply" type="button">Copy code</button>
+              <button class="bw-btn2" id="bw-share-reply" type="button" hidden>Share…</button>
+            </div>
             <p class="bw-wait">Waiting for your friend to paste it…</p>
           </div>
         </div>
@@ -397,12 +409,14 @@ export class Hud {
       joinBtn: q('#bw-join'),
       invite: q('#bw-invite'),
       copyInvite: q('#bw-copy-invite'),
+      shareInvite: q('#bw-share-invite'),
       replyIn: q('#bw-reply-in'),
       connect: q('#bw-connect'),
       inviteIn: q('#bw-invite-in'),
       makeReply: q('#bw-make-reply'),
       reply: q('#bw-reply'),
       copyReply: q('#bw-copy-reply'),
+      shareReply: q('#bw-share-reply'),
       status: q('#bw-lstatus'),
       start: q('#bw-net-start'),
       wait: q('#bw-lwait'),
@@ -477,7 +491,7 @@ export class Hud {
     l.host.hidden = step !== 'host';
     l.join.hidden = step !== 'join';
     l.ready.hidden = step !== 'ready';
-    l.note.hidden = step === 'ready';
+    l.note.hidden = step !== 'choose'; // the steps explain themselves; keep them on one screen
     if (step === 'ready') {
       l.status.textContent = status;
       l.start.hidden = !isHost;
@@ -496,13 +510,14 @@ export class Hud {
   /**
    * @param {import('./Race.js').Race} race
    * @param {boolean} show
-   * @param {{ canRestart?: boolean }} [opts]
+   * @param {{ canRestart?: boolean, note?: string }} [opts] `note` says why there is no "Race again"
    */
-  showResults(race, show = true, { canRestart = true } = {}) {
+  showResults(race, show = true, { canRestart = true, note = '' } = {}) {
     this.results.hidden = !show;
     if (!show) return;
     this.againBtn.hidden = !canRestart;
-    this.rWait.hidden = canRestart;
+    this.rWait.hidden = canRestart || !note;
+    this.rWait.textContent = note;
     const locals = race.players;
     const humans = race.racers.filter((r) => r.isPlayer || r.isRemote);
     if (humans.length === 1) {

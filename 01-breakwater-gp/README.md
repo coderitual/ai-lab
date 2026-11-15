@@ -1,9 +1,12 @@
 # Breakwater GP
 
 A small, original jet-ski slalom racing demo for the browser, built with
-[three.js](https://threejs.org). One island circuit, three laps, three bots,
+[three.js](https://threejs.org). One island circuit, three laps, four crafts,
 a simulated sea that the crafts genuinely ride on. Everything you see is
 generated in code: there are no model, texture or audio files.
+
+Race alone against three bots, or against a friend: split screen on one
+keyboard, or online from two devices with no game server.
 
 It runs on desktop (keyboard) and on phones (touch), and is written for iPhone Safari.
 
@@ -29,7 +32,8 @@ Three ways to race, chosen on the title screen:
 - **Two players, split screen**: two riders on one keyboard, each with their
   own half of the screen, plus two bots. Player 1 uses `W` `A` `S` `D`,
   player 2 the arrow keys.
-- **Two players, online**: see [Online play](#online-play) below.
+- **Two players, online**: one rider each on two devices, plus two bots, with
+  no game server. See [Online play](#online-play) below.
 
 Solo controls:
 
@@ -55,6 +59,35 @@ The sea is rough on the open-ocean side of the island and calmer in its lee.
 Hitting the swell head-on at speed throws the craft into the air; you cannot
 steer or drive in the air, and a hard landing costs speed.
 
+## Online play
+
+Two players on two devices, and no game server in between: the two browsers
+connect straight to each other (WebRTC). All they need from you is help finding
+each other, which takes two messages in any chat app.
+
+1. **You**: *2 players online → Invite a friend*, then send the invite link.
+2. **Your friend**: opens the link, gets a reply code, sends it back.
+3. **You**: paste the reply code, press *Connect*, then *Start race*.
+
+Each of you rides your own craft on your own device, so the controls never wait
+for the network; the host's device also runs the two bots. Both devices keep one
+shared clock, so the waves, the start lights and the timing are the same on both
+screens. After the flag the host can start a rematch on the same link.
+
+Good to know:
+
+- Keep the page open while you swap the two messages. Reloading or closing it
+  makes the invite or the reply worthless, and each can be used once.
+- The link and the code describe how to reach your browser, network addresses
+  included. Send them to the person you are playing with, not to a public channel.
+- Public STUN servers (Google's and Cloudflare's) are asked for each device's
+  public address. No game data passes through them, and there is no relay to
+  fall back on, so two devices that both sit behind strict networks (some
+  office, campus and mobile-carrier networks) may not be able to connect. The
+  game says so after about 25 seconds; home Wi-Fi or a phone hotspot usually works.
+- Open the game from its public address. Embedded previews that block WebRTC
+  cannot connect.
+
 ## How it is put together
 
 ```
@@ -79,9 +112,12 @@ src/
     Craft.js        watercraft physics          drivers.js player + bot drivers
     Race.js         rules: marks, power, misses, laps, ranking, respawn
     effects.js      wake field (render-to-texture foam + shadows), spray particles
-    Hud.js / hud.css   DOM HUD, minimap, panels
-    Game.js         wires it all together
-tools/        optional dev scripts (need Playwright): screenshots, frame-stepped capture, input smoke test
+    Hud.js / hud.css   DOM HUD (one set of readouts per rider), minimap, panels, online lobby
+    Game.js         wires it all together: solo, split screen (two viewports), online
+  net/        online play
+    PeerLink.js     WebRTC data channels joined by hand-carried codes (no signalling server)
+    OnlinePlay.js   lobby flow, shared clock, state messages, prediction of remote crafts
+tools/        optional dev scripts (need Playwright): screenshots, frame-stepped capture, play tests
 ```
 
 A few choices worth knowing about:
@@ -111,7 +147,24 @@ A few choices worth knowing about:
   foam lies in the water surface and drifts with it. No geometry floating on top.
 - **Cheap to draw.** Static scenery is merged and vertex-coloured, floats are
   instanced, there are no shadow maps or post-processing: about 100 draw calls
-  and 170k triangles per frame.
+  and 170k triangles per frame. Split screen draws the scene twice, each half
+  with its own camera, its own dense patch of ocean and its own wake texture.
+- **Online without a server.** `net/PeerLink.js` packs each browser's WebRTC
+  session description into a text code (deflate + base64url) that the players
+  carry by hand; that replaces the signalling server. `net/OnlinePlay.js` then
+  runs the race over two data channels:
+  - Each machine simulates only its own rider (the host also the bots) and
+    reports those crafts 20 times a second on an unreliable channel, where a
+    late update is simply dropped.
+  - Both machines read one **sea clock**. The guest sets its clock to the
+    host's from ping round trips and keeps trimming it by a few milliseconds
+    during the race. While a link is up the clock is tied to real time: a
+    machine that drops frames or has its tab hidden loses ground on the water,
+    not time on the clock, so the two race clocks cannot drift apart.
+  - A remote craft is drawn where it should be *now*: its newest report is
+    coasted forward on its speed and turn rate, and each correction is blended
+    in over a few frames. Its height, pitch and roll are replayed a moment late
+    and set onto the local copy of the shared sea.
 
 ## Phones
 
@@ -132,12 +185,15 @@ These are not part of the build and need Playwright available to Node.
 node tools/shot.cjs --url "http://localhost:5173/viewer.html?asset=craft" --out craft.png   # asset viewer shots
 node tools/capture.cjs --url "http://localhost:4173/?auto&ap&manual&dpr=1" --at 9,24,41 --out shots/lap   # stills
 node tools/capture.cjs --url "…" --from 46 --seconds 10 --fps 30 --out clip/f                # frames for ffmpeg
-node tools/playtest.cjs http://localhost:4173/                                                # input smoke test
+node tools/playtest.cjs http://localhost:4173/                                                # solo + split screen: input, rules, panels
+node tools/nettest.cjs http://localhost:4173/                                                 # online: two pages join and race
 ```
 
 Useful query options: `?auto` (skip the title), `?ap` (a bot rides your craft),
-`?laps=1`, `?dpr=1`, `?sea=0.8` (wave height), `?manual` (step with
-`__bw.advance(seconds)` / `__bw.skip(seconds)`).
+`?mode=split`, `?laps=1`, `?dpr=1`, `?sea=0.8` (wave height), `?manual` (step
+with `__bw.advance(seconds)` / `__bw.skip(seconds)`), `?nodraw` (run without
+rendering), and for online play `?netlag=80&netjitter=40&netloss=5` (hold back
+by 80–120 ms, and drop 5 % of, the updates this page receives).
 
 `viewer.html?asset=sea|craft|crafts|world&az=…&el=…&dist=…` shows single assets
 over the real sea and sky.
@@ -145,10 +201,28 @@ over the real sea and sky.
 ## What was (and was not) verified
 
 Checked with the scripts in `tools/` in headless Chromium (software WebGL):
-a full three-lap bot race, the keyboard path, the touch path on iPhone-sized
-viewports in both orientations (drag steering, two-thumb braking, panels fit),
-the rules (clean pass, miss, off-course reset, five misses and out), results
-and restart, a lost and restored WebGL context, and the production build.
 
-Not checked: real Safari/WebKit and real phone hardware (only Chromium was
-available), frame rate on a device, and how the synthesised audio sounds.
+- **Solo**: a full three-lap bot race, the keyboard path, the touch path on
+  iPhone-sized viewports in both orientations (drag steering, two-thumb
+  braking, panels fit), the rules (clean pass, miss, off-course reset, five
+  misses and out), results and restart, a lost and restored WebGL context, and
+  the production build.
+- **Split screen**: separate keys per rider, rules and readouts per rider,
+  results, rematch, back to the menu.
+- **Online**, between two pages of one browser on one machine:
+  - the whole flow: invite, reply, wrong or mangled pastes, race, results,
+    rematch, one side leaving;
+  - a simulated bad link (80–120 ms each way, 5 % of updates lost): the other
+    rider is drawn about 0.1 m from where they really are on average and
+    under 1 m at worst, without visible snapping, and a 1.5 s stall on one
+    machine leaves both clocks in agreement;
+  - both pages running in real time: the two sea clocks stay within a few
+    milliseconds of each other, also after a 0.7 s hitch.
+
+Not checked:
+
+- Real Safari/WebKit and real phone hardware (only Chromium was available),
+  frame rate on a device, and how the synthesised audio sounds.
+- Online play between two real devices across the internet. Whether two
+  networks let the browsers reach each other (NAT traversal) cannot be tried
+  from one machine, and neither can the system share sheet on a phone.

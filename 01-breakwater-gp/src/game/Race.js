@@ -15,6 +15,9 @@
 import { clamp } from '../engine/math.js';
 import { RULES } from './config.js';
 
+const COUNTDOWN = 3.6; // seconds from "get ready" to the end of the countdown clock
+const GO_AT = 0.6; // GO falls when this much of it is left (3, 2, 1 take a second each)
+
 export class Race {
   /**
    * @param {object} o
@@ -64,6 +67,8 @@ export class Race {
     this.time = 0; // race clock (starts at GO)
     this.countdown = 0;
     this._countShown = 0;
+    /** Online: the sea time of GO, agreed by both machines; the race clock is read off it. */
+    this.goAt = null;
     this._loc = {};
     this._pt = {};
     this.endTimer = 0;
@@ -106,25 +111,34 @@ export class Race {
     this.state = 'grid';
     this.time = 0;
     this.endTimer = 0;
+    this.goAt = null;
     this._rank();
   }
 
-  startCountdown() {
+  /**
+   * @param {number|null} [at] online: the sea time at which the countdown began
+   *   on both machines. With it, the countdown and the race clock follow the
+   *   shared sea clock instead of counting this machine's own steps, so they
+   *   agree on both sides even if one of them started late or stalled.
+   */
+  startCountdown(at = null) {
     this.state = 'countdown';
-    this.countdown = 3.6;
+    this.countdown = COUNTDOWN;
     this._countShown = 4;
+    this.goAt = at === null ? null : at + COUNTDOWN - GO_AT;
   }
 
   /** Before physics: let the drivers set their controls. */
   preStep(dt, seaTime) {
     if (this.state === 'countdown') {
-      this.countdown -= dt;
-      const n = Math.ceil(this.countdown - 0.6);
+      if (this.goAt === null) this.countdown -= dt;
+      else this.countdown = GO_AT + this.goAt - seaTime;
+      const n = Math.ceil(this.countdown - GO_AT);
       if (n !== this._countShown && n >= 1 && n <= 3) {
         this._countShown = n;
         this._emit('countdown', n);
       }
-      if (this.countdown <= 0.6 && this._countShown !== 0) {
+      if (this.countdown <= GO_AT && this._countShown !== 0) {
         this._countShown = 0;
         this.state = 'racing';
         this.time = 0;
@@ -155,10 +169,9 @@ export class Race {
     const { track } = this;
     const L = track.length;
     const racing = this.state === 'racing' || this.state === 'finished';
-    if (this.state === 'racing') this.time += dt;
-    else if (this.state === 'finished') {
-      this.time += dt;
-      this.endTimer += dt;
+    if (racing) {
+      this.time = this.goAt === null ? this.time + dt : Math.max(0, seaTime - this.goAt);
+      if (this.state === 'finished') this.endTimer += dt;
     }
 
     // the catch-up for bots is measured against the best-placed human

@@ -32,7 +32,7 @@ const BOTS = [
 export class Game {
   /**
    * @param {HTMLElement} root
-   * @param {{ pixelRatio?: number, manual?: boolean, autopilot?: boolean, laps?: number, seaScale?: number }} [options]
+   * @param {{ pixelRatio?: number, manual?: boolean, draw?: boolean, autopilot?: boolean, laps?: number, seaScale?: number, online?: boolean, playUrl?: string, net?: { lag: number, jitter: number, loss: number } }} [options]
    */
   constructor(root, options = {}) {
     this.options = options;
@@ -51,7 +51,7 @@ export class Game {
     };
     const coarse = matchMedia('(pointer: coarse)').matches;
 
-    const engine = new Engine(hud.canvasHost, { pixelRatio: options.pixelRatio, manual: options.manual });
+    const engine = new Engine(hud.canvasHost, { pixelRatio: options.pixelRatio, manual: options.manual, draw: options.draw });
     this.engine = engine;
     const world = createWorld(engine, { waterSegments: coarse ? 176 : 256 });
     this.world = world;
@@ -71,9 +71,8 @@ export class Game {
     /** One per rider on this machine: { racer, camera, chase, hud, rect, emphasis, auto }. */
     this.views = [];
     this.mode = 'solo';
-    /** @type {OnlinePlay | null} */
-    this.net = null;
     this.phase = 'title'; // title | lobby | race | results
+    this._countdownAt = null; // online: the sea time at which both machines start counting down
     this._resultsIn = 0;
     this._orbitIn = 0;
     this._lightsOff = 0;
@@ -92,8 +91,10 @@ export class Game {
       hud.showTouch(input);
     };
 
-    // browsers may suspend audio (tab switch, phone call): any touch brings it back
-    const resumeAudio = () => this.audio.ctx && this.audio.unlock();
+    // browsers may suspend audio (tab switch, phone call): any touch brings it back.
+    // It also starts it for a rider who was put into a race without tapping Start
+    // (the guest of an online race).
+    const resumeAudio = () => (this.audio.ctx || this.phase !== 'title') && this.audio.unlock();
     window.addEventListener('pointerdown', resumeAudio, true);
     window.addEventListener('keydown', resumeAudio, true);
 
@@ -117,6 +118,7 @@ export class Game {
 
     this.online = new OnlinePlay(this);
 
+    engine.onLostTime = (seconds) => this.online.lostTime(seconds);
     engine.onUpdate = (dt, time) => this.update(dt, time);
     engine.onRender = (frameDt, alpha, time) => this.render(frameDt, alpha, time);
     engine.onDraw = (time) => this.draw(time);
@@ -183,6 +185,7 @@ export class Game {
     this._resultsIn = 0;
     this._orbitIn = 0;
     this._settledShown = false;
+    this._countdownAt = null;
   }
 
   /** Size the viewports: side by side on a wide window, stacked on a tall one. */
@@ -209,8 +212,26 @@ export class Game {
     return null;
   }
 
+  /**
+   * Online, only the host can start the next race: while the link is up, and
+   * once the other rider is home too (a rematch would cut their race short).
+   */
   get canRestart() {
-    return this.mode !== 'online' || !this.net || this.net.isHost;
+    if (this.mode !== 'online') return true;
+    const o = this.online;
+    return o.isHost && !!o.link && !o.broken && this.race.humans.every((h) => h.finished || h.retired);
+  }
+
+  /** (Re)draw the results panel from the race as it stands. */
+  refreshResults() {
+    const canRestart = this.canRestart;
+    let note = '';
+    if (!canRestart) {
+      if (!this.online.link) note = 'Your friend has left. Go back to the menu to play again.';
+      else if (this.online.isHost) note = 'Your friend is still racing…';
+      else note = 'Waiting for the host to start the next race…';
+    }
+    this.hud.showResults(this.race, true, { canRestart, note });
   }
 
   _raceEvents() {
@@ -288,8 +309,11 @@ export class Game {
 
   // ------------------------------------------------------------ flow
 
-  /** @param {boolean} [fromGesture] false when started by script (no tap to unlock audio with) */
-  start(fromGesture = true) {
+  /**
+   * @param {boolean} [fromGesture] false when started by script (no tap to unlock audio with)
+   * @param {number|null} [at] online: sea time at which the countdown begins on both machines
+   */
+  start(fromGesture = true, at = null) {
     if (this.phase !== 'title' && this.phase !== 'lobby') return;
     if (fromGesture) this.audio.unlock(); // we are inside the tap / key press that started the race
     this.phase = 'race';
@@ -297,15 +321,18 @@ export class Game {
     this.hud.showLobby(false);
     this.hud.showRace(true);
     for (const v of this.views) v.chase.mode = 'chase';
-    this.race.startCountdown();
+    this._armCountdown(at);
   }
 
-  /** Same riders, new race. Online: only the host calls this; it tells the guest. */
-  restart(fromNet = false) {
+  /**
+   * Same riders, new race.
+   * @param {number|null} [at] online: set by the link; without it the host asks the link to start both sides
+   */
+  restart(at = null) {
     const { race, hud } = this;
-    if (this.mode === 'online' && this.net && !fromNet) {
-      if (!this.net.isHost) return;
-      this.online.sendStart();
+    if (this.mode === 'online' && at === null) {
+      this.online.hostStart(); // comes back here with the agreed start time
+      return;
     }
     this.audio.unlock();
     for (const v of this.views) v.racer.driver = this.options.autopilot ? v.auto : v.human;
@@ -324,7 +351,12 @@ export class Game {
       v.chase.mode = 'chase';
       v.chase.snap(v.racer.craft);
     }
-    race.startCountdown();
+    this._armCountdown(at);
+  }
+
+  _armCountdown(at) {
+    if (at === null) this.race.startCountdown();
+    else this._countdownAt = at;
   }
 
   /** Leave the race (and any online link) and go back to the title screen. */
@@ -343,10 +375,16 @@ export class Game {
   update(dt, time) {
     const { race, world } = this;
     const racers = race.racers;
+    this.online.pump(dt);
+    if (this._countdownAt !== null && time >= this._countdownAt) {
+      // online: both machines count down from the same sea time, however late this one got here
+      race.startCountdown(this._countdownAt);
+      this._countdownAt = null;
+    }
     race.preStep(dt, time);
 
     // riders simulated on the other machine are placed from what it last told us
-    if (this.net) this.online.applyRemote(time);
+    this.online.applyRemote(time, dt);
     for (const r of racers) if (r.control !== 'remote') r.craft.step(dt, time);
 
     for (const r of racers) {
@@ -374,7 +412,7 @@ export class Game {
     }
 
     race.postStep(dt, time);
-    if (this.net) this.online.afterStep(dt, time);
+    this.online.afterStep(dt, time);
     this._effects(dt, time);
     this.spray.update(dt, time);
 
@@ -393,7 +431,7 @@ export class Game {
         this.phase = 'results';
         this._resultsTimer = 0;
         this.hud.showRace(false);
-        this.hud.showResults(race, true, { canRestart: this.canRestart });
+        this.refreshResults();
       }
     }
   }
@@ -533,8 +571,9 @@ export class Game {
       this._resultsTimer -= frameDt;
       if (this._resultsTimer <= 0) {
         this._resultsTimer = 0.5;
-        hud.showResults(race, true, { canRestart: this.canRestart });
-        if (race.settled) this._settledShown = true;
+        this.refreshResults();
+        // online, what the panel offers can still change (the friend finishes, or leaves)
+        if (race.settled && (this.mode !== 'online' || !this.online.link)) this._settledShown = true;
       }
     }
   }

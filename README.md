@@ -9,7 +9,7 @@ All demos: https://coderitual.github.io/ai-lab/
 
 | #  | Demo | Play |
 | -- | ---- | ---- |
-| 01 | [Breakwater GP](01-breakwater-gp/) — an original jet-ski slalom race on simulated waves, built with three.js | https://coderitual.github.io/ai-lab/01-breakwater-gp/ |
+| 01 | [Breakwater GP](01-breakwater-gp/) — an original jet-ski slalom race on simulated waves, built with three.js. Solo, two-player split screen, or two players online with no server | https://coderitual.github.io/ai-lab/01-breakwater-gp/ |
 
 ## Publishing
 

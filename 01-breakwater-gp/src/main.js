@@ -6,20 +6,30 @@
 //   ?dpr=1     force the canvas pixel ratio
 //   ?sea=0.8   scale the wave height
 //   ?manual    do not run the frame loop (step with __bw.advance)
+//   ?nodraw    run the frame loop without rendering
+//   ?netlag=80&netjitter=30&netloss=5
+//              online play: hold back (ms) and drop (%) what this page receives
 
 import { Game } from './game/Game.js';
 
 const q = new URLSearchParams(location.search);
 const num = (key) => (q.has(key) ? parseFloat(q.get(key)) : undefined);
 const loading = document.getElementById('loading');
+// The host page can switch online play off (data-online="off": an embed that
+// cannot open direct connections) and say where the full game lives (data-play-url).
+const root = document.getElementById('game');
 
 try {
-  const game = new Game(document.getElementById('game'), {
+  const game = new Game(root, {
+    online: root.dataset.online !== 'off',
+    playUrl: root.dataset.playUrl || '',
     pixelRatio: num('dpr'),
     manual: q.has('manual'),
     autopilot: q.has('ap'),
     laps: num('laps'),
     seaScale: num('sea'),
+    draw: !q.has('nodraw'),
+    net: { lag: (num('netlag') || 0) / 1000, jitter: (num('netjitter') || 0) / 1000, loss: (num('netloss') || 0) / 100 },
   });
   if (q.get('mode') === 'split') game.setupRace('split');
   if (q.has('auto')) game.start(false);

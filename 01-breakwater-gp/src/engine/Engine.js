@@ -9,7 +9,8 @@ const MAX_FRAME_DT = 0.1;
 export class Engine {
   /**
    * @param {HTMLElement} container element the canvas fills
-   * @param {{ maxPixelRatio?: number, pixelRatio?: number, manual?: boolean }} [options]
+   * @param {{ maxPixelRatio?: number, pixelRatio?: number, manual?: boolean, draw?: boolean }} [options]
+   *   `draw: false` runs the loop without rendering (automated checks).
    */
   constructor(container, options = {}) {
     this.container = container;
@@ -58,6 +59,12 @@ export class Engine {
     this.onRender = null;
     /** Optional: draws the frame itself (several viewports). Default: one full-size render. */
     this.onDraw = null;
+    /**
+     * Optional: called with the seconds of real time that were *not* simulated
+     * (a frame longer than the cap, or the tab was hidden). Solo play just
+     * drops that time; online play keeps its shared clock running through it.
+     */
+    this.onLostTime = null;
 
     this._tick = this._tick.bind(this);
     this.resize = this.resize.bind(this);
@@ -71,8 +78,12 @@ export class Engine {
     if (window.visualViewport) window.visualViewport.addEventListener('resize', this.resize);
 
     document.addEventListener('visibilitychange', () => {
-      // Drop the time that passed while hidden instead of fast-forwarding.
-      this._last = performance.now();
+      // Coming back: the time spent hidden is not simulated (no fast-forward).
+      if (document.hidden || !this.running || this.manual) return;
+      const now = performance.now();
+      const lost = (now - this._last) / 1000;
+      this._last = now;
+      if (lost > 0 && this.onLostTime) this.onLostTime(lost);
     });
 
     canvas.addEventListener('webglcontextlost', (e) => {
@@ -132,9 +143,18 @@ export class Engine {
     let dt = (now - this._last) / 1000;
     this._last = now;
     if (!(dt > 0)) dt = 0;
-    if (dt > MAX_FRAME_DT) dt = MAX_FRAME_DT;
+    if (dt > MAX_FRAME_DT) {
+      if (this.onLostTime) this.onLostTime(dt - MAX_FRAME_DT);
+      dt = MAX_FRAME_DT;
+    }
     this._adaptQuality(dt);
-    this.advance(this.paused ? 0 : dt, dt);
+    this.advance(this.paused ? 0 : dt, dt, this.options.draw !== false);
+  }
+
+  /** Seconds of real time since the last frame began (0 when stepped by hand). */
+  sinceFrame() {
+    if (this.manual || !this.running) return 0;
+    return Math.max(0, (performance.now() - this._last) / 1000);
   }
 
   /**

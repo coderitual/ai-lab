@@ -351,11 +351,12 @@
 }
 .bw-wait { text-align: center; }
 .bw-ready { color: var(--go); font-weight: 700; font-size: clamp(18px, 4.4vh, 26px); text-align: center; }
-.bw-error { color: #ff9ea3; }
+.bw-error { color: #ff9ea3; user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
 .bw-lstep { display: grid; gap: clamp(6px, 1.5vh, 10px); margin-top: clamp(10px, 2.4vh, 16px); }
 .bw-lstep label { font-size: clamp(13px, 3vh, 16px); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); }
 .bw-lstep .bw-btn { margin-top: 0; }
-#bw-ljoin2 { display: grid; gap: clamp(6px, 1.5vh, 10px); }
+.bw-lcol { display: grid; gap: clamp(6px, 1.5vh, 10px); align-content: start; min-width: 0; }
+.bw-pair { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; }
 .bw-code {
   width: 100%;
   min-height: 3.6em;
@@ -372,6 +373,8 @@
   -webkit-user-select: text;
   touch-action: auto;
 }
+/* iOS zooms the page when a field with small type takes focus */
+@media (pointer: coarse) { .bw-code { font-size: 16px; } }
 
 .bw-link {
   display: block;
@@ -477,6 +480,13 @@
   .bw-rules { font-size: clamp(15px, 4vw, 18px); }
   .bw-btn { font-size: clamp(22px, 6vw, 30px); }
   .bw.touch .bw-rotate { display: block; animation: bw-hint 9s ease-out forwards; }
+}
+
+/* phones held sideways: the two lobby steps sit side by side so nothing needs scrolling */
+@media (orientation: landscape) and (max-height: 520px) {
+  .bw-panel-wide { width: min(780px, 100%); }
+  .bw-lsplit { grid-template-columns: 1fr 1fr; column-gap: clamp(14px, 2.6vw, 24px); align-items: start; }
+  .bw-lsplit .bw-wait { margin-top: 0; }
 }
 
 /* short landscape phones: tuck the standings away to keep the water visible */
