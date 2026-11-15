@@ -1,6 +1,7 @@
 // Entry point. Query options (all optional, mostly for testing):
 //   ?auto      start the race straight away
 //   ?ap        let a bot ride the player's craft
+//   ?mode=split  two riders on one keyboard
 //   ?laps=1    shorter race
 //   ?dpr=1     force the canvas pixel ratio
 //   ?sea=0.8   scale the wave height
@@ -20,6 +21,7 @@ try {
     laps: num('laps'),
     seaScale: num('sea'),
   });
+  if (q.get('mode') === 'split') game.setupRace('split');
   if (q.has('auto')) game.start(false);
   if (loading) loading.remove();
 

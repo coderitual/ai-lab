@@ -22,10 +22,9 @@ const FLOAT_DEPTH = T.gravity / T.buoyancy; // how far below the float line grav
 const VISUAL_LIFT = 0.06; // draw the hull a touch high so short chop does not swallow the deck
 
 export class Craft {
-  constructor({ team, number, isPlayer = false }) {
+  constructor({ team, number }) {
     this.team = team;
     this.number = number;
-    this.isPlayer = isPlayer;
 
     this.object = createWatercraft(team);
     this.rider = createRider(team, number);
@@ -327,6 +326,32 @@ export function collideCrafts(a, b) {
       a.events.push({ type: 'bump', strength: s });
       b.events.push({ type: 'bump', strength: s });
     }
+  }
+  return true;
+}
+
+/**
+ * A craft simulated here bumping into one that is simulated on another machine
+ * (online play). Only ours moves; the other machine does the same for its own.
+ */
+export function collideWithGhost(a, ghost) {
+  const dx = a.pos.x - ghost.pos.x;
+  const dz = a.pos.z - ghost.pos.z;
+  const min = T.radius * 2;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= min * min || d2 < 1e-6) return false;
+  if (Math.abs(a.pos.y - ghost.pos.y) > 1.6) return false;
+  const d = Math.sqrt(d2);
+  const nx = dx / d;
+  const nz = dz / d;
+  a.pos.x += nx * (min - d);
+  a.pos.z += nz * (min - d);
+  const rel = (a.vel.x - ghost.vel.x) * nx + (a.vel.z - ghost.vel.z) * nz;
+  if (rel < 0) {
+    const j = -(1 + 0.35) * rel * 0.5;
+    a.vel.x += nx * j;
+    a.vel.z += nz * j;
+    if (rel < -1.2) a.events.push({ type: 'bump', strength: clamp01(-rel / 10) });
   }
   return true;
 }

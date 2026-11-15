@@ -8,6 +8,16 @@ import { clamp } from './math.js';
 
 const STEER_RANGE = 62; // px of thumb travel for full lock
 
+/** Key presses that belong to a text field (the online invite boxes) are not for the game. */
+const isTyping = (e) => e.target instanceof HTMLElement && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
+
+// Which keys a rider uses. Solo: both sets work. Split screen: one set each.
+const KEYS = {
+  all: { left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'], up: ['ArrowUp', 'KeyW'], down: ['ArrowDown', 'KeyS', 'Space'] },
+  wasd: { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'] },
+  arrows: { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['ArrowUp'], down: ['ArrowDown'] },
+};
+
 export class Input {
   /** @param {HTMLElement} surface element that receives touches (covers the game) */
   constructor(surface) {
@@ -23,7 +33,7 @@ export class Input {
     this.onAnyInput = null;
 
     this._keydown = (e) => {
-      if (e.repeat) return;
+      if (e.repeat || isTyping(e)) return;
       this.keys.add(e.code);
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
       if (this.isTouch) {
@@ -129,8 +139,11 @@ export class Input {
     return Math.sign(v) * Math.pow(Math.abs(v), 1.25);
   }
 
-  /** Read the current controls into `out` = { steer, throttle, brake, analog }. */
-  read(out) {
+  /**
+   * Read the current controls into `out` = { steer, throttle, brake, analog }.
+   * @param {'all'|'wasd'|'arrows'} [scheme] which keys count; touch only applies to 'all'
+   */
+  read(out, scheme = 'all') {
     if (!this.enabled) {
       out.steer = 0;
       out.throttle = 0;
@@ -138,22 +151,20 @@ export class Input {
       out.analog = false;
       return out;
     }
-    const k = this.keys;
-    const left = k.has('ArrowLeft') || k.has('KeyA');
-    const right = k.has('ArrowRight') || k.has('KeyD');
-    const up = k.has('ArrowUp') || k.has('KeyW');
-    const down = k.has('ArrowDown') || k.has('KeyS') || k.has('Space');
-    if (this.isTouch) {
+    if (this.isTouch && scheme === 'all') {
       out.steer = this.touchSteer;
       out.brake = this.brakePointer ? 1 : 0;
       out.throttle = this.brakePointer ? 0 : 1;
       out.analog = true;
-    } else {
-      out.steer = (right ? 1 : 0) - (left ? 1 : 0);
-      out.throttle = up ? 1 : 0;
-      out.brake = down ? 1 : 0;
-      out.analog = false;
+      return out;
     }
+    const k = this.keys;
+    const map = KEYS[scheme] || KEYS.all;
+    const held = (codes) => codes.some((c) => k.has(c));
+    out.steer = (held(map.right) ? 1 : 0) - (held(map.left) ? 1 : 0);
+    out.throttle = held(map.up) ? 1 : 0;
+    out.brake = held(map.down) ? 1 : 0;
+    out.analog = false;
     return out;
   }
 }

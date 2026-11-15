@@ -271,14 +271,8 @@ export class WakeField {
     this._writeQuad(this.blobGeo, this._blobCount++, x + (sx / sl) * reach, z + (sz / sl) * reach, sx / sl, sz / sl, 1.9 + 0.75 * perMetre, 1.5, -0.62 * fade);
   }
 
-  /** Rebuild the strips and draw the field around (cx, cz). */
-  render(time, cx, cz) {
-    const texel = this.extent / this.size;
-    cx = Math.round(cx / texel) * texel;
-    cz = Math.round(cz / texel) * texel;
-    this.fieldUniform.value.set(cx, cz, 2 / this.extent);
-    this.uniforms.uWake.value.set(cx, cz, 1 / this.extent);
-
+  /** Once per frame, after emit()/stampCraft(): rebuild the strips and stamps. */
+  update(time) {
     // --- trails
     const pos = this.trailGeo.attributes.position.array;
     const dat = this.trailGeo.attributes.aData.array;
@@ -352,6 +346,15 @@ export class WakeField {
     }
     this.ringGeo.attributes.position.needsUpdate = true;
     this.ringGeo.attributes.aData.needsUpdate = true;
+  }
+
+  /** Per view: draw the field around that view's rider (cx, cz). */
+  render(cx, cz) {
+    const texel = this.extent / this.size;
+    cx = Math.round(cx / texel) * texel;
+    cz = Math.round(cz / texel) * texel;
+    this.fieldUniform.value.set(cx, cz, 2 / this.extent);
+    this.uniforms.uWake.value.set(cx, cz, 1 / this.extent);
 
     const renderer = this.renderer;
     const prevTarget = renderer.getRenderTarget();

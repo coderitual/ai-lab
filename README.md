@@ -3,6 +3,10 @@
 Small experiments that run in the browser. Each one lives in its own numbered
 folder and is published to GitHub Pages under the same name.
 
+**▶ Play Breakwater GP: https://coderitual.github.io/ai-lab/01-breakwater-gp/**
+
+All demos: https://coderitual.github.io/ai-lab/
+
 | #  | Demo | Play |
 | -- | ---- | ---- |
 | 01 | [Breakwater GP](01-breakwater-gp/) — an original jet-ski slalom race on simulated waves, built with three.js | https://coderitual.github.io/ai-lab/01-breakwater-gp/ |

@@ -1,5 +1,10 @@
 // DOM heads-up display. Text is real text (crisp at any pixel ratio), values
 // are only written when they change, and the layout adapts with CSS.
+//
+//   Hud      — everything shared: canvas host, touch layer and pads, the title,
+//              results and online-lobby panels.
+//   ViewHud  — one player's readouts, laid over that player's viewport
+//              (there are two of them in split screen).
 
 import css from './hud.css?inline';
 import { formatTime, ordinal } from '../engine/math.js';
@@ -20,25 +25,12 @@ function setText(node, value) {
   }
 }
 
-export class Hud {
-  /** @param {HTMLElement} root the element the game lives in */
-  constructor(root) {
-    if (!document.getElementById('bw-style')) {
-      const style = document.createElement('style');
-      style.id = 'bw-style';
-      style.textContent = css;
-      document.head.appendChild(style);
-    }
-    root.classList.add('bw');
+export class ViewHud {
+  /** @param {HTMLElement} parent */
+  constructor(parent) {
+    const root = el('div', 'bw-view');
     this.root = root;
 
-    this.canvasHost = el('div', 'bw-canvas');
-    this.touchLayer = el('div', 'bw-touch');
-    root.append(this.canvasHost, this.touchLayer);
-
-    // ---- race readouts
-    this.race = el('div', 'bw-race');
-    this.race.hidden = true;
     const top = el('div', 'bw-top');
     const pos = el('div', 'bw-pos');
     this.posN = el('span', 'bw-pos-n', '1');
@@ -70,100 +62,34 @@ export class Hud {
     missMeter.append(el('span', 'bw-meter-label', 'Miss'), misses);
     meters.append(this.powerMeter, missMeter);
     speed.append(meters);
-
     top.append(pos, clock, speed);
+
     this.standings = el('ol', 'bw-standings');
     this.rows = [];
     this.map = el('canvas', 'bw-map');
     this.mapCtx = this.map.getContext('2d');
-    this.race.append(top, this.standings, this.map);
-    root.append(this.race);
-
-    // ---- touch pads (visual only; the touch layer receives the input)
-    this.steerPad = el('div', 'bw-pad bw-pad-steer', '<div class="bw-rail"><span>◀</span><span>▶</span></div><div class="bw-knob"></div>');
-    this.knob = this.steerPad.querySelector('.bw-knob');
-    this.brakePad = el('div', 'bw-pad bw-pad-brake', '<div class="bw-brake">BRAKE</div>');
-    this.rotate = el('div', 'bw-rotate', 'Tip: turn your phone sideways');
-    this.race.append(this.steerPad, this.brakePad, this.rotate);
-
     this.banner = el('div', 'bw-banner');
     this.toast = el('div', 'bw-toast');
-    root.append(this.banner, this.toast);
-
-    // ---- title + results
-    this.title = el('div', 'bw-overlay');
-    this.title.innerHTML = `
-      <div class="bw-panel" role="dialog" aria-label="Breakwater GP">
-        <h1 class="bw-title">BREAKWATER <span>GP</span></h1>
-        <p class="bw-sub">${RULES.laps} laps · ${RULES.racers} riders · one island</p>
-        <ul class="bw-rules">
-          <li><i class="bw-ico can"></i><span><b>Red can</b> — ride past on its <b>right</b></span></li>
-          <li><i class="bw-ico cone"></i><span><b>Green cone</b> — ride past on its <b>left</b></span></li>
-          <li><i class="bw-ico bolt"></i><span>Each clean pass adds <b>power</b>. A miss resets it; ${RULES.maxMisses} misses and you are out.</span></li>
-          <li class="bw-ctl-keys"><i class="bw-ico key">←→</i><span>steer</span><i class="bw-ico key">↑</i><span>throttle</span><i class="bw-ico key">↓</i><span>brake</span></li>
-          <li class="bw-ctl-touch" hidden><span><b>Left thumb</b> drag to steer · <b>right thumb</b> hold to brake. Throttle is automatic.</span></li>
-        </ul>
-        <button class="bw-btn" id="bw-start" type="button">Start race</button>
-        <button class="bw-link bw-soundbtn" type="button">Sound: on</button>
-      </div>`;
-    this.startBtn = this.title.querySelector('#bw-start');
-    this.ctlKeys = this.title.querySelector('.bw-ctl-keys');
-    this.ctlTouch = this.title.querySelector('.bw-ctl-touch');
-
-    this.results = el('div', 'bw-overlay');
-    this.results.hidden = true;
-    this.results.innerHTML = `
-      <div class="bw-panel" role="dialog" aria-label="Results">
-        <div class="bw-result-head">
-          <div class="bw-result-pos" id="bw-rpos"></div>
-          <div class="bw-result-note" id="bw-rnote"></div>
-        </div>
-        <table class="bw-table"><tbody id="bw-rbody"></tbody></table>
-        <button class="bw-btn" id="bw-again" type="button">Race again</button>
-        <button class="bw-link bw-soundbtn" type="button">Sound: on</button>
-      </div>`;
-    this.againBtn = this.results.querySelector('#bw-again');
-    this.rPos = this.results.querySelector('#bw-rpos');
-    this.rNote = this.results.querySelector('#bw-rnote');
-    this.rBody = this.results.querySelector('#bw-rbody');
-    root.append(this.title, this.results);
-
-    /** Set by the game: called when a sound toggle is pressed. */
-    this.onToggleSound = null;
-    this.soundBtns = [...root.querySelectorAll('.bw-soundbtn')];
-    this.soundBtns.forEach((b) => b.addEventListener('click', () => this.onToggleSound && this.onToggleSound()));
+    root.append(top, this.standings, this.map, this.banner, this.toast);
+    parent.append(root);
 
     this._toastTimer = 0;
     this._mapStatic = null;
     this._mapSize = 0;
-    this.setTouch(matchMedia('(pointer: coarse)').matches);
   }
 
-  setSoundLabel(muted) {
-    this.soundBtns.forEach((b) => (b.textContent = muted ? 'Sound: off' : 'Sound: on'));
+  /** Place this HUD over its viewport (fractions of the game area, from the top-left). */
+  setRect(left, top, width, height) {
+    const s = this.root.style;
+    s.left = `${left * 100}%`;
+    s.top = `${top * 100}%`;
+    s.width = `${width * 100}%`;
+    s.height = `${height * 100}%`;
+    this._mapStatic = null;
   }
 
-  setTouch(isTouch) {
-    this.root.classList.toggle('touch', isTouch);
-    this.ctlKeys.hidden = isTouch;
-    this.ctlTouch.hidden = !isTouch;
-  }
-
-  /** Reflect the thumbs on the on-screen pads. */
-  showTouch(input) {
-    const s = input.steerPointer;
-    this.steerPad.classList.toggle('active', !!s);
-    const travel = this.steerPad.clientWidth * 0.5 - this.knob.clientWidth * 0.5 - 4;
-    this.knob.style.transform = `translateX(${(input.touchSteer * travel).toFixed(1)}px)`;
-    this.brakePad.classList.toggle('active', !!input.brakePointer);
-  }
-
-  showTitle(show) {
-    this.title.hidden = !show;
-  }
-
-  showRace(show) {
-    this.race.hidden = !show;
+  dispose() {
+    this.root.remove();
   }
 
   flash(text, cls = '') {
@@ -186,10 +112,11 @@ export class Hud {
     this._toastTimer = 0;
   }
 
-  setStandings(racers) {
+  /** @param {object[]} racers all racers  @param {object} me the racer this view follows */
+  setStandings(racers, me) {
     this.standings.textContent = '';
     this.rows = racers.map((r) => {
-      const li = el('li', r.isPlayer ? 'me' : '');
+      const li = el('li', r === me ? 'me' : '');
       const n = el('span', 'n', String(r.rank));
       const chip = el('i', 'chip');
       chip.style.background = r.team.css;
@@ -197,19 +124,20 @@ export class Hud {
       this.standings.append(li);
       return { li, n, racer: r, shown: -1 };
     });
+    this._power = this._misses = this._gate = undefined;
   }
 
   /** Per-frame refresh. Cheap: every write is guarded. */
-  update(dt, race, craft) {
+  update(dt, race, racer) {
     if (this._toastTimer > 0 && this._toastTimer !== Infinity) {
       this._toastTimer -= dt;
       if (this._toastTimer <= 0) this.toast.classList.remove('show');
     }
-    const p = race.player;
-    setText(this.posN, String(p.rank));
-    setText(this.posSfx, ordinal(p.rank));
-    setText(this.lapN, String(Math.min(p.lap, race.laps)));
-    setText(this.time, formatTime(race.state === 'racing' || race.state === 'finished' ? (p.finished ? p.finishTime : race.time) : 0));
+    const craft = racer.craft;
+    setText(this.posN, String(racer.rank));
+    setText(this.posSfx, ordinal(racer.rank));
+    setText(this.lapN, String(Math.min(racer.lap, race.laps)));
+    setText(this.time, formatTime(race.state === 'racing' || race.state === 'finished' ? (racer.finished ? racer.finishTime : race.time) : 0));
     setText(this.speedN, String(Math.round(craft.speed * KMH)));
 
     const power = Math.round(craft.power);
@@ -218,18 +146,17 @@ export class Hud {
       this.pips.forEach((pip, i) => pip.classList.toggle('on', i < power));
       this.powerMeter.classList.toggle('full', power >= RULES.maxPower);
     }
-    if (this._misses !== p.misses) {
-      this._misses = p.misses;
-      this.missDots.forEach((d, i) => d.classList.toggle('on', i < p.misses));
+    if (this._misses !== racer.misses) {
+      this._misses = racer.misses;
+      this.missDots.forEach((d, i) => d.classList.toggle('on', i < racer.misses));
     }
-    const gate = race.track.gates[p.nextGate];
+    const gate = race.track.gates[racer.nextGate];
     if (this._gate !== gate.index) {
       this._gate = gate.index;
       this.next.className = `bw-next ${gate.pass}`;
       this.nextTxt.textContent = gate.pass === 'right' ? 'pass right' : 'pass left';
       this.nextArrow.textContent = gate.pass === 'right' ? '▶' : '◀';
     }
-    // standings order
     for (const row of this.rows) {
       const rank = row.racer.rank;
       if (row.shown !== rank) {
@@ -302,8 +229,7 @@ export class Hud {
     this._mapStatic = off;
   }
 
-  drawMap(race) {
-    if (this.race.hidden) return;
+  drawMap(race, me) {
     const track = race.track;
     this._prepareMap(track);
     const size = this._mapSize;
@@ -311,7 +237,7 @@ export class Hud {
     c.clearRect(0, 0, size, size);
     c.drawImage(this._mapStatic, 0, 0);
     // marks
-    const next = race.player.nextGate;
+    const next = me.nextGate;
     for (const g of track.gates) {
       const [x, y] = this._toMap(g.x, g.z);
       c.fillStyle = g.pass === 'right' ? '#e8343f' : '#17b26a';
@@ -324,38 +250,283 @@ export class Hud {
         c.stroke();
       }
     }
-    // racers (player last so it is on top)
-    const sorted = race.racers.slice().sort((a, b) => (a.isPlayer ? 1 : 0) - (b.isPlayer ? 1 : 0));
-    for (const r of sorted) {
-      const [x, y] = this._toMap(r.craft.pos.x, r.craft.pos.z);
-      c.fillStyle = r.team.css;
-      c.strokeStyle = r.isPlayer ? '#fff8ea' : 'rgba(9,30,44,0.8)';
-      c.lineWidth = size * (r.isPlayer ? 0.018 : 0.012);
-      c.beginPath();
-      c.arc(x, y, size * (r.isPlayer ? 0.05 : 0.036), 0, Math.PI * 2);
-      c.fill();
-      c.stroke();
+    // racers (this view's rider last so it is on top)
+    for (let pass = 0; pass < 2; pass++) {
+      for (const r of race.racers) {
+        const mine = r === me;
+        if ((pass === 1) !== mine) continue;
+        const [x, y] = this._toMap(r.craft.pos.x, r.craft.pos.z);
+        c.fillStyle = r.team.css;
+        c.strokeStyle = mine ? '#fff8ea' : 'rgba(9,30,44,0.8)';
+        c.lineWidth = size * (mine ? 0.018 : 0.012);
+        c.beginPath();
+        c.arc(x, y, size * (mine ? 0.05 : 0.036), 0, Math.PI * 2);
+        c.fill();
+        c.stroke();
+      }
     }
+  }
+}
+
+export class Hud {
+  /** @param {HTMLElement} root the element the game lives in */
+  constructor(root) {
+    if (!document.getElementById('bw-style')) {
+      const style = document.createElement('style');
+      style.id = 'bw-style';
+      style.textContent = css;
+      document.head.appendChild(style);
+    }
+    root.classList.add('bw');
+    this.root = root;
+
+    this.canvasHost = el('div', 'bw-canvas');
+    this.touchLayer = el('div', 'bw-touch');
+    root.append(this.canvasHost, this.touchLayer);
+
+    // ---- race readouts: one ViewHud per viewport, plus the shared thumb pads
+    this.race = el('div', 'bw-race');
+    this.race.hidden = true;
+    this.viewHost = el('div', 'bw-views');
+    this.divider = el('div', 'bw-divider');
+    this.divider.hidden = true;
+    this.steerPad = el('div', 'bw-pad bw-pad-steer', '<div class="bw-rail"><span>◀</span><span>▶</span></div><div class="bw-knob"></div>');
+    this.knob = this.steerPad.querySelector('.bw-knob');
+    this.brakePad = el('div', 'bw-pad bw-pad-brake', '<div class="bw-brake">BRAKE</div>');
+    this.rotate = el('div', 'bw-rotate', 'Tip: turn your phone sideways');
+    this.race.append(this.viewHost, this.divider, this.steerPad, this.brakePad, this.rotate);
+    root.append(this.race);
+    /** @type {ViewHud[]} */
+    this.views = [];
+
+    // ---- title
+    this.title = el('div', 'bw-overlay');
+    this.title.innerHTML = `
+      <div class="bw-panel" role="dialog" aria-label="Breakwater GP">
+        <h1 class="bw-title">BREAKWATER <span>GP</span></h1>
+        <p class="bw-sub">${RULES.laps} laps · ${RULES.racers} riders · one island</p>
+        <ul class="bw-rules">
+          <li><i class="bw-ico can"></i><span><b>Red can</b> — ride past on its <b>right</b></span></li>
+          <li><i class="bw-ico cone"></i><span><b>Green cone</b> — ride past on its <b>left</b></span></li>
+          <li><i class="bw-ico bolt"></i><span>Each clean pass adds <b>power</b>. A miss resets it; ${RULES.maxMisses} misses and you are out.</span></li>
+          <li class="bw-ctl-keys"><i class="bw-ico key">←→</i><span>steer</span><i class="bw-ico key">↑</i><span>throttle</span><i class="bw-ico key">↓</i><span>brake</span></li>
+          <li class="bw-ctl-touch" hidden><span><b>Left thumb</b> drag to steer · <b>right thumb</b> hold to brake. Throttle is automatic.</span></li>
+        </ul>
+        <button class="bw-btn" id="bw-start" type="button">Start race</button>
+        <div class="bw-modes">
+          <button class="bw-btn2" id="bw-split" type="button">2 players<small>split screen · WASD + arrows</small></button>
+          <button class="bw-btn2" id="bw-online" type="button">2 players<small>online · no server</small></button>
+        </div>
+        <button class="bw-link bw-soundbtn" type="button">Sound: on</button>
+      </div>`;
+    this.startBtn = this.title.querySelector('#bw-start');
+    this.splitBtn = this.title.querySelector('#bw-split');
+    this.onlineBtn = this.title.querySelector('#bw-online');
+    this.ctlKeys = this.title.querySelector('.bw-ctl-keys');
+    this.ctlTouch = this.title.querySelector('.bw-ctl-touch');
+
+    // ---- results
+    this.results = el('div', 'bw-overlay');
+    this.results.hidden = true;
+    this.results.innerHTML = `
+      <div class="bw-panel" role="dialog" aria-label="Results">
+        <div class="bw-result-head">
+          <div class="bw-result-pos" id="bw-rpos"></div>
+          <div class="bw-result-note" id="bw-rnote"></div>
+        </div>
+        <table class="bw-table"><tbody id="bw-rbody"></tbody></table>
+        <button class="bw-btn" id="bw-again" type="button">Race again</button>
+        <p class="bw-wait" id="bw-rwait" hidden>Waiting for the host to start the next race…</p>
+        <button class="bw-link" id="bw-menu" type="button">Back to menu</button>
+        <button class="bw-link bw-soundbtn" type="button">Sound: on</button>
+      </div>`;
+    this.againBtn = this.results.querySelector('#bw-again');
+    this.menuBtn = this.results.querySelector('#bw-menu');
+    this.rWait = this.results.querySelector('#bw-rwait');
+    this.rPos = this.results.querySelector('#bw-rpos');
+    this.rNote = this.results.querySelector('#bw-rnote');
+    this.rBody = this.results.querySelector('#bw-rbody');
+
+    // ---- online lobby: two players swap an invite and a reply, nothing else
+    this.lobby = el('div', 'bw-overlay');
+    this.lobby.hidden = true;
+    this.lobby.innerHTML = `
+      <div class="bw-panel" role="dialog" aria-label="Play online">
+        <h2 class="bw-h2">Play online</h2>
+        <p class="bw-note" id="bw-lnote">Two players, connected straight from browser to browser. There is no game server: you swap an invite and a reply by any chat app.</p>
+        <div class="bw-lstep" id="bw-lchoose">
+          <button class="bw-btn" id="bw-host" type="button">Invite a friend</button>
+          <button class="bw-btn2" id="bw-join" type="button">I have an invite</button>
+        </div>
+        <div class="bw-lstep" id="bw-lhost" hidden>
+          <label for="bw-invite">1 · Send this invite link to your friend</label>
+          <textarea id="bw-invite" class="bw-code" readonly rows="3"></textarea>
+          <button class="bw-btn2" id="bw-copy-invite" type="button">Copy invite link</button>
+          <label for="bw-reply-in">2 · Paste the reply code they send back</label>
+          <textarea id="bw-reply-in" class="bw-code" rows="3" placeholder="Reply code" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+          <button class="bw-btn" id="bw-connect" type="button">Connect</button>
+        </div>
+        <div class="bw-lstep" id="bw-ljoin" hidden>
+          <label for="bw-invite-in">1 · Paste the invite link or code</label>
+          <textarea id="bw-invite-in" class="bw-code" rows="3" placeholder="Invite link or code" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+          <button class="bw-btn2" id="bw-make-reply" type="button">Make reply code</button>
+          <div id="bw-ljoin2" hidden>
+            <label for="bw-reply">2 · Send this reply code back to your friend</label>
+            <textarea id="bw-reply" class="bw-code" readonly rows="3"></textarea>
+            <button class="bw-btn2" id="bw-copy-reply" type="button">Copy reply code</button>
+            <p class="bw-wait">Waiting for your friend to paste it…</p>
+          </div>
+        </div>
+        <div class="bw-lstep" id="bw-lready" hidden>
+          <p class="bw-ready" id="bw-lstatus">Connected</p>
+          <button class="bw-btn" id="bw-net-start" type="button">Start race</button>
+          <p class="bw-wait" id="bw-lwait" hidden>Waiting for the host to start…</p>
+        </div>
+        <p class="bw-error" id="bw-lerror" hidden></p>
+        <button class="bw-link" id="bw-lback" type="button">Back</button>
+      </div>`;
+    const q = (id) => this.lobby.querySelector(id);
+    this.l = {
+      note: q('#bw-lnote'),
+      choose: q('#bw-lchoose'),
+      host: q('#bw-lhost'),
+      join: q('#bw-ljoin'),
+      join2: q('#bw-ljoin2'),
+      ready: q('#bw-lready'),
+      hostBtn: q('#bw-host'),
+      joinBtn: q('#bw-join'),
+      invite: q('#bw-invite'),
+      copyInvite: q('#bw-copy-invite'),
+      replyIn: q('#bw-reply-in'),
+      connect: q('#bw-connect'),
+      inviteIn: q('#bw-invite-in'),
+      makeReply: q('#bw-make-reply'),
+      reply: q('#bw-reply'),
+      copyReply: q('#bw-copy-reply'),
+      status: q('#bw-lstatus'),
+      start: q('#bw-net-start'),
+      wait: q('#bw-lwait'),
+      error: q('#bw-lerror'),
+      back: q('#bw-lback'),
+    };
+
+    root.append(this.title, this.results, this.lobby);
+
+    /** Set by the game: called when a sound toggle is pressed. */
+    this.onToggleSound = null;
+    this.soundBtns = [...root.querySelectorAll('.bw-soundbtn')];
+    this.soundBtns.forEach((b) => b.addEventListener('click', () => this.onToggleSound && this.onToggleSound()));
+
+    this.setTouch(matchMedia('(pointer: coarse)').matches);
+  }
+
+  /**
+   * (Re)build the per-player HUDs.
+   * @param {Array<{left:number, top:number, width:number, height:number}>} rects
+   */
+  setViews(rects) {
+    while (this.views.length > rects.length) this.views.pop().dispose();
+    while (this.views.length < rects.length) this.views.push(new ViewHud(this.viewHost));
+    rects.forEach((r, i) => this.views[i].setRect(r.left, r.top, r.width, r.height));
+    const split = rects.length > 1;
+    this.root.classList.toggle('split', split);
+    this.divider.hidden = !split;
+    if (split) {
+      const sideBySide = rects[1].left > 0;
+      this.divider.className = `bw-divider ${sideBySide ? 'v' : 'h'}`;
+    }
+    return this.views;
+  }
+
+  setSoundLabel(muted) {
+    this.soundBtns.forEach((b) => (b.textContent = muted ? 'Sound: off' : 'Sound: on'));
+  }
+
+  setTouch(isTouch) {
+    this.root.classList.toggle('touch', isTouch);
+    this.ctlKeys.hidden = isTouch;
+    this.ctlTouch.hidden = !isTouch;
+    this.splitBtn.hidden = isTouch; // split screen needs a keyboard
+  }
+
+  /** Reflect the thumbs on the on-screen pads. */
+  showTouch(input) {
+    const s = input.steerPointer;
+    this.steerPad.classList.toggle('active', !!s);
+    const travel = this.steerPad.clientWidth * 0.5 - this.knob.clientWidth * 0.5 - 4;
+    this.knob.style.transform = `translateX(${(input.touchSteer * travel).toFixed(1)}px)`;
+    this.brakePad.classList.toggle('active', !!input.brakePointer);
+  }
+
+  showTitle(show) {
+    this.title.hidden = !show;
+  }
+
+  showRace(show) {
+    this.race.hidden = !show;
+  }
+
+  showLobby(show) {
+    this.lobby.hidden = !show;
+  }
+
+  /** Which lobby step is showing: 'choose' | 'host' | 'join' | 'ready'. */
+  lobbyStep(step, { isHost = true, status = '' } = {}) {
+    const l = this.l;
+    l.choose.hidden = step !== 'choose';
+    l.host.hidden = step !== 'host';
+    l.join.hidden = step !== 'join';
+    l.ready.hidden = step !== 'ready';
+    l.note.hidden = step === 'ready';
+    if (step === 'ready') {
+      l.status.textContent = status;
+      l.start.hidden = !isHost;
+      l.wait.hidden = isHost;
+    }
+    this.lobbyError('');
+  }
+
+  lobbyError(text) {
+    this.l.error.hidden = !text;
+    this.l.error.textContent = text;
   }
 
   // ------------------------------------------------------------ results
 
-  showResults(race, show = true) {
+  /**
+   * @param {import('./Race.js').Race} race
+   * @param {boolean} show
+   * @param {{ canRestart?: boolean }} [opts]
+   */
+  showResults(race, show = true, { canRestart = true } = {}) {
     this.results.hidden = !show;
     if (!show) return;
-    const p = race.player;
-    if (p.retired) {
-      this.rPos.innerHTML = 'OUT';
-      this.rNote.textContent = `${RULES.maxMisses} marks missed`;
+    this.againBtn.hidden = !canRestart;
+    this.rWait.hidden = canRestart;
+    const locals = race.players;
+    const humans = race.racers.filter((r) => r.isPlayer || r.isRemote);
+    if (humans.length === 1) {
+      const p = locals[0];
+      if (p.retired) {
+        this.rPos.textContent = 'OUT';
+        this.rNote.textContent = `${RULES.maxMisses} marks missed`;
+      } else {
+        this.rPos.innerHTML = `${p.rank}<small>${ordinal(p.rank)}</small>`;
+        const best = p.lapTimes.length ? Math.min(...p.lapTimes) : NaN;
+        this.rNote.innerHTML = `${p.rank === 1 ? 'Winner' : 'Finished'}<br>best lap ${formatTime(best)}`;
+      }
     } else {
-      this.rPos.innerHTML = `${p.rank}<small>${ordinal(p.rank)}</small>`;
-      const best = p.lapTimes.length ? Math.min(...p.lapTimes) : NaN;
-      this.rNote.innerHTML = `${p.rank === 1 ? 'Winner' : 'Finished'}<br>best lap ${formatTime(best)}`;
+      // two riders: say who came out ahead
+      const done = humans.filter((r) => r.finished).sort((a, b) => a.finishTime - b.finishTime);
+      const racing = humans.some((r) => !r.finished && !r.retired);
+      if (done.length) this.rPos.textContent = `${done[0].name} ${done[0].rank === 1 ? 'wins' : 'leads'}`;
+      else this.rPos.textContent = racing ? 'Racing…' : 'Both out';
+      this.rNote.textContent = racing ? 'still racing' : done.length === 2 ? `by ${(done[1].finishTime - done[0].finishTime).toFixed(3)} s` : '';
     }
     this.rBody.textContent = '';
     const leader = race.order[0];
     for (const r of race.order) {
-      const tr = el('tr', r.isPlayer ? 'me' : '');
+      const tr = el('tr', r.isPlayer ? 'me' : r.isRemote ? 'them' : '');
       let t;
       if (r.retired) t = 'OUT';
       else if (r.finished) t = r === leader ? formatTime(r.finishTime) : `+${(r.finishTime - leader.finishTime).toFixed(3)}`;

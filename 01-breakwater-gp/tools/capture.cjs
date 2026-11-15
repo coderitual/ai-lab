@@ -65,7 +65,8 @@ const STATS = `(() => {
   await page.waitForFunction('window.__ready === true && !!window.__bw', null, { timeout: 90000 });
   if (a.eval) await page.evaluate(a.eval);
 
-  const shot = (file) => page.screenshot({ path: file, type: 'jpeg', quality: 90 });
+  // software WebGL can lag far behind the script: give the frame time to arrive
+  const shot = (file) => page.screenshot({ path: file, type: 'jpeg', quality: 90, timeout: 180000 });
   let now = 0;
 
   if (a.at) {
@@ -74,7 +75,7 @@ const STATS = `(() => {
       // fast-forward, then draw the last moments so the camera has settled
       const settle = Math.min(dt, 0.8);
       await page.evaluate(`window.__bw.skip(${dt - settle})`);
-      if (settle > 0) await page.evaluate(`window.__bw.advance(${settle}, 30)`);
+      if (settle > 0) await page.evaluate(`window.__bw.advance(${settle}, 12)`);
       now = t;
       const file = `${out}_${String(t).replace('.', 'p')}.jpg`;
       await page.waitForTimeout(350); // let CSS transitions settle

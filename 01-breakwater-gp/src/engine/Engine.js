@@ -56,6 +56,8 @@ export class Engine {
     this.onUpdate = null;
     /** Called once per rendered frame: (frameDt, alpha, renderTime). */
     this.onRender = null;
+    /** Optional: draws the frame itself (several viewports). Default: one full-size render. */
+    this.onDraw = null;
 
     this._tick = this._tick.bind(this);
     this.resize = this.resize.bind(this);
@@ -153,7 +155,8 @@ export class Engine {
     const alpha = this.accumulator / FIXED_DT;
     const renderTime = this.simTime + this.accumulator;
     if (this.onRender) this.onRender(frameDt, alpha, renderTime);
-    this.renderer.render(this.scene, this.camera);
+    if (this.onDraw) this.onDraw(renderTime);
+    else this.renderer.render(this.scene, this.camera);
     this.frame++;
   }
 

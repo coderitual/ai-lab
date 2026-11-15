@@ -5,6 +5,12 @@
 //    level of power (more top speed); a miss drops power to zero and counts
 //    toward the miss limit.
 //  - Leave the floats for too long and you are put back on course, powerless.
+//
+// A racer is controlled in one of three ways:
+//   'local'  — a human on this machine (one in solo, two in split screen)
+//   'bot'    — simulated here
+//   'remote' — simulated on another machine (online play); its position and
+//              race progress arrive over the network and are only displayed here
 
 import { clamp } from '../engine/math.js';
 import { RULES } from './config.js';
@@ -13,7 +19,7 @@ export class Race {
   /**
    * @param {object} o
    * @param {ReturnType<import('./track.js').createTrack>} o.track
-   * @param {Array<{craft: import('./Craft.js').Craft, driver: any, name: string, isPlayer: boolean, powerCap?: number, pace?: number}>} o.entries
+   * @param {Array<{craft: import('./Craft.js').Craft, driver?: any, name: string, control: 'local'|'bot'|'remote', human?: boolean, powerCap?: number, pace?: number}>} o.entries
    * @param {object} [o.on] event callbacks
    */
   constructor({ track, entries, on = {} }) {
@@ -23,10 +29,14 @@ export class Race {
     this.racers = entries.map((e, index) => ({
       index,
       craft: e.craft,
-      driver: e.driver,
+      driver: e.driver || null,
       name: e.name,
       team: e.craft.team,
-      isPlayer: !!e.isPlayer,
+      control: e.control,
+      /** a human riding on this machine (has a view and plays by the strict rules) */
+      isPlayer: e.control === 'local',
+      /** a human riding on the other machine */
+      isRemote: e.control === 'remote' && !!e.human,
       powerCap: e.powerCap ?? RULES.maxPower,
       pace: e.pace ?? 1,
       s: 0,
@@ -46,7 +56,9 @@ export class Race {
       stuckTimer: 0,
       rank: index + 1,
     }));
-    this.player = this.racers.find((r) => r.isPlayer) || this.racers[0];
+    /** Local humans. */
+    this.players = this.racers.filter((r) => r.isPlayer);
+    this.humans = this.racers.filter((r) => r.isPlayer || r.isRemote);
     this.order = this.racers.slice();
     this.state = 'grid'; // grid | countdown | racing | finished
     this.time = 0; // race clock (starts at GO)
@@ -57,6 +69,11 @@ export class Race {
     this.endTimer = 0;
   }
 
+  /** The (first) local human. */
+  get player() {
+    return this.players[0] || this.racers[0];
+  }
+
   _emit(name, ...args) {
     const fn = this.on[name];
     if (fn) fn(...args);
@@ -65,10 +82,8 @@ export class Race {
   /** Line everyone up on the grid. */
   reset(seaTime) {
     const { track } = this;
-    // player starts on the outside (far left) with a clear view
-    const slots = [0, 1, 2, 3];
     this.racers.forEach((r, i) => {
-      const slot = track.gridSlot(slots[i]);
+      const slot = track.gridSlot(i);
       r.craft.place(slot.x, slot.z, slot.heading, seaTime, 0);
       r.craft.power = 0;
       r.craft.speedFactor = r.pace;
@@ -118,6 +133,7 @@ export class Race {
     }
     const racing = this.state === 'racing' || this.state === 'finished';
     for (const r of this.racers) {
+      if (r.control === 'remote') continue; // ridden elsewhere
       const input = r.craft.input;
       if (!racing || r.retired) {
         input.steer = 0;
@@ -145,6 +161,10 @@ export class Race {
       this.endTimer += dt;
     }
 
+    // the catch-up for bots is measured against the best-placed human
+    let humanBest = -Infinity;
+    for (const h of this.humans) if (!h.retired && h.totalS > humanBest) humanBest = h.totalS;
+
     for (const r of this.racers) {
       const c = r.craft;
       const prevS = r.s;
@@ -152,6 +172,7 @@ export class Race {
       r.locIndex = this._loc.index;
       r.s = this._loc.s;
       r.lateral = this._loc.lateral;
+      if (r.control === 'remote') continue; // its progress and rules are reported by its own machine
       let ds = r.s - prevS;
       if (ds > L / 2) ds -= L;
       else if (ds < -L / 2) ds += L;
@@ -179,7 +200,7 @@ export class Race {
         if (r.isPlayer && r.misses >= RULES.maxMisses) {
           r.retired = true;
           this._emit('retire', r, 'misses');
-          this._finishRace();
+          this._checkRaceOver();
           continue;
         }
       }
@@ -197,7 +218,7 @@ export class Race {
           r.finishTime = stamp;
           r.lap = this.laps;
           this._emit('finish', r);
-          if (r.isPlayer) this._finishRace();
+          if (r.isPlayer) this._checkRaceOver();
         } else {
           this._emit('lap', r, r.lap, r.lapTimes[r.lapTimes.length - 1]);
         }
@@ -221,13 +242,13 @@ export class Race {
         const wrong = facing < -0.35 && c.forwardSpeed > 4;
         const was = r.wrongTimer > 1.0;
         r.wrongTimer = wrong ? r.wrongTimer + dt : 0;
-        if (r.wrongTimer > 1.0 !== was) this._emit('wrongWay', r.wrongTimer > 1.0);
+        if (r.wrongTimer > 1.0 !== was) this._emit('wrongWay', r, r.wrongTimer > 1.0);
       } else {
         // bots that get wedged somewhere are put back on the line
         r.stuckTimer = c.speed < 2.5 ? r.stuckTimer + dt : 0;
         if (r.stuckTimer > 3.5) this.respawn(r, seaTime);
         // keep the pack interesting: a small, bounded catch-up
-        const gap = this.player.totalS - r.totalS;
+        const gap = humanBest > -Infinity ? humanBest - r.totalS : 0;
         c.speedFactor = r.pace + clamp(gap / 6000, -0.025, 0.045);
       }
     }
@@ -235,11 +256,13 @@ export class Race {
     this._rank();
   }
 
-  _finishRace() {
+  /** The race is over (for this machine) once every local human is done. */
+  _checkRaceOver() {
     if (this.state === 'finished') return;
+    if (!this.players.every((p) => p.finished || p.retired)) return;
     this.state = 'finished';
     this.endTimer = 0;
-    this._emit('raceOver', this.player);
+    this._emit('raceOver');
   }
 
   /** Put a racer back on the ideal line where they left the course. */
@@ -266,8 +289,9 @@ export class Race {
 
   _rank() {
     if (this.state === 'grid' || this.state === 'countdown') {
-      // nobody has gone anywhere yet: show the grid order (player lines up last)
-      this.order.sort((a, b) => (a.isPlayer ? 1 : 0) - (b.isPlayer ? 1 : 0) || a.index - b.index);
+      // nobody has gone anywhere yet: show the grid order (humans line up last)
+      const human = (r) => (r.isPlayer || r.isRemote ? 1 : 0);
+      this.order.sort((a, b) => human(a) - human(b) || b.index - a.index);
       this.order.forEach((r, i) => (r.rank = i + 1));
       return;
     }

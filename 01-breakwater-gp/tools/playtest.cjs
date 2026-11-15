@@ -185,6 +185,74 @@ const run = (page, seconds) => page.evaluate(`window.__bw.skip(${seconds})`);
     await context.close();
   }
 
+  // ------------------------------------------------------------ split screen
+  {
+    const { context, page, problems } = await open(browser, { width: 1280, height: 720, query: '?manual&dpr=1' });
+    const st = `(() => { const g = window.__bw.game; return { mode: g.mode, phase: g.phase, race: g.race.state, views: g.views.length,
+      rects: g.views.map((v) => [v.rect.left, v.rect.width]), aspects: g.views.map((v) => +v.camera.aspect.toFixed(2)), huds: document.querySelectorAll('.bw-view').length,
+      split: g.hud.root.classList.contains('split'), names: g.race.racers.map((r) => r.name + ':' + r.control),
+      p: g.views.map((v) => ({ kmh: v.racer.craft.speed * 3.6, yaw: v.racer.craft.yaw, power: v.racer.craft.power, misses: v.racer.misses, gate: v.racer.nextGate, rank: v.racer.rank, finished: v.racer.finished })) }; })()`;
+    await page.click('#bw-split');
+    let s = await page.evaluate(st);
+    check('split: the button starts a two-rider race', s.mode === 'split' && s.phase === 'race' && s.race === 'countdown' && s.views === 2, JSON.stringify(s.names));
+    check('split: two viewports side by side, each with its own HUD', s.split && s.huds === 2 && s.rects[0][0] === 0 && s.rects[1][0] === 0.5 && s.aspects[0] < 1, `aspects ${s.aspects}`);
+    check('split: riders are P1 and P2 plus two bots', s.names.join() === 'P1:local,P2:local,MIRA:bot,JUNO:bot', s.names.join());
+    await run(page, 3.8);
+    await page.keyboard.down('KeyW');
+    await run(page, 2.5);
+    s = await page.evaluate(st);
+    check('split: W drives P1 only', s.p[0].kmh > 40 && s.p[1].kmh < 12, `P1 ${s.p[0].kmh.toFixed(0)} km/h, P2 ${s.p[1].kmh.toFixed(0)} km/h`);
+    await page.keyboard.down('ArrowUp');
+    await run(page, 2.5);
+    s = await page.evaluate(st);
+    check('split: ArrowUp drives P2', s.p[1].kmh > 40, `P2 ${s.p[1].kmh.toFixed(0)} km/h`);
+    const y0 = s.p.map((p) => p.yaw);
+    await page.keyboard.down('KeyD');
+    await page.keyboard.down('ArrowLeft');
+    await run(page, 0.8);
+    s = await page.evaluate(st);
+    check('split: D turns P1 right while ArrowLeft turns P2 left', s.p[0].yaw < y0[0] - 0.15 && s.p[1].yaw > y0[1] + 0.15, `P1 ${y0[0].toFixed(2)}->${s.p[0].yaw.toFixed(2)}  P2 ${y0[1].toFixed(2)}->${s.p[1].yaw.toFixed(2)}`);
+    await page.keyboard.up('KeyD');
+    await page.keyboard.up('ArrowLeft');
+    // a miss for P2 must not touch P1
+    await page.evaluate(`(() => {
+      const g = window.__bw.game; const t = g.race.track;
+      g.views.forEach((v, i) => { const r = v.racer; const gate = t.gates[r.nextGate];
+        const p = t.pointAt(gate.s - 14, gate.lateral + gate.side * (i === 0 ? 5 : -5) + (i === 0 ? 0 : 0));
+        r.craft.place(p.x + (i ? 0 : 0), p.z, p.heading, g.engine.simTime, 20);
+        t.locate(p.x, p.z, -1, g.race._loc); r.locIndex = g.race._loc.index; r.s = g.race._loc.s; });
+    })()`);
+    await run(page, 1.6);
+    s = await page.evaluate(st);
+    check('split: marks are judged per rider', s.p[0].power === 1 && s.p[0].misses === 0 && s.p[1].power === 0 && s.p[1].misses === 1, JSON.stringify(s.p.map((p) => [p.power, p.misses])));
+    await page.keyboard.up('KeyW');
+    await page.keyboard.up('ArrowUp');
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(outDir, 'split_race.jpg'), type: 'jpeg', quality: 88, timeout: 180000 });
+    check('split: no console errors', problems.length === 0, problems.slice(0, 3).join(' | '));
+    await context.close();
+  }
+  {
+    // a whole split-screen race on autopilot: finish, results, rematch, back to the menu
+    const { context, page, problems } = await open(browser, { width: 1280, height: 720, query: '?manual&dpr=1&ap&laps=1&mode=split&auto' });
+    const st = `(() => { const g = window.__bw.game; return { mode: g.mode, phase: g.phase, race: g.race.state, views: g.views.length, finished: g.views.map((v) => v.racer.finished),
+      resultsHidden: g.hud.results.hidden, titleHidden: g.hud.title.hidden, head: document.getElementById('bw-rpos').textContent, rows: document.querySelectorAll('#bw-rbody tr').length, split: g.hud.root.classList.contains('split') }; })()`;
+    await page.evaluate('window.__bw.skip(72)');
+    let s = await page.evaluate(st);
+    check('split: results come up once both riders are in', s.phase === 'results' && !s.resultsHidden && s.finished.every(Boolean) && s.rows === 4, `${s.phase} ${s.head}`);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(outDir, 'split_results.jpg'), type: 'jpeg', quality: 88, timeout: 180000 });
+    await page.click('#bw-again');
+    s = await page.evaluate(st);
+    check('split: Race again keeps both riders', s.phase === 'race' && s.race === 'countdown' && s.views === 2 && s.mode === 'split');
+    await page.evaluate('window.__bw.skip(72)');
+    await page.click('#bw-menu');
+    s = await page.evaluate(st);
+    check('split: Back to menu returns to the solo title screen', s.phase === 'title' && !s.titleHidden && s.views === 1 && s.mode === 'solo' && !s.split);
+    check('split: no console errors (full race)', problems.length === 0, problems.slice(0, 3).join(' | '));
+    await context.close();
+  }
+
   // ------------------------------------------------- rules: miss, off course, out
   {
     const { context, page, problems } = await open(browser, { width: 960, height: 540, query: '?manual&dpr=1&auto' });
@@ -198,7 +266,7 @@ const run = (page, seconds) => page.evaluate(`window.__bw.skip(${seconds})`);
       t.locate(p.x, p.z, -1, g.race._loc); r.locIndex = g.race._loc.index; r.s = g.race._loc.s;
       return gate.index;
     })()`);
-    const info = `(() => { const g = window.__bw.game; const r = g.race.player; return { misses: r.misses, power: r.craft.power, gate: r.nextGate, retired: r.retired, state: g.race.state, phase: g.phase, toast: g.hud.toast.textContent, toastOn: g.hud.toast.classList.contains('show'), lat: r.lateral, off: r.offTimer }; })()`;
+    const info = `(() => { const g = window.__bw.game; const r = g.race.player; return { misses: r.misses, power: r.craft.power, gate: r.nextGate, retired: r.retired, state: g.race.state, phase: g.phase, toast: g.views[0].hud.toast.textContent, toastOn: g.views[0].hud.toast.classList.contains('show'), lat: r.lateral, off: r.offTimer }; })()`;
     await page.keyboard.down('ArrowUp');
     await place(5); // correct side
     await run(page, 1.6);

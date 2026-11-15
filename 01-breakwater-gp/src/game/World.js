@@ -151,9 +151,13 @@ export function createWorld(engine, { waterSegments } = {}) {
     return h;
   }
 
-  function update(time, dt, camera, focusX, focusZ) {
+  /** Per viewport, just before it is drawn: aim the sky and the ocean grid at that view. */
+  function prepareView(time, camera, focusX, focusZ) {
     env.update(time, camera, focusX, focusZ);
+  }
 
+  /** Once per frame: everything that floats rides the swell. */
+  function update(time, dt) {
     for (let i = 0; i < floatPts.length; i++) {
       const p = floatPts[i];
       sampleSurface(p.x, p.z, time, sample);
@@ -170,7 +174,6 @@ export function createWorld(engine, { waterSegments } = {}) {
       // tilt only the body (in the group's frame); the sign above stays level
       n.set(sample.nx * 0.7, sample.ny, sample.nz * 0.7).normalize().applyAxisAngle(UP, -buoy.rotation.y);
       buoy.userData.body.quaternion.setFromUnitVectors(UP, n);
-      buoy.userData.animate(time, dt);
     }
 
     for (const boat of sailboats) {
@@ -183,5 +186,5 @@ export function createWorld(engine, { waterSegments } = {}) {
     lighthouse.userData.animate(time);
   }
 
-  return { env, track, root, islands: solid, colliders, buoys, arch, floats, sailboats, terrainHeightAt, update };
+  return { env, track, root, islands: solid, colliders, buoys, arch, floats, sailboats, terrainHeightAt, update, prepareView };
 }

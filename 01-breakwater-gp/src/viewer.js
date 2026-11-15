@@ -54,7 +54,11 @@ engine.onRender = (frameDt) => {
   time += frameDt;
   placeCamera(spin * time * DEG);
   subject.traverse((c) => c.userData.update && c.userData.update(time, frameDt));
-  if (world) world.update(time, frameDt, camera, camera.position.x, camera.position.z);
+  if (world) {
+    world.update(time, frameDt);
+    world.buoys.forEach((b) => b.userData.pose(time, 0));
+    world.prepareView(time, camera, camera.position.x, camera.position.z);
+  }
   else env.update(time, camera, target.x, target.z);
 };
 

@@ -68,7 +68,7 @@ function sharedAssets() {
 /**
  * @param {'right'|'left'} passSide which side the rider must take
  * Local axes once placed by the track: +Z = direction of travel, +X = port.
- * userData: body (tilts with the water), sign (stays level), setActive(bool), animate(time)
+ * userData: body (tilts with the water), sign (stays level), pose(time, emphasis)
  */
 export function createSlalomBuoy(passSide) {
   const a = sharedAssets();
@@ -91,16 +91,14 @@ export function createSlalomBuoy(passSide) {
   sign.position.set(dir * 0.4, 4.2, 0);
   group.add(sign);
 
-  let active = false;
-  let emphasis = 0;
   group.userData.body = body;
   group.userData.sign = sign;
   group.userData.radius = 0.85;
-  group.userData.setActive = (v) => {
-    active = v;
-  };
-  group.userData.animate = (time, dt) => {
-    emphasis += ((active ? 1 : 0) - emphasis) * Math.min(1, dt * 6);
+  /**
+   * Pose the sign for one view. `emphasis` (0..1) is how strongly this mark is
+   * that view's next target; the caller smooths it per rider.
+   */
+  group.userData.pose = (time, emphasis) => {
     const nudge = Math.sin(time * 5.5) * 0.5 + 0.5;
     const s = 1.0 + emphasis * (0.55 + 0.12 * nudge);
     sign.scale.setScalar(s);

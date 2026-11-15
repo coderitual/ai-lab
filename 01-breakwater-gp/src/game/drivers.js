@@ -2,14 +2,19 @@
 
 import { angleDiff, clamp } from '../engine/math.js';
 
-/** The human: copies the input device state onto the craft. */
+/** A human on this machine: copies the input device state onto the craft. */
 export class PlayerDriver {
-  constructor(input) {
+  /**
+   * @param {import('../engine/Input.js').Input} input
+   * @param {'all'|'wasd'|'arrows'} [scheme] which keys this rider uses
+   */
+  constructor(input, scheme = 'all') {
     this.input = input;
+    this.scheme = scheme;
   }
 
   update(dt, racer) {
-    this.input.read(racer.craft.input);
+    this.input.read(racer.craft.input, this.scheme);
   }
 }
 

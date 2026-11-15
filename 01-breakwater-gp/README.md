@@ -7,7 +7,7 @@ generated in code: there are no model, texture or audio files.
 
 It runs on desktop (keyboard) and on phones (touch), and is written for iPhone Safari.
 
-**Play it:** https://coderitual.github.io/ai-lab/01-breakwater-gp/
+**▶ Play it: https://coderitual.github.io/ai-lab/01-breakwater-gp/**
 
 ![Mid-air over a swell on the home stretch](public/og.jpg)
 ![Phone layout with thumb controls](docs/race-phone.jpg)
@@ -22,6 +22,16 @@ npm run preview    # serve the production build
 ```
 
 ## How to play
+
+Three ways to race, chosen on the title screen:
+
+- **Solo**: you against three bots.
+- **Two players, split screen**: two riders on one keyboard, each with their
+  own half of the screen, plus two bots. Player 1 uses `W` `A` `S` `D`,
+  player 2 the arrow keys.
+- **Two players, online**: see [Online play](#online-play) below.
+
+Solo controls:
 
 |            | Keyboard            | Phone                                   |
 | ---------- | ------------------- | --------------------------------------- |
