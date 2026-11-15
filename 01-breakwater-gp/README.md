@@ -5,8 +5,8 @@ A small, original jet-ski slalom racing demo for the browser, built with
 a simulated sea that the crafts genuinely ride on. Everything you see is
 generated in code: there are no model, texture or audio files.
 
-Race alone against three bots, or against a friend: split screen on one
-keyboard, or online from two devices with no game server.
+Race alone against three bots, or against friends: split screen on one
+keyboard, or online with up to four players and no game server.
 
 It runs on desktop (keyboard) and on phones (touch), and is written for iPhone Safari.
 
@@ -33,18 +33,22 @@ Three ways to race, chosen on the title screen:
   own half of the screen, plus two bots. Player 1 uses `W` `A` `S` `D`,
   player 2 the arrow keys. Each rider's engine, chimes and splashes come from
   their side of the stereo picture (headphones or two speakers help).
-- **Two players, online**: one rider each on two devices, plus two bots, with
-  no game server. See [Online play](#online-play) below.
+- **Online, two to four players**: one rider per device, bots in the empty
+  seats, and no game server. See [Online play](#online-play) below.
 
 Solo controls:
 
 |            | Keyboard            | Phone                                   |
 | ---------- | ------------------- | --------------------------------------- |
-| Steer      | `←` `→` (or `A` `D`) | left thumb: press and drag sideways     |
+| Steer      | `←` `→` (or `A` `D`) | touch anywhere and drag sideways        |
 | Throttle   | `↑` (or `W`)         | automatic                               |
-| Brake      | `↓` / `S` / `Space`  | right thumb: hold                       |
+| Brake      | `↓` / `S` / `Space`  | pull that thumb down, or hold a second finger anywhere |
 | Start      | `Enter` or the button | tap the button                         |
 | Sound      | `M` or the link on the panels | the link on the panels         |
+
+On a phone one thumb is enough: wherever it lands, a stick appears under it.
+In multiplayer every other rider carries a name tag with their place, and
+online their ping.
 
 The slalom marks follow real lateral marks:
 
@@ -62,30 +66,50 @@ steer or drive in the air, and a hard landing costs speed.
 
 ## Online play
 
-Two players on two devices, and no game server in between: the two browsers
-connect straight to each other (WebRTC). All they need from you is help finding
-each other, which takes two messages in any chat app.
+Up to four players on their own devices, and no game server in between: the
+browsers connect straight to each other (WebRTC). All they need from you is
+help finding each other, which takes two messages per friend in any chat app.
 
-1. **You**: *2 players online → Invite a friend*, then send the invite link.
+1. **You** (the host): *2–4 players online → Invite friends*, then send the
+   invite link to a friend.
 2. **Your friend**: opens the link, gets a reply code, sends it back.
-3. **You**: paste the reply code, press *Connect*, then *Start race*.
+3. **You**: paste the reply code and press *Connect*. Their name appears in
+   the seat list, and a fresh invite is ready for the next friend.
+4. Repeat for up to three friends, then *Start race*. Bots take the seats
+   nobody claimed.
 
-Each of you rides your own craft on your own device, so the controls never wait
-for the network; the host's device also runs the two bots. Both devices keep one
-shared clock, so the waves, the start lights and the timing are the same on both
-screens. After the flag the host can start a rematch on the same link.
+Everyone rides their own craft on their own device, so the controls never wait
+for the network. All devices keep one shared clock, so the waves, the start
+lights and the timing are the same on every screen. After the flag the host
+can start a rematch, or go back to the lobby to invite more players.
+
+### If there is no server, what does the work?
+
+- **GitHub Pages** only hands out the game's files. It never sees a race.
+- **You** are the matchmaker. The invite and the reply are each browser's
+  "this is how to reach me" note (network addresses and an encryption
+  fingerprint), which a signalling server would normally pass along. Here you
+  pass them along by chat.
+- **STUN servers** (public ones run by Google and Cloudflare) answer one
+  question while a note is being written: "what is my address as seen from the
+  internet?". No game data goes through them.
+- **The host's browser** is the nearest thing to a server once the race is on:
+  it runs the bots, starts the races, and passes each guest's position on to
+  the other guests. Guests are linked to the host only.
+- Everything in a race travels directly between the browsers, encrypted.
 
 Good to know:
 
 - Keep the page open while you swap the two messages. Reloading or closing it
   makes the invite or the reply worthless, and each can be used once.
-- The link and the code describe how to reach your browser, network addresses
-  included. Send them to the person you are playing with, not to a public channel.
-- Public STUN servers (Google's and Cloudflare's) are asked for each device's
-  public address. No game data passes through them, and there is no relay to
-  fall back on, so two devices that both sit behind strict networks (some
-  office, campus and mobile-carrier networks) may not be able to connect. The
-  game says so after about 25 seconds; home Wi-Fi or a phone hotspot usually works.
+- The link and the code contain network addresses. Send them to the people you
+  are playing with, not to a public channel.
+- There is no relay to fall back on, so two devices that both sit behind strict
+  networks (some office, campus and mobile-carrier networks) may not be able
+  to connect. The game says so after about 25 seconds; home Wi-Fi or a phone
+  hotspot usually works.
+- If the host leaves, the race is over for everyone; if a guest leaves, the
+  others race on.
 - Open the game from its public address. Embedded previews that block WebRTC
   cannot connect.
 
@@ -95,10 +119,10 @@ Good to know:
 src/
   assets/     everything visible, generated with three.js
     palette.js      colour script + sun direction + team colours
-    textures.js     tileable noise / ripple / label textures (CPU generated)
+    textures.js     tileable noise / ripple / caustic / label textures (CPU generated)
     sky.js          sky dome shader, shared sky-fog GLSL, PMREM environment
-    water.js        ocean mesh (radial grid) + shader (scattering, foam trails, glitter)
-    watercraft.js   lofted hull + trim            rider.js   IK-posed rider
+    water.js        ocean mesh (radial grid) + shader (light through the waves, caustics, foam trails, glitter)
+    watercraft.js   swept hull, saddle, trim      rider.js   IK-posed rider
     buoys.js        slalom marks, course floats, start arch
     island.js       analytic low-poly islands     scenery.js palms, rocks, lighthouse, pier, sailboats
     geo.js          modelling helpers (loft, merge, facet, two-bone IK)
@@ -130,12 +154,21 @@ A few choices worth knowing about:
   clearance). What you see is what the physics rides. A second tier of short,
   steep chop (under 10 cm high) is drawn by the GPU only: it sharpens the
   surface without touching the handling.
-- **Water shading** (`assets/water.js`): a deep-blue body that lightens with
-  wave height; sunlight scattering through thin crests and through faces
-  turned toward the viewer (the turquoise glow); foam that is laid where the
-  swell bunches up and then lingers behind the moving crest, drawn as lacy
-  threads over a veil of aerated water; and sun glitter from a normal-map
-  lookup held at constant size on screen, so facets sparkle near and far.
+- **Water shading** (`assets/water.js`): a deep body that lightens with wave
+  height; sunlight coming *through* the water where a wave is thin and where
+  you look sunward into its face (the turquoise glow); caustics drifting inside
+  that glow, and sharp on the sand where the water is shallow enough to see
+  the bottom; foam that is laid where the swell bunches up and then lingers
+  behind the moving crest, drawn as lacy threads over a veil of aerated water;
+  and sun glitter from a normal-map lookup held at constant size on screen.
+- **Caustics made the way they are made** (`assets/textures.js`): a grid of
+  rays is bent by the slopes of a periodic ripple field and collected where it
+  lands. Where neighbouring rays cross, light piles up into the familiar net.
+  Two copies of that texture slide over each other in the shader.
+- **The watercraft** (`assets/watercraft.js`) is one cross-section (keel,
+  strake, chine, topside, gunwale, footwell, hood) swept from stern to bow and
+  split into strips where a real hull has a hard edge, so chines and deck
+  edges stay crisp while the rest is smooth. The paint has a clear coat.
 - **Craft physics** (`game/Craft.js`) is a one-sided buoyancy spring — water
   pushes up, only gravity pulls down — so jumps fall out of the simulation
   instead of being scripted. Wave faces push the hull downhill, grip and
@@ -160,7 +193,10 @@ A few choices worth knowing about:
 - **Online without a server.** `net/PeerLink.js` packs each browser's WebRTC
   session description into a text code (deflate + base64url) that the players
   carry by hand; that replaces the signalling server. `net/OnlinePlay.js` then
-  runs the race over two data channels:
+  runs the race over two data channels per friend:
+  - The links form a star: each guest is linked to the host only (anything
+    else would mean swapping codes between every pair of players), and the
+    host passes each guest's reports on to the other guests.
   - Each machine simulates only its own rider (the host also the bots) and
     reports those crafts 20 times a second on an unreliable channel, where a
     late update is simply dropped.
@@ -178,6 +214,9 @@ A few choices worth knowing about:
 
 - Canvas pixel ratio is capped at 2 and steps down (at most twice) if the device
   cannot hold about 45 fps.
+- One-hand touch control: the first finger down becomes a stick wherever it
+  lands (sideways steers, a pull down brakes, both follow the thumb so a
+  change of direction answers at once); a second finger is a brake too.
 - Touch input uses Pointer Events with `touch-action: none`; scrolling, pinch
   zoom, double-tap zoom, text selection and long-press callouts are suppressed
   on the game surface. HUD padding respects the safe-area insets.
@@ -194,7 +233,7 @@ node tools/shot.cjs --url "http://localhost:5173/viewer.html?asset=craft" --out 
 node tools/capture.cjs --url "http://localhost:4173/?auto&ap&manual&dpr=1" --at 9,24,41 --out shots/lap   # stills
 node tools/capture.cjs --url "…" --from 46 --seconds 10 --fps 30 --out clip/f                # frames for ffmpeg
 node tools/playtest.cjs http://localhost:4173/                                                # solo + split screen: input, rules, panels
-node tools/nettest.cjs http://localhost:4173/                                                 # online: two pages join and race
+node tools/nettest.cjs http://localhost:4173/                                                 # online: two to four pages join and race
 node tools/soundtest.cjs http://localhost:4173/ wavs/                                         # sound: every cue, its moment and its side
 ```
 
@@ -224,8 +263,9 @@ over the real sea and sky.
 
 Checked with the scripts in `tools/` in headless Chromium (software WebGL):
 
-- **Solo**: a full three-lap bot race, the keyboard path, the touch path on
-  iPhone-sized viewports in both orientations (drag steering, two-thumb
+- **Solo**: a full three-lap bot race on the bigger sea, the keyboard path,
+  the touch path on iPhone-sized viewports in both orientations (the stick
+  appears under the thumb anywhere, drag steering, pull-down and second-finger
   braking, panels fit), the rules (clean pass, miss, off-course reset, five
   misses and out), results and restart, a lost and restored WebGL context, and
   the production build.
@@ -237,9 +277,13 @@ Checked with the scripts in `tools/` in headless Chromium (software WebGL):
   side (about 10 dB stronger there) while the start signals are centred; solo
   and stacked split screen are centred; the level is about -18 LUFS with
   nothing clipping; "sound off" is silent.
-- **Online**, between two pages of one browser on one machine:
-  - the whole flow: invite, reply, wrong or mangled pastes, race, results,
-    rematch, one side leaving;
+- **Online**, between pages of one browser on one machine:
+  - the whole flow with two players: invite, reply, wrong or mangled pastes,
+    race, results, rematch, one side leaving;
+  - four players, each joined with their own invite and reply: names and
+    seats, every rider drawn where they really are on every machine (guest to
+    guest through the host), name tags, one friend leaving mid-race, results,
+    back to the lobby and on into the next race;
   - a simulated bad link (80–120 ms each way, 5 % of updates lost): the other
     rider is drawn about 0.1 m from where they really are on average and
     under 1 m at worst, without visible snapping, and a 1.5 s stall on one

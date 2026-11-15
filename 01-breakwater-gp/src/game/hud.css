@@ -211,52 +211,117 @@
 .bw-toast.warn { background: rgba(232, 52, 63, 0.9); }
 .bw-toast.good { background: rgba(23, 150, 90, 0.9); }
 
-/* ---------------------------------------------------------- touch controls */
-.bw-pad { position: absolute; bottom: var(--pad-b); pointer-events: none; opacity: 0.9; }
-.bw-pad-steer { left: var(--pad-l); width: clamp(150px, 38vh, 210px); height: clamp(52px, 13vh, 70px); }
-.bw-pad-brake { right: var(--pad-r); }
-.bw-rail {
+/* ------------------------------------------------- name tags over riders */
+.bw-tags { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.bw-tag {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 5px;
   border-radius: 999px;
-  background: rgba(9, 30, 44, 0.35);
-  border: 2px solid rgba(255, 248, 234, 0.45);
+  background: rgba(9, 30, 44, 0.6);
+  white-space: nowrap;
+  font-style: normal;
+  font-size: 13px;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  text-shadow: none;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.bw-tag .chip { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.bw-tag b { font-weight: 700; }
+.bw-tag .place, .bw-tag small { font-size: 0.82em; color: var(--ink-dim); }
+.bw-tag small:empty { display: none; }
+.bw-tag.human { background: rgba(9, 30, 44, 0.82); border: 1px solid rgba(255, 248, 234, 0.35); font-size: 15px; }
+.bw-tag:not(.human) { opacity: 0.8; }
+
+/* ---------------------------------------------------------- touch controls */
+/* A stick that appears where the thumb lands. The ring is as wide as full lock. */
+.bw-stick { position: absolute; width: 0; height: 0; pointer-events: none; }
+.bw-stick-ring {
+  position: absolute;
+  left: -84px;
+  top: -34px;
+  width: 168px;
+  height: 68px;
+  border-radius: 999px;
+  background: rgba(9, 30, 44, 0.3);
+  border: 2px solid rgba(255, 248, 234, 0.5);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 14px;
+  padding: 0 12px;
   font-style: normal;
-  font-size: clamp(18px, 4.6vh, 26px);
+  font-size: 20px;
   color: var(--ink-dim);
   text-shadow: none;
 }
+.bw-stick-brake {
+  position: absolute;
+  left: -46px;
+  top: 44px;
+  width: 92px;
+  padding: 26px 0 7px;
+  border-radius: 0 0 46px 46px;
+  background: rgba(9, 30, 44, 0.28);
+  border: 2px solid rgba(255, 248, 234, 0.32);
+  border-top: 0;
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: var(--ink-dim);
+  text-shadow: none;
+}
+.bw-stick.braking .bw-stick-brake { background: rgba(232, 52, 63, 0.72); border-color: rgba(255, 248, 234, 0.6); color: var(--ink); }
 .bw-knob {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: clamp(44px, 11vh, 60px);
-  height: clamp(44px, 11vh, 60px);
-  margin: calc(clamp(44px, 11vh, 60px) / -2) 0 0 calc(clamp(44px, 11vh, 60px) / -2);
+  left: -27px;
+  top: -27px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  background: rgba(255, 248, 234, 0.9);
+  background: var(--accent);
   box-shadow: 0 3px 10px rgba(6, 24, 36, 0.5);
   will-change: transform;
 }
-.bw-pad-steer.active .bw-knob { background: var(--accent); }
-.bw-brake {
-  width: clamp(82px, 21vh, 112px);
-  height: clamp(82px, 21vh, 112px);
+.bw-stick.braking .bw-knob { background: var(--red); }
+.bw-finger {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
   border-radius: 50%;
-  background: rgba(9, 30, 44, 0.35);
-  border: 2px solid rgba(255, 248, 234, 0.45);
+  background: rgba(232, 52, 63, 0.72);
+  border: 2px solid rgba(255, 248, 234, 0.6);
   display: grid;
   place-items: center;
-  font-size: clamp(15px, 3.8vh, 21px);
+  font-size: 15px;
   letter-spacing: 0.12em;
-  color: var(--ink-dim);
   text-shadow: none;
+  pointer-events: none;
 }
-.bw-pad-brake.active .bw-brake { background: rgba(232, 52, 63, 0.75); color: var(--ink); }
+.bw-touchhint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--pad-b) + 14px);
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--shade);
+  font-style: normal;
+  font-weight: 600;
+  font-size: clamp(13px, 3.4vh, 17px);
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-shadow: none;
+  pointer-events: none;
+}
+.bw:not(.touch) .bw-stick, .bw:not(.touch) .bw-finger, .bw:not(.touch) .bw-touchhint { display: none; }
 
 /* ---------------------------------------------------------------- panels */
 .bw-overlay {
@@ -356,6 +421,37 @@
 .bw-lstep label { font-size: clamp(13px, 3vh, 16px); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); }
 .bw-lstep .bw-btn { margin-top: 0; }
 .bw-lcol { display: grid; gap: clamp(6px, 1.5vh, 10px); align-content: start; min-width: 0; }
+.bw-lsplit { display: grid; gap: clamp(6px, 1.5vh, 10px); }
+.bw-lhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.bw-name { display: flex; align-items: center; gap: 8px; font-size: clamp(12px, 2.8vh, 15px); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); }
+.bw-name input {
+  width: 8.5em;
+  padding: 5px 8px;
+  border: 1.5px solid rgba(255, 248, 234, 0.35);
+  border-radius: 8px;
+  background: rgba(4, 16, 24, 0.6);
+  color: var(--ink);
+  font: inherit;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: auto;
+}
+.bw-name input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+/* who is in: one chip per seat */
+.bw-roster { margin: clamp(8px, 2vh, 12px) 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; font-style: normal; font-size: clamp(13px, 3vh, 16px); }
+.bw-roster li { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 7px; border-radius: 999px; background: rgba(4, 16, 24, 0.55); border: 1.5px solid rgba(255, 248, 234, 0.2); }
+.bw-roster li.me { border-color: var(--accent); }
+.bw-roster li.open, .bw-roster li.bot { color: var(--ink-dim); }
+.bw-roster li.open { border-style: dashed; }
+.bw-roster .chip { width: 0.8em; height: 0.8em; border-radius: 50%; }
+.bw-roster li.open .chip { opacity: 0.35; }
+.bw-roster b { font-weight: 700; letter-spacing: 0.04em; }
+.bw-roster small { font-size: 0.8em; color: var(--ink-dim); }
 .bw-pair { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; }
 .bw-code {
   width: 100%;
@@ -433,7 +529,7 @@
 }
 
 /* split screen: each view is half as wide (or half as tall), so the readouts shrink */
-.bw.split .bw-pad, .bw.split .bw-rotate { display: none !important; }
+.bw.split .bw-stick, .bw.split .bw-finger, .bw.split .bw-touchhint, .bw.split .bw-rotate { display: none !important; }
 .bw.split .bw-pos-n { font-size: clamp(40px, 10vh, 72px); }
 .bw.split .bw-pos-sfx { font-size: clamp(16px, 3.6vh, 25px); }
 .bw.split .bw-pos-of { font-size: clamp(12px, 2.7vh, 18px); }
@@ -450,8 +546,6 @@
   .bw.split .bw-map { display: none; }
 }
 
-/* keyboard users do not need thumb pads */
-.bw:not(.touch) .bw-pad { display: none; }
 
 /* phones held upright: stack the readouts, keep thumbs free */
 @media (orientation: portrait) {
@@ -472,9 +566,6 @@
   .bw-banner { font-size: clamp(54px, 22vw, 130px); top: 24%; }
   .bw-banner.small { font-size: clamp(28px, 10.5vw, 64px); }
   .bw-toast { font-size: clamp(15px, 4.4vw, 24px); bottom: calc(var(--pad-b) + 22%); }
-  .bw-pad-steer { width: clamp(150px, 44vw, 210px); height: clamp(52px, 15vw, 70px); }
-  .bw-knob { width: clamp(44px, 12.5vw, 60px); height: clamp(44px, 12.5vw, 60px); margin: calc(clamp(44px, 12.5vw, 60px) / -2) 0 0 calc(clamp(44px, 12.5vw, 60px) / -2); }
-  .bw-brake { width: clamp(82px, 23vw, 112px); height: clamp(82px, 23vw, 112px); font-size: clamp(15px, 4vw, 21px); }
   .bw-title { font-size: clamp(38px, 12.5vw, 68px); }
   .bw-sub { font-size: clamp(13px, 3.5vw, 18px); }
   .bw-rules { font-size: clamp(15px, 4vw, 18px); }
@@ -486,6 +577,7 @@
 @media (orientation: landscape) and (max-height: 520px) {
   .bw-panel-wide { width: min(780px, 100%); }
   .bw-lsplit { grid-template-columns: 1fr 1fr; column-gap: clamp(14px, 2.6vw, 24px); align-items: start; }
+  .bw-lstep .bw-btn { padding-top: 7px; padding-bottom: 7px; }
   .bw-lsplit .bw-wait { margin-top: 0; }
 }
 

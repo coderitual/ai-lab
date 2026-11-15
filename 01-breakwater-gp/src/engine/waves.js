@@ -23,12 +23,12 @@ const coarsePointer = typeof matchMedia === 'function' && matchMedia('(pointer: 
 // dir: travel direction in degrees (0 = +X, 90 = +Z), len: wavelength (m),
 // amp: amplitude (m), steep: horizontal sharpening (1 = physical trochoid).
 const PHYSICS_DEFS = [
-  { dir: 218, len: 58.0, amp: 0.8, steep: 1.25 }, // main ocean swell
-  { dir: 250, len: 37.0, amp: 0.55, steep: 1.25 },
-  { dir: 188, len: 24.0, amp: 0.33, steep: 1.25 },
-  { dir: 290, len: 15.0, amp: 0.16, steep: 1.25 }, // wind chop
-  { dir: 150, len: 9.5, amp: 0.085, steep: 1.2 },
-  { dir: 325, len: 5.8, amp: 0.04, steep: 1.1 },
+  { dir: 218, len: 76.0, amp: 1.35, steep: 1.18 }, // main ocean swell
+  { dir: 250, len: 47.0, amp: 0.85, steep: 1.18 },
+  { dir: 188, len: 29.0, amp: 0.5, steep: 1.2 },
+  { dir: 290, len: 17.0, amp: 0.23, steep: 1.2 }, // wind chop
+  { dir: 150, len: 10.5, amp: 0.105, steep: 1.2 },
+  { dir: 325, len: 6.2, amp: 0.045, steep: 1.1 },
 ];
 const DETAIL_DEFS = [
   { dir: 238, len: 4.3, amp: 0.072, steep: 1.15 },

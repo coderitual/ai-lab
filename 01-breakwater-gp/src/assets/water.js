@@ -1,8 +1,9 @@
 // The ocean: a camera-centred radial grid (dense near the rider, sparse toward
 // the horizon) displaced by the shared Gerstner waves in the vertex shader and
-// shaded per pixel: analytic normals, deep-blue body with sunlight scattering
-// through the crests, sky reflection, sun glitter, and foam that trails behind
-// breaking waves.
+// shaded per pixel: analytic normals, a deep body that sunlight shines through
+// (most where a wave is thin and where you look sunward into its face),
+// caustics inside the waves and on the sand in the shallows, sky reflection,
+// sun glitter, and foam that trails behind breaking waves.
 
 import * as THREE from 'three';
 import { SEA_HEIGHT, WAVE_GLSL, setWaveMeshDensity, waveUniforms, waves } from '../engine/waves.js';
@@ -86,10 +87,12 @@ ${SKY_GLSL}
 #define FOAM_LAGS ${FOAM_LAGS}
 uniform sampler2D uNormalTex;
 uniform sampler2D uNoiseTex;
+uniform sampler2D uCausticTex;
 uniform vec3 uDeepColor;
 uniform vec3 uMidColor;
 uniform vec3 uShallowColor;
 uniform vec3 uScatterColor;
+uniform vec3 uSandColor;
 uniform vec3 uFoamColor;
 uniform float uDetail;
 uniform float uSeaHeight;     // typical crest-to-trough range of the open sea (m)
@@ -100,6 +103,15 @@ uniform sampler2D uWakeTex;   // r: foam laid down by crafts, g: their shadows
 uniform vec3 uWake;           // centre x, centre z, 1 / extent
 varying vec3 vWorldPos;
 varying vec2 vBase;
+
+// Two copies of the light net sliding over each other: lines flare where they
+// meet and fade where they part, the way real caustics shimmer.
+// About 0.25 on average, 1 and more on the lines.
+float caustic(vec2 uv, float time) {
+  float a = texture2D(uCausticTex, uv + time * vec2(0.031, 0.017)).r;
+  float b = texture2D(uCausticTex, uv * 1.31 + vec2(0.37, 0.61) - time * vec2(0.023, 0.029)).r;
+  return a * b * 3.2;
+}
 
 void main() {
   vec3 toCam = cameraPosition - vWorldPos;
@@ -144,11 +156,13 @@ void main() {
   // ask how hard the swell was bunching up here now and a little while ago.
   float crestNow = swellCrest(vBase, ampScale, 0.0, uFoam.x);
   float crest = smoothstep(uFoam.y, uFoam.z, crestNow);
-  crest = max(crest, 0.85 * smoothstep(uFoam.y, uFoam.z, swellCrest(vBase, ampScale, 0.9, uFoam.x)));
+  crest = max(crest, 0.8 * smoothstep(uFoam.y, uFoam.z, swellCrest(vBase, ampScale, 0.9, uFoam.x)));
   #if FOAM_LAGS > 2
-  crest = max(crest, 0.7 * smoothstep(uFoam.y, uFoam.z, swellCrest(vBase, ampScale, 1.9, uFoam.x)));
-  crest = max(crest, 0.5 * smoothstep(uFoam.y, uFoam.z, swellCrest(vBase, ampScale, 3.1, uFoam.x)));
+  crest = max(crest, 0.6 * smoothstep(uFoam.y, uFoam.z, swellCrest(vBase, ampScale, 1.9, uFoam.x)));
+  crest = max(crest, 0.4 * smoothstep(uFoam.y, uFoam.z, swellCrest(vBase, ampScale, 3.1, uFoam.x)));
   #endif
+  // even a breaking crest is streaks of white on water, never a sheet
+  crest *= 0.82;
   // small whitecaps where the short chop piles up as well
   float chop = 1.0 - jac;
   crest = max(crest, 0.75 * smoothstep(0.5, 0.7, chop));
@@ -175,25 +189,46 @@ void main() {
   // bubbles just under the surface around the foam turn the water milky
   float aerated = smoothstep(0.05, 0.75, mask);
 
-  // ---- water body: navy in the troughs, clearer blue toward the tops
+  // ---- water body: dark in the troughs, clearer toward the tops
   float hn = clamp(0.5 + vWorldPos.y / (uSeaHeight * max(ampScale, 0.3)), 0.0, 1.0);
-  float shallow = exp(-max(shore, 0.0) * 0.05);
   vec3 body = mix(uDeepColor, uMidColor, smoothstep(0.1, 0.85, hn));
-  body = mix(body, uShallowColor, shallow * 0.8);
   body *= 0.55 + 0.82 * lit;
   // little peaks catch the light, the hollows between them go dark
   body *= clamp(1.0 + chop * 0.9, 0.6, 1.4);
 
-  // ---- sunlight through the wave: thin crests glow, and so do steep faces
-  //      turned toward the viewer (you look *into* the wave there)
-  // "thin" = near the top of a wave: where the swell bunches up, or a chop peak
-  float thin = max(smoothstep(0.03, 0.36, crestNow) * (0.35 + 0.65 * smoothstep(0.3, 0.9, hn)), 0.55 * smoothstep(0.16, 0.5, chop));
-  float throughLight = pow(clamp(dot(V, -normalize(uSunDir + N * 0.45)) * 0.5 + 0.5, 0.0, 1.0), 2.5);
+  // which way "further into the water" lies as seen from here (for parallax)
+  vec2 into = V.xz / max(V.y, 0.3);
+
+  // ---- sunlight through the wave
+  // The less water behind the surface, the more gets through: the upper part
+  // of a wave, a crest where the swell bunches up, a peak of the chop.
+  float top = smoothstep(0.3, 1.0, hn);
+  float thin = max(top * top * 0.8, smoothstep(0.03, 0.36, crestNow) * (0.35 + 0.65 * top));
+  thin = max(thin, 0.55 * smoothstep(0.16, 0.5, chop));
+  // strongest looking toward the sun: the wave stands between you and the light
+  float sunward = pow(clamp(dot(V, -normalize(uSunDir + N * 0.5)) * 0.5 + 0.5, 0.0, 1.0), 3.0);
+  // steep faces turned toward the viewer: you look into the wave, not at its skin
   vec2 nh = N.xz / max(length(N.xz), 1.0e-4);
   vec2 vh = V.xz / max(length(V.xz), 1.0e-4);
-  float faceOn = max(dot(nh, vh), 0.0) * clamp((1.0 - N.y) * 5.0, 0.0, 1.0) * smoothstep(0.3, 0.85, hn);
-  float scatter = thin * (0.2 + 0.55 * throughLight) + faceOn * 0.16;
+  float faceOn = max(dot(nh, vh), 0.0) * clamp((1.0 - N.y) * 5.0, 0.0, 1.0) * smoothstep(0.25, 0.85, hn);
+  float scatter = thin * (0.27 + 0.85 * sunward) + faceOn * (0.16 + 0.45 * sunward);
+  // caustics drifting inside the wave give that glow its texture
+  float cIn = caustic((vBase - into * 1.8) * 0.05 + N.xz * 0.45, t * 0.6);
+  scatter *= 0.68 + 1.3 * cIn;
   body += uScatterColor * scatter * (0.35 + 0.65 * lit);
+  // and a trace of it everywhere near the top of a wave, sun or no sun
+  body += uScatterColor * cIn * (0.03 + 0.1 * top) * (0.4 + 0.6 * lit);
+
+  // ---- the sandy bed showing through where the water is shallow, with the
+  //      light net sharp on it
+  float depth = 0.25 + max(shore, 0.0) * 0.1;
+  float clear = exp(-depth * 0.55);
+  float cBed = caustic((vBase - into * depth * 0.8 + N.xz * depth * 1.5) * 0.17, t);
+  vec3 bed = uSandColor * (0.42 + 0.7 * lit) * (0.72 + 1.5 * cBed * (0.3 + 0.7 * lit));
+  // the more water over it, the more of the water's own colour it takes
+  bed *= mix(vec3(1.0), uShallowColor * 1.2, 1.0 - exp(-depth * 0.75));
+  body = mix(body, bed, clear * 0.9);
+
   body = mix(body, uScatterColor * (0.5 + 0.45 * lit) + 0.05, aerated * 0.4);
   body *= shade;
 
@@ -216,7 +251,8 @@ void main() {
   vec2 g = mix(g0, g1, lvl - band) * uGlint.y;
   vec3 Ng = normalize(Nr + vec3(g.x, 0.0, g.y));
   float glint = pow(max(dot(Ng, H), 0.0), uGlint.z) * uGlint.w;
-  float sheen = pow(max(dot(Nr, H), 0.0), 40.0) * 0.16;
+  // and a broad soft glare under the sun
+  float sheen = pow(max(dot(Nr, H), 0.0), 48.0) * 0.3;
 
   vec3 col = mix(body, refl, fresnel);
   col += uSunColor * (glint + sheen) * shade * shade * (1.0 - foam);
@@ -244,7 +280,7 @@ function getBlackTexture() {
   return blackTex;
 }
 
-export function createWater({ normalTex, noiseTex, segments = 192 }) {
+export function createWater({ normalTex, noiseTex, causticTex, segments = 192 }) {
   setWaveMeshDensity(segments);
   const material = new THREE.ShaderMaterial({
     name: 'Water',
@@ -256,6 +292,8 @@ export function createWater({ normalTex, noiseTex, segments = 192 }) {
       uCenter: { value: new THREE.Vector2() },
       uNormalTex: { value: normalTex },
       uNoiseTex: { value: noiseTex },
+      uCausticTex: { value: causticTex },
+      uSandColor: { value: PALETTE.sand.clone() },
       uDeepColor: { value: PALETTE.waterDeep.clone() },
       uMidColor: { value: PALETTE.waterMid.clone() },
       uShallowColor: { value: PALETTE.waterShallow.clone() },
@@ -264,7 +302,7 @@ export function createWater({ normalTex, noiseTex, segments = 192 }) {
       uDetail: { value: 0.3 },
       uSeaHeight: { value: SEA_HEIGHT },
       uSwellDir: { value: new THREE.Vector2(waves[0].dx, waves[0].dz) },
-      uFoam: { value: new THREE.Vector3(1.85, 0.16, 0.5) },
+      uFoam: { value: new THREE.Vector3(1.7, 0.3, 0.66) },
       uGlint: { value: new THREE.Vector4(2.2, 1.45, 1000, 18) },
       uWakeTex: { value: getBlackTexture() },
       uWake: { value: new THREE.Vector3(0, 0, 0.001) },

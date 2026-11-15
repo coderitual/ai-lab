@@ -144,6 +144,67 @@ export function makeWaterNormalTexture(size = 256, anisotropy = 4) {
   return finishDataTexture(new THREE.DataTexture(data, size, size, THREE.RGBAFormat), anisotropy);
 }
 
+/**
+ * Tileable caustics: the net of bright lines that sunlight draws under a
+ * rippled surface. Made the way the real thing is made: a grid of rays is bent
+ * by the slopes of a (periodic) ripple field and collected where it lands.
+ * Where neighbouring rays cross, light piles up into lines.
+ * Single channel; around 0.3 in the open cells, 1 on the lines.
+ */
+export function makeCausticTexture(size = 256, raysPerTexel = 3) {
+  const rng = makeRng(4242);
+  const TAU = Math.PI * 2;
+  // the ripple field: sines with a whole number of cycles per tile, so it repeats seamlessly
+  const ripples = [];
+  while (ripples.length < 16) {
+    const kx = Math.round((rng() * 2 - 1) * 7);
+    const ky = Math.round((rng() * 2 - 1) * 7);
+    const k = Math.hypot(kx, ky);
+    if (k < 1.5 || k > 7.5) continue;
+    ripples.push({ kx: kx * TAU, ky: ky * TAU, amp: 1 / Math.pow(k, 1.25), phase: rng() * TAU });
+  }
+  // how far below the surface the light is caught: far enough that rays start to cross
+  let curvature = 0;
+  for (const w of ripples) curvature += (w.amp * (w.kx * w.kx + w.ky * w.ky)) ** 2 / 2;
+  const depth = 1.1 / Math.sqrt(curvature);
+
+  const rays = size * raysPerTexel;
+  const light = new Float32Array(size * size);
+  for (let j = 0; j < rays; j++) {
+    const y = (j + 0.5) / rays;
+    for (let i = 0; i < rays; i++) {
+      const x = (i + 0.5) / rays;
+      let gx = 0;
+      let gy = 0;
+      for (let n = 0; n < ripples.length; n++) {
+        const w = ripples[n];
+        const c = Math.cos(w.kx * x + w.ky * y + w.phase) * w.amp;
+        gx += c * w.kx;
+        gy += c * w.ky;
+      }
+      // where this ray lands (wrapping round the tile), shared between the four texels there
+      const u = (x + gx * depth) * size - 0.5;
+      const v = (y + gy * depth) * size - 0.5;
+      const u0 = Math.floor(u);
+      const v0 = Math.floor(v);
+      const fu = u - u0;
+      const fv = v - v0;
+      const a = ((u0 % size) + size) % size;
+      const b = (a + 1) % size;
+      const c0 = ((v0 % size) + size) % size;
+      const d = (c0 + 1) % size;
+      light[c0 * size + a] += (1 - fu) * (1 - fv);
+      light[c0 * size + b] += fu * (1 - fv);
+      light[d * size + a] += (1 - fu) * fv;
+      light[d * size + b] += fu * fv;
+    }
+  }
+  const data = new Uint8Array(size * size);
+  const perTexel = 1 / (raysPerTexel * raysPerTexel);
+  for (let i = 0; i < light.length; i++) data[i] = Math.round(Math.min(1, Math.pow(light[i] * perTexel, 0.85) * 0.36) * 255);
+  return finishDataTexture(new THREE.DataTexture(data, size, size, THREE.RedFormat), 2);
+}
+
 /** Soft round sprite with a bright core (spray droplets, light glows). */
 export function makeGlowTexture(size = 64) {
   const canvas = document.createElement('canvas');

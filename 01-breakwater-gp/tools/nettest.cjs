@@ -1,6 +1,6 @@
 // Dev tool: test online play between two pages of one headless browser.
 //
-//   node tools/nettest.cjs http://localhost:4173/ [outDir] [--only=a|b|c]
+//   node tools/nettest.cjs http://localhost:4173/ [outDir] [--only=a|b|c|d]
 //
 // The pages exchange an invite and a reply exactly as two players would (by
 // copying the text out of one page and into the other), then race.
@@ -13,6 +13,9 @@
 //      and what happens when one machine stalls.
 //   C  both pages running in real time (no rendering): the parts that read the
 //      wall clock — pings, the shared sea clock, long frames.
+//   D  four players: a host and three friends, each joined with their own invite
+//      and reply. Names, seats, positions passed on by the host, results, and
+//      one of them leaving.
 //
 // This proves the signalling codes, the data channels, the clock sync and the
 // prediction of remote crafts. It cannot prove NAT traversal: both pages are on
@@ -43,10 +46,13 @@ window.__probe = () => {
   const g = window.__bw.game; const o = g.online;
   return {
     phase: g.phase, mode: g.mode, race: g.race.state, sea: o._sea(), wall: performance.timeOrigin + performance.now(),
-    time: g.race.time, active: o.active, isHost: o.isHost, link: !!o.link, broken: o.broken, clockError: o.clockError,
+    time: g.race.time, active: o.active, isHost: o.isHost, link: o.connected, broken: o.broken, clockError: o.clockError, seat: o.seat, gone: [...o.gone],
+    roster: o.roster.map((x) => x.kind + ':' + x.name), chips: [...document.querySelectorAll('#bw-roster li')].map((li) => li.textContent),
+    tags: g.views[0] ? g.views[0].hud.tags.map((t) => ({ name: t.racer.name, shown: t.shown, text: t.node.textContent })) : [],
     racers: g.race.racers.map((r) => ({ name: r.name, control: r.control, x: r.craft.pos.x, z: r.craft.pos.z, y: r.craft.pos.y, vx: r.craft.vel.x, vz: r.craft.vel.z, kmh: r.craft.speed * 3.6, total: r.totalS, rank: r.rank, lap: r.lap, finished: r.finished, retired: r.retired, fin: r.finished ? r.finishTime : null, power: r.craft.power })),
     order: g.race.order.map((r) => r.index),
-    lobbyReady: !document.getElementById('bw-lready').hidden, lobbyError: document.getElementById('bw-lerror').textContent,
+    lobbyReady: o.isHost ? !document.getElementById('bw-net-start').disabled && !document.getElementById('bw-lhost').hidden : !document.getElementById('bw-lready').hidden,
+    lobbyError: document.getElementById('bw-lerror').textContent, startLabel: document.getElementById('bw-net-start').textContent,
     resultsHidden: g.hud.results.hidden, againHidden: document.getElementById('bw-again').hidden, waitHidden: document.getElementById('bw-rwait').hidden, waitText: document.getElementById('bw-rwait').textContent,
     toast: g.views[0] ? g.views[0].hud.toast.textContent : '',
   };
@@ -151,8 +157,14 @@ const fmt = (st, unit = 'm') => `mean ${st.mean.toFixed(2)} ${unit}, 95% under $
 
     await host.fill('#bw-reply-in', reply);
     await host.click('#bw-connect');
-    await host.waitForFunction(`!document.getElementById('bw-lready').hidden`, null, { timeout: 30000 });
     await guest.waitForFunction(`!document.getElementById('bw-lready').hidden`, null, { timeout: 30000 });
+    // the host's Start comes alive when the friend's hello arrives; stepped pages
+    // on a delayed link only pass time (and so messages) when they are stepped
+    for (let i = 0; i < 600; i++) {
+      if (await host.evaluate(`!document.getElementById('bw-net-start').disabled`)) break;
+      if (manual) await both(host, guest, 0.05, 1 / 60);
+      await host.waitForTimeout(40);
+    }
     // time for a few pings
     if (manual) await both(host, guest, 1.5, 1 / 60);
     else await host.waitForTimeout(1500);
@@ -175,7 +187,8 @@ const fmt = (st, unit = 'm') => `mean ${st.mean.toFixed(2)} ${unit}, 95% under $
     let g = await probe(guest);
     check('both: the link opens and both lobbies say so', h.lobbyReady && g.lobbyReady && h.link && g.link);
     check('guest: adopted the host sea clock', Math.abs(h.sea - g.sea) < 0.03, `host ${h.sea.toFixed(3)} s, guest ${g.sea.toFixed(3)} s`);
-    check('guest: only the host can start', await guest.evaluate(`document.getElementById('bw-net-start').hidden && !document.getElementById('bw-lwait').hidden`));
+    check('guest: only the host can start', await guest.evaluate(`document.getElementById('bw-lhost').hidden && !document.getElementById('bw-lready').hidden && !document.getElementById('bw-lwait').hidden`));
+    check('lobby: both see who is in', h.chips.length === 4 && g.chips.length === 4 && /open/.test(h.chips[2]) && /ms/.test(h.chips[1]) && /2 riders \+ 2 bots/.test(h.startLabel), `${h.chips.join(' | ')} · "${h.startLabel}"`);
     await host.screenshot({ path: path.join(outDir, 'lobby_host.jpg'), type: 'jpeg', quality: 85, timeout: 120000 });
 
     await host.click('#bw-net-start');
@@ -380,6 +393,118 @@ const fmt = (st, unit = 'm') => `mean ${st.mean.toFixed(2)} ${unit}, 95% under $
     check('hitch: the clocks agree again afterwards', s.clocks.p95 < 0.03, fmt({ mean: s.clocks.mean * 1000, p95: s.clocks.p95 * 1000, max: s.clocks.max * 1000 }, 'ms'));
     check('hitch: the host clock ran on through it', Math.abs(h.sea - t0.sea - (h.wall - t0.wall) / 1000) < 0.05, `sea moved ${(h.sea - t0.sea).toFixed(2)} s in ${((h.wall - t0.wall) / 1000).toFixed(2)} s`);
     check('hitch: the picture has caught up again', s.err.p95 < 2, fmt(s.err));
+    await context.close();
+  }
+
+  // ======================================================================= D
+  if (!only || only === 'd') {
+    console.log('\n— D: four players, each friend joined with an invite and a reply of their own —');
+    const query = '?manual&dpr=1&laps=1';
+    const context = await browser.newContext({ viewport: { width: 640, height: 360 }, permissions: ['clipboard-read', 'clipboard-write'] });
+    const setName = (page, name) => page.evaluate(`(() => { const f = document.getElementById('bw-name'); f.value = ${JSON.stringify(name)}; f.dispatchEvent(new Event('change')); })()`);
+    const host = await open(context, 'host', base + query);
+    await host.evaluate('window.__bw.skip(3.1)');
+    await host.click('#bw-online');
+    await setName(host, 'Mike');
+    await host.click('#bw-host');
+    const guests = [];
+    let lastInvite = '';
+    for (const name of ['ANNA', 'ben!', 'Cleo']) {
+      // the host has a fresh invite on show for the next seat
+      await host.waitForFunction(`(() => { const v = document.getElementById('bw-invite').value; return v.includes('#join=BW1') && v !== ${JSON.stringify(lastInvite)}; })()`, null, { timeout: 20000 });
+      const invite = await host.inputValue('#bw-invite');
+      lastInvite = invite;
+      const guest = await open(context, name, base + query + invite.slice(invite.indexOf('#join=')));
+      await setName(guest, name);
+      await guest.waitForFunction(`document.getElementById('bw-reply').value.startsWith('BW1')`, null, { timeout: 20000 });
+      await host.fill('#bw-reply-in', await guest.inputValue('#bw-reply'));
+      await host.click('#bw-connect');
+      await guest.waitForFunction(`!document.getElementById('bw-lready').hidden`, null, { timeout: 30000 });
+      guests.push(guest);
+    }
+    const pages = [host, ...guests];
+    const all = async (seconds, slice = 0.05) => {
+      const n = Math.round(seconds / slice);
+      for (let i = 0; i < n; i++) for (const page of pages) await page.evaluate(`window.__bw.game.engine.advance(${slice}, ${slice}, false)`);
+    };
+    await all(1.5, 1 / 60);
+    let st = [];
+    for (const page of pages) st.push(await probe(page));
+    check('lobby: three friends are in, seats 2 to 4, under the names they chose', st[0].roster.join() === 'host:MIKE,guest:ANNA,guest:BEN,guest:CLEO' && st.every((x, i) => x.seat === i && x.roster.join() === st[0].roster.join()), st.map((x) => `${x.seat}:${x.roster.join('/')}`).join(' | '));
+    check('lobby: the host is told the seats are full and what Start starts', await host.evaluate(`document.getElementById('bw-linvite').hidden && !document.getElementById('bw-lfull').hidden`) && /4 riders$/.test(st[0].startLabel), st[0].startLabel);
+    check('lobby: everyone holds the host sea clock', st.every((x) => Math.abs(x.sea - st[0].sea) < 0.03), st.map((x) => x.sea.toFixed(3)).join(' '));
+    await host.screenshot({ path: path.join(outDir, 'lobby_four.jpg'), type: 'jpeg', quality: 85, timeout: 120000 });
+
+    await host.click('#bw-net-start');
+    await all(0.6);
+    // bots ride for everyone, as their riders
+    for (const page of pages) await page.evaluate(`(() => { const g = window.__bw.game; for (const v of g.views) v.racer.driver = v.auto; })()`);
+    st = [];
+    for (const page of pages) st.push(await probe(page));
+    check('race: each machine rides its own seat and sees three others', st.every((x, i) => x.mode === 'online' && x.racers.every((r, k) => r.control === (k === i ? 'local' : 'remote'))), st.map((x) => x.racers.map((r) => r.control[0]).join('')).join(' | '));
+    check('race: the riders carry their names on every machine', st.every((x) => x.racers.map((r) => r.name).join() === 'MIKE,ANNA,BEN,CLEO'), st.map((x) => x.racers.map((r) => r.name).join()).join(' | '));
+
+    await all(16, 1 / 60);
+    st = [];
+    for (const page of pages) st.push(await probe(page));
+    // how far is each rider drawn, on each other machine, from where their own machine has them?
+    let worst = 0;
+    let worstPair = '';
+    for (let viewer = 0; viewer < 4; viewer++) {
+      for (let seat = 0; seat < 4; seat++) {
+        if (seat === viewer) continue;
+        const d = dist(st[viewer].racers[seat], st[seat].racers[seat]);
+        if (d > worst) {
+          worst = d;
+          worstPair = `${st[seat].racers[seat].name} as seen by ${st[viewer].racers[viewer].name}`;
+        }
+      }
+    }
+    check('race: everyone is drawn where they really are, also guest to guest through the host', worst < 3 && st.every((x) => x.racers.every((r) => r.kmh > 40)), `worst ${worst.toFixed(2)} m (${worstPair})`);
+    check('race: the race clocks agree on all four machines', st.every((x) => Math.abs(x.time - st[0].time) < 0.03), st.map((x) => x.time.toFixed(3)).join(' '));
+    for (const page of pages) await page.evaluate('window.__bw.advance(0.3, 10)');
+    st = [];
+    for (const page of pages) st.push(await probe(page));
+    // every other rider has a tag; the ones on screen say who, where in the race, and how far away on the wire
+    const tagsOk = st.every((x, i) => x.tags.length === 3 && x.tags.every((t) => t.name !== x.racers[i].name && t.text.includes(t.name)));
+    const shown = st.flatMap((x) => x.tags.filter((t) => t.shown));
+    check('race: each view has a name tag over every other rider, with place and ping', tagsOk && shown.length >= 3 && shown.every((t) => /\d(st|nd|rd|th)/.test(t.text) && /\d+ ms/.test(t.text)), `${shown.length} on screen, e.g. ${shown.slice(0, 3).map((t) => t.text).join(' | ')}`);
+    await guests[0].screenshot({ path: path.join(outDir, 'race_four.jpg'), type: 'jpeg', quality: 85, timeout: 180000 });
+
+    // one friend closes the page
+    await guests[2].close();
+    pages.pop();
+    await host.waitForFunction('window.__bw.game.online.peers.length === 2', null, { timeout: 20000 });
+    await all(1);
+    st = [];
+    for (const page of pages) st.push(await probe(page));
+    check('leaving: when one friend goes, the other three are told and race on', st.every((x) => x.racers[3].retired && x.gone.join() === '3' && x.active && !x.broken && x.racers.slice(0, 3).every((r) => r.kmh > 30)), st.map((x) => `${x.racers[3].retired}/${x.gone}/${x.active}/${x.broken}`).join(' | '));
+
+    for (let i = 0; i < 50; i++) {
+      await all(2.5);
+      st = [];
+      for (const page of pages) st.push(await probe(page));
+      if (st.every((x) => x.phase === 'results' && x.racers.every((r) => r.finished || r.retired))) break;
+    }
+    await all(1.5);
+    for (const page of pages) await page.evaluate('window.__bw.advance(0.6, 10)');
+    st = [];
+    for (const page of pages) st.push(await probe(page));
+    check('results: the same order and times on every machine', st.every((x) => x.phase === 'results' && x.order.join() === st[0].order.join()) && Math.max(...st.map((x) => Math.max(...x.racers.slice(0, 3).map((r, k) => Math.abs(r.fin - st[0].racers[k].fin))))) < 0.01, st.map((x) => x.order.join('')).join(' | '));
+    await host.screenshot({ path: path.join(outDir, 'results_four.jpg'), type: 'jpeg', quality: 85, timeout: 120000 });
+
+    // the host goes back to the lobby to fill the empty seat again; the others follow and keep their links
+    await host.click('#bw-rlobby');
+    await all(1, 1 / 60);
+    await host.waitForFunction(`document.getElementById('bw-invite').value.includes('#join=BW1')`, null, { timeout: 20000 });
+    st = [];
+    for (const page of pages) st.push(await probe(page));
+    check('lobby again: links kept, the empty seat is open and a new invite is on show', st.every((x) => x.phase === 'lobby' && x.link) && st[0].roster.join() === 'host:MIKE,guest:ANNA,guest:BEN,open:JUNO' && (await host.inputValue('#bw-invite')).includes('#join=BW1'), st[0].roster.join());
+    await host.click('#bw-net-start');
+    await all(5);
+    st = [];
+    for (const page of pages) st.push(await probe(page));
+    check('next race: three riders and a bot in the seat that emptied', st.every((x) => x.race === 'racing') && st[0].racers.map((r) => r.control).join() === 'local,remote,remote,bot' && st[1].racers.map((r) => r.control).join() === 'remote,local,remote,remote', `${st[0].racers.map((r) => r.control)} | ${st[1].racers.map((r) => r.control)}`);
     await context.close();
   }
 

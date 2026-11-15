@@ -14,7 +14,7 @@ export const atmosphereUniforms = {
   uSkyHorizonAway: { value: PALETTE.skyHorizonAway.clone() },
   uSunColor: { value: PALETTE.sunColor.clone() },
   // x: density (1/m), y: max amount
-  uFog: { value: new THREE.Vector2(0.00042, 0.96) },
+  uFog: { value: new THREE.Vector2(0.00055, 0.97) },
 };
 
 /** skyGradient(dir) and applySkyFog(color, viewDir, dist) — include once per shader. */
@@ -35,7 +35,8 @@ vec3 skyGradient(vec3 dir) {
   vec3 col = mix(horizon, uSkyMid, smoothstep(0.0, 0.26, pow(y, 0.75)));
   col = mix(col, uSkyZenith, smoothstep(0.08, 0.85, y));
   float sd = max(dot(dir, uSunDir), 0.0);
-  col += uSunColor * (0.10 * pow(sd, 5.0) + 0.45 * pow(sd, 40.0));
+  // haze lit up around the sun: a wide soft glow and a hot core
+  col += uSunColor * (0.2 * pow(sd, 4.0) + 0.55 * pow(sd, 32.0));
   return col;
 }
 

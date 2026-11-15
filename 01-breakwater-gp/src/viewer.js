@@ -22,6 +22,7 @@ const az = num('az', 35) * DEG;
 const el = num('el', 10) * DEG;
 const dist = num('dist', 10);
 const target = new THREE.Vector3(num('tx', 0), num('ty', 1), num('tz', 0));
+const targetY = target.y;
 let time = num('t', 0);
 const spin = num('spin', 0);
 
@@ -52,8 +53,10 @@ function placeCamera(extraAz = 0) {
 
 engine.onRender = (frameDt) => {
   time += frameDt;
-  placeCamera(spin * time * DEG);
   subject.traverse((c) => c.userData.update && c.userData.update(time, frameDt));
+  // a floating subject rides the swell: keep the camera on it
+  if (asset === 'craft' && subject.children.length) target.y = targetY + subject.children[0].position.y;
+  placeCamera(spin * time * DEG);
   if (world) {
     world.update(time, frameDt);
     world.buoys.forEach((b) => b.userData.pose(time, 0));

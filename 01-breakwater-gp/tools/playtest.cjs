@@ -4,7 +4,7 @@
 //
 // 1. Desktop: click Start, hold the arrow keys, check the craft answers.
 // 2. Phone (iPhone-sized touch viewport, landscape + portrait): tap Start,
-//    drag the left thumb to steer, hold the right thumb to brake.
+//    touch anywhere and drag to steer, pull down (or add a finger) to brake.
 // 3. Finish a short race on autopilot and check results + "Race again".
 //
 // Requires Playwright to be available to Node (it is not a project dependency).
@@ -27,7 +27,8 @@ const check = (name, ok, detail = '') => {
 const state = `(() => {
   const g = window.__bw.game; const c = g.crafts[0]; const i = g.input;
   return { phase: g.phase, race: g.race.state, kmh: c.speed * 3.6, yaw: c.yaw, steer: c.steer, throttle: c.throttle, brake: c.brake,
-    isTouch: i.isTouch, touchSteer: i.touchSteer, braking: !!i.brakePointer, time: g.race.time, rank: g.race.player.rank,
+    isTouch: i.isTouch, touchSteer: i.touchSteer, braking: i.touchBrake > 0.12, pull: i.touchBrake, time: g.race.time, rank: g.race.player.rank,
+    stick: g.hud.stick.hidden ? null : [parseFloat(g.hud.stick.style.left), parseFloat(g.hud.stick.style.top)], hint: !g.hud.touchHint.hidden,
     titleHidden: g.hud.title.hidden, resultsHidden: g.hud.results.hidden, touchClass: g.hud.root.classList.contains('touch'),
     w: g.engine.width, h: g.engine.height, pr: g.engine.pixelRatio, fov: g.engine.camera.fov };
 })()`;
@@ -126,38 +127,60 @@ const run = (page, seconds) => page.evaluate(`window.__bw.skip(${seconds})`);
     s = await page.evaluate(state);
     check(`phone ${label}: throttle is automatic`, s.isTouch && s.kmh > 35, `${s.kmh.toFixed(0)} km/h`);
 
-    // left thumb: press, drag right
-    const lx = width * 0.2;
-    const ly = height * 0.8;
+    s = await page.evaluate(state);
+    check(`phone ${label}: a hint explains the touch controls until the first touch`, s.hint === true);
+
+    // one thumb, anywhere on the screen (here: right of centre): press, drag right
+    const lx = width * 0.62;
+    const ly = height * 0.55;
     await touch('touchStart', [[lx, ly, 1]]);
+    s = await page.evaluate(state);
+    check(`phone ${label}: a stick appears under the thumb, wherever it lands`, s.stick && Math.abs(s.stick[0] - lx) < 2 && Math.abs(s.stick[1] - ly) < 2 && s.hint === false, JSON.stringify(s.stick));
     await touch('touchMove', [[lx + 30, ly, 1]]);
     await touch('touchMove', [[lx + 70, ly, 1]]);
     const yaw0 = (await page.evaluate(state)).yaw;
     await run(page, 0.8);
     s = await page.evaluate(state);
-    check(`phone ${label}: dragging the left thumb right steers right`, s.touchSteer > 0.9 && s.yaw < yaw0 - 0.15, `steer=${s.touchSteer.toFixed(2)} yaw ${yaw0.toFixed(2)} -> ${s.yaw.toFixed(2)}`);
+    check(`phone ${label}: dragging the thumb right steers right`, s.touchSteer > 0.9 && s.yaw < yaw0 - 0.15 && !s.braking, `steer=${s.touchSteer.toFixed(2)} yaw ${yaw0.toFixed(2)} -> ${s.yaw.toFixed(2)}`);
 
-    // right thumb joins: brake while still steering (multi-touch)
-    const v0 = s.kmh;
-    await touch('touchStart', [[lx + 70, ly, 1], [width * 0.85, height * 0.8, 2]]);
+    // the same thumb pulls down: brake, while still steering (one hand does it all)
+    let v0 = s.kmh;
+    await touch('touchMove', [[lx + 70, ly + 14, 1]]);
+    s = await page.evaluate(state);
+    check(`phone ${label}: a small downward drift does not brake`, !s.braking && s.pull === 0);
+    await touch('touchMove', [[lx + 70, ly + 45, 1]]);
+    await touch('touchMove', [[lx + 70, ly + 80, 1]]);
     await run(page, 1.0);
     s = await page.evaluate(state);
-    check(`phone ${label}: right thumb brakes while the left still steers`, s.braking && s.kmh < v0 * 0.75 && s.touchSteer > 0.9, `${v0.toFixed(0)} -> ${s.kmh.toFixed(0)} km/h`);
+    check(`phone ${label}: pulling the thumb down brakes while it still steers`, s.braking && s.pull > 0.9 && s.kmh < v0 * 0.75 && s.touchSteer > 0.9, `${v0.toFixed(0)} -> ${s.kmh.toFixed(0)} km/h`);
     await page.screenshot({ path: path.join(outDir, `phone_${label}_race.jpg`), type: 'jpeg', quality: 88 });
+    // easing the thumb back up lets go of the brake
+    await touch('touchMove', [[lx + 70, ly + 40, 1]]);
+    await touch('touchMove', [[lx + 70, ly + 4, 1]]);
+    s = await page.evaluate(state);
+    check(`phone ${label}: easing the thumb back up releases the brake`, !s.braking && s.touchSteer > 0.9);
+    await run(page, 1.2);
 
-    // reverse the left thumb quickly
-    await touch('touchMove', [[lx - 40, ly, 1], [width * 0.85, height * 0.8, 2]]);
+    // a second finger anywhere is a brake too (two-thumb riders)
+    v0 = (await page.evaluate(state)).kmh;
+    await touch('touchStart', [[lx + 70, ly + 4, 1], [width * 0.15, height * 0.3, 2]]);
+    await run(page, 1.0);
+    s = await page.evaluate(state);
+    check(`phone ${label}: a second finger brakes while the first still steers`, s.braking && s.kmh < v0 * 0.8 && s.touchSteer > 0.9, `${v0.toFixed(0)} -> ${s.kmh.toFixed(0)} km/h`);
+
+    // reverse the thumb quickly
+    await touch('touchMove', [[lx - 40, ly + 4, 1], [width * 0.15, height * 0.3, 2]]);
     await run(page, 0.3);
     s = await page.evaluate(state);
     check(`phone ${label}: reversing the thumb steers left at once`, s.touchSteer < -0.5 && s.braking, `steer=${s.touchSteer.toFixed(2)}`);
-    // lift only the right thumb (CDP can only end all touches, so send the pointer event the browser would)
+    // lift only the second finger (CDP can only end all touches, so send the pointer event the browser would)
     await page.evaluate(`(() => { const i = window.__bw.game.input; i.surface.dispatchEvent(new PointerEvent('pointerup', { pointerId: i.brakePointer.id, pointerType: 'touch', bubbles: true })); })()`);
     s = await page.evaluate(state);
-    check(`phone ${label}: lifting the right thumb releases the brake only`, !s.braking && s.touchSteer < -0.5);
+    check(`phone ${label}: lifting the second finger releases the brake only`, !s.braking && s.touchSteer < -0.5);
     await touch('touchEnd', []);
     await run(page, 0.3);
     s = await page.evaluate(state);
-    check(`phone ${label}: lifting the thumb centres the steering`, s.touchSteer === 0 && Math.abs(s.steer) < 0.2, `steer=${s.steer.toFixed(2)}`);
+    check(`phone ${label}: lifting the thumb centres the steering and hides the stick`, s.touchSteer === 0 && Math.abs(s.steer) < 0.2 && s.stick === null, `steer=${s.steer.toFixed(2)}`);
     check(`phone ${label}: no console errors`, problems.length === 0, problems.slice(0, 3).join(' | '));
     await context.close();
   }

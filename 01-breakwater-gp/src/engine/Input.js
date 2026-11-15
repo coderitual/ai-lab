@@ -1,12 +1,15 @@
-// Player input: keyboard on desktop, two thumbs on a phone.
+// Player input: keyboard on desktop, one thumb (or two) on a phone.
 //
-// Touch layout (auto-throttle is on while touch is in use):
-//   left half   — press and drag sideways to steer (analog, floating origin)
-//   lower right — hold to brake / tighten the turn
+// Touch (throttle is automatic while touch is in use):
+//   - touch anywhere: a stick appears under the thumb. Drag sideways to steer,
+//     pull down to brake. One hand is enough.
+//   - a second finger anywhere is the brake as well, for two-thumb riders.
 
 import { clamp } from './math.js';
 
 const STEER_RANGE = 62; // px of thumb travel for full lock
+const BRAKE_DEAD = 26; // px the thumb may drift down before the brake starts to bite
+const BRAKE_RANGE = 44; // px from there to full brake
 
 /** Key presses that belong to a text field (the online invite boxes) are not for the game. */
 const isTyping = (e) => e.target instanceof HTMLElement && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
@@ -27,8 +30,8 @@ export class Input {
     this.isTouch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     this.enabled = true;
 
-    this.steerPointer = null; // { id, originX, x, y }
-    this.brakePointer = null;
+    this.steerPointer = null; // the stick: { id, originX, originY, x, y }
+    this.brakePointer = null; // a second finger: { id, x, y }
     this.onTouchChange = null; // (state) => void, for drawing the on-screen stick
     this.onAnyInput = null;
 
@@ -80,21 +83,15 @@ export class Input {
     if (e.pointerType === 'mouse') return;
     e.preventDefault();
     if (!this.isTouch) this.isTouch = true;
-    const rect = this.surface.getBoundingClientRect();
-    const u = (e.clientX - rect.left) / rect.width;
-    const v = (e.clientY - rect.top) / rect.height;
-    const left = u < 0.5;
-    // the brake only answers in the lower right, where its button is drawn, so a
-    // stray palm or a finger on the readouts does not stop the craft
-    const onBrake = u > 0.55 && v > 0.4;
     try {
       this.surface.setPointerCapture(e.pointerId);
     } catch {
       /* not capturable: fine */
     }
-    if (left && !this.steerPointer) {
-      this.steerPointer = { id: e.pointerId, originX: e.clientX, x: e.clientX, y: e.clientY };
-    } else if (onBrake && !this.brakePointer) {
+    // the first finger down is the stick, wherever it lands; one more is the brake
+    if (!this.steerPointer) {
+      this.steerPointer = { id: e.pointerId, originX: e.clientX, originY: e.clientY, x: e.clientX, y: e.clientY };
+    } else if (!this.brakePointer) {
       this.brakePointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
     }
     this._notify();
@@ -107,9 +104,20 @@ export class Input {
       e.preventDefault();
       s.x = e.clientX;
       s.y = e.clientY;
-      // let the origin trail the thumb so reversing direction is immediate
+      // the origin trails the thumb, so reversing direction answers at once
       if (s.x - s.originX > STEER_RANGE) s.originX = s.x - STEER_RANGE;
       if (s.x - s.originX < -STEER_RANGE) s.originX = s.x + STEER_RANGE;
+      // likewise up and down: the brake is a pull from wherever the thumb has got to
+      const maxPull = BRAKE_DEAD + BRAKE_RANGE + 12;
+      if (s.y < s.originY) s.originY = s.y;
+      if (s.y - s.originY > maxPull) s.originY = s.y - maxPull;
+      this._notify();
+      return;
+    }
+    const b = this.brakePointer;
+    if (b && b.id === e.pointerId) {
+      b.x = e.clientX;
+      b.y = e.clientY;
       this._notify();
     }
   }
@@ -139,6 +147,14 @@ export class Input {
     return Math.sign(v) * Math.pow(Math.abs(v), 1.25);
   }
 
+  /** How hard the brake is on, 0 .. 1: the thumb pulled down, or a second finger held. */
+  get touchBrake() {
+    if (this.brakePointer) return 1;
+    const s = this.steerPointer;
+    if (!s) return 0;
+    return clamp((s.y - s.originY - BRAKE_DEAD) / BRAKE_RANGE, 0, 1);
+  }
+
   /**
    * Read the current controls into `out` = { steer, throttle, brake, analog }.
    * @param {'all'|'wasd'|'arrows'} [scheme] which keys count; touch only applies to 'all'
@@ -152,9 +168,10 @@ export class Input {
       return out;
     }
     if (this.isTouch && scheme === 'all') {
+      const brake = this.touchBrake;
       out.steer = this.touchSteer;
-      out.brake = this.brakePointer ? 1 : 0;
-      out.throttle = this.brakePointer ? 0 : 1;
+      out.brake = brake;
+      out.throttle = brake > 0.12 ? 0 : 1;
       out.analog = true;
       return out;
     }
