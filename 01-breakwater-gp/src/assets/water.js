@@ -99,7 +99,7 @@ uniform float uSeaHeight;     // typical crest-to-trough range of the open sea (
 uniform vec2 uSwellDir;       // travel direction of the main swell: foam streaks line up with it
 uniform vec3 uFoam;           // crest steepening, threshold low, threshold high
 uniform vec4 uGlint;          // texture scale, normal spread, exponent, strength
-uniform sampler2D uWakeTex;   // r: foam laid down by crafts, g: their shadows
+uniform sampler2D uWakeTex;   // r: water churned by crafts, g: their shadows, b: how fresh the churn is
 uniform vec3 uWake;           // centre x, centre z, 1 / extent
 varying vec3 vWorldPos;
 varying vec2 vBase;
@@ -137,6 +137,15 @@ void main() {
   vec2 rs = n1 * 0.8 + n2.yx * 0.75 + n4 * 0.65;       // in swell space
   vec2 ripple = (uSwellDir * rs.x + vec2(-uSwellDir.y, uSwellDir.x) * rs.y + n3 * 0.35) * uDetail;
   ripple *= 0.4 + 0.6 * ampScale;                  // glassier in sheltered water
+
+  // ---- what the crafts have done to the water around the player
+  vec2 wuv = (vBase - uWake.xy) * uWake.z + 0.5;
+  vec2 wedge = abs(wuv - 0.5) * 2.0;
+  vec3 wake = texture2D(uWakeTex, wuv).rgb * (1.0 - smoothstep(0.86, 1.0, max(wedge.x, wedge.y)));
+  float shade = 1.0 - wake.g * 0.5;
+  // churned water is rough: it boils, and stops mirroring the sky
+  vec2 boil = texture2D(uNormalTex, vBase * 0.83 + t * vec2(0.09, -0.06)).xy + texture2D(uNormalTex, vBase * 0.37 - t * vec2(0.05, 0.07)).xy - 1.0;
+  ripple += boil * wake.r * (0.25 + 0.5 * wake.b);
   // the finest ripples mostly show up in what the surface mirrors, less in its colour
   vec3 Nr = normalize(N + vec3(ripple.x, 0.0, ripple.y) * 2.4);
   N = normalize(N + vec3(ripple.x, 0.0, ripple.y));
@@ -144,12 +153,6 @@ void main() {
   float NdV = max(dot(Nr, V), 0.0);
   // 0.55 on flat water, brighter on faces turned to the sun, darker on the far side
   float lit = clamp((dot(N, uSunDir) - uSunDir.y) * 2.3 + 0.55, 0.0, 1.3);
-
-  // ---- what the crafts have done to the water around the player
-  vec2 wuv = (vBase - uWake.xy) * uWake.z + 0.5;
-  vec2 wedge = abs(wuv - 0.5) * 2.0;
-  vec2 wake = texture2D(uWakeTex, wuv).rg * (1.0 - smoothstep(0.86, 1.0, max(wedge.x, wedge.y)));
-  float shade = 1.0 - wake.g * 0.5;
 
   // ---- foam mask
   // Breaking crests leave foam behind that lingers while the wave moves on:
@@ -180,14 +183,27 @@ void main() {
   float sd = shore + (fine - 0.5) * 3.5 + sin(t * 0.9 + vBase.x * 0.05) * 0.8;
   float wash = smoothstep(9.0, 0.5, sd) * mix(0.3, 1.0, 0.5 + 0.5 * sin(sd * 1.15 - t * 1.4));
 
-  float mask = max(max(crest, wash * 0.85), wake.r);
+  float mask = max(crest, wash * 0.85);
   // white threads where the pattern is strong; in between, a thin veil of bubbles
-  // (a craft's wake is fresh churn, so it leans toward threads)
-  float threadMask = max(mask, min(wake.r * 1.6, 1.0));
-  float foam = smoothstep(1.25 - threadMask * 1.05, 1.5 - threadMask * 1.05, churn);
+  float foam = smoothstep(1.25 - mask * 1.05, 1.5 - mask * 1.05, churn);
+
+  // ---- a craft's wake
+  // Fresh from the jet it is solid white water. As the air escapes, the same
+  // bubble pattern is cut by a rising threshold: it opens into lace, then
+  // flecks, then it is gone. Two layers sliding against each other keep it alive.
+  float cells = texture2D(uNoiseTex, vBase * 0.19 + t * vec2(0.013, -0.009)).g;
+  float cells2 = texture2D(uNoiseTex, vBase * 0.43 - t * vec2(0.016, 0.011) + 0.31).g;
+  float grit = texture2D(uNoiseTex, vBase * 1.25 + t * vec2(0.045, 0.03)).b;
+  float bubbles = cells * 0.42 + cells2 * 0.38 + grit * 0.5;
+  float wfoam = smoothstep(0.93 - wake.r * 0.95, 1.1 - wake.r * 0.9, bubbles + wake.b * 0.22);
+  // light and shade inside the foam, so thick white water has some body
+  float foamBody = 0.8 + 0.32 * grit - 0.1 * cells2;
+  foam = max(foam, wfoam);
+
+  mask = max(mask, wake.r);
   float veil = mask * (0.14 + 0.3 * fine) * (1.0 - foam);
   // bubbles just under the surface around the foam turn the water milky
-  float aerated = smoothstep(0.05, 0.75, mask);
+  float aerated = smoothstep(0.04, 0.7, mask);
 
   // ---- water body: dark in the troughs, clearer toward the tops
   float hn = clamp(0.5 + vWorldPos.y / (uSeaHeight * max(ampScale, 0.3)), 0.0, 1.0);
@@ -258,7 +274,7 @@ void main() {
   col += uSunColor * (glint + sheen) * shade * shade * (1.0 - foam);
 
   // the veil is aerated water: pale turquoise rather than white
-  vec3 foamCol = uFoamColor * (0.6 + 0.5 * lit) * mix(1.0, shade, 0.7);
+  vec3 foamCol = uFoamColor * (0.6 + 0.5 * lit) * mix(1.0, shade, 0.7) * mix(1.0, foamBody, wfoam);
   vec3 veilCol = mix(uScatterColor, uFoamColor, 0.55) * (0.55 + 0.5 * lit) * mix(1.0, shade, 0.7);
   col = mix(col, veilCol, veil);
   col = mix(col, foamCol, foam);

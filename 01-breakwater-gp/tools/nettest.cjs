@@ -165,8 +165,8 @@ const fmt = (st, unit = 'm') => `mean ${st.mean.toFixed(2)} ${unit}, 95% under $
       if (manual) await both(host, guest, 0.05, 1 / 60);
       await host.waitForTimeout(40);
     }
-    // time for a few pings
-    if (manual) await both(host, guest, 1.5, 1 / 60);
+    // time for the guest to ping a few times and settle on the quickest round trips
+    if (manual) await both(host, guest, 3, 1 / 60);
     else await host.waitForTimeout(1500);
     return { context, host, guest };
   };

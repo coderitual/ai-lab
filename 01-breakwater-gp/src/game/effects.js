@@ -12,8 +12,8 @@ import { SUN_DIR } from '../assets/palette.js';
 import { SKY_GLSL, atmosphereUniforms } from '../assets/sky.js';
 import { waterHeight } from '../engine/waves.js';
 
-const TRAIL_POINTS = 46;
-const TRAIL_LIFE = 2.6;
+const TRAIL_POINTS = 76;
+const TRAIL_LIFE = 6.5; // seconds until a stretch of wake has dissolved
 
 // Vertices are in "undisplaced" sea coordinates and mapped straight to the
 // texture: u = (x - cx) / extent + 0.5, v = (z - cz) / extent + 0.5.
@@ -27,6 +27,8 @@ void main() {
 }
 `;
 
+// What the field holds: r = how much air is churned into the water (foam),
+// g = craft shadows, b = how fresh the churn is (1 at the jet, 0 when gone).
 const trailFragment = /* glsl */ `
 precision highp float;
 varying vec3 vData;
@@ -34,15 +36,15 @@ void main() {
   float x = vData.x;
   float age = vData.y;
   float life = clamp(1.0 - age / ${TRAIL_LIFE.toFixed(1)}, 0.0, 1.0);
-  // churned core straight behind the jet, fading fast
-  float core = exp(-x * x * 16.0) * clamp(1.0 - age / 1.15, 0.0, 1.0);
-  // two thin diverging arms that last a little longer
-  float ax = abs(x) - 0.8;
-  float arms = exp(-ax * ax * 70.0) * life * life * 0.46;
-  // faint sheet of bubbles in between
-  float sheet = (1.0 - x * x) * life * life * life * 0.1;
-  float a = (core * 0.85 + arms + sheet) * vData.z * smoothstep(1.0, 0.9, abs(x));
-  gl_FragColor = vec4(a, 0.0, 0.0, 1.0);
+  // straight behind the jet: solid white water for the first second or so
+  float core = exp(-x * x * 9.0) * clamp(1.0 - age / 1.5, 0.0, 1.0);
+  // the turbulent band that spreads out behind it and thins as the air escapes
+  float band = (1.0 - smoothstep(0.3, 0.8, abs(x))) * pow(life, 1.35) * 0.6;
+  // the two edges of the wake: thin lines of foam that outlast the middle
+  float ax = abs(x) - 0.85;
+  float arms = exp(-ax * ax * 95.0) * life * 0.46;
+  float a = (max(core, band) + arms) * vData.z * smoothstep(1.0, 0.93, abs(x));
+  gl_FragColor = vec4(a, 0.0, life * step(0.004, a), 1.0);
 }
 `;
 
@@ -55,7 +57,8 @@ void main() {
   float blob = smoothstep(1.0, 0.25, r);
   float ring = smoothstep(0.45, 0.78, r) * smoothstep(1.0, 0.86, r);
   float a = mix(blob, ring, uRing) * abs(vData.z);
-  gl_FragColor = vData.z < 0.0 ? vec4(0.0, a, 0.0, 1.0) : vec4(a, 0.0, 0.0, 1.0);
+  // white water thrown up by a hull or a landing is as fresh as it gets
+  gl_FragColor = vData.z < 0.0 ? vec4(0.0, a, 0.0, 1.0) : vec4(a, 0.0, min(1.0, a * 1.6), 1.0);
 }
 `;
 
@@ -244,7 +247,7 @@ export class WakeField {
     } else {
       const dx = x - t.lastX;
       const dz = z - t.lastZ;
-      if (dx * dx + dz * dz > 1.7 * 1.7) t.push(x, z, dirX, dirZ, time, strength);
+      if (dx * dx + dz * dz > 1.9 * 1.9) t.push(x, z, dirX, dirZ, time, strength);
     }
     t.liveX = x;
     t.liveZ = z;
@@ -280,7 +283,8 @@ export class WakeField {
       const t = this.trails[c];
       let k = c * this.stripVerts * 3;
       const write = (x, z, dx, dz, age, strength) => {
-        const w = 0.4 + 1.7 * (1 - Math.exp(-age * 0.8));
+        // half-width: a craft's beam at the stern, spreading as the churn drifts apart
+        const w = 0.5 + 3.3 * (1 - Math.exp(-age * 0.5));
         const nx = -dz * w;
         const nz = dx * w;
         pos[k] = x - nx;
@@ -386,8 +390,8 @@ void main() {
   vViewDir = position - cameraPosition;
   gl_Position = projectionMatrix * mv;
   float px = aInfo.x * uPixelsPerUnit / max(-mv.z, 0.5);
-  gl_PointSize = clamp(px, 1.5, 24.0);
-  vAlpha *= clamp(22.0 / px, 0.0, 1.0);      // droplets right at the lens fade out instead of ballooning
+  gl_PointSize = clamp(px, 1.5, 11.0);
+  vAlpha *= clamp(9.0 / px, 0.0, 1.0);       // spray right at the lens thins out instead of ballooning
 }
 `;
 

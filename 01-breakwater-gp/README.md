@@ -137,6 +137,7 @@ src/
     Craft.js        watercraft physics          drivers.js player + bot drivers
     Race.js         rules: marks, power, misses, laps, ranking, respawn
     effects.js      wake field (render-to-texture foam + shadows), spray particles
+    LensDrops.js    water drops on the camera lens
     Hud.js / hud.css   DOM HUD (one set of readouts per rider), minimap, panels, online lobby
     Game.js         wires it all together: solo, split screen (two viewports), online
   net/        online play
@@ -179,6 +180,19 @@ A few choices worth knowing about:
 - **Wake field.** Wakes, hull wash, splash rings and soft craft shadows are drawn
   top-down into a small texture each frame and sampled by the ocean shader, so
   foam lies in the water surface and drifts with it. No geometry floating on top.
+  The texture also carries how *fresh* the churn is: straight from the jet it
+  is solid white water; as the air escapes, the same bubble pattern is cut by a
+  rising threshold and opens into lace, then flecks, while the band widens and
+  its two edges outlast the middle. Churned water is also rougher, so it stops
+  mirroring the sky.
+- **Water on the lens** (`game/LensDrops.js`). Landings, bumps and a rooster
+  tail followed too closely throw drops onto the camera. Each drop is drawn as
+  a small lens over a copy of the frame just rendered: the scene upside down
+  and squeezed inside it, a glint and a dark rim. Small drops sit and dry; big
+  ones are pushed outward by the airflow at speed (or run down at a
+  standstill), stretch, swallow the small ones in their way and leave beads
+  behind. Nothing is copied or drawn while the lens is dry, and the effect
+  switches itself off on a device that is already dropping resolution.
 - **Cheap to draw.** Static scenery is merged and vertex-coloured, floats are
   instanced, there are no shadow maps or post-processing: about 100 draw calls
   and 170k triangles per frame. Split screen draws the scene twice, each half
@@ -251,7 +265,8 @@ unchanged and the whole soundtrack is rendered at the end, in step with the
 frames. `--ride` lets bots ride for the riders, who keep their names.
 
 Useful query options: `?auto` (skip the title), `?ap` (a bot rides your craft),
-`?mode=split`, `?laps=1`, `?dpr=1`, `?sea=0.8` (wave height), `?manual` (step
+`?mode=split`, `?laps=1`, `?dpr=1`, `?sea=0.8` (wave height), `?drops=0` (no
+water on the lens), `?manual` (step
 with `__bw.advance(seconds)` / `__bw.skip(seconds)`), `?nodraw` (run without
 rendering), and for online play `?netlag=80&netjitter=40&netloss=5` (hold back
 by 80–120 ms, and drop 5 % of, the updates this page receives).
@@ -294,7 +309,9 @@ Checked with the scripts in `tools/` in headless Chromium (software WebGL):
 Not checked:
 
 - Real Safari/WebKit and real phone hardware (only Chromium was available),
-  and frame rate on a device.
+  and frame rate on a device. The water shader, the clear-coated paint and
+  the lens drops (which copy the frame while the lens is wet) all cost more
+  than what they replaced; how much on a phone is not known.
 - Whether the sound is *pleasant*. The measurements say what is played, when,
   where and how loud; nobody has listened to it on speakers.
 - Online play between two real devices across the internet. Whether two

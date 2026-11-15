@@ -19,6 +19,7 @@ import { BotDriver, PlayerDriver } from './drivers.js';
 import { Race } from './Race.js';
 import { Hud } from './Hud.js';
 import { Spray, WakeField } from './effects.js';
+import { LensDrops } from './LensDrops.js';
 import { RULES } from './config.js';
 import { OnlinePlay } from '../net/OnlinePlay.js';
 
@@ -32,7 +33,7 @@ const BOTS = [
 export class Game {
   /**
    * @param {HTMLElement} root
-   * @param {{ pixelRatio?: number, manual?: boolean, draw?: boolean, autopilot?: boolean, laps?: number, seaScale?: number, online?: boolean, playUrl?: string, net?: { lag: number, jitter: number, loss: number } }} [options]
+   * @param {{ pixelRatio?: number, manual?: boolean, draw?: boolean, autopilot?: boolean, laps?: number, seaScale?: number, drops?: boolean, online?: boolean, playUrl?: string, net?: { lag: number, jitter: number, loss: number } }} [options]
    */
   constructor(root, options = {}) {
     this.options = options;
@@ -58,7 +59,7 @@ export class Game {
 
     this.wake = new WakeField(engine.renderer, { size: coarse ? 512 : 1024, extent: 176, maxCrafts: RULES.racers });
     world.env.water.userData.setWake(this.wake.uniforms);
-    this.spray = new Spray(1400);
+    this.spray = new Spray(coarse ? 1500 : 2200);
     engine.scene.add(this.spray.points);
 
     this.input = new Input(hud.touchLayer);
@@ -68,8 +69,10 @@ export class Game {
       return craft;
     });
 
-    /** One per rider on this machine: { racer, camera, chase, hud, rect, pan, emphasis, human, auto }. */
+    /** One per rider on this machine: { racer, camera, chase, hud, rect, pan, emphasis, human, auto, lens, wet }. */
     this.views = [];
+    /** Water on each view's camera lens (kept from race to race). */
+    this.lenses = [];
     this.mode = 'solo';
     this.phase = 'title'; // title | lobby | race | results
     this._countdownAt = null; // online: the sea time at which both machines start counting down
@@ -163,10 +166,14 @@ export class Game {
 
     // one view per rider on this machine
     const locals = race.players;
-    this.views = locals.map((racer) => {
+    this.views = locals.map((racer, n) => {
       const camera = new THREE.PerspectiveCamera(62, 1, 0.3, 9000);
       const chase = new ChaseCamera(camera);
+      if (!this.lenses[n]) this.lenses[n] = new LensDrops(this.engine.renderer);
+      this.lenses[n].clear();
       return {
+        lens: this.lenses[n],
+        wet: 0,
         racer,
         camera,
         chase,
@@ -454,6 +461,7 @@ export class Game {
     race.postStep(dt, time);
     this.online.afterStep(dt, time);
     this._effects(dt, time);
+    this._wetLenses(dt);
     this.spray.update(dt, time);
 
     if (this._lightsOff > 0) {
@@ -472,6 +480,29 @@ export class Game {
         this._resultsTimer = 0;
         this.hud.showRace(false);
         this.refreshResults();
+      }
+    }
+  }
+
+  /** Spray that reaches a camera all the time: the rider's own at speed, and a rooster tail followed too closely. */
+  _wetLenses(dt) {
+    for (const v of this.views) {
+      const me = v.racer.craft;
+      let rate = me.grip > 0.3 ? 0.8 * clamp01((me.speed - 14) / 12) : 0;
+      for (const c of this.crafts) {
+        if (c === me || c.grip < 0.3 || c.speed < 8) continue;
+        const dx = me.pos.x - c.pos.x;
+        const dz = me.pos.z - c.pos.z;
+        const fx = Math.sin(c.yaw);
+        const fz = Math.cos(c.yaw);
+        const behind = -(dx * fx + dz * fz);
+        const side = Math.abs(dx * fz - dz * fx);
+        if (behind > 1 && behind < 10 && side < 2.4) rate += 13 * (1 - behind / 10) * (1 - side / 2.4) * c.throttle;
+      }
+      v.wet += rate * dt;
+      while (v.wet >= 1) {
+        v.wet -= 1;
+        v.lens.splash(1, 0);
       }
     }
   }
@@ -507,7 +538,7 @@ export class Game {
       if (near && c.grip > 0.3) {
         const acc = this._emitAcc[i];
         // rooster tail from the jet
-        acc.tail += dt * 120 * c.throttle * (0.35 + 0.65 * speedK);
+        acc.tail += dt * 210 * c.throttle * (0.35 + 0.65 * speedK);
         while (acc.tail >= 1) {
           acc.tail -= 1;
           const side = (Math.random() - 0.5) * 1.6;
@@ -516,15 +547,15 @@ export class Game {
             c.pos.y + 0.12,
             c.pos.z - fz * 1.55 + lz * side * 0.2,
             c.vel.x * 0.5 - fx * (2 + Math.random() * 3) + lx * side,
-            2.6 + Math.random() * 3.6 * (0.4 + c.throttle),
+            2.6 + Math.random() * 4.2 * (0.4 + c.throttle),
             c.vel.z * 0.5 - fz * (2 + Math.random() * 3) + lz * side,
-            0.05 + Math.random() * Math.random() * 0.16,
-            0.4 + Math.random() * 0.5,
+            0.03 + Math.random() * Math.random() * 0.09,
+            0.4 + Math.random() * 0.55,
           );
         }
         // sheets of spray peeling off the bow, heavier on the outside of a turn
         if (c.speed > 8) {
-          acc.bow += dt * 110 * speedK;
+          acc.bow += dt * 150 * speedK;
           while (acc.bow >= 1) {
             acc.bow -= 1;
             const turn = Math.max(-1, Math.min(1, c.yawRate));
@@ -537,7 +568,7 @@ export class Game {
               c.vel.x * 0.72 + lx * sideSign * out,
               1.5 + Math.random() * 2.4,
               c.vel.z * 0.72 + lz * sideSign * out,
-              0.045 + Math.random() * Math.random() * 0.14,
+              0.03 + Math.random() * Math.random() * 0.085,
               0.3 + Math.random() * 0.4,
             );
           }
@@ -553,16 +584,25 @@ export class Game {
             for (let k = 0; k < n; k++) {
               const a = Math.random() * Math.PI * 2;
               const sp = 2.5 + Math.random() * 5 * (0.5 + ev.strength);
-              this.spray.emit(c.pos.x + Math.cos(a) * 0.8, c.pos.y + 0.1, c.pos.z + Math.sin(a) * 0.8, c.vel.x * 0.6 + Math.cos(a) * sp, 2.5 + Math.random() * 5.5 * (0.4 + ev.strength), c.vel.z * 0.6 + Math.sin(a) * sp, 0.06 + Math.random() * Math.random() * 0.2, 0.55 + Math.random() * 0.5);
+              this.spray.emit(c.pos.x + Math.cos(a) * 0.8, c.pos.y + 0.1, c.pos.z + Math.sin(a) * 0.8, c.vel.x * 0.6 + Math.cos(a) * sp, 2.5 + Math.random() * 5.5 * (0.4 + ev.strength), c.vel.z * 0.6 + Math.sin(a) * sp, 0.04 + Math.random() * Math.random() * 0.13, 0.55 + Math.random() * 0.5);
             }
           }
           if (view) {
             view.chase.kick(0.25 + ev.strength * 0.6);
             this.audio.splash(ev.strength, view.pan);
+            // the splash comes up over the camera
+            if (ev.strength > 0.28) view.lens.splash(3 + 30 * ev.strength, ev.strength);
+          }
+          // and somebody else coming down close by wets the lens too
+          for (const v of this.views) {
+            if (v === view) continue;
+            const d = Math.hypot(c.pos.x - v.racer.craft.pos.x, c.pos.z - v.racer.craft.pos.z);
+            if (d < 6) v.lens.splash((2 + 12 * ev.strength) * (1 - d / 6), ev.strength * 0.4);
           }
         } else if (ev.type === 'bump' && view) {
           view.chase.kick(0.2 + ev.strength * 0.6);
           this.audio.splash(0.2 + ev.strength * 0.5, view.pan);
+          view.lens.splash(3 + 10 * ev.strength, ev.strength * 0.5);
         }
       }
       c.events.length = 0;
@@ -591,6 +631,7 @@ export class Game {
     const racing = this.phase === 'race';
     for (const v of this.views) {
       v.chase.update(frameDt, v.racer.craft, time);
+      v.lens.update(frameDt, clamp01(v.racer.craft.speed / 26));
       // each rider's next mark stands out in their own view
       const next = racing ? v.racer.nextGate : -1;
       const k = Math.min(1, frameDt * 6);
@@ -646,6 +687,12 @@ export class Game {
       renderer.setViewport(x, y, w, h);
       renderer.setScissor(x, y, w, h);
       renderer.render(engine.scene, v.camera);
+      // water on the lens goes on last, bending what was just drawn
+      // (left out on devices that are already struggling to keep up)
+      if (this.options.drops !== false && engine._qualitySteps < 2) {
+        const pr = engine.pixelRatio;
+        v.lens.render(Math.round(x * pr), Math.round(y * pr), Math.round(w * pr), Math.round(h * pr));
+      }
     }
   }
 }
