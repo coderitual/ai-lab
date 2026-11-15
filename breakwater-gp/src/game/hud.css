@@ -106,8 +106,6 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-shadow: none;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 .bw-mark { width: 1.05em; height: 1.05em; flex: none; }
 .bw-next.right .bw-mark { background: var(--red); border-radius: 3px; }

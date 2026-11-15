@@ -1,8 +1,8 @@
 // Player input: keyboard on desktop, two thumbs on a phone.
 //
 // Touch layout (auto-throttle is on while touch is in use):
-//   left half  — press and drag sideways to steer (analog, floating origin)
-//   right half — hold to brake / tighten the turn
+//   left half   — press and drag sideways to steer (analog, floating origin)
+//   lower right — hold to brake / tighten the turn
 
 import { clamp } from './math.js';
 
@@ -71,7 +71,12 @@ export class Input {
     e.preventDefault();
     if (!this.isTouch) this.isTouch = true;
     const rect = this.surface.getBoundingClientRect();
-    const left = e.clientX - rect.left < rect.width * 0.5;
+    const u = (e.clientX - rect.left) / rect.width;
+    const v = (e.clientY - rect.top) / rect.height;
+    const left = u < 0.5;
+    // the brake only answers in the lower right, where its button is drawn, so a
+    // stray palm or a finger on the readouts does not stop the craft
+    const onBrake = u > 0.55 && v > 0.4;
     try {
       this.surface.setPointerCapture(e.pointerId);
     } catch {
@@ -79,7 +84,7 @@ export class Input {
     }
     if (left && !this.steerPointer) {
       this.steerPointer = { id: e.pointerId, originX: e.clientX, x: e.clientX, y: e.clientY };
-    } else if (!left && !this.brakePointer) {
+    } else if (onBrake && !this.brakePointer) {
       this.brakePointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
     }
     this._notify();

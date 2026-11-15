@@ -17,9 +17,9 @@ import { RULES } from './config.js';
 
 // Bots: how much power they can build, base pace, and their habits.
 const BOTS = [
-  { powerCap: 5, pace: 0.972, bias: 0.0, wobble: 0.6, sharpness: 2.5 },
-  { powerCap: 4, pace: 0.982, bias: -3.4, wobble: 1.0, sharpness: 2.2 },
-  { powerCap: 4, pace: 0.958, bias: 3.4, wobble: 1.4, sharpness: 2.0 },
+  { powerCap: 5, pace: 0.958, bias: 0.0, wobble: 0.6, sharpness: 2.5 },
+  { powerCap: 4, pace: 0.968, bias: -3.4, wobble: 1.0, sharpness: 2.2 },
+  { powerCap: 4, pace: 0.945, bias: 3.4, wobble: 1.4, sharpness: 2.0 },
 ];
 
 export class Game {
@@ -141,15 +141,17 @@ export class Game {
     };
 
     // browsers may suspend audio (tab switch, phone call): any touch brings it back
-    const wake = () => this.audio.ctx && this.audio.unlock();
-    window.addEventListener('pointerdown', wake, true);
-    window.addEventListener('keydown', wake, true);
+    const resumeAudio = () => this.audio.ctx && this.audio.unlock();
+    window.addEventListener('pointerdown', resumeAudio, true);
+    window.addEventListener('keydown', resumeAudio, true);
 
     hud.startBtn.addEventListener('click', () => this.start());
     hud.againBtn.addEventListener('click', () => this.restart());
     window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
       if (e.code === 'KeyM') hud.onToggleSound();
-      if (e.code !== 'Enter' && e.code !== 'Space') return;
+      // Enter starts / restarts (a focused button handles its own Enter as a click)
+      if (e.code !== 'Enter' || e.target instanceof HTMLButtonElement) return;
       if (this.phase === 'title') this.start();
       else if (this.phase === 'results') this.restart();
     });
@@ -357,8 +359,8 @@ export class Game {
     }
     this.wake.render(time, player.object.position.x, player.object.position.z);
 
-    const nextGate = race.player.nextGate;
-    world.buoys.forEach((b, i) => b.userData.setActive(this.phase === 'race' && i === nextGate));
+    const nextGate = this.phase === 'race' ? race.player.nextGate : -1;
+    for (let i = 0; i < world.buoys.length; i++) world.buoys[i].userData.setActive(i === nextGate);
     world.update(time, frameDt, engine.camera, player.object.position.x, player.object.position.z);
 
     this.audio.update(player, this.phase === 'race' && race.state !== 'grid');
