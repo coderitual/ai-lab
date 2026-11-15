@@ -7,7 +7,9 @@ generated in code: there are no model, texture or audio files.
 
 It runs on desktop (keyboard) and on phones (touch), and is written for iPhone Safari.
 
-![Mid-air over a swell on the home stretch](docs/race-desktop.jpg)
+**Play it:** https://coderitual.github.io/ai-lab/01-breakwater-gp/
+
+![Mid-air over a swell on the home stretch](public/og.jpg)
 ![Phone layout with thumb controls](docs/race-phone.jpg)
 
 ## Run it
