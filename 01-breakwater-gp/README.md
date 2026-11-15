@@ -31,7 +31,8 @@ Three ways to race, chosen on the title screen:
 - **Solo**: you against three bots.
 - **Two players, split screen**: two riders on one keyboard, each with their
   own half of the screen, plus two bots. Player 1 uses `W` `A` `S` `D`,
-  player 2 the arrow keys.
+  player 2 the arrow keys. Each rider's engine, chimes and splashes come from
+  their side of the stereo picture (headphones or two speakers help).
 - **Two players, online**: one rider each on two devices, plus two bots, with
   no game server. See [Online play](#online-play) below.
 
@@ -105,7 +106,7 @@ src/
     Engine.js       renderer, resize, fixed-timestep loop + interpolation, adaptive resolution
     waves.js        THE sea: one Gerstner wave set used by both the shaders and the physics
     ChaseCamera.js  chase / orbit camera        Input.js   keyboard + multi-touch
-    Audio.js        synthesised engine, water and cues (Web Audio)
+    Audio.js        synthesised engine, water and cues (Web Audio), one voice per rider
   game/       this particular game
     track.js        centre line, marks, racing line, grid
     World.js        builds the location from the assets, floats the props
@@ -117,7 +118,7 @@ src/
   net/        online play
     PeerLink.js     WebRTC data channels joined by hand-carried codes (no signalling server)
     OnlinePlay.js   lobby flow, shared clock, state messages, prediction of remote crafts
-tools/        optional dev scripts (need Playwright): screenshots, frame-stepped capture, play tests
+tools/        optional dev scripts (need Playwright): screenshots, frame-stepped capture with sound, play and sound tests
 ```
 
 A few choices worth knowing about:
@@ -149,6 +150,13 @@ A few choices worth knowing about:
   instanced, there are no shadow maps or post-processing: about 100 draw calls
   and 170k triangles per frame. Split screen draws the scene twice, each half
   with its own camera, its own dense patch of ocean and its own wake texture.
+- **Sound without files.** `engine/Audio.js` synthesises everything: each rider
+  on the machine gets a voice (three oscillators through a low-pass that opens
+  with the revs, plus filtered noise for the water), and one-off tones and
+  noise bursts mark the start, clean passes, misses, laps and landings. In
+  split screen the two voices are panned to their rider's half of the screen,
+  the second engine runs 7 % higher so the two do not blur into one, and each
+  rider's cues are panned with them. The start signals stay in the middle.
 - **Online without a server.** `net/PeerLink.js` packs each browser's WebRTC
   session description into a text code (deflate + base64url) that the players
   carry by hand; that replaces the signalling server. `net/OnlinePlay.js` then
@@ -187,7 +195,21 @@ node tools/capture.cjs --url "http://localhost:4173/?auto&ap&manual&dpr=1" --at 
 node tools/capture.cjs --url "…" --from 46 --seconds 10 --fps 30 --out clip/f                # frames for ffmpeg
 node tools/playtest.cjs http://localhost:4173/                                                # solo + split screen: input, rules, panels
 node tools/nettest.cjs http://localhost:4173/                                                 # online: two pages join and race
+node tools/soundtest.cjs http://localhost:4173/ wavs/                                         # sound: every cue, its moment and its side
 ```
+
+A recording with sound, straight to a file (needs `ffmpeg`):
+
+```bash
+node tools/capture.cjs --url "http://localhost:4173/?mode=split&manual&dpr=1" --ride --seconds 40 --out clip/f --sound --mp4 clip/split.mp4
+```
+
+Software WebGL draws a frame far slower than it plays, so neither the picture
+nor the sound can be recorded in real time. The game is stepped frame by frame
+instead, and for the sound the page is handed an `OfflineAudioContext` whose
+clock is the game clock (`tools/soundcap.cjs`): the game's audio code runs
+unchanged and the whole soundtrack is rendered at the end, in step with the
+frames. `--ride` lets bots ride for the riders, who keep their names.
 
 Useful query options: `?auto` (skip the title), `?ap` (a bot rides your craft),
 `?mode=split`, `?laps=1`, `?dpr=1`, `?sea=0.8` (wave height), `?manual` (step
@@ -209,6 +231,12 @@ Checked with the scripts in `tools/` in headless Chromium (software WebGL):
   the production build.
 - **Split screen**: separate keys per rider, rules and readouts per rider,
   results, rematch, back to the menu.
+- **Sound**, by measuring the rendered soundtrack rather than by listening:
+  every start signal and mark chime the game asks for is found at its moment;
+  in split screen each rider's engine, chimes and hard landings sit on their
+  side (about 10 dB stronger there) while the start signals are centred; solo
+  and stacked split screen are centred; the level is about -18 LUFS with
+  nothing clipping; "sound off" is silent.
 - **Online**, between two pages of one browser on one machine:
   - the whole flow: invite, reply, wrong or mangled pastes, race, results,
     rematch, one side leaving;
@@ -222,7 +250,9 @@ Checked with the scripts in `tools/` in headless Chromium (software WebGL):
 Not checked:
 
 - Real Safari/WebKit and real phone hardware (only Chromium was available),
-  frame rate on a device, and how the synthesised audio sounds.
+  and frame rate on a device.
+- Whether the sound is *pleasant*. The measurements say what is played, when,
+  where and how loud; nobody has listened to it on speakers.
 - Online play between two real devices across the internet. Whether two
   networks let the browsers reach each other (NAT traversal) cannot be tried
   from one machine, and neither can the system share sheet on a phone.

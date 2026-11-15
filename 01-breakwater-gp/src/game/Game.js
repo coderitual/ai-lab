@@ -10,7 +10,7 @@ import { Engine } from '../engine/Engine.js';
 import { ChaseCamera } from '../engine/ChaseCamera.js';
 import { Input } from '../engine/Input.js';
 import { GameAudio } from '../engine/Audio.js';
-import { clamp01 } from '../engine/math.js';
+import { clamp, clamp01 } from '../engine/math.js';
 import { sea } from '../engine/waves.js';
 import { TEAMS } from '../assets/palette.js';
 import { createWorld } from './World.js';
@@ -68,7 +68,7 @@ export class Game {
       return craft;
     });
 
-    /** One per rider on this machine: { racer, camera, chase, hud, rect, emphasis, auto }. */
+    /** One per rider on this machine: { racer, camera, chase, hud, rect, pan, emphasis, human, auto }. */
     this.views = [];
     this.mode = 'solo';
     this.phase = 'title'; // title | lobby | race | results
@@ -164,6 +164,7 @@ export class Game {
         chase,
         hud: null,
         rect: { left: 0, top: 0, width: 1, height: 1 },
+        pan: 0,
         emphasis: new Float32Array(world.buoys.length),
         human: racer.driver,
         auto: new BotDriver(world.track, { bias: racer.index ? 1.5 : 0, wobble: 0.4, sharpness: 2.6, phase: 1.1 + racer.index }),
@@ -202,9 +203,13 @@ export class Game {
       v.camera.aspect = aspect;
       v.camera.updateProjectionMatrix();
       v.chase.setAspect(aspect);
+      // sound: a rider is heard from their side of the screen (left / right halves only)
+      v.pan = two ? clamp((v.rect.left + v.rect.width / 2 - 0.5) * 2.4, -0.6, 0.6) : 0;
     });
     const huds = hud.setViews(views.map((v) => v.rect));
     views.forEach((v, i) => (v.hud = huds[i]));
+    /** What the audio follows: one voice per rider on this machine. */
+    this.riders = views.map((v) => ({ craft: v.racer.craft, pan: v.pan }));
   }
 
   viewOf(racer) {
@@ -254,9 +259,9 @@ export class Game {
         if (ok) {
           const full = r.craft.power >= RULES.maxPower;
           v.hud.say(full ? 'Full power' : 'Clean pass', 'good', 1.0);
-          audio.pass(full);
+          audio.pass(full, v.pan);
         } else {
-          audio.miss();
+          audio.miss(v.pan);
           v.hud.flash('MISS', 'bad small');
           v.hud.say(`Power lost · ${RULES.maxMisses - r.misses} misses left`, 'warn', 1.8);
           v.chase.kick(0.35);
@@ -266,13 +271,13 @@ export class Game {
         const v = this.viewOf(r);
         if (!v) return;
         v.hud.flash(lap === this.race.laps ? 'FINAL LAP' : `LAP ${lap}`, 'small');
-        audio.lap();
+        audio.lap(v.pan);
       },
       finish: (r) => {
         const v = this.viewOf(r);
         if (!v) return;
         v.hud.flash('FINISH', 'go small');
-        audio.finish();
+        audio.finish(v.pan);
         r.driver = v.auto; // cruise while the others come in
         if (this.race.humans.some((h) => h !== r && !h.finished && !h.retired)) v.hud.say('Finished · waiting for the other rider', 'good', 0);
       },
@@ -280,7 +285,7 @@ export class Game {
         const v = this.viewOf(r);
         if (!v) return;
         v.hud.flash('OUT', 'bad');
-        audio.miss();
+        audio.miss(v.pan);
       },
       raceOver: () => {
         this._resultsIn = 2.2;
@@ -518,11 +523,11 @@ export class Game {
           }
           if (view) {
             view.chase.kick(0.25 + ev.strength * 0.6);
-            this.audio.splash(ev.strength);
+            this.audio.splash(ev.strength, view.pan);
           }
         } else if (ev.type === 'bump' && view) {
           view.chase.kick(0.2 + ev.strength * 0.6);
-          this.audio.splash(0.2 + ev.strength * 0.5);
+          this.audio.splash(0.2 + ev.strength * 0.5, view.pan);
         }
       }
       c.events.length = 0;
@@ -565,7 +570,7 @@ export class Game {
       }
     }
 
-    this.audio.update(this.views[0].racer.craft, racing && race.state !== 'grid');
+    this.audio.update(this.riders, racing && race.state !== 'grid');
 
     if (this.phase === 'results' && !this._settledShown) {
       this._resultsTimer -= frameDt;
