@@ -360,7 +360,12 @@ export class Hud {
       if (r.retired) t = 'OUT';
       else if (r.finished) t = r === leader ? formatTime(r.finishTime) : `+${(r.finishTime - leader.finishTime).toFixed(3)}`;
       else t = 'still racing';
-      tr.append(el('td', '', String(r.rank)), el('td', '', `<i class="chip" style="background:${r.team.css}"></i>${r.name}`), el('td', '', t));
+      // colours are set through the CSSOM (no inline style attributes), which strict CSPs allow
+      const who = el('td');
+      const chip = el('i', 'chip');
+      chip.style.background = r.team.css;
+      who.append(chip, document.createTextNode(r.name));
+      tr.append(el('td', '', String(r.rank)), who, el('td', '', t));
       this.rBody.append(tr);
     }
   }
