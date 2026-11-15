@@ -1,0 +1,18 @@
+{
+  "name": "breakwater-gp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Breakwater GP — an original jet-ski slalom racing demo built with three.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}

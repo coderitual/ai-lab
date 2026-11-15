@@ -1,0 +1,58 @@
+// Everything that makes "a sea under a sky": textures, sky dome, ocean,
+// sun + ambient light. Shared by the game and the asset viewer.
+
+import * as THREE from 'three';
+import { makeNoiseTexture, makeWaterNormalTexture } from './textures.js';
+import { createSky, createSkyEnvironment } from './sky.js';
+import { createWater } from './water.js';
+import { PALETTE, SUN_DIR } from './palette.js';
+import { updateWaveUniforms } from '../engine/waves.js';
+
+export function createEnvironment(engine, { waterSegments = 192 } = {}) {
+  const { renderer, scene } = engine;
+  const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+
+  const noiseTex = makeNoiseTexture(256, Math.min(4, anisotropy));
+  const normalTex = makeWaterNormalTexture(256, anisotropy);
+
+  const sky = createSky(noiseTex);
+  scene.add(sky);
+
+  const water = createWater({ normalTex, noiseTex, segments: waterSegments });
+  scene.add(water);
+
+  // Key light from the low sun, soft fill from the sky.
+  const sun = new THREE.DirectionalLight(PALETTE.sunColor, 3.1);
+  sun.position.copy(SUN_DIR).multiplyScalar(100);
+  scene.add(sun);
+  scene.add(sun.target);
+
+  // Image-based light from the sky needs half-float render targets.
+  const canPmrem = renderer.extensions.has('EXT_color_buffer_half_float') || renderer.extensions.has('EXT_color_buffer_float');
+  const fill = new THREE.HemisphereLight('#cfe6ff', '#2e6f78', 1.5);
+  scene.add(fill);
+  function buildEnvironment() {
+    const envMap = canPmrem ? createSkyEnvironment(renderer, sky) : null;
+    if (scene.environment) scene.environment.dispose();
+    scene.environment = envMap;
+    scene.environmentIntensity = 0.85;
+    fill.intensity = envMap ? 0.35 : 1.5;
+  }
+  buildEnvironment();
+  if (engine.onContextRestored) engine.onContextRestored(buildEnvironment);
+
+  return {
+    sky,
+    water,
+    sun,
+    noiseTex,
+    normalTex,
+    anisotropy,
+    /** Call every rendered frame. */
+    update(time, camera, focusX = camera.position.x, focusZ = camera.position.z) {
+      sky.material.uniforms.uTime.value = time;
+      updateWaveUniforms(time, camera.position.y);
+      water.userData.follow(focusX, focusZ);
+    },
+  };
+}
