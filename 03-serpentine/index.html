@@ -35,24 +35,65 @@
         position: absolute;
         inset: 0;
       }
+      /* the loading veil: the name and a thin line that runs while the world is built; it fades when the first frame is up */
       #loading {
         position: absolute;
         inset: 0;
+        z-index: 10;
         display: grid;
-        place-items: center;
+        place-content: center;
+        justify-items: center;
+        gap: 18px;
         padding: 24px;
         background: #07090c;
-        color: #c9ced6;
-        font: 500 13px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        color: #dfe7ee;
+        font: 200 clamp(26px, 6vmin, 52px) / 1 -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display', 'Segoe UI', Roboto, Inter,
+          system-ui, sans-serif;
         letter-spacing: 0.3em;
         text-transform: uppercase;
         text-align: center;
+        transition: opacity 0.5s ease;
+      }
+      #loading.gone {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #loading i {
+        display: block;
+        width: min(220px, 50vw);
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #93dcff, transparent) no-repeat;
+        background-size: 40% 100%;
+        animation: loading-run 1.4s ease-in-out infinite;
+      }
+      #loading p {
+        margin: 0;
+        max-width: 26em;
+        font-size: 14px;
+        font-weight: 400;
+        letter-spacing: 0.04em;
+        text-transform: none;
+        color: #9aa6b1;
+      }
+      @keyframes loading-run {
+        from {
+          background-position: -60% 0;
+        }
+        to {
+          background-position: 160% 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #loading i {
+          animation: none;
+          background-size: 100% 100%;
+        }
       }
     </style>
   </head>
   <body>
     <div id="game"></div>
-    <div id="loading">Loading…</div>
+    <div id="loading" aria-live="polite"><span>Serpentine</span><i></i></div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

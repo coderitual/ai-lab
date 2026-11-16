@@ -476,7 +476,7 @@
 .hud .hint {
   position: absolute;
   left: 50%;
-  bottom: 30%;
+  top: calc(var(--pad) + var(--st) + var(--u) * 7.5);
   transform: translateX(-50%);
   max-width: 80%;
   padding: calc(var(--u) * 0.8) calc(var(--u) * 1.6);
@@ -574,7 +574,7 @@
   height: calc(var(--u) * 1.9);
   padding: 0 calc(var(--u) * 0.35);
   box-sizing: border-box;
-  font-size: calc(var(--u) * 0.95);
+  font-size: max(9px, calc(var(--u) * 1.05));
   font-weight: 700;
   letter-spacing: 0.06em;
   border: max(1px, calc(var(--u) * 0.11)) solid currentColor;
