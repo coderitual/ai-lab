@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { ATLAS_SIZE, bakeAtlas } from './atlas.js';
 import { MESH_EDGE, createArchGeometry, createLayout, inArch, sampleSkin, skinGeometry, skinIndex } from './body.js';
 import { createLampLights } from './lamps.js';
-import { PAINTS, createGhostMaterial, createGlassMaterial, createPaintMaterial, createShared, createShellMaterial } from './materials.js';
+import { PAINTS, createGhostMaterial, createGlassMaterial, createPaintMaterial, createDarkMaterial, createShared } from './materials.js';
 import { createPlaceholderWheels } from './placeholderWheels.js';
 import { createContactShadow } from './shadow.js';
 import { createSkin } from './skin.js';
@@ -24,6 +24,23 @@ import { DIMS, STATIONS } from './spec.js';
 const GLASS = 0;
 const LENS = 3;
 const OPENING = 4;
+
+/** Triangles over every other column and row of the sampled skin (both halves), leaving out the arches' holes. */
+function coarseIndex(samples, arch) {
+  const { columns, rows } = samples;
+  const half = columns * rows;
+  const index = [];
+  for (let i = 0; i < columns - 1; i += 2) {
+    const i2 = Math.min(i + 2, columns - 1);
+    for (let k = 0; k < rows - 1; k += 2) {
+      const k2 = Math.min(k + 2, rows - 1);
+      if (arch(i, k) && arch(Math.min(i + 1, columns - 2), Math.min(k + 1, rows - 2))) continue;
+      const [a, b, c, d] = [i * rows + k, i2 * rows + k, i * rows + k2, i2 * rows + k2];
+      index.push(a, b, c, b, d, c, a + half, c + half, b + half, b + half, c + half, d + half);
+    }
+  }
+  return new Uint32Array(index);
+}
 
 /**
  * @param {{ paint?: string, plate?: string, tier?: 'low'|'medium'|'high', caps?: object, ghost?: boolean }} [options]
@@ -90,10 +107,19 @@ export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false
     // the glass and the lenses lie on the paint's own surface: drawn after it, at the same depth
     skinMesh((i, k) => extremes(GLASS, i, k)[0] < 0.002, keep(createGlassMaterial(shared, caps, GLASS))).renderOrder = 1;
     skinMesh((i, k) => extremes(LENS, i, k)[0] < 0.002, keep(createGlassMaterial(shared, caps, LENS))).renderOrder = 1;
-    skinMesh(() => true, keep(createShellMaterial()));
+    // the shell, on every other vertex each way: a quarter of the triangles, and its chords stay inside the paint
+    object.add(new THREE.Mesh(keep(skinGeometry(attributes, coarseIndex(samples, arch))), keep(createDarkMaterial(THREE.BackSide))));
+    // behind each opening a dark surface 40 mm in: the skin itself, pushed in along its normal
+    const recessed = new Float32Array(samples.position.length);
+    for (let j = 0; j < recessed.length; j++) recessed[j] = samples.position[j] - samples.normal[j] * 0.04;
+    const recess = skinGeometry(
+      { ...attributes, position: new THREE.BufferAttribute(recessed, 3) },
+      skinIndex(samples, (i, k) => extremes(OPENING, i, k)[0] < 0.005),
+    );
+    object.add(new THREE.Mesh(keep(recess), keep(createDarkMaterial(THREE.FrontSide, 0.02, 0.6))));
     const lip = new THREE.Mesh(archGeometry.lip, paintMaterial);
     lip.castShadow = lip.receiveShadow = true;
-    object.add(lip, new THREE.Mesh(archGeometry.liner, keep(new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 }))));
+    object.add(lip, new THREE.Mesh(archGeometry.liner, keep(createDarkMaterial(THREE.DoubleSide, 0.012))));
     shadow = createContactShadow(samples.position, samples.columns * samples.rows, tier);
     disposables.push(shadow);
     lights = createLampLights(object, keep);

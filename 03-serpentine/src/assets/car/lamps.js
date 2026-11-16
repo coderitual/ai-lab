@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { LAMPS, STATIONS } from './spec.js';
 
 /** What the lamps throw: head lamps in candela-like units at the beam's brightest point, the tail glow likewise. */
-const THROW = { low: 3200, high: 9000, tail: 0.6, brake: 1.8 };
+const THROW = { low: 3200, high: 9000, tail: 0.3, brake: 1.2 };
 /** Half the angle the beam picture covers, and how far main beam tilts it up. */
 const BEAM_ANGLE = 0.5;
 const HIGH_TILT = Math.tan(THREE.MathUtils.degToRad(3.5));
@@ -70,7 +70,7 @@ export function createLampLights(object, keep) {
   });
   // It sits under the boot floor, just ahead of the bumper's face: from there it reddens the road behind and
   // cannot shine on the car's own tail (a point light this close to a panel would whiten it).
-  const taillight = new THREE.PointLight(0xff1408, 0, 12, 2);
+  const taillight = new THREE.PointLight(0xff1408, 0, 7, 2);
   taillight.position.set(0, 0.2, STATIONS.tail + 0.25);
   object.add(taillight);
   return {

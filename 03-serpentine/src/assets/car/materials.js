@@ -289,6 +289,27 @@ void carLamp(float lens, float w) {
     CAR_REGION(carInside(trim), vec3(0.72), 1.0, 0.12, 0.0);
     CAR_REGION(carInside(trim + 0.01), vec3(0.015), 0.0, 0.8, 0.0);
   }
+  // the number plates, blank (their characters belong to the plate's own stage), and the rear plate's recess
+  if (p.z < -2.3 && vCarNormal.z < -0.5) {
+    float recess = carBox(vCarPos.xy, vec2(0.0, 0.765), vec2(0.30, 0.085), 0.025);
+    cBase *= 1.0 - 0.3 * carInside(recess) * (1.0 - smoothstep(-0.025, 0.0, -recess - 0.0));
+    CAR_REGION(carInside(carBox(vCarPos.xy, vec2(0.0, 0.771), vec2(0.27, 0.0675), 0.008)), vec3(0.015), 0.0, 0.5, 0.0);
+    vec3 face = mix(vec3(0.8), vec3(0.01, 0.07, 0.4), carInside(0.22 - vCarPos.x));
+    CAR_REGION(carInside(carBox(vCarPos.xy, vec2(0.0, 0.771), vec2(0.26, 0.057), 0.004)), face, 0.0, 0.35, 0.0);
+  }
+  if (p.z > 2.1 && vCarNormal.z > 0.5) {
+    CAR_REGION(carInside(carBox(vCarPos.xy, vec2(0.0, 0.392), vec2(0.265, 0.0625), 0.006)), vec3(0.015), 0.0, 0.5, 0.0);
+    vec3 face = mix(vec3(0.8), vec3(0.01, 0.07, 0.4), carInside(vCarPos.x + 0.22));
+    CAR_REGION(carInside(carBox(vCarPos.xy, vec2(0.0, 0.392), vec2(0.26, 0.057), 0.004)), face, 0.0, 0.35, 0.0);
+  }
+  // door handles (2.8): a painted grip over a darker recess, with a bright insert along its lower half
+  if (abs(vCarNormal.x) > 0.6 && p.y > 0.8 && p.y < 0.92) {
+    vec2 c = p.z > -0.66 ? vec2(-0.147, 0.857) : vec2(-1.18, 0.867);
+    vec2 q = vec2(p.z, p.y);
+    cBase *= 1.0 - 0.4 * carInside(carBox(q, c, vec2(0.13, 0.035), 0.03)) * (1.0 - carInside(carBox(q, c, vec2(0.1175, 0.014), 0.012)));
+    cBase *= 1.0 - 0.6 * carInside(abs(carBox(q, c, vec2(0.1175, 0.014), 0.012)) - 0.001);
+    CAR_REGION(carInside(carBox(q, c - vec2(0.0, 0.007), vec2(0.105, 0.0045), 0.004)), vec3(0.83, 0.84, 0.86), 1.0, 0.1, 0.0);
+  }
   carLamp(A.a, carCover(A.a));
   // shut lines: a dark gap with a little shade either side; the fuel flap (right side only)
   float shut = A.b;
@@ -390,12 +411,19 @@ export function createGlassMaterial(shared, caps, channel) {
 }
 
 /**
- * The inside of the body: seen only through the glass and the openings (its back faces). Unlit: the cabin is
- * black, and the lamps' lights, which stand inside the body, must not light it.
+ * The dark insides: the cabin's stand-in (the shell's back faces, seen through the glass), the recesses behind the
+ * openings, the wheel-arch liners. Lit only by the sky and the environment, never directly: the lamps' own lights
+ * stand inside the body and would light it up from within.
  */
-export function createShellMaterial() {
-  const material = new THREE.MeshBasicMaterial({ side: THREE.BackSide });
-  material.color.setRGB(0.012, 0.012, 0.013, THREE.LinearSRGBColorSpace);
+export function createDarkMaterial(side, value = 0.015, roughness = 0.9) {
+  const material = new THREE.MeshStandardMaterial({ roughness, metalness: 0, side });
+  material.color.setRGB(value, value, value * 1.05, THREE.LinearSRGBColorSpace);
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <lights_fragment_end>',
+      '#include <lights_fragment_end>\n  reflectedLight.directDiffuse = vec3(0.0);\n  reflectedLight.directSpecular = vec3(0.0);',
+    );
+  };
   return material;
 }
 
