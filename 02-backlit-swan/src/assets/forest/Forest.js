@@ -32,7 +32,11 @@ void main() {
   vec3 n = normal;
 #ifdef USE_INSTANCING
   local = instanceMatrix * local;
-  n = mat3(instanceMatrix) * n;
+  // Instances are stretched (a trunk is a unit cylinder made twenty times
+  // taller than wide), and a normal must be squashed where the surface is
+  // stretched: divide by the square of each axis's scale before turning it.
+  mat3 im = mat3(instanceMatrix);
+  n = im * (n / vec3(dot(im[0], im[0]), dot(im[1], im[1]), dot(im[2], im[2])));
 #endif
 #ifdef USE_INSTANCING_COLOR
   vTint = instanceColor;
@@ -41,7 +45,7 @@ void main() {
 #endif
   vec4 world = modelMatrix * local;
   vWorldPos = world.xyz;
-  vNormal = n;
+  vNormal = normalize(n);
   vUv = uv;
   gl_Position = projectionMatrix * viewMatrix * world;
 }
@@ -245,22 +249,22 @@ void main() {
       // Low boughs over the bank and the first few metres of crown: from 5 m
       // away and a metre up, the picture's top edge is only 13 degrees above
       // the horizon, so anything higher than about 7 m is never seen.
-      const cy = 1.4 + 8.5 * Math.pow(rng.float(), 1.25);
+      const cy = 3.4 + 7.5 * Math.pow(rng.float(), 0.9);
       const cz = tree.z + rng.gauss() * 2.2;
       const radius = rng.range(0.7, 1.9);
       // whole clumps are in the sun or out of it
-      const lit = rng.float() < 0.5;
+      const lit = rng.float() < 0.42;
       const perClump = Math.ceil(count / clumps);
       for (let k = 0; k < perClump && i < count; k++, i++) {
         p.set(cx + rng.gauss() * radius, cy + rng.gauss() * radius * 0.6, cz + rng.gauss() * radius);
         q.setFromEuler(turn.set(rng.range(0, 6.28), rng.range(0, 6.28), rng.range(0, 6.28)));
-        const size = rng.range(0.07, 0.17);
+        const size = rng.range(0.05, 0.13);
         mesh.setMatrixAt(i, m.compose(p, q, s.set(size, size, size)));
         if (lit && rng.float() < 0.55) {
           // Sun through a leaf: yellow-olive (156, 157, 72 on screen in the
           // film, up to 195, 186, 96), scaled by the sun itself. A few are
           // much brighter: the small hot points among the soft blobs.
-          const k2 = rng.float() < 0.06 ? rng.range(2.5, 6) : rng.range(0.2, 1.25);
+          const k2 = rng.float() < 0.13 ? rng.range(2.5, 7) : rng.range(0.2, 1.25);
           color.setRGB(0.085 * sun.x * k2, 0.088 * sun.y * k2, 0.03 * sun.z * k2);
         } else {
           const k2 = rng.range(0.3, 1);
@@ -309,7 +313,7 @@ void main() {
     shaftGeometry.translate(0, 0.5, 0);
     const sunDir = light.uniforms.uSunDir.value;
     const shafts = [
-      { theta: 3, back: 5, width: 5.2, color: [0.017, 0.026, 0.056] },
+      { theta: 3, back: 5, width: 4.6, color: [0.013, 0.02, 0.044] },
       { theta: -31, back: 7, width: 3.2, color: [0.006, 0.01, 0.022] },
       { theta: 27, back: 8, width: 3.6, color: [0.007, 0.011, 0.02] },
       { theta: 118, back: 6, width: 4, color: [0.005, 0.008, 0.018] },

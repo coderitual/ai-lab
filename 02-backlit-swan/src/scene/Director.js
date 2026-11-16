@@ -53,10 +53,11 @@ function track(keys, t, column) {
 
 /**
  * @param {object} ctx the shared context (see World.js)
- * @param {{ rig: import('../engine/OrbitRig.js').OrbitRig, mind: import('./SwanMind.js').SwanMind|null, staged?: boolean }} parts
- *   `staged`: the camera was placed by the URL; leave it exactly there.
+ * @param {{ rig: import('../engine/OrbitRig.js').OrbitRig, mind: import('./SwanMind.js').SwanMind|null, staged?: boolean, view?: object }} parts
+ *   `staged`: the camera was placed by the URL (`view`, as parsed by engine/params.js). It keeps exactly
+ *   that angle, height and distance, and stays on the swan: ?tx= and ?tz= are then metres from the swan.
  */
-export function createDirector(ctx, { rig, mind, staged = false }) {
+export function createDirector(ctx, { rig, mind, staged = false, view = {} }) {
   // where the film's operator starts: where the default view puts the camera
   const start = new THREE.Vector3(
     CAMERA.target[0] - Math.sin(CAMERA.az * DEG) * Math.cos(CAMERA.el * DEG) * CAMERA.dist,
@@ -108,7 +109,12 @@ export function createDirector(ctx, { rig, mind, staged = false }) {
      * @param {number} dt seconds of real time
      */
     update(dt) {
-      if (staged || !mind) return;
+      if (!mind) return;
+      if (staged) {
+        const t = view.target || [];
+        rig.target.set(mind.position.x + (t[0] ?? 0), t[1] ?? CAMERA.target[1], mind.position.z + (t[2] ?? 0));
+        return;
+      }
       // The point the camera looks at trails the swan a little, as a hand on
       // a tripod head does, so that the picture breathes instead of being nailed to it.
       const lag = mode === 'film' ? 3.2 : 2.2;

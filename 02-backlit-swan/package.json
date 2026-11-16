@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "test": "node tools/playtest.cjs http://localhost:4173/",
+    "screenshots": "node tools/screenshots.cjs"
   },
   "dependencies": {
     "three": "0.187.0"

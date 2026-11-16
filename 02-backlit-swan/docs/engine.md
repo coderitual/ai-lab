@@ -1,9 +1,8 @@
-# Foundation notes
+# The engine and the frame
 
-What the foundation of `02-backlit-swan` is, as built: the frame pipeline, the
-shared context, the URL parameters and debug hooks, and the rules the parts
-that replace the placeholders have to keep. Written to be folded into the
-final docs; every number here is in the source and should be changed there
+How a frame is made: the passes, the shared context every part is handed, how
+materials are written, and the rules that are easy to break when adding
+something. Every number here is in the source and should be changed there
 first.
 
 ## Layout
@@ -25,24 +24,24 @@ src/engine/             reusable; knows nothing about swans or ponds
   PlanarMirror.js       mirror camera, texture matrix, subject mirror target
   FarLayer.js           a scene drawn small and defocused with a disc blur
   PostChain.js          scene target, bloom, grade, FXAA + grain
-  OrbitRig.js           the camera (placeholder: no gestures)
+  OrbitRig.js           the camera: views set from code, drag, pinch, wheel, taps
 src/assets/             what is visible
-  lighting.js           the light, once
+  lighting.js           the light, once (sun, sky, the wood's shadow)
   pond.js               the shore outline, once (JS and GLSL from one table)
-  swan/Swan.js          PLACEHOLDER
-  pond/Water.js         PLACEHOLDER
-  pond/Specks.js        PLACEHOLDER
-  forest/Forest.js      PLACEHOLDER
-  fx/Droplets.js        PLACEHOLDER
+  swan/                 the swan (see swan.md)
+  pond/Water.js         the water's surface; pond/surface.js, what the swan does to it
+  pond/Specks.js        what floats on it
+  forest/Forest.js      the wood, the meadow, the fence, the haze
+  fx/Droplets.js        drops in the air
 src/scene/              the show
   config.js             LOOK, CAMERA, SIM, TIERS
   World.js              builds ctx and every part, owns the frame
-  SwanMind.js           PLACEHOLDER
-  Director.js           stub
-  Interaction.js        stub
-src/ui/Ui.js, ui.css    stub: only the loading veil
-src/audio/Ambience.js   stub
-tools/shot.cjs          one screenshot of any URL
+  SwanMind.js           what the swan does: the film, and life on its own
+  Director.js           who holds the camera
+  Interaction.js        touching the water and the swan, keys
+src/ui/Ui.js, ui.css    the controls
+src/audio/Ambience.js   generated sound
+tools/                  shot, screenshots, playtest (see tools.md)
 ```
 
 ## Conventions
@@ -102,13 +101,14 @@ the finish pass, and the sRGB curve is applied by the grade pass.
 | mirror MSAA | 0 | 4 | 4 |
 | `farScale` | 0.4 | 0.5 | 0.5 |
 | `farMirrorScale` | 0.25 | 0.3 | 0.4 |
-| `mirrorScale` | 0.4 | 0.5 | 0.6 |
+| `mirrorScale` | 0.5 | 0.75 | 1 |
 | blur taps (disc + fill) | 12 + 6 | 16 + 8 | 24 + 10 |
 | bloom levels | 5 | 6 | 7 |
 | FXAA search steps | 5 | 7 | 10 |
-| ripple texture | 128² | 256² | 512² |
-| specks / leaves / trunks / droplets | 1500 / 2500 / 80 / 192 | 3500 / 5000 / 140 / 384 | 7000 / 9000 / 220 / 768 |
-| `featherDetail` (unused so far) | 0 | 1 | 2 |
+| ripple texture | 256² | 384² | 512² |
+| `waterDetail` (ripple trains summed; mirror read twice at 2) | 0 | 1 | 2 |
+| specks / leaves / trunks / droplets | 7000 / 4000 / 80 / 192 | 13000 / 8000 / 140 / 384 | 16000 / 13000 / 220 / 768 |
+| `featherDetail` (the swan's mesh and fringe) | 0 | 1 | 2 |
 
 The tier is `?q=` if given, else the probe's guess (`caps.tier`): software
 rasterisers low; phones medium for Apple GPUs and recent Adreno / Mali /
@@ -118,20 +118,22 @@ Sizes on a 390 x 844 CSS-pixel phone with a device pixel ratio of 2 or more:
 
 | | canvas = scene | far | far mirror | mirror | bloom levels |
 | - | - | - | - | - | - |
-| low | 585 x 1266 | 234 x 506 | 146 x 317 | 234 x 506 | 293 x 633 ... 19 x 40 |
-| medium | 780 x 1688 (4x) | 390 x 844 | 234 x 506 | 390 x 844 (4x) | 390 x 844 ... 13 x 27 |
-| high | 780 x 1688 (4x) | 390 x 844 | 312 x 675 | 468 x 1013 (4x) | 390 x 844 ... 7 x 14 |
+| low | 585 x 1266 | 234 x 506 | 146 x 317 | 293 x 633 | 293 x 633 ... 19 x 40 |
+| medium | 780 x 1688 (4x) | 390 x 844 | 234 x 506 | 585 x 1266 (4x) | 390 x 844 ... 13 x 27 |
+| high | 780 x 1688 (4x) | 390 x 844 | 312 x 675 | 780 x 1688 (4x) | 390 x 844 ... 7 x 14 |
 
-### What a frame costs (medium)
+### What a frame costs
 
-Four geometry passes (far, far mirrored, subject mirrored, main), about 45
-draw calls and 33,000 triangles with the placeholders, and 19 to 20
-full-screen passes on small targets (2 to 3 ripple, 4 blur, 11 bloom, grade,
-finish). Texture lookups per scene pixel, roughly: blur of the far layer 6
-(24 taps on a quarter of the pixels), of the far mirror 2, bloom 8, grade 2,
-finish 5 on flat areas and about 24 on edges, water 3 (ripple field and two
-mirrors) plus eight evaluations of value noise. Low tier: about 19 lookups a
-pixel on 0.74 million pixels.
+Four geometry passes (far, far mirrored, subject mirrored, main). Counted
+over all of them at 1.3 s into the film, when the spray is in the air: 43
+draw calls and 39,000 triangles on low, 45 and 73,000 on medium, 47 and
+135,000 on high (most of them the leaves and the specks, which are drawn as
+small quads and points). On top of that, 19 to 20 full-screen passes on
+small targets: 2 to 3 for the ripple field, 4 of blur, 11 of bloom, the
+grade and the finish. The water's fragment shader is the dearest thing in
+the frame: it covers most of the picture, reads the ripple field and the two
+mirror pictures (the swan's twice on the high tier) and sums five to seven
+analytic wave trains.
 
 ### Things about the frame that are easy to break
 
@@ -217,9 +219,9 @@ Built in `World.createContext`, handed to every factory.
 `post`, `ripple`, `swan`, `mind`, `water`, `specks`, `forest`, `droplets`,
 `director`, `interaction`, `ambience`, `tier`, `time`, `realTime`.
 
-## Interfaces as built
+## Interfaces
 
-Same as the contract, with these additions and one clarification.
+What each engine class offers.
 
 - `RippleField(renderer, { size, extent, speed, damping, ldr })`. Also
   `reset()`, `time`, `precision` (`'float' | 'half' | 'packed'`), `size`,
@@ -234,9 +236,9 @@ Same as the contract, with these additions and one clarification.
   `matrix`, `valid`, `target`, `texture`, `uniforms { uMirrorTex,
   uMirrorMatrix }`, `setSize`, `update(camera)`, `render(scene, layer)`.
   `uMirrorMatrix * vec4(world, 1)` then `.xy / .w` is where a world point is
-  in the mirror picture. The placeholder water uses that for more than the
-  flat mirror: it reflects the eye ray about the rippled normal, follows it a
-  distance, and looks that world point up.
+  in the mirror picture. The water uses that for more than the flat mirror:
+  it reflects the eye ray about the rippled normal, follows it a distance,
+  and looks that world point up.
 - `FarLayer(renderer, caps, { taps, fillTaps })`: `texture` (blurred),
   `sharpTexture`, `clearColor`, `setSize`, `render(scene, camera, radius)`.
   `createWater` receives the mirrored one as `farMirror` and reads
@@ -250,8 +252,13 @@ Same as the contract, with these additions and one clarification.
   gets a taller, narrower angle and a wide one a wider, lower angle, which is
   what keeps the swan a sensible size on both. `World.placeCamera` sets
   `rig.offset` every frame from `CAMERA.offsetPortrait` / `offsetLandscape`
-  by aspect; the Director will have to take that over if it wants its own
-  framing. `enabled` is for gestures (none yet); views set from code always
+  by aspect. Gestures: one pointer drags (`feel.az`, `feel.el` degrees per
+  pixel, coasting when released), two pinch, the wheel zooms; `onTap(x, y)`,
+  `onDoubleTap(x, y)` and `onGrab()` are called for a press that does not
+  move, two of them within a third of a second, and the start of any
+  movement by hand. `idle` is the seconds since a person last moved it,
+  `held` whether they are holding it now, `nudge(daz, del, zoom)` moves it
+  from keys. `enabled` switches gestures off; views set from code always
   apply.
 - `Engine(container, { manual, pixelRatio, maxPixelRatio, adaptive })`:
   `onUpdate(dt)`, `onRender()`, `onResize(fn)`, `onContextRestored(fn)`,
@@ -260,12 +267,11 @@ Same as the contract, with these additions and one clarification.
   The live loop passes real frame time (capped at 1/15 s) to `onUpdate`;
   there is no fixed-step accumulator. Everything fixed-step goes through
   `__swan.advance`, which uses 1/60 s.
-- `createUi(ctx, { root, enabled, instant })` returns `ready()` and
+- `createUi(ctx, { world, enabled, instant })` returns `ready()` and
   `fail(message)` besides `update` and `dispose`.
-- `Swan.pose` has one field so far, `dip` (0 upright, 1 bill in the water).
-  The swan's owner and `SwanMind`'s owner have to agree on the real set.
-- `createSwan`'s feather material is `Swan.js`'s own. Nothing else depends on
-  it.
+- The swan's interface (its pose, `billTip`, `measure`) is in
+  [swan.md](swan.md). Its feather material is its own; nothing else depends
+  on it.
 
 ## Adaptive resolution
 
@@ -335,50 +341,14 @@ GPU reads every WebGL canvas back to composite it and its driver reports
 With `?manual` the same URL and the same `--eval` give the same file, byte
 for byte.
 
-## What was checked, and how
+## What was checked
 
-All in headless Chromium 153 on SwiftShader (software WebGL 2 with float
-targets and 4x MSAA), dev server and production build.
-
-- No console errors or warnings (other than the one above); `gl.getError()`
-  is 0 after a frame in every tier, with `?ldr`, in each debug view, after a
-  resize and after a lost and restored context.
-- The mirror: six camera positions (az -70 to 180, el 1.5 to 40, dist 7 to
-  30) with the ambient ripple off; the reflection meets the body at the
-  waterline in each.
-- The far layer: `debug=far` at aperture 0, 0.3 and 1.
-- Bloom: `debug=bloom`. Dark gradients: an 8x contrast stretch of a dark
-  area of the final picture, with and without grain, shows noise and no
-  steps.
-- Ripples: `debug=ripple` and the main view after `disturb`; drops landing
-  after `act('shake')` (40 `'drop'` events); the window scrolled by 1.5 m
-  and 0.75 m with a ring in it, which stayed where it was in the world.
-- Determinism: two separate page loads, `advance`, a disturbance, a shake,
-  `advance`: the screenshots are byte-identical.
-- Resize: 390 x 844 to 1280 x 720 and back; every target takes the new size,
-  the swan stays framed, and the picture after the round trip is
-  byte-identical to the one before.
-- A lost context (`WEBGL_lose_context`): stepping while lost does not throw;
-  after restore the picture is back, with still water.
-- The live loop: runs at 4 to 5 frames a second in software, and the render
-  scale stepped from 1 to 0.85 without errors.
-- `npm run build`, and `npm run preview` on port 4180 gives a picture
-  byte-identical to the dev server's.
-
-## What was not checked
-
-- Real phones, Safari/WebKit, Firefox, a real GPU. Frame rates are unknown.
-- Multisampled half-float targets on mobile GPUs (the probe in `caps.js`
-  falls back to no MSAA if the driver refuses; that branch never ran).
-- Mip generation on half-float targets on iOS (three.js's own transmission
-  pass relies on the same thing).
-- The `'half'` ripple precision (half-float targets but no 32-bit float
-  ones): SwiftShader has both, so only `'float'` and `'packed'` ran.
-- The branch of the adaptive scale that detects a browser capping the frame
-  rate, and the step back up.
-- `orientationchange` and `visualViewport` on a device; only viewport
-  resizes were tried.
-- Touch input of any kind (there is none yet).
+What has and has not been verified, for the engine and everything else, is in
+[tools.md](tools.md#what-has-been-verified). Of the engine in particular,
+these branches have never run, because the test machine's software rasteriser
+supports everything: the fall-back from multisampled half-float targets, the
+`'half'` ripple precision (half-float targets without 32-bit float ones), and
+the part of the adaptive scale that detects a browser capping the frame rate.
 
 ## Known weaknesses
 
@@ -397,5 +367,3 @@ targets and 4x MSAA), dev server and production build.
   built from mip texels).
 - The adaptive scale can only see frame time, not GPU load: it may sit one
   step lower than necessary for a while.
-- The placeholder water's ambient ripple is finite-differenced value noise
-  and aliases into horizontal streaks at grazing angles.

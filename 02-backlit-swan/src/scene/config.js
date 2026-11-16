@@ -27,7 +27,7 @@ export const LOOK = {
   shadeWanderLength: 2.9,
 
   // Lens
-  aperture: 0.42, // 0..1: how far out of focus the background is
+  aperture: 0.3, // 0..1: how far out of focus the background is
   bokehMax: 0.034, // blur disc radius at aperture 1, as a fraction of the picture height
   farClear: [0.0004, 0.0005, 0.0011], // what shows between the trees: nothing
 
@@ -85,9 +85,9 @@ export const LOOK = {
   // The swan (assets/swan/). How its feathers take the light; shapes and sizes are in assets/swan/anatomy.js.
   swanAlbedo: [0.93, 0.92, 0.9], // white feather
   swanStain: [0.92, 0.86, 0.72], // head and upper neck, as stained as a mute swan's usually are
-  swanFreePath: 0.048, // metres of plain feather that take red light down to 1/e (0.08 L)
+  swanFreePath: 0.034, // metres of plain feather that take red light down to 1/e (0.08 L)
   swanAbsorb: [1.0, 1.45, 2.3], // green and blue are taken faster than red by these factors: thin is cream, thicker amber
-  swanThrough: 0.38, // share of the light inside the plumage that leaves through a surface facing away from the sun
+  swanThrough: 0.32, // share of the light inside the plumage that leaves through a surface facing away from the sun
   swanWrap: 0.12, // how far direct sun creeps past the terminator on something this soft
   swanNeckDensity: 3.0, // the neck and head, relative to plain feather
   swanNeckThrough: 0.08, // the same share as swanThrough, for the neck and head: their feathering is close and dense
@@ -149,7 +149,7 @@ export const TIERS = {
     fxaaSteps: 5,
     rippleSize: 256,
     waterDetail: 0, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 7000, leaves: 4000, trunks: 80, droplets: 192, featherDetail: 0 },
+    counts: { specks: 7000, leaves: 3200, trunks: 80, droplets: 192, featherDetail: 0 },
   },
   medium: {
     pixelRatio: 2,
@@ -164,7 +164,7 @@ export const TIERS = {
     fxaaSteps: 7,
     rippleSize: 384,
     waterDetail: 1, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 13000, leaves: 8000, trunks: 140, droplets: 384, featherDetail: 1 },
+    counts: { specks: 13000, leaves: 6000, trunks: 140, droplets: 384, featherDetail: 1 },
   },
   high: {
     pixelRatio: 2,
@@ -179,6 +179,6 @@ export const TIERS = {
     fxaaSteps: 10,
     rippleSize: 512,
     waterDetail: 2, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 16000, leaves: 13000, trunks: 220, droplets: 768, featherDetail: 2 },
+    counts: { specks: 16000, leaves: 9000, trunks: 220, droplets: 768, featherDetail: 2 },
   },
 };

@@ -155,7 +155,7 @@ export class World {
       this.rig.drift.el = 0;
       this.rig.set(params.view);
     }
-    this.director = createDirector(ctx, { rig: this.rig, mind: this.mind, staged: this.staged });
+    this.director = createDirector(ctx, { rig: this.rig, mind: this.mind, staged: this.staged, view: params.view });
     this.interaction = createInteraction(ctx, { domElement: renderer.domElement, camera: this.camera, rig: this.rig, mind: this.mind, droplets: this.droplets, director: this.director });
     this.ambience = createAmbience(ctx);
 

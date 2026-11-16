@@ -9,8 +9,8 @@
 //
 //   shadow   the body is treated as an ellipsoid sitting in the water; a
 //            point is shaded when the line from it toward the sun passes
-//            through that ellipsoid. With the sun 20 degrees up the shadow
-//            reaches 0.8 m in front of a 0.3 m tall bird: that is why the
+//            through that ellipsoid. With the sun 32 degrees up the shadow
+//            reaches 0.5 m in front of a 0.3 m tall bird: that is why the
 //            film has only half as many specks, and no glints, in the first
 //            stretch of water below the swan.
 //   wake     a gliding swan is slower than the slowest ripple (0.23 m/s), so
@@ -24,7 +24,7 @@ import * as THREE from 'three';
 /** The ellipsoid that stands in for the swan's body: half length, half width, half height, in metres. */
 const HULL = { length: 0.35, width: 0.2, height: 0.29, centreHeight: 0.02 };
 /** Below this speed (m/s) the water behind the body stays smooth; at `full` the wake is at its strongest. */
-const WAKE = { from: 0.07, full: 0.22, amount: 0.42 };
+const WAKE = { from: 0.07, full: 0.3, amount: 0.22 };
 
 const cache = new WeakMap();
 

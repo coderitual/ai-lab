@@ -24,8 +24,10 @@ void main() {
   vWorldPos = position;
   gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
   float px = aSize * uResolution.y * projectionMatrix[1][1] / (2.0 * gl_Position.w);
-  vOn = min(1.0, px * px / 2.25);
-  gl_PointSize = max(px, 1.5);
+  // a drop smaller than the smallest point drawn is dimmed by the area it lacks, but never to nothing:
+  // a bead of water against the light shows well below the size at which its shape could
+  vOn = clamp(px * px / 4.0, 0.35, 1.0);
+  gl_PointSize = max(px, 2.0);
   // a point of size zero may still be drawn as one pixel: move unused drops off the screen instead
   if (aSize <= 0.0) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }
@@ -44,7 +46,7 @@ void main() {
   // light. Out of the sun it has only the sky to show, which is very little.
   vec3 v = normalize(cameraPosition - vWorldPos);
   float back = towardSun(v);
-  vec3 col = uSunColor * sunReach(vWorldPos) * (0.16 + 0.3 * back * back) + uSkyColor * 0.05;
+  vec3 col = uSunColor * sunReach(vWorldPos) * (0.4 + 0.7 * back * back) + uSkyColor * 0.05;
   // (a soft-edged disc, so that a drop two pixels wide does not crawl)
   outColor = toTarget(vec4(col * (1.0 - d * d) * vOn, 1.0));
 }
@@ -143,7 +145,7 @@ export function createDroplets(ctx) {
             if (splash[i]) {
               ctx.ripple.disturb(x, z, size * 3, size * 0.2);
             } else {
-              ctx.ripple.disturb(x, z, size * 4, size * 0.5);
+              ctx.ripple.disturb(x, z, size * 4, size * 0.32);
               ctx.events.emit('drop', { x, z, size });
               // the rebound: a couple of specks hop up and out and are gone in a tenth of a second
               landed.push(x, z, size);

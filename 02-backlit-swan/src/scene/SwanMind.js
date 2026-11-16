@@ -426,7 +426,7 @@ export class SwanMind {
     if (under !== this._billIn) {
       this._billIn = under;
       ctx.events.emit(under ? 'billEnter' : 'billExit', { x: swan.billTip.x, z: swan.billTip.z });
-      ctx.ripple.disturb(swan.billTip.x, swan.billTip.z, 0.06, under ? 0.006 : 0.004);
+      ctx.ripple.disturb(swan.billTip.x, swan.billTip.z, 0.06, under ? 0.0035 : 0.0022);
       if (!under) {
         // it comes out streaming: a string of beads at once, then drips for a couple of seconds
         this._wet = Math.max(this._wet, clamp(0.5 + this._under, 0.6, 1));
@@ -454,17 +454,15 @@ export class SwanMind {
       }
     }
 
-    // The body pushes water aside as it moves: a dent under the breast every
-    // few centimetres travelled, and a smaller one off the stern, which the
-    // ripple field turns into the bow line and the band of wake behind the tail.
+    // The breast pushes water aside as it moves: a small dent every few
+    // centimetres travelled, which the ripple field turns into the bow line.
+    // (The churned water behind the tail is laid down by pond/surface.js,
+    // from the body's movement alone.)
     this._sinceWake += this.speed * dt;
     if (this._sinceWake > 0.045) {
       this._sinceWake = 0;
       const reach = swan.footprint.length * 0.42;
-      ctx.ripple.disturb(this.position.x + _forward.x * reach, this.position.z + _forward.z * reach, 0.1, 0.0015 + this.speed * 0.012);
-      _left.set(_forward.z, 0, -_forward.x);
-      const side = rng.sign() * 0.07;
-      ctx.ripple.disturb(this.position.x - _forward.x * reach * 1.1 + _left.x * side, this.position.z - _forward.z * reach * 1.1 + _left.z * side, 0.07, 0.0006 + this.speed * 0.008);
+      ctx.ripple.disturb(this.position.x + _forward.x * reach, this.position.z + _forward.z * reach, 0.1, 0.0008 + this.speed * 0.007);
     }
     // and it never sits perfectly still: a slow breath of a ripple under the body
     if (Math.floor(time * 0.7) !== Math.floor((time - dt) * 0.7)) {
