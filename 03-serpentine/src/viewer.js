@@ -77,7 +77,8 @@ import { encodeForTarget } from './engine/glsl.js';
 import { DEG } from './engine/math.js';
 import { parseParams } from './engine/params.js';
 import { createRng } from './engine/rng.js';
-import { LAMPS } from './game/config.js';
+// the lamp presets of the `lights` parameter (game/config.js no longer has a table of them)
+const LAMPS = { drl: { drl: 1, tail: 0 }, low: { drl: 0.12, low: 1, tail: 1 } };
 import { createTrack } from './game/track.js';
 
 const params = parseParams();

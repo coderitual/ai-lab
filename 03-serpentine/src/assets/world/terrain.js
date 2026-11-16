@@ -205,7 +205,13 @@ export function createTerrain({ track, tier, rng, material, lights }) {
         if (inside(x, z)) {
           // the massif: gently up from the road at first (meadows, the wood), then steeply
           const cap = 165 + 45 * noise.fbm(x / 300, z / 300, 3);
-          v = Math.max(Math.min(base + 0.22 * d + 0.42 * Math.max(0, d - 50), cap), Math.min(base, cap));
+          // where the Track asks the ground to fall away (the summit's crest, the valley side of a hairpin), it
+          // does so for a while before the massif rises, so no hill stands over an open crest
+          const fall = read(side > 0 ? track.farSlopeL : track.farSlopeR, spot.s);
+          const open = smoothstep(0, -0.2, fall);
+          const rise = 0.22 * d + 0.42 * Math.max(0, d - 50);
+          const away = fall * Math.min(d, 45) + 0.4 * Math.max(0, d - 130);
+          v = Math.max(Math.min(base + rise + (away - rise) * open, cap), Math.min(base + fall * 45 * open, cap));
         } else {
           v = Math.max(base - 0.25 * d, g);
         }
