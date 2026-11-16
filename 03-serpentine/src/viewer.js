@@ -8,6 +8,7 @@
 // What is shown
 //   asset=car      the car, standing on the road in the world (on the grid, or at s=)
 //   asset=world    the world alone, looking at the same spot
+//   asset=wheel    a front and a rear wheel alone (side=left|right, only=front|rear, steer, spin, travel, omega)
 //   time=day|night   q=low|medium|high   paint=NAME   plate=TEXT   manual   post=0   dpr=N   (as in the game)
 //   lights=off|drl|low|high|brake|all    the car's lamps (default: what the time of day asks for)
 //   s=120          track distance to stand at (default: the first grid slot)
@@ -36,6 +37,12 @@
 //   span           metres across the picture's full width in an ortho view. Default: the smallest that shows
 //                  the whole bounding box with 6 % to spare on each side. One CSS pixel is span / width metres;
 //                  that number is in the page title and in what __viewer.view() returns.
+//
+//   pin=f,cx,cy,cz,rx,ry,rz,w,h   a pinhole camera fitted to a photograph instead (for laying a still over that
+//                  photograph, pixel on pixel): focal length f in pixels of a w x h picture with the principal
+//                  point at its centre; position (cx, cy, cz) in the asset's frame; orientation (rx, ry, rz) a
+//                  rotation vector (axis times angle) taking the asset's frame to the camera's, whose x points
+//                  right, y down and z forward. Take the still at w : h. Also __viewer.pinhole({ f, c, r, size }).
 //
 // The handle
 //   __viewer.view()            the camera as it is: { az, el, dist, fov, target, ortho, span, width, height,
@@ -116,9 +123,33 @@ const ASSETS = {
     const box = { center: new THREE.Vector3(0, 1.2, 0), half: new THREE.Vector3(6, 1.2, 6) };
     return { box, view: { az: 180, el: 10, dist: 14, fov: 50 } };
   },
+  /**
+   * The wheels alone: a front one ahead (z +0.42) and a rear one behind (z -0.42), standing on the road with their
+   * centres on the stand's x = 0. Its own parameters: side=left|right (which way the outer faces look: +X or -X),
+   * only=front|rear, and the pose: steer (degrees), spin (degrees), travel (m), omega (rad/s).
+   */
+  async wheel() {
+    const { createWheel } = await import('./assets/car/wheel.js');
+    const { TYRES } = await import('./assets/car/spec.js');
+    const query = new URLSearchParams(window.location.search);
+    const number = (key) => parseFloat(query.get(key)) || 0;
+    const left = query.get('side') !== 'right';
+    const wheels = ['front', 'rear']
+      .filter((name) => !query.get('only') || query.get('only') === name)
+      .map((name) => {
+        const wheel = createWheel({ front: name === 'front', left, tier, caps });
+        wheel.object.position.set(0, TYRES[name].radius, name === 'front' ? 0.42 : -0.42);
+        wheel.setPose({ steer: number('steer') * DEG, spin: number('spin') * DEG, travel: number('travel'), omega: number('omega') });
+        wheel.setReflections({ cube: null, sky: 1 });
+        stand.add(wheel.object);
+        return wheel;
+      });
+    const box = { center: new THREE.Vector3(0, 0.33, 0), half: new THREE.Vector3(0.13, 0.33, 0.75) };
+    return { wheels, box, view: { az: left ? 90 : 270, el: 4, dist: 2.6, fov: 30 } };
+  },
 };
 const assetName = ASSETS[given.asset] ? given.asset : 'car';
-const asset = ASSETS[assetName]();
+const asset = await ASSETS[assetName]();
 
 // ---- the camera
 const view = {
@@ -168,6 +199,32 @@ const offset = new THREE.Vector3();
 const up = new THREE.Vector3();
 const point = new THREE.Vector3();
 
+// ---- a camera fitted to a photograph (?pin=, see the header)
+/** @type {{ f: number, c: number[], r: number[], size: number[] } | null} */
+let pinhole = null;
+const pinValues = (new URLSearchParams(window.location.search).get('pin') || '').split(',').map(Number);
+if (pinValues.length === 9 && pinValues.every(Number.isFinite)) {
+  pinhole = { f: pinValues[0], c: pinValues.slice(1, 4), r: pinValues.slice(4, 7), size: pinValues.slice(7, 9) };
+}
+const pinAxis = new THREE.Vector3();
+const pinMatrix = new THREE.Matrix4();
+
+/** Puts the perspective camera where the pinhole is: the photograph's camera looks along +z with y down, three.js's along -z with y up. */
+function placePinhole() {
+  const { f, c, r, size } = pinhole;
+  const angle = Math.hypot(r[0], r[1], r[2]);
+  // the rotation vector takes the asset's frame to the camera's; the camera's own orientation is its inverse
+  pinMatrix.identity();
+  if (angle > 1e-9) pinMatrix.makeRotationAxis(pinAxis.set(r[0], r[1], r[2]).divideScalar(angle), -angle);
+  pinMatrix.multiply(new THREE.Matrix4().makeScale(1, -1, -1));
+  perspective.quaternion.setFromRotationMatrix(pinMatrix.premultiply(new THREE.Matrix4().extractRotation(stand.matrixWorld)));
+  perspective.position.set(c[0], c[1], c[2]).applyMatrix4(stand.matrixWorld);
+  perspective.fov = (2 * Math.atan(size[1] / 2 / f)) / DEG;
+  perspective.aspect = engine.aspect;
+  perspective.updateProjectionMatrix();
+  perspective.updateMatrixWorld();
+}
+
 function placeCamera() {
   const ortho = ORTHO[view.ortho] || null;
   const az = (ortho ? ortho.az : view.az) * DEG;
@@ -194,6 +251,7 @@ function placeCamera() {
   }
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld();
+  if (pinhole && !ortho) placePinhole();
 
   for (const object of scenery) object.visible = !ortho;
   world.scene.background = ortho ? backdrop : null;
@@ -254,6 +312,7 @@ window.__viewer = {
   world,
   stand,
   car: asset.car ?? null,
+  wheels: asset.wheels ?? null,
   /** Run and draw `n` frames, a sixtieth of a second apart. */
   frames(n = 1) {
     for (let i = 0; i < n; i++) engine.advance(1 / 60);
@@ -269,6 +328,12 @@ window.__viewer = {
     return describe();
   },
   project,
+  /** Use a pinhole camera fitted to a photograph ({ f, c: [x, y, z], r: [rx, ry, rz], size: [w, h] }), or null for the orbit camera. */
+  pinhole(fit) {
+    pinhole = fit;
+    if (engine.manual) engine.advance(0);
+    else placeCamera();
+  },
 };
 
 engine.advance(0);
