@@ -264,10 +264,10 @@ export class Input {
       for (let b = 0; b < pad.buttons.length; b++) {
         const down = pad.buttons[b].pressed || pad.buttons[b].value > 0.5;
         if (down) used = true;
-        if (down && !prev[b]) {
-          for (const [button, name] of PAD_ACTIONS) if (button === b) this._emit(name, d < this.schemes.length ? d : 0);
-        }
+        const pressed = down && !prev[b];
+        // remembered before the action goes out: whoever receives it may well poll again
         prev[b] = down;
+        if (pressed) for (const [button, name] of PAD_ACTIONS) if (button === b) this._emit(name, d < this.schemes.length ? d : 0);
       }
       if (Math.abs(pad.axes[0] || 0) > 0.3) used = true;
       if (used) {

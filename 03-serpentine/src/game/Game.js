@@ -426,8 +426,8 @@ export class Game {
       default:
         return;
     }
-    // with no loop running nobody would show the change
-    if (this.engine.manual) this.engine.advance(0);
+    // with no loop running nobody would show the change (unless it came from the frame being drawn: the pads)
+    if (this.engine.manual && !this._rendering) this.engine.advance(0);
   }
 
   _unlockSound() {
@@ -761,7 +761,9 @@ export class Game {
       view.frame.cut = view.frame.cut || view.rig.cut;
     }
 
+    this._rendering = true;
     this.input.poll();
+    this._rendering = false;
     if (this.params.ui) this._hud();
     if (this.sound) {
       this.sound.update(
