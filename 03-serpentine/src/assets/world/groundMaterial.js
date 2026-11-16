@@ -48,11 +48,18 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
   const rockHeight = new Float32Array(size * size);
   for (let i = 0; i < r.length; i++) {
     r[i] = 0.65 * clumps[i] + 0.35 * (1 - blades[i]);
-    // strata: bands across the texture's v, wavering with the gradient noise, cut by cracks
+    // strata: beds of uneven thickness across the texture's v (each its own tone), warped by the gradient
+    // noise, each bed a flat face with a broken lip at its top, cut through by joints (the worley edges)
     const y = Math.floor(i / size) / size;
-    const band = Math.pow(0.5 + 0.5 * Math.sin((y * 11 + strata[i] * 1.6) * Math.PI * 2), 0.6);
-    g[i] = Math.min(1, 0.5 * band + 0.4 * strata[i] + 0.12) * (0.72 + 0.28 * Math.min(1, cracks[i] * 14));
-    rockHeight[i] = 0.55 * band + 0.45 * strata[i];
+    const yy = y * 9 + strata[i] * 2.4;
+    const bed = Math.floor(yy);
+    const f = yy - bed;
+    const key = ((bed % 9) + 9) % 9;
+    const tone = 0.5 + 0.5 * Math.sin(key * 12.9898 + 3.1) * Math.cos(key * 4.1);
+    const lip = Math.min(1, f / 0.18) * (1 - 0.6 * Math.max(0, (f - 0.82) / 0.18));
+    const joint = Math.min(1, cracks[i] * 14);
+    g[i] = Math.min(1, 0.25 + 0.45 * tone + 0.2 * strata[i] + 0.12 * lip) * (0.94 + 0.06 * joint);
+    rockHeight[i] = 0.65 * lip + 0.35 * strata[i];
     b[i] = 1 - pebbles[i];
     height[i] = 0.45 * r[i] + 0.35 * b[i] + 0.2 * g[i];
   }

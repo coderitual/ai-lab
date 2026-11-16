@@ -19,7 +19,7 @@ import { planeNoise } from './shading.js';
 /** How far the face leans back (m out per m up), less than the terrain's cliff (terrain.js LEAN). */
 const LEAN = 0.17;
 /** Rows of the face from its buried foot to its top, and the rows that fold over the lip. */
-const FACE_ROWS = 10;
+const FACE_ROWS = 14;
 /** Rows along the road: one every this many metres, per tier. */
 const STEP = { low: 2, medium: 1, high: 1 };
 
@@ -43,7 +43,7 @@ export function createRockFaces({ track, terrain, tier, rng }) {
 
   /** How far a stratum at height t sticks out (m), 0..1 of what there is room for. */
   function jut(s, t, side) {
-    const layer = Math.floor(t / 0.75 + 0.4 * noise.value(s * 0.05, side * 11));
+    const layer = Math.floor(t / 1.1 + 0.9 * noise.fbm(s * 0.03, side * 11 + t * 0.2, 2));
     const along = noise.fbm(s / 9 + layer * 3.1, layer * 1.7 + side * 5, 3);
     const fine = noise.value(s * 0.6, t * 1.3 + side * 7);
     return Math.min(1, Math.max(0, 0.15 + 0.75 * along * along * 1.6 + 0.25 * (fine - 0.5)));

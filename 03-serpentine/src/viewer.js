@@ -385,6 +385,10 @@ engine.onDraw = () => {
   if (Number.isFinite(view.focus)) track.pointAt(view.focus, view.lat, focus);
   else stand.getWorldPosition(focus);
   world.prepareView(camera, focus, beams);
+  // as in the game: the exposure follows how much sky is over the spot looked at (the tunnel's is higher)
+  if (assetName === 'world' || assetName === 'car') {
+    frame.exposure = THREE.MathUtils.lerp(time.tunnelExposure, time.exposure, track.surfaceAt(focus.x, focus.z, -1, {}).sky);
+  }
   if (asset.probe) {
     const at = asset.car.box.center.clone().applyMatrix4(stand.matrixWorld);
     asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...world.probeHidden], 6);
