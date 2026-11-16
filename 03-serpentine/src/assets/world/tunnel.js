@@ -29,7 +29,6 @@ const KERB = { width: 0.3, height: 0.12 };
 const BAND = 1.4;
 /** The portal: how far the face reaches beyond the walls and above the road, and the collar round the opening. */
 const FACE_WIDE = 9;
-const FACE_TOP = 11;
 const COLLAR = { width: 0.7, depth: 0.6 };
 /** How far daylight carries into the bore (m to fall to a third). */
 const DAYLIGHT = 5;
@@ -194,6 +193,8 @@ function boreShader(material, { lamps, first, rows, spacing, lampLat, lampH, lef
     uBoreLamp: { value: new THREE.Vector4(spec.intensity, spec.range, cone.x, cone.y) },
     uBoreColor: { value: new THREE.Vector3(...spec.color) },
     uBoreFirst: { value: first },
+    // a lamp's axis in (along, lat, h), down and across the road by its tilt (lat's sign is the lamp's side)
+    uBoreAxis: { value: new THREE.Vector3(0, Math.sin(spec.tilt), -Math.cos(spec.tilt)) },
   };
   const count = Math.max(1, lamps.real.value.length);
   return extend(material, `bore${count}`, (shader) => {
@@ -216,6 +217,7 @@ uniform vec4 uBore;      // rows, spacing, lamp lat, lamp height
 uniform vec4 uBoreLamp;  // intensity, range, cos outer, cos inner
 uniform vec3 uBoreColor;
 uniform int uBoreFirst;
+uniform vec3 uBoreAxis;
 vec3 boreLampLight(vec3 P, vec3 N) {
   float sum = 0.0;
   float k0 = floor(P.x / uBore.y - 0.5);
@@ -227,7 +229,9 @@ vec3 boreLampLight(vec3 P, vec3 N) {
       float lat = (side == 0 ? ${leftFirst ? '1.0' : '-1.0'} : ${leftFirst ? '-1.0' : '1.0'}) * uBore.z;
       int index = uBoreFirst + int(k) * 2 + side;
       float share = uOn[index] * (1.0 - uReal[index]);
-      sum += share * spotIrradiance(P, N, vec3(s, lat, uBore.w), vec3(0.0, 0.0, -1.0), uBoreLamp.x, uBoreLamp.y, uBoreLamp.zw);
+      // each lamp leans across the road, towards the far wall
+      vec3 axis = uBoreAxis * vec3(0.0, -sign(lat), 1.0);
+      sum += share * spotIrradiance(P, N, vec3(s, lat, uBore.w), axis, uBoreLamp.x, uBoreLamp.y, uBoreLamp.zw);
     }
   }
   return sum * uBoreColor;
@@ -300,6 +304,7 @@ function buildPortal(track, terrain, s, out, W) {
   const origin = frame.pos.clone();
   const P = (lat, h, along) =>
     new THREE.Vector3(origin.x + left.x * lat + ahead.x * along, origin.y + h, origin.z + left.z * lat + ahead.z * along);
+  const FACE_TOP = faceTop(terrain, P);
   const positions = [];
   const quad = (a, b, c, d) => positions.push(a, b, c, a, c, d);
 
@@ -349,8 +354,11 @@ function buildPortal(track, terrain, s, out, W) {
   // the wing walls: from the face beside the opening out along the road, turned away from it, falling with it
   for (const sign of [1, -1]) {
     const lat0 = sign * (W + COLLAR.width + 0.2);
-    const reach = 16;
-    const lat1 = lat0 + sign * 7;
+    // where the ground falls away beside the road the wall only has to hold the road's edge: keep it short
+    const probe = P(lat0 + sign * 7, 0, 16);
+    const falls = terrain.heightAt(probe.x, probe.z) < origin.y;
+    const reach = falls ? 6 : 16;
+    const lat1 = lat0 + sign * (falls ? 2.5 : 7);
     const end = P(lat1, 0, reach);
     const ground = terrain.heightAt(end.x, end.z) - origin.y;
     const top0 = FACE_TOP - 0.5;
@@ -371,6 +379,16 @@ function buildPortal(track, terrain, s, out, W) {
   geometry.setAttribute('position', new THREE.BufferAttribute(flat, 3));
   geometry.computeVertexNormals();
   return geometry;
+}
+
+/** How high a portal's face stands above the road: a little above the ground just behind it. */
+function faceTop(terrain, P) {
+  let top = 0;
+  for (const lat of [-8, 0, 8]) {
+    const p = P(lat, 0, -2);
+    top = Math.max(top, terrain.heightAt(p.x, p.z) - p.y);
+  }
+  return Math.min(13, Math.max(CROWN + 2.4, top + 0.8));
 }
 
 /** An axis-aligned box in the portal's frame (lat, h, along). */
@@ -410,7 +428,8 @@ function buildLid(track, terrain, s, out, W) {
       const x = frame.pos.x + frame.flat.x * lat + ahead.x * along;
       const z = frame.pos.z + frame.flat.z * lat + ahead.z * along;
       let y = terrain.heightAt(x, z);
-      if (along < 0.5) y = Math.max(y, frame.pos.y + FACE_TOP - 0.2);
+      // over the bore it keeps clear of the vault
+      if (along < 0.5) y = Math.max(y, frame.pos.y + CROWN + 0.8);
       pos.push(x, y, z);
       terrain.bakeAt(x, z, b, 0);
       bake.push(...b);

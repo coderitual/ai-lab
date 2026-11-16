@@ -1,0 +1,181 @@
+// Guard rails: wherever the Track's solid edge is a RAIL, a galvanised W-beam
+// on posts, its face standing exactly at the edge distance (that is where the
+// physics stops a car), with a reflector every few posts.
+//
+// The beam is one profile swept along each run, closer in bends than on the
+// straight; its texture coordinates are metres of road, so the splices and
+// the bolts land on the posts. A run that ends against a wall or a parapet
+// meets it; a run that ends in the open is ramped down into the ground over
+// its last metres, turned a little away from the road, as real terminals are.
+
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { EDGE, along, levelFrame, row, runsOf, stripGeometry, upright } from './furniture.js';
+import { retroReflective } from './retro.js';
+import { extend } from './shading.js';
+
+/** The W-beam seen end on, the road to the left: [out from the edge, up from the ground at the edge] (m). */
+const BEAM = [
+  [0.075, 0.44],
+  [0.03, 0.455],
+  [0, 0.49],
+  [0, 0.53],
+  [0.03, 0.565],
+  [0.055, 0.6],
+  [0.03, 0.635],
+  [0, 0.67],
+  [0, 0.71],
+  [0.03, 0.745],
+  [0.075, 0.76],
+];
+/** Posts: spacing (m) by tier, and where they stand behind the beam. */
+const POST_SPACING = { low: 4, medium: 2, high: 2 };
+const POST_OUT = 0.16;
+/** A reflector on every this many posts. */
+const REFLECTOR_EVERY = 6;
+/** The terminals: metres over which a free end goes down into the ground, and how far it turns away. */
+const RAMP = 7;
+const FLARE = 0.5;
+
+/**
+ * @param {object} options
+ * @param {object} options.track
+ * @param {import('../../engine/caps.js').Tier} options.tier
+ * @param {import('./atmosphere.js').Atmosphere} options.atmosphere
+ */
+export function createRails({ track, tier, atmosphere }) {
+  const group = new THREE.Group();
+  group.name = 'rails';
+  const steel = railSteel(
+    atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xa9afb3, metalness: 0.85, roughness: 0.36, side: THREE.DoubleSide })),
+  );
+  const postSteel = atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0x8f959a, metalness: 0.8, roughness: 0.5 }));
+  const reflectorMaterial = retroReflective(atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })), 1);
+
+  const frame = {};
+  const base = new THREE.Vector3();
+  const beams = [];
+  const posts = [];
+  const reflectors = [];
+  const reflectorColors = [];
+  const n = track.count;
+  let metres = 0;
+
+  for (const side of [1, -1]) {
+    const kinds = side > 0 ? track.kindL : track.kindR;
+    for (const run of runsOf(track, (i) => kinds[i] === EDGE.RAIL)) {
+      const before = kinds[(run.i0 - 1 + n) % n];
+      const after = kinds[(run.i1 + 1) % n];
+      const freeStart = before !== EDGE.WALL && before !== EDGE.PARAPET;
+      const freeEnd = after !== EDGE.WALL && after !== EDGE.PARAPET;
+      // a run that meets a structure reaches a little into it, so no gap shows
+      const s0 = run.s0 - (freeStart ? 0 : 0.6);
+      const s1 = run.s1 + track.ds + (freeEnd ? 0 : 0.6);
+      metres += s1 - s0;
+      /** How far a cross-section at s is into a terminal, 0 (none) .. 1 (the very end). */
+      const terminal = (s) => {
+        const a = freeStart ? Math.max(0, 1 - (s - s0) / RAMP) : 0;
+        const b = freeEnd ? Math.max(0, 1 - (s1 - s) / RAMP) : 0;
+        return Math.max(a, b);
+      };
+      const place = (s, out, up, into) => {
+        levelFrame(track, s, frame);
+        const edge = track.edgeAt(s, side);
+        track.pointAt(s, side * edge, base);
+        const t = into * into;
+        const o = out + FLARE * t;
+        return [base.x + frame.flat.x * side * o, base.y + up - 0.78 * t, base.z + frame.flat.z * side * o];
+      };
+
+      // the beam: closer sections where the road bends hard
+      const rows = [];
+      const sections = [];
+      along(track, s0, s1, (s) => (Math.abs(track.frameAt(s, frame).curvature) > 1 / 120 ? 2 : 4), (s) => sections.push(s), { ends: true });
+      if (sections.length < 2) continue;
+      let previous = s0;
+      for (const sw of sections) {
+        let s = sw;
+        while (s < previous - track.length / 2) s += track.length; // unwrapped, for the terminals and the texture
+        previous = s;
+        const into = terminal(s);
+        rows.push(BEAM.map(([out, up]) => [...place(s, out, up, into), s, up]));
+      }
+      beams.push(stripGeometry(rows));
+
+      // posts behind it, and a reflector on every few
+      const spacing = POST_SPACING[tier] ?? 2;
+      along(
+        track,
+        s0,
+        s1,
+        spacing,
+        (s, k) => {
+          let su = s;
+          while (su < s0 - 1) su += track.length;
+          const into = terminal(su);
+          if (into > 0.6) return;
+          const [x, y, z] = place(su, POST_OUT, 0, into);
+          levelFrame(track, su, frame);
+          posts.push(upright(new THREE.Vector3(x, y - 0.45, z), frame.yaw));
+          if (k % REFLECTOR_EVERY === 3 && into === 0) {
+            const [rx, ry, rz] = place(su, 0.04, 0.8, 0);
+            reflectors.push(upright(new THREE.Vector3(rx, ry, rz), frame.yaw));
+            // white on the left of the way the road is driven, red on the right
+            reflectorColors.push(side > 0 ? [1, 1, 1] : [1, 0.06, 0.02]);
+          }
+        },
+        { ends: true },
+      );
+    }
+  }
+
+  const beamGeometry = mergeGeometries(beams);
+  for (const g of beams) g.dispose();
+  const beam = new THREE.Mesh(beamGeometry, steel);
+  beam.name = 'rail-beams';
+  beam.castShadow = true;
+  beam.receiveShadow = true;
+  group.add(beam);
+
+  // a C-section post, a spacer block in front of it at the beam's height
+  const postGeometry = mergeGeometries([
+    new THREE.BoxGeometry(0.11, 1.2, 0.06).translate(0, 0.6, 0),
+    new THREE.BoxGeometry(0.1, 0.32, 0.1).translate(0, 1.05, 0),
+  ]);
+  group.add(row(postGeometry, postSteel, posts, { name: 'rail-posts' }));
+
+  const reflectorMesh = row(new THREE.BoxGeometry(0.05, 0.1, 0.02).translate(0, 0.05, 0), reflectorMaterial, reflectors, {
+    shadow: false,
+    name: 'rail-reflectors',
+  });
+  reflectorColors.forEach((c, i) => reflectorMesh.setColorAt(i, new THREE.Color(...c)));
+  group.add(reflectorMesh);
+
+  return {
+    group,
+    stats: { metres: Math.round(metres), posts: posts.length, reflectors: reflectors.length },
+  };
+}
+
+/** Galvanised steel: dull bands where the splices overlap every 4 m, and a little grime towards the bottom. */
+function railSteel(material) {
+  return extend(material, 'rail-steel', (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vRail;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRail = uv;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vRail;')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+{
+  float splice = smoothstep(0.2, 0.14, abs(fract(vRail.x / 4.0 + 0.5) - 0.5) * 4.0);
+  diffuseColor.rgb *= mix(1.0, 0.78, splice) * mix(0.82, 1.0, smoothstep(0.44, 0.7, vRail.y));
+}`,
+      )
+      .replace(
+        '#include <roughnessmap_fragment>',
+        '#include <roughnessmap_fragment>\nroughnessFactor = mix( roughnessFactor, 0.6, smoothstep( 0.6, 0.44, vRail.y ) );',
+      );
+  });
+}

@@ -747,7 +747,8 @@ export function createTerrain({ track, tier, rng, material, lights }) {
         const under = x > minX + 2 * FAR_CELL && x < maxX - 2 * FAR_CELL && z > minZ + 2 * FAR_CELL && z < maxZ - 2 * FAR_CELL;
         const overlap = x > minX && x < maxX && z > minZ && z < maxZ;
         pos[v * 3] = x;
-        pos[v * 3 + 1] = under ? heights[v] - 40 : overlap ? heights[v] - 1.5 : heights[v];
+        // (well under: the tunnel runs 45 m below the ground over it, and must not see the far land from inside)
+        pos[v * 3 + 1] = under ? heights[v] - 150 : overlap ? heights[v] - 1.5 : heights[v];
         pos[v * 3 + 2] = z;
         const h0 = heights[v] + 2;
         bake[v * 3] = marchSun(x, z, h0, dirs[0], 4000);

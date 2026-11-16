@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { disposeGroup } from './furniture.js';
 import { createLamps } from './lamps.js';
+import { createRails } from './rails.js';
 import { setRetroBeams } from './retro.js';
 import { createTunnels } from './tunnel.js';
 
@@ -35,12 +36,14 @@ export function createStructures({ track, terrain, caps, tier, atmosphere }) {
   lap('lamps');
   const tunnels = createTunnels({ track, terrain, atmosphere, lamps });
   lap('tunnel');
-  const parts = [lamps, tunnels];
+  const rails = createRails({ track, tier, atmosphere });
+  lap('rails');
+  const parts = [lamps, tunnels, rails];
   for (const part of parts) group.add(part.group);
 
   return {
     group,
-    stats: { ms, lamps: lamps.stats },
+    stats: { ms, lamps: lamps.stats, rails: rails.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {
       for (const part of parts) part.setTime?.(time);
