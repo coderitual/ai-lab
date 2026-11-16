@@ -336,7 +336,8 @@ export class CameraRig {
     const grade = (back ? -1 : 1) * at(GRADE);
     const y = at(Y);
     const distance = (m.distance + feel * c.pullBack + at(PULL)) * lerp(1, c.narrowBack, narrow) * lerp(1, c.wideBack, wide);
-    const height = (m.height - feel * c.drop + Math.abs(bend) * c.bendLift) * lerp(1, c.narrowLift, narrow) * lerp(1, c.wideLift, wide);
+    const lift = Math.abs(bend) * c.bendLift;
+    const height = (m.height - feel * c.drop + lift) * lerp(1, c.narrowLift, narrow) * lerp(1, c.wideLift, wide);
     // behind the car along the swung heading, a little to the inside of the bend
     const bx = Math.sin(yaw);
     const bz = Math.cos(yaw);
@@ -348,7 +349,7 @@ export class CameraRig {
     // looking at a point ahead, turned into the bend
     const ly = yaw + bend;
     const ahead = m.lookAhead * lerp(1, c.narrowAhead, narrow);
-    targetOut.set(p.x + Math.sin(ly) * ahead, y + m.lookHeight * lerp(1, c.narrowLook, narrow) + grade * ahead * 0.5, p.z + Math.cos(ly) * ahead);
+    targetOut.set(p.x + Math.sin(ly) * ahead, y + m.lookHeight * lerp(1, c.narrowLook, narrow) + grade * ahead * 0.5 + lift, p.z + Math.cos(ly) * ahead);
     return lerp(c.fov, c.fovFast, feel);
   }
 
@@ -379,7 +380,8 @@ export class CameraRig {
     euler.z = at(LEANR);
     const qq = qMount.setFromEuler(euler);
     eye.set(vp.x, vp.y, z).applyQuaternion(qq).add(p);
-    fwd.set(0, m.lookDown, back ? -1 : 1).normalize().applyQuaternion(qq);
+    // on a tall picture it looks up a little, so the lower frame is the bonnet's edge and the road, not the body
+    fwd.set(0, m.lookDown + this._shape().narrow * m.narrowUp, back ? -1 : 1).normalize().applyQuaternion(qq);
     camera.position.copy(eye);
     camera.up.set(0, 1, 0).applyQuaternion(qq);
     camera.lookAt(target.copy(eye).add(fwd));
