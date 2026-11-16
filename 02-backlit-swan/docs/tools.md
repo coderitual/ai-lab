@@ -24,7 +24,7 @@ the preview.
 
 | script | what it does |
 | --- | --- |
-| `tools/playtest.cjs URL` | Drives the demo through its real input paths: mouse, touch on phone-sized viewports upright and sideways, keys, the buttons and the look panel; the film's events at their times; determinism; a pinch as the first gesture while someone else holds the camera; a turned phone, a lost WebGL context, each tier, the 8-bit fallback. 82 checks. `--only start,film,repeat,mouse,touch,pinch,sturdy`, `--list`. |
+| `tools/playtest.cjs URL` | Drives the demo through its real input paths: mouse, touch on phone-sized viewports upright and sideways, keys, the buttons and the look panel; the film's events at their times; determinism; steering the swan with W A S D and with the thumbstick; a pinch as the first gesture while someone else holds the camera; a turned phone, a lost WebGL context, each tier, the 8-bit fallback. 136 checks. `--only start,film,repeat,mouse,steer,stick,touch,pinch,sturdy`, `--list`. |
 | `tools/screenshots.cjs` | Regenerates every picture in the README and these documents, and `public/og.jpg`. `--list`, `--only hero,film`, `--base URL`, `--q medium`. |
 | `tools/shot.cjs` | One screenshot of any URL. `--url --out --w --h --dpr --mobile --eval "js" --resize WxH`. |
 
@@ -90,9 +90,24 @@ With the scripts above, in headless Chromium on software WebGL.
   for byte.
 - **Mouse and keys**: drag turns and lifts the camera, the wheel brings it
   closer and stops at the limit; a click on the water is a touch there, the
-  swan swims to it, gets there and feeds with its bill under water; `S`,
-  `D`, `4`, `F`; taking the camera during the film leaves the swan
+  swan swims to it, gets there and feeds with its bill under water;
+  `Space`, `E`, `4`, `F`; taking the camera during the film leaves the swan
   performing.
+- **Steering with keys**: with `W` held the swan is steered and swims away
+  from the camera at about half a metre a second, the camera keeping up and
+  the stick on the screen showing what the keys ask for; let go, it glides
+  back to its idle drift within a few seconds; with the camera turned 90
+  degrees `A` and `D` still go to the left and right of the picture; told to
+  go the other way at full speed it comes about in about a body length; a
+  key held when the window loses focus does not stick; asked to dunk at
+  speed it waits until it has slowed; held toward the bank for a minute it
+  is still on the water; steering during the film ends the film and hands
+  the camera over without a jump.
+- **Steering with the thumbstick**, upright and sideways: the knob follows
+  the thumb as far as the rim; pushed up the swan swims away from the
+  camera, pushed right to the right of the picture; a second finger drags
+  the camera, or presses Shake, while the thumb keeps the stick; let go, the
+  stick springs back and the swan is no longer steered.
 - **Touch**, upright and sideways: one finger drags, two fingers pinch
   without turning, a tap on the water calls the swan, the Shake, Reach and
   Film buttons, slow motion runs the scene at a quarter speed, the look
@@ -142,6 +157,9 @@ With the scripts above, in headless Chromium on software WebGL.
   (resumed on return and on the next press; no test exercises it).
 - **Whether it sounds good.** The sound is generated and nobody has listened
   to it; the tests do not cover it at all.
+- **The thumbstick under a real thumb**: its size, dead zone and position,
+  and using it together with a camera drag by the other hand, were tried
+  only with synthetic touch events.
 - **The feel of the gestures**: coasting, pinch speed and the double-tap
   delay were chosen by reasoning, not by hand on glass.
 - **Colour on a real display.** The print curve was fitted to pixel values;

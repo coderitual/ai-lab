@@ -22,7 +22,8 @@ its head, and reaches down again. Then it is yours.
 | Touch the water | a drop falls there; the swan comes over and feeds |
 | Touch the swan | it shakes its head |
 | Double tap | back to the film's view |
-| **Shake**, **Dunk**, **Reach** | what the swan does in the film, on request (`S`, `D`, `R`) |
+| The stick, or `W` `A` `S` `D` | swim the swan that way, as the camera sees it; let go and it goes back to its own life |
+| **Shake**, **Dunk**, **Reach** | what the swan does in the film, on request (`Space`, `E`, `R`) |
 | **Film** | the whole performance again, with its camera (`F`) |
 | ¼× | slow motion (`T`) |
 | Speaker | generated sound: air in the trees, water, drops landing (`M`) |
@@ -51,9 +52,12 @@ files.
   looked up along the reflected ray through a simulated ripple field plus
   finer analytic ripple trains. Glints are the sun in facets tilted just so,
   which only disturbed water has. Thousands of specks (7,000 to 16,000, by quality) float on it.
-- **The surroundings** are drawn small into their own layer and defocused as
-  one, which is all the depth of field there is: the subject stays sharp and
-  nothing bright leaks into the blur.
+- **The surroundings** are a wood grown in code: trunks and boughs as bent,
+  tapering tubes, foliage as ragged clumps with brighter leaves among them,
+  haze, and shafts of light that lean with the sun; a meadow and a fence
+  where the trees open. It is drawn small into its own layer and defocused
+  as one, which is all the depth of field there is: the subject stays sharp
+  and nothing bright leaks into the blur.
 - **The picture** is rendered in linear light with nearly neutral colours;
   the film's teal-olive-cream look is one curve per channel, fitted to the
   film's own pixels.

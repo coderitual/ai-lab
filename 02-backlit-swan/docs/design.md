@@ -216,6 +216,9 @@ Out of focus, as one layer. From the film:
   closer or back off; **double tap** to return to the film's view.
 - **Touch the water** and a drop falls there: rings, a glint, and the swan
   comes over and feeds.
+- **Steer** the swan: a stick under the left thumb, or W A S D, swims it
+  that way across the water as the camera sees it. Let go and it is its own
+  bird again.
 - Buttons for what the swan does in the film: **shake**, **dunk**, **reach**;
   and **replay** for the whole performance with the film's camera.
 - A panel for the picture: sun direction and height, aperture, glow,

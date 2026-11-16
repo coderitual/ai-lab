@@ -31,7 +31,8 @@ src/assets/             what is visible
   swan/                 the swan (see swan.md)
   pond/Water.js         the water's surface; pond/surface.js, what the swan does to it
   pond/Specks.js        what floats on it
-  forest/Forest.js      the wood, the meadow, the fence, the haze
+  forest/Forest.js      the wood: where things stand, the ground, the meadow, the fence
+  forest/trees.js       trunks and boughs; forest/foliage.js, leaves; forest/haze.js, the air and its shafts
   fx/Droplets.js        drops in the air
 src/scene/              the show
   config.js             LOOK, CAMERA, SIM, TIERS
@@ -108,7 +109,7 @@ the finish pass, and the sRGB curve is applied by the grade pass.
 | FXAA search steps | 5 | 7 | 10 |
 | ripple texture | 256² | 384² | 512² |
 | `waterDetail` (ripple trains summed; mirror read twice at 2) | 0 | 1 | 2 |
-| specks / leaves / trunks / droplets | 7000 / 4800 / 80 / 192 | 13000 / 9000 / 140 / 384 | 16000 / 13500 / 220 / 768 |
+| specks / leaf lights / leaf sprays / trunks / droplets | 7000 / 4800 / 1200 / 80 / 192 | 13000 / 9000 / 2100 / 140 / 384 | 16000 / 13500 / 3300 / 220 / 768 |
 | `featherDetail` (the swan's mesh and fringe) | 0 | 1 | 2 |
 
 The tier is `?q=` if given, else the probe's guess (`caps.tier`): software

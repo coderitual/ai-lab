@@ -93,7 +93,9 @@ vec2 acrossSun(vec3 p) {
 // the lit clumps, the flecks on the bark and the shadows on the meadow are
 // one pattern, and it moves as one when the sun is turned.
 float canopyLight(vec3 p) {
-  vec2 q = acrossSun(p);
+  // (the pattern is slid to where, with the sun as the film has it, the film's
+  // camera finds lit leaves up to its left and right and shade between them)
+  vec2 q = acrossSun(p) + vec2(21.0, 18.0);
   float n = valueNoise(q * 0.29 + 3.7) * 0.5 + valueNoise(q * 0.83 + 11.3) * 0.3 + valueNoise(q * 2.3 + 23.9) * 0.2;
   // value noise crowds round one half: 0.3 .. 0.7 holds nearly all of this sum
   float open = 0.7 - 0.4 * uDapple.z;

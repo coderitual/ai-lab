@@ -42,6 +42,7 @@ All in [`images/`](images/), all made by `tools/screenshots.cjs`.
 | ![](images/hero.jpg) The shake, 1.3 s into the film | ![](images/head-on.jpg) Head-on at 3.75 s: the two wing lobes either side of the neck |
 | ![](images/desktop.jpg) On a desktop, with the look panel open | ![](images/close.jpg) Close: the fringe of down along the neck, light through the tail |
 | ![](images/phone.jpg) On a phone held upright | ![](images/phone-side.jpg) On a phone held sideways |
+| ![](images/steer.jpg) Steering: the stick held over to the left, the swan swimming that way | |
 | ![](images/reach.jpg) The reach, bill in the water | ![](images/water.jpg) The spray landing: glints only where the water is disturbed |
 | ![](images/above.jpg) From above, as the swan comes up from the dunk | ![](images/meadow.jpg) Toward the meadow and the fence |
 | ![](images/sunny-side.jpg) From the sunny side, where the film never went | ![](images/no-print.jpg) A frame before the print curve |

@@ -96,6 +96,33 @@ of 20 keys naming shapes.
 - **Views** (`VIEWS`): film, low, close, high, meadow. Double tap or `1`
   returns to the film's view.
 
+## Steering (`STEER` in `scene/SwanMind.js`, input in `scene/Interaction.js`)
+
+- The stick (a finger, or the mouse) or `W` `A` `S` `D`, relative to the
+  camera: up or `W` is away from the camera, along where it looks across the
+  water; left is the picture's left. The stick has a dead zone of 0.14 of its
+  travel and full strength at its rim; keys are full strength, two together a
+  diagonal, opposite keys cancel, and keys override the stick.
+- The swan swims at up to 0.55 m/s times the strength, gathering speed at
+  1.1 a second. It turns first and then goes (the speed is scaled by 0.3 +
+  0.7 of the cosine of the angle still to turn), at up to 1.5 rad/s at rest
+  falling to 0.9 rad/s at full speed, its head leading into the turn. A bill
+  that is in the water comes up before it sets off. Its neck takes a swimming
+  carriage blended from the film's shapes A, C, B and G by speed.
+- It cannot leave the water: it slides along a line 1.5 m inside the shore,
+  and from 0.8 m short of that line the part of the push that points at the
+  bank is taken away.
+- While it is steered the film ends and a call to the water is dropped; a
+  shake or a look happens at once; a dunk or a reach waits until it is let go
+  and slower than 0.22 m/s, or for 4 s.
+- Let go, it glides on (its speed dies away at 0.7 a second for 4 s), is left
+  where it is for 4 s, and over the next 8 s is drawn back toward its own
+  patch of sunlit water. `state` reads `steer` while a control is held.
+- The stick is 120 px across on an upright phone, 112 px on a phone held
+  sideways and 104 px on larger screens, bottom left. The four action
+  buttons are a 2 by 2 grid bottom right on phones and a row bottom middle
+  on larger screens.
+
 ## Touch
 
 - A tap on the water lets a drop of 11 mm fall there from 0.55 m and calls
@@ -108,9 +135,11 @@ of 20 keys naming shapes.
 
 ## Keys
 
-`S` shake, `D` dunk, `R` reach, `F` the film again, `1` to `5` views, arrows
-move the camera, `+` and `-` closer and further, `T` slow motion, `M` sound,
-`H` hide the controls.
+`W` `A` `S` `D` swim (by their place on the keyboard, so Z Q S D on a French
+one), `Space` shake, `E` dunk, `R` reach, `F` the film again, `1` to `5`
+views, arrows move the camera, `+` and `-` closer and further, `T` slow
+motion, `M` sound, `H` hide the controls. Keys held when the window loses
+focus are let go.
 
 ## The look (`LOOK` in `scene/config.js`)
 
@@ -119,7 +148,9 @@ move the camera, `+` and `-` closer and further, `T` slow motion, `M` sound,
 | Sun | 14 degrees east of north, 32 degrees up; linear colour 4.2, 4.0, 3.6 |
 | Sky fill | 0.1, 0.2, 0.33 |
 | The wood's shadow | begins 1.6 m from the pond's centre toward the sun, soft over 0.9 m, wandering by 0.5 m |
-| Aperture | 0.08 of a blur disc of 3.4 % of the picture height; the mirrored far layer is blurred by at least `mirrorSoftness` 0.3 of it |
+| Aperture | 0.045 of a blur disc of 3.4 % of the picture height; the mirrored far layer is blurred by at least `mirrorSoftness` 0.3 of it |
+| The wood | `canopyOpen` 0.42 (the share of the canopy the sun comes through), `haze` 1, `shafts` 1, `leafLight` 1 |
+| The shadow's edge | 0.7 of its width is broken into flecks of sun and shade 0.2 m across (`shadeDapple`, `shadeDappleSize`) |
 | Glow | strength 0.22, no threshold |
 | Tone | exposure 1, toe 0.008, shoulder 3 |
 | Print | 1 (the measured curve, `printCurve` in `engine/PostChain.js`) |
@@ -148,7 +179,7 @@ Chosen by a probe of the device (`engine/caps.js`) or by `?q=`.
 | ripple texture | 256² | 384² | 512² |
 | water detail | 0 | 1 | 2 |
 | specks | 7000 | 13000 | 16000 |
-| leaves, trunks | 4800, 80 | 9000, 140 | 13500, 220 |
+| leaf lights, leaf sprays, trunks | 4800, 1200, 80 | 9000, 2100, 140 | 13500, 3300, 220 |
 | drops in the air at once | 192 | 384 | 768 |
 | swan detail | 0 | 1 | 2 |
 
@@ -173,6 +204,7 @@ burst when the bill enters or leaves the water.
   of the picture." with the driver's own log in small print.
 - If the WebGL context is lost and not restored within 3 s (page visible):
   "The picture was lost. Tap to load it again." A tap reloads the page.
-- Hint under the title until the picture is first touched, or for 14 s: "Drag
-  to look round · pinch to come closer · touch the water" (with a mouse:
-  "scroll" and "click").
+- Hint under the title until the picture is first touched, or for 14 s. On a
+  touch screen: "The stick swims the swan · drag to look round · pinch to
+  come closer · touch the water". Otherwise: "W A S D or the stick to swim ·
+  drag to look round · scroll to come closer · click the water".

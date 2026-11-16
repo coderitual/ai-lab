@@ -47,6 +47,7 @@ const SHOTS = [
   { name: 'desktop', size: WIDE, query: 't=7.4', ui: true, eval: "document.querySelector('.ui-tool[title=\"The look\"]').click()", caption: 'On a desktop, with the look panel open' },
   { name: 'phone', size: PHONE, query: 't=5.25', ui: true, caption: 'On a phone held upright' },
   { name: 'phone-side', size: PHONE_SIDE, query: 't=7.6', ui: true, caption: 'On a phone held sideways' },
+  { name: 'steer', size: PHONE, query: 'film=0&t=2', ui: true, eval: "__swan.world.interaction.setStick(-0.75, 0.35); __swan.advance(3.2)", caption: 'Steering: the stick held over to the left, the swan swimming that way' },
   { name: 'close', size: WIDE, query: 'still&heading=28&pose=A&az=14&el=7&dist=2.3&tx=-0.14&ty=0.3&fov=24', caption: 'Close: the fringe of down along the neck, light through the tail' },
   { name: 'head-on', size: TALL, query: 't=3.75', caption: 'Head-on at 3.75 s: the two wing lobes either side of the neck' },
   { name: 'reach', size: WIDE, query: 'still&heading=172&pose=F&az=16&el=11&dist=3.4', caption: 'The reach, bill in the water' },

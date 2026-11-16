@@ -3,7 +3,8 @@
 // A tree here is a skeleton of limbs, and a limb is a bent tube that tapers:
 // a trunk that flares at the root, wanders a little on its way up and thins
 // toward the top; boughs that leave it at an angle and curve toward the light;
-// on the trees at the water's edge, a few thin dead branches low down. The
+// on the trees at the water's edge, a few thin dead branches low down; on some,
+// leaves up the trunk on the side of their light. The
 // trees on the bank lean out over the pond and carry their boughs low, as
 // trees at the edge of a wood do, because that is where their light is.
 //
@@ -79,6 +80,8 @@ function addLimb(limbs, points, sides) {
  *   edge: on the bank, leaning out, boughs from low down; inner: a pole with its crown out of sight;
  *   framing: a big tree with heavy boughs
  * @param {[number, number]} spot.toward unit (x, z): where its light is (the pond; for a framing tree, the clearing)
+ * @param {boolean} [spot.bare] no leaves low on its trunk, and no bough on its lower two fifths
+ * @param {boolean} [spot.leafy] in leaf from low down: a column of leaves up its trunk, and (inside the wood) boughs from 2.5 m
  * @param {number} [spot.detail] 0..2, the quality tier: fewer faces and boughs when low
  * @returns {{ x: number, y: number, z: number, size: number, low: boolean, edge: boolean }[]}
  *   where its leaves belong: a place and the radius of the clump there; `low` if on a bough rather than in
@@ -125,9 +128,11 @@ export function growTree(limbs, rng, spot) {
   };
 
   // Boughs. On the bank they start low and most reach out toward the light;
-  // inside the wood there are few, and high.
-  const boughs = kind === 'framing' ? 6 : edge ? 2 + rng.int(3) : 1 + rng.int(2);
-  const lowest = edge ? 1.5 : height * 0.45;
+  // inside the wood there are few, and high, except on a tree that stands in
+  // a gap and is in leaf from low down (leafy).
+  const boughs = kind === 'framing' ? 6 : edge || spot.leafy ? 2 + rng.int(3) : 1 + rng.int(2);
+  // (the framing tree's begin above the film's picture: only their leaves hang into it)
+  const lowest = spot.bare ? height * 0.4 : kind === 'framing' ? 4 : edge ? 1.5 : spot.leafy ? 2.5 : height * 0.45;
   const facing = Math.atan2(toward[0], toward[1]);
   for (let b = 0; b < boughs; b++) {
     const h = lowest + (height * 0.72 - lowest) * Math.pow(rng.float(), edge ? 1.7 : 1);
@@ -157,6 +162,22 @@ export function growTree(limbs, rng, spot) {
       turn += rng.gauss() * 0.3;
     }
     addLimb(limbs, points, kind === 'framing' ? 6 : detail > 0 ? 5 : 4);
+  }
+
+  // Leaves low on the trunk. A tree with light at its side is often in leaf
+  // nearly to the ground there (shoots from the trunk, ivy, a sapling in
+  // front of it): from the water, a tall column of leaves. The film's lit
+  // foliage stands in such columns, not in round clumps. Leafy trees have
+  // them, and one in four of the others on the bank.
+  if (!spot.bare && (spot.leafy || (kind === 'edge' && rng.float() < 0.25))) {
+    const top = rng.range(6, 11);
+    const side = facing + rng.gauss() * 0.6;
+    for (let h = rng.range(1.6, 2.6); h < top; h += rng.range(0.9, 1.5)) {
+      const from = trunkAt(h);
+      const out = from.r + rng.range(0.2, 0.9);
+      const around = side + rng.gauss() * 0.5;
+      anchors.push({ x: from.x + Math.sin(around) * out, y: from.y, z: from.z + Math.cos(around) * out, size: rng.range(0.5, 0.9), low: true, edge });
+    }
   }
 
   // Thin dead branches low on the trunk: lines across the dark, as in the film.

@@ -17,6 +17,15 @@ is done.
 
 ## Closer to the film
 
+- **Finish checking the new wood**: it was built in two sittings that were
+  both cut short. Not yet looked at systematically: every compass direction
+  for seams or holes, the mirrored far layer, the low and high tiers, and
+  whether the shafts read well when the sun is turned far from where the
+  film has it.
+- **A second pass on the swan against the new lighting** (its form at the
+  six moments, the wide soft edge of the warm region, the amber patch, the
+  thin rim along the neck) was planned and has not run.
+
 3. **A side-by-side tool**: the film's frame beside the build's at the same
    moment, with the measured sRGB targets of [design.md](design.md) sampled
    from both and printed. The measurements exist; the comparison is still
@@ -50,6 +59,8 @@ is done.
    seconds.
 
 ## More swan
+
+- **A gamepad** for steering, beside the stick and the keys.
 
 10. **Preening**: the neck laid back along a wing, the bill working in the
     feathers.

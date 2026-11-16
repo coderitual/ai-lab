@@ -27,7 +27,7 @@ import { AIR_GLSL } from './haze.js';
 
 const SPRAY_VERTEX = (ctx) => /* glsl */ `
 ${ctx.light.glsl}
-in vec4 aSpray;   // seed, leaves across the card, share of the sun this clump can get, unused
+in vec4 aSpray;   // seed, leaf blobs across half the card, share of the sun this clump can get, unused
 out vec2 vCard;   // -1 .. 1 across the card
 out vec4 vSpray;
 out vec3 vWorldPos;
@@ -37,19 +37,21 @@ void main() {
   vCard = position.xy;
   vSpray = aSpray;
   vWorldPos = world.xyz;
-  vLight = canopyLight(world.xyz) * aSpray.z;
+  // (where the wood's shadow does not reach, on the bank across the pond from
+  // the sun, every clump is in the open: the sun comes at it over the water)
+  vLight = canopyLight(world.xyz) * max(aSpray.z, sunReach(world.xyz));
   gl_Position = projectionMatrix * viewMatrix * world;
 }
 `;
 
 // What a leaf does with the sun, as shares of uSunColor: seen against the
-// light it glows with what passes through it, yellow-olive (156, 157, 72 on
-// screen in the film, up to 195, 186, 96); seen with the light it only
-// reflects, greener and a third as bright.
+// light it glows with what passes through it, yellow-olive (on screen in the
+// film the lit foliage averages 81, 89, 45, its brighter tenth 151, 154, 88);
+// seen with the light it only reflects, greener and a third as bright.
 const LEAF_GLSL = /* glsl */ `
 vec3 leafGlow(vec3 toEye) {
   float against = dot(-toEye, uSunDir);
-  return uSunColor * mix(vec3(0.026, 0.04, 0.011), vec3(0.085, 0.088, 0.03), smoothstep(-0.25, 0.55, against));
+  return uSunColor * mix(vec3(0.026, 0.04, 0.011), vec3(0.085, 0.087, 0.036), smoothstep(-0.25, 0.55, against));
 }
 `;
 
@@ -68,39 +70,38 @@ void main() {
   float inside = 1.0 - dot(vCard, vCard) + (valueNoise(vCard * 2.3 + seed * 37.0) - 0.5) * 1.1;
   if (inside < 0.1) discard;
 
-  // Leaves: at most one to a cell of a grid that is turned differently on
-  // every card; a third of the cells have none.
+  // Leaves and the gaps between them: blobs a leaf across, gathered in
+  // bunches of a few, laid at a different angle on every card (no grid, no
+  // two cards alike). A quarter of the card is leaf at its ragged edge, three
+  // quarters in its middle.
   float c = cos(seed * 6.2832), s = sin(seed * 6.2832);
   vec2 g = mat2(c, s, -s, c) * vCard * vSpray.y + seed * 91.0;
-  vec2 cell = floor(g);
-  vec2 h = hash22(cell);
-  float h2 = hash12(cell + 57.0);
-  vec2 f = g - cell - 0.5 - (h - 0.5) * 0.5;
-  // each a small oval at its own angle
-  float a = h.x * 6.2832;
-  vec2 axis = vec2(cos(a), sin(a));
-  vec2 o = vec2(dot(f, axis), dot(f, vec2(-axis.y, axis.x)) * 1.6);
-  bool leaf = dot(o, o) < 0.06 + 0.14 * h.y && fract(h2 * 7.31) > 0.33;
-  // Between the leaves: a hole, more often toward the outside of the clump;
-  // in its middle mostly more leaves, further in and in the dark.
-  if (!leaf && (inside < 0.55 || fract(h2 * 3.17) > 0.6)) discard;
+  float bunch = valueNoise(g * 0.31 + 19.0);
+  float leafy = valueNoise(g) * 0.4 + valueNoise(g * 0.62 + 3.0) * 0.35 + bunch * 0.25;
+  if (leafy < mix(0.6, 0.4, smoothstep(0.1, 0.8, inside))) discard;
 
   vec3 toEye = normalize(cameraPosition - vWorldPos);
-  // In shade: nearly black, a little of the sky's light on it.
-  vec3 color = vec3(0.006, 0.011, 0.008) * (0.4 + 0.6 * h.y) + uSkyColor * vec3(0.004, 0.007, 0.004);
-  if (leaf) {
-    // The sun does not light a clump evenly: it comes through the leaves
-    // above in patches a third of the clump across. In a patch three leaves
-    // in five are lit and no two alike (how a leaf is turned decides how much
-    // it passes on: most little, a few nearly all). They stir.
-    float pool = smoothstep(0.38, 0.62, valueNoise(vCard * 1.9 + seed * 53.0));
-    float lit = step(h2, vLight * pool * 0.6);
-    float turned = 0.06 + 0.94 * h.x * h.x * h.x;
-    float stir = 0.85 + 0.15 * sin(uTime * (0.5 + 1.2 * h.y) + h.x * 40.0);
-    color += leafGlow(toEye) * (lit * turned * stir * 0.9 * uWood.z);
-  } else {
-    color *= 0.35;
-  }
+  // In shade a leaf is nearly black: a little of the sky on it, and of the
+  // sun that is scattered about under the trees.
+  vec3 color = vec3(0.019, 0.019, 0.012) * (0.6 + 0.8 * bunch) * (uSkyColor * 0.45 + uSunColor * 0.012);
+
+  // The sun does not light a clump evenly. It comes through the leaves above
+  // in pools about a third of the clump across. In a pool most leaves are
+  // still dark: one behind another, or edge-on to the light. One in four
+  // glows, each by itself (a fleck one leaf across, a little likelier where
+  // the leaves bunch), and how it is turned decides how much: most a little,
+  // a few with nearly all the sun, brighter than the film's white. So lit
+  // foliage is a sparkle of small lights on a dark mass with a dim olive glow
+  // under it (the many leaves further in), which is how the film's reads; an
+  // even wash of lit leaf looks like lichen. The leaves stir, by a tenth of
+  // their light.
+  float pool = valueNoise(vCard * 1.7 + seed * 53.0);
+  float sun = smoothstep(0.55, 0.8, vLight * (0.1 + 1.5 * pool));
+  float turned = valueNoise(g + 71.0);
+  float glow = smoothstep(0.66, 0.94, turned + 0.3 * (bunch - 0.5));
+  glow = 0.07 + 4.2 * glow * glow;
+  float stir = 0.9 + 0.1 * sin(uTime * (0.5 + 1.2 * bunch) + turned * 40.0);
+  color += leafGlow(toEye) * (sun * glow * stir * uWood.z * uWood.w);
   outColor = toTarget(vec4(throughHaze(color, vWorldPos), 1.0));
 }
 `;
@@ -118,10 +119,10 @@ void main() {
   float dist = length(toEye);
   toEye /= dist;
   // lit only where the canopy lets the sun through; at the edge of a patch, some are and some are not
-  float lit = smoothstep(0.35, 0.65, canopyLight(position) * aLeaf.w + (aLeaf.z - 0.5) * 0.5);
+  float lit = smoothstep(0.35, 0.65, canopyLight(position) * max(aLeaf.w, sunReach(position)) + (aLeaf.z - 0.5) * 0.5);
   // every leaf stirs in its own time, a fifth of its light at most
   float stir = 0.8 + 0.2 * sin(uTime * (0.5 + 1.3 * aLeaf.z) + aLeaf.z * 50.0);
-  vec3 color = leafGlow(toEye) * (aLeaf.y * lit * stir * uWood.z * (1.0 - hazeAmount(dist)));
+  vec3 color = leafGlow(toEye) * (aLeaf.y * lit * stir * uWood.z * uWood.w * (1.0 - hazeAmount(dist)));
 
   vec4 view = viewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * view;
@@ -135,7 +136,7 @@ void main() {
   vColor = color * (6.0 * px * px / (size * size));
   gl_PointSize = size;
   // leaves in shade give no light: do not draw them at all
-  if (lit < 0.004) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+  if (lit * uWood.w < 0.004) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }
 `;
 
@@ -166,6 +167,8 @@ export function createFoliage(ctx, { clumps, uniforms, keep }) {
   // --- sprays
   {
     const budget = ctx.quality.counts.sprays;
+    /** The low tier, told by its budget of sprays. */
+    const coarse = budget < 1400;
     // Two to a clump on the boughs (one behind the other gives the lights
     // something to hide behind), one in a crown. Where the budget does not
     // reach, the crowns go without first: they are mostly above the picture.
@@ -214,10 +217,11 @@ export function createFoliage(ctx, { clumps, uniforms, keep }) {
       const facing = Math.atan2(-spray.x, -spray.z) + rng.gauss() * 0.5;
       q.setFromEuler(turn.set(rng.gauss() * 0.35, facing, rng.range(0, Math.PI * 2), 'YXZ'));
       mesh.setMatrixAt(i, m.compose(p.set(spray.x, spray.y, spray.z), q, s.set(spray.half, spray.half * rng.range(0.75, 1.1), 1)));
-      // Leaves 9 cm apart on the nearest trees, and wider apart in proportion
-      // further back, so that they stay a few pixels across in the picture
-      // instead of turning into a shimmer too fine to draw.
-      const spacing = 0.09 * Math.max(1, distance / 16);
+      // Leaves 2.4 cm apart on the trees of the bank (3.6 cm on the low
+      // tier, whose far layer is coarser), and wider apart in proportion
+      // further back: nearly two texels of the far layer each, which is as
+      // fine as it can show them without their turning into a shimmer.
+      const spacing = (coarse ? 0.036 : 0.024) * Math.max(1, distance / 16);
       data.set([rng.float(), spray.half / spacing, spray.shade, 0], i * 4);
     });
     geometry.setAttribute('aSpray', new THREE.InstancedBufferAttribute(data, 4));
@@ -249,7 +253,7 @@ export function createFoliage(ctx, { clumps, uniforms, keep }) {
         // the sun straight on and is several times brighter than white: the
         // small hot points among the soft ones.
         const brightness = rng.float() < 0.13 ? rng.range(3, 9) : rng.range(0.35, 2.2);
-        leaves.set([rng.range(0.035, 0.075), brightness, rng.float(), shade], i * 4);
+        leaves.set([rng.range(0.025, 0.055), brightness, rng.float(), shade], i * 4);
       }
     }
     const geometry = keep(new THREE.BufferGeometry());
