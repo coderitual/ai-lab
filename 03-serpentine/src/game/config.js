@@ -65,34 +65,95 @@ export const VIEW = {
 
 /**
  * The cameras. Distances are from the car's origin (on the ground, midway between the axles) in metres, lenses
- * in degrees top to bottom on a wide picture. (A first version: the real rigs come with the camera stage.)
+ * in degrees top to bottom on a 16:9 picture, rates in 1/s (the reciprocal of a time constant).
  */
 export const CAMERA = {
   chase: {
     distance: 5.7,
-    height: 1.45,
+    height: 1.5,
     /** What it looks at: a point this far ahead of the car and this high. */
     lookAhead: 8,
-    lookHeight: 1.0,
+    lookHeight: 0.45,
     fov: 50,
-    /** ...widening to this at `fastSpeed`. */
+    /** ...widening to this as the speed signal rises from `slowSpeed` to `fastSpeed` (m/s), eased over `feelTime` s. */
     fovFast: 58,
+    slowSpeed: 16.7,
     fastSpeed: 49,
+    feelTime: 0.4,
+    /** At speed it also settles this much lower and drops back this much further. */
+    drop: 0.15,
+    pullBack: 0.4,
     /** How much of the angle between where the car points and where it is going the camera takes up. */
-    slide: 0.55,
-    /** How quickly it swings round behind the car, and how lazily it follows height (1/s). */
+    slide: 0.65,
+    /** How quickly it swings round behind the car. */
     yawRate: 4.6,
-    heightRate: 3,
-    /** On a picture narrower than 4:3 (a phone held upright, half a split screen) it backs off and lifts by up to: */
-    narrowBack: 1.35,
-    narrowLift: 1.25,
+    /**
+     * Looking into the bend: the road's turn over the next `bendReach` m (more at speed) times `bendRoad`, plus the
+     * yaw rate (rad/s) times `bendYawRate`, at most `bendMax` rad, followed at `bendRate`; the camera itself moves
+     * `inside` m per radian of it towards the inside.
+     */
+    bendReach: 22,
+    bendRoad: 0.22,
+    bendYawRate: 0.08,
+    bendMax: 0.2,
+    bendRate: 2.5,
+    inside: 2.5,
+    /** Height: followed at `heightRate` (never more than `heightSlack` m behind), the grade lazily at `gradeRate`. */
+    heightRate: 5,
+    heightSlack: 0.5,
+    gradeRate: 1.6,
+    /** The distance spring: this far back per g of acceleration (closer under braking), its frequency and damping. */
+    pullPerG: 0.35,
+    pullOmega: 6,
+    pullDamping: 0.6,
+    /** Roll of the picture: a share of the body's roll, a little against the yaw rate, followed at `rollRate`. */
+    rollShare: 0.3,
+    rollYawRate: 0.012,
+    rollRate: 4,
+    /** On a picture narrower than 4:3 (a phone held upright, a side-by-side half) it backs off and lifts by up to: */
+    narrowBack: 1.3,
+    narrowLift: 1.45,
+    narrowAhead: 1.3,
+    narrowLook: 1.0,
+    /** ...and on one wider than 16:9 (a stacked half): */
+    wideBack: 1.1,
+    wideLift: 1.15,
   },
-  far: { distance: 9.5, height: 2.6, lookAhead: 10, lookHeight: 1.0 },
-  /** Fixed to the body at the car's own viewpoints (VIEWPOINTS in assets/car/spec.js): how far ahead they look, and the lens. */
-  bonnet: { lookAhead: 20, fov: 60 },
-  bumper: { lookAhead: 20, fov: 62 },
-  /** The title's slow circle round the parked car (rate in rad/s). */
-  orbit: { distance: 7.2, height: 1.6, rate: 0.12, lookHeight: 0.7, fov: 42 },
+  far: { distance: 9.2, height: 2.5, lookAhead: 12, lookHeight: 1.2 },
+  /**
+   * Fixed to the body at the car's own viewpoints (VIEWPOINTS in assets/car/spec.js): the lens (widening with speed),
+   * how far below level it looks (rise per metre), and how firmly it follows the body's pitch and roll.
+   */
+  bonnet: { fov: 56, fovFast: 62, lookDown: -0.04, firm: 30 },
+  bumper: { fov: 62, fovFast: 68, lookDown: -0.01 },
+  /** Shake, in radians of turn: the road at speed, more on the verge, and the knocks (strength in m/s for the full). */
+  shake: { road: 0.0012, verge: 0.006, roadHz: 9, impact: 0.02, impactMove: 0.1, impactHz: 14, impactFull: 12, decay: 0.6, kick: 0.3 },
+  /**
+   * The title's slow circle round the parked car (rate in rad/s, slower by `linger` over the three-quarter views),
+   * its radius drifting between `near` and `far` and its height between `low` and `high`.
+   */
+  orbit: { near: 4.6, far: 5.4, low: 1.1, high: 1.4, driftRate: 0.23, rate: 0.16, linger: 0.55, lookHeight: 0.62, fov: 38, narrowBack: 1.5 },
+  /** The orbit behind the results: blended in from the chase view over `blend` s while the car rolls home. */
+  results: { near: 6.2, far: 7.2, low: 1.2, high: 1.6, driftRate: 0.2, rate: 0.36, linger: 0.4, lookHeight: 0.7, fov: 44, narrowBack: 1.4, blend: 1.5 },
+  /**
+   * The start sweep, on the race clock (RULES.sweep): through these points in car space (x towards the middle of
+   * the road), then into the chase view, looking from the car's middle out to the chase camera's point ahead.
+   */
+  sweep: {
+    path: [
+      [2.6, 0.55, 4.8],
+      [4.2, 0.8, 2.0],
+      [4.4, 1.05, -1.8],
+      [2.6, 1.35, -5.0],
+    ],
+    lookHeight: 0.6,
+    lookZ: 0.3,
+    fov: 40,
+  },
+  /** Keeping clear: of a solid edge, of the ground, of the tunnel's roof (and this far beyond the portals). */
+  clear: { wall: 0.6, ground: 0.45, roof: 1.2, portal: 3 },
+  /** Lens limits: pictures narrower than `narrow` or wider than `wide` keep that shape's width of view. */
+  lens: { narrow: 4 / 3, wide: 16 / 9, max: 100 },
   /** The camera modes C steps through. */
   modes: ['chase', 'far', 'bonnet', 'bumper'],
 };

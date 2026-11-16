@@ -274,7 +274,7 @@ export class Game {
       return {
         racer,
         camera: new THREE.PerspectiveCamera(CAMERA.chase.fov, 1, VIEW.near, VIEW.far),
-        rig: new CameraRig(this.phase === 'title' ? 'orbit' : this.cameraModes[i]),
+        rig: new CameraRig(this.phase === 'title' ? 'orbit' : this.cameraModes[i], this.rng.fork(`camera${i}`)),
         hud: this.hud.views[i],
         rect: { x: 0, y: 0, w: 1, h: 1 },
         zone: { left: 0, top: 0, width: 1, height: 1 },
@@ -351,7 +351,7 @@ export class Game {
     this.views.forEach((view, i) => {
       view.rig.setMode(this.cameraModes[i]);
       view.rig.lookBack = false;
-      view.rig.snap(view.racer.vehicle);
+      view.rig.snap(view.racer.vehicle, 0);
     });
   }
 
@@ -569,7 +569,10 @@ export class Game {
       // look back: held, from the driver's own keys or pad
       if (this.phase !== 'title' && racer.driver === racer.player) view.rig.lookBack = !!this.input.read(lookRead, racer.scheme, i).lookBack;
       else view.rig.lookBack = false;
-      view.rig.update(dt, racer.vehicle, this.track);
+      // the rig reads this step's knocks, the start sweep off the race clock, and whether its car has taken the flag
+      const sweep = race && race.clock < 0 ? clamp01((race.clock + race.lead) / RULES.sweep) : 1;
+      const finished = !!race && this.phase !== 'title' && race.cars[racer.index].finished;
+      view.rig.update(dt, racer.vehicle, this.track, { impacts: racer.impacts, sweep, finished });
       // eyes take a moment to follow the light: closing down quickly, opening up slowly (eased in stops)
       const target = this._exposureFor(racer.vehicle);
       const tau = target < view.exposure ? EXPOSURE.close : EXPOSURE.open;
