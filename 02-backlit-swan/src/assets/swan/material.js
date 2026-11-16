@@ -6,8 +6,8 @@
 // feather it has to cross, using a stand-in for the bird made of a few
 // ellipsoids (the loose plumage as a whole, the two wings, the body under
 // them, the tail) and a chain of cylinders (the neck and head). Light that
-// crosses little comes out cream; a little more and the blue is gone and it
-// is amber; more still and nothing comes through, and the surface is left
+// crosses little comes out cream; a little more and it is dimmer and a little
+// warmer; more still and nothing comes through, and the surface is left
 // with the blue light of the sky: the teal shadow side. The bright rim, the
 // glowing bow, the lit tail and the dark middle are all this one sum, so they
 // move correctly when the bird turns or the sun does. Nothing is painted on.
@@ -312,8 +312,9 @@ uniform vec4 uSky;        // share of the sky's light on a surface that faces do
 uniform vec3 uAlbedo;
 uniform vec3 uStain;      // the feathers of the head and upper neck are a little stained
 uniform vec3 uBillColor;
-uniform vec2 uNeckSky;     // x: share of the sky's light the neck and head get (they stand upright under their own arch);
-                           // y: share of the light inside them that leaves through their skin (dense, close feathering: little)
+uniform vec3 uNeckSky;     // x: share of the sky's light the neck and head get (they stand upright under their own arch);
+                           // y: share of the light inside them that leaves through their skin (dense, close feathering: little);
+                           // z: share of the sun that gets round them in the down, however thick they are
 in vec3 vWorldPos;
 in vec3 vNormal;
 in float vDepth;
@@ -373,7 +374,7 @@ void main() {
   // Light inside the plumage leaves through any surface, whichever way it
   // faces; a surface turned to the sun is lit by it directly as well, and
   // shows whichever of the two is the brighter.
-  vec3 sunFeather = uSunColor * reach * through * max(mix(uFeather.x, uNeckSky.y, vHead.w), direct);
+  vec3 sunFeather = uSunColor * reach * max(through * max(mix(uFeather.x, uNeckSky.y, vHead.w), direct), vec3(uNeckSky.z * vHead.w));
   // Bare parts let nothing through: plain sunlight, shadowed by the bird.
   vec3 sunBare = uSunColor * reach * through * max(nl, 0.0);
 

@@ -462,7 +462,7 @@ export class SwanMind {
     if (this._sinceWake > 0.045) {
       this._sinceWake = 0;
       const reach = swan.footprint.length * 0.42;
-      ctx.ripple.disturb(this.position.x + _forward.x * reach, this.position.z + _forward.z * reach, 0.1, 0.0008 + this.speed * 0.007);
+      ctx.ripple.disturb(this.position.x + _forward.x * reach, this.position.z + _forward.z * reach, 0.1, 0.0005 + this.speed * 0.004);
     }
     // and it never sits perfectly still: a slow breath of a ripple under the body
     if (Math.floor(time * 0.7) !== Math.floor((time - dt) * 0.7)) {

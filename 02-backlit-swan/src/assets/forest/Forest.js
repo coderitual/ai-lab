@@ -224,8 +224,10 @@ void main() {
     far.add(mesh);
   }
 
-  // Leaves: clumps hung in the crowns. Most are dark; the ones the sun reaches
-  // are many times brighter than white, which is what makes the bokeh.
+  // Leaves: clumps hung in the crowns and over the bank. Most are dark; the
+  // ones the sun reaches are many times brighter than white, which is what
+  // makes the dapples. Small leaves, many to a clump: the film's foliage is
+  // dense masses of dapples a few pixels across with dark between them.
   {
     const count = ctx.quality.counts.leaves;
     const geometry = keep(new THREE.PlaneGeometry(1, 1));
@@ -238,33 +240,33 @@ void main() {
     const turn = new THREE.Euler();
     const color = new THREE.Color();
     const sun = light.uniforms.uSunColor.value;
-    const clumps = Math.max(1, Math.round(count / 40));
+    const clumps = Math.max(1, Math.round(count / 180));
     let i = 0;
     for (let c = 0; c < clumps && trunkSpots.length; c++) {
-      // half of the clumps go to the trees in the north, behind the swan as
-      // the default camera sees it, so that even a few leaves are in the picture
+      // three clumps in four go to the trees in the north, behind the swan as
+      // the default camera sees it, so that there are leaves in the picture
       let tree = rng.pick(trunkSpots);
-      if (c % 2 === 0) for (let tries = 0; tries < 12 && !(tree.z < -9 && tree.z > -22 && Math.abs(tree.x) < 12); tries++) tree = rng.pick(trunkSpots);
+      if (c % 4 !== 3) for (let tries = 0; tries < 12 && !(tree.z < -9 && tree.z > -22 && Math.abs(tree.x) < 12); tries++) tree = rng.pick(trunkSpots);
       const cx = tree.x + rng.gauss() * 2.2;
       // Low boughs over the bank and the first few metres of crown: from 5 m
       // away and a metre up, the picture's top edge is only 13 degrees above
       // the horizon, so anything higher than about 7 m is never seen.
-      const cy = 3.4 + 7.5 * Math.pow(rng.float(), 0.9);
+      const cy = 1.6 + 6.0 * Math.pow(rng.float(), 1.2);
       const cz = tree.z + rng.gauss() * 2.2;
-      const radius = rng.range(0.7, 1.9);
+      const radius = rng.range(0.5, 1.2);
       // whole clumps are in the sun or out of it
-      const lit = rng.float() < 0.42;
+      const lit = rng.float() < 0.55;
       const perClump = Math.ceil(count / clumps);
       for (let k = 0; k < perClump && i < count; k++, i++) {
         p.set(cx + rng.gauss() * radius, cy + rng.gauss() * radius * 0.6, cz + rng.gauss() * radius);
         q.setFromEuler(turn.set(rng.range(0, 6.28), rng.range(0, 6.28), rng.range(0, 6.28)));
-        const size = rng.range(0.05, 0.13);
+        const size = rng.range(0.015, 0.05);
         mesh.setMatrixAt(i, m.compose(p, q, s.set(size, size, size)));
-        if (lit && rng.float() < 0.55) {
+        if (lit && rng.float() < 0.7) {
           // Sun through a leaf: yellow-olive (156, 157, 72 on screen in the
           // film, up to 195, 186, 96), scaled by the sun itself. A few are
           // much brighter: the small hot points among the soft blobs.
-          const k2 = rng.float() < 0.13 ? rng.range(2.5, 7) : rng.range(0.2, 1.25);
+          const k2 = rng.float() < 0.13 ? rng.range(2.5, 7) : rng.range(0.3, 1.75);
           color.setRGB(0.085 * sun.x * k2, 0.088 * sun.y * k2, 0.03 * sun.z * k2);
         } else {
           const k2 = rng.range(0.3, 1);

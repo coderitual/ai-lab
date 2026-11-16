@@ -24,7 +24,7 @@ import * as THREE from 'three';
 /** The ellipsoid that stands in for the swan's body: half length, half width, half height, in metres. */
 const HULL = { length: 0.35, width: 0.2, height: 0.29, centreHeight: 0.02 };
 /** Below this speed (m/s) the water behind the body stays smooth; at `full` the wake is at its strongest. */
-const WAKE = { from: 0.07, full: 0.3, amount: 0.22 };
+const WAKE = { from: 0.03, full: 0.2, amount: 0.22 };
 
 const cache = new WeakMap();
 

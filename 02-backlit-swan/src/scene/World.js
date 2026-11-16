@@ -329,11 +329,12 @@ void main() {
     resolution.set(far.sharp.width, far.sharp.height);
     far.render(this.farScene, camera, blur);
 
-    // 4. far layer, mirrored
+    // 4. far layer, mirrored. Its picture is never as sharp as the thing
+    // itself: ripples too fine to draw spread a reflection from that far away.
     if (mirror.valid) {
       mirror.camera.layers.enableAll();
       resolution.set(farMirror.sharp.width, farMirror.sharp.height);
-      farMirror.render(this.farScene, mirror.camera, blur);
+      farMirror.render(this.farScene, mirror.camera, Math.max(LOOK.aperture, LOOK.mirrorSoftness) * LOOK.bokehMax);
     }
 
     // 5. subject, mirrored

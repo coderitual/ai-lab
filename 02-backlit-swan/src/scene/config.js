@@ -27,7 +27,7 @@ export const LOOK = {
   shadeWanderLength: 2.9,
 
   // Lens
-  aperture: 0.3, // 0..1: how far out of focus the background is
+  aperture: 0.08, // 0..1: how far out of focus the background is (the film's is only a little: its lit leaves are dapples a few pixels across)
   bokehMax: 0.034, // blur disc radius at aperture 1, as a fraction of the picture height
   farClear: [0.0004, 0.0005, 0.0011], // what shows between the trees: nothing
 
@@ -71,9 +71,10 @@ export const LOOK = {
   mirrorBase: 0.02, // share of light mirrored looking straight down
   mirrorRise: 2.6, // exponent of its rise toward grazing; 5 is the textbook, 2.6 gives the film's 0.57 at 10 to 13 degrees
   mirrorFarDistance: 14, // metres along a reflected ray to the surroundings
+  mirrorSoftness: 0.3, // the mirror image of the surroundings is at least as soft as this aperture would make them
   glintStrength: 4.5, // the sun in the water, as a multiple of what sunColor alone would give
   glintCalm: 0.008, // roughness (spread of slopes) of calm water, the sun's own size included
-  glintSteep: 2.5, // roughness added per unit of simulated slope
+  glintSteep: 1.2, // roughness added per unit of simulated slope
   glintSun: 0.2, // how far leaves and haze spread the sun (as a roughness): bounds how bright its own image in calm water is
   glintMax: 40, // brightest a glint may be
   // What floats on it (assets/pond/Specks.js)
@@ -86,12 +87,13 @@ export const LOOK = {
   swanAlbedo: [0.93, 0.92, 0.9], // white feather
   swanStain: [0.92, 0.86, 0.72], // head and upper neck, as stained as a mute swan's usually are
   swanFreePath: 0.034, // metres of plain feather that take red light down to 1/e (0.057 L)
-  swanAbsorb: [1.0, 1.45, 2.3], // green and blue are taken faster than red by these factors: thin is cream, thicker amber
+  swanAbsorb: [1.0, 1.12, 1.4], // green and blue are taken faster than red by these factors: thin is cream, thicker a dimmer, slightly warmer cream (in the film the edge from cream to teal is pale olive, not amber)
   swanThrough: 0.32, // share of the light inside the plumage that leaves through a surface facing away from the sun
   swanWrap: 0.12, // how far direct sun creeps past the terminator on something this soft
   swanNeckDensity: 3.0, // the neck and head, relative to plain feather
-  swanNeckThrough: 0.08, // the same share as swanThrough, for the neck and head: their feathering is close and dense
-  swanNeckSky: 0.3, // share of the sky's light the neck and head get (the film's neck is olive inside, not teal)
+  swanNeckThrough: 0.16, // the same share as swanThrough, for the neck and head: their feathering is close and dense
+  swanNeckSky: 0.1, // share of the sky's light the neck and head get (the film's neck is olive inside, not teal)
+  swanNeckAround: 0.0065, // share of the sun that gets round the neck and head in their down and out on the shadow side, however thick they are
   swanSkyAtWater: 0.5, // share of the sky's light that reaches the skin at the waterline...
   swanSkyHeight: 0.2, // ...rising to all of it this many metres up
   swanSkyTilt: [0.05, 0.27, 1.0, 0.45], // share of it on surfaces facing down, facing the horizon, tilted up; the tilt (normal's y) that gets it all
@@ -149,7 +151,7 @@ export const TIERS = {
     fxaaSteps: 5,
     rippleSize: 256,
     waterDetail: 0, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 7000, leaves: 3200, trunks: 80, droplets: 192, featherDetail: 0 },
+    counts: { specks: 7000, leaves: 4800, trunks: 80, droplets: 192, featherDetail: 0 },
   },
   medium: {
     pixelRatio: 2,
@@ -164,7 +166,7 @@ export const TIERS = {
     fxaaSteps: 7,
     rippleSize: 384,
     waterDetail: 1, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 13000, leaves: 6000, trunks: 140, droplets: 384, featherDetail: 1 },
+    counts: { specks: 13000, leaves: 9000, trunks: 140, droplets: 384, featherDetail: 1 },
   },
   high: {
     pixelRatio: 2,
@@ -179,6 +181,6 @@ export const TIERS = {
     fxaaSteps: 10,
     rippleSize: 512,
     waterDetail: 2, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 16000, leaves: 9000, trunks: 220, droplets: 768, featherDetail: 2 },
+    counts: { specks: 16000, leaves: 13500, trunks: 220, droplets: 768, featherDetail: 2 },
   },
 };
