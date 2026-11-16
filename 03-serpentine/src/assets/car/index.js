@@ -1,272 +1,171 @@
-// PLACEHOLDER CAR. A body-sized box with a cabin on it, four wheels that
-// steer, spin and ride up and down, lamps that light up, and the real lights
-// the lamps cast. Its sizes come from spec.js and its interface (CarModel,
-// below) is the final one, so the physics, the cameras, the frame pipeline and
-// the night lighting can be built against it before the real model exists.
+// The car: createCar() builds the whole model in code and returns the handle
+// the game drives it with (CarModel).
 //
-// Two things here are meant to be kept by the real car:
-//  - the lights are always the same three (two head lamps, one tail glow) and
-//    are switched by intensity, never by `visible`, so no shader is recompiled
-//    when the lamps come on;
-//  - the head lamps are spot lights with a picture of the beam in front of
-//    them (SpotLight.map): the cut-off of a low beam is in that picture, and
-//    main beam is the same picture tilted up and turned up.
-//
-// The paint and the glass carry a clear coat that mirrors the car's reflection
-// probe (addCoat below): it is there so that the probe can be judged, and it
-// shows how any material reads one (GLSL_PROBE in engine/glsl.js).
+// The body is one lofted skin (skin.js) sampled into a mesh (body.js); what
+// is flush with it (glass, lamp lenses, shut lines, openings) is an atlas of
+// distances baked from outlines at start-up (features.js, atlas.js); the same
+// vertices are drawn as paint, glass, lenses and a dark inner shell, each with
+// its own triangles (materials.js). The lamp units, the grille's insides, the
+// mirrors and the cabin are later work: the lamps have stand-ins drawn by the
+// paint under their lenses, the openings show the dark shell behind them.
+// The wheels are placeholders until wheel.js is fitted.
 
 import * as THREE from 'three';
-import { GLSL_PROBE, targetDefines } from '../../engine/glsl.js';
-import { DIMS, LAMPS, STATIONS, WHEELS } from './spec.js';
+import { ATLAS_SIZE, bakeAtlas } from './atlas.js';
+import { MESH_EDGE, createArchGeometry, createLayout, inArch, sampleSkin, skinGeometry, skinIndex } from './body.js';
+import { createLampLights } from './lamps.js';
+import { PAINTS, createGhostMaterial, createGlassMaterial, createPaintMaterial, createDarkMaterial, createShared } from './materials.js';
+import { createPlaceholderWheels } from './placeholderWheels.js';
+import { createContactShadow } from './shadow.js';
+import { createSkin } from './skin.js';
+import { DIMS, STATIONS } from './spec.js';
 
-/**
- * @typedef {object} CarModel
- * @property {THREE.Group} object the root, in car space (origin on the ground midway between the axles, +Z forward,
- *   +Y up, +X the car's left)
- * @property {(i: number, pose: { steer: number, spin: number, travel: number }) => void} setWheel pose wheel `i`
- *   (0 FL, 1 FR, 2 RL, 3 RR): steer about +Y (left is positive), spin about its axle (rolling forward is
- *   positive), travel up from rest in metres
- * @property {(lights: { drl?: number, low?: number, high?: number, tail?: number, brake?: number, reverse?: number,
- *   indicatorL?: number, indicatorR?: number, interior?: number }) => void} setLights each 0..1; what is left out
- *   stays as it was
- * @property {(reflections: { cube: THREE.Texture|null, sky: number }) => void} setReflections `cube`: the car's
- *   reflection probe, or null for the scene's environment; `sky`: 0..1 how much sky is overhead
- * @property {THREE.SpotLight[]} headlights the real lights the head lamps cast (left, right)
- * @property {THREE.PointLight} taillight the red spill on the road behind
- * @property {{ center: THREE.Vector3, half: THREE.Vector3 }} box bounding box in car space
- * @property {string[]} paints the paint names it knows
- * @property {() => void} dispose
- */
+/** Atlas channels (features.js CHANNELS). */
+const GLASS = 0;
+const LENS = 3;
+const OPENING = 4;
 
-const PAINTS = {
-  silver: { color: 0xb4b8bc, metalness: 0.85, roughness: 0.32 },
-  graphite: { color: 0x2b2e33, metalness: 0.8, roughness: 0.3 },
-  blue: { color: 0x123c8a, metalness: 0.7, roughness: 0.3 },
-  red: { color: 0x8c1016, metalness: 0.5, roughness: 0.3 },
-  white: { color: 0xd9dad6, metalness: 0.1, roughness: 0.35 },
-};
-
-/**
- * How bright each lamp is when fully on: what its lens sends out, in scene units (see world/lighting.js).
- * A lamp does not know the time of day: the running lights that are a clean white by day (exposure 1) are far
- * too bright for the night's exposure, which is why real cars dim them when the head lamps come on. The game
- * does the same through setLights().
- */
-const LENS = { drl: 40, low: 120, high: 260, tail: 0.5, brake: 1.5, reverse: 8, indicator: 6 };
-/** What the lamps throw: head lamps in candela-like units at the beam's brightest point, the tail glow likewise. */
-const THROW = { low: 3200, high: 9000, tail: 0.6, brake: 1.8 };
-/** Half the angle the beam picture covers, and how far main beam tilts it up. */
-const BEAM_ANGLE = 0.5;
-const HIGH_TILT = Math.tan(THREE.MathUtils.degToRad(3.5));
-
-/**
- * The picture of a low beam, as a head lamp projects it (u to the car's right, v up, both spanning
- * -BEAM_ANGLE..BEAM_ANGLE). Dark above a cut-off just under the horizontal, which kicks up on the right to light
- * the verge; brightest right under the cut-off; and much dimmer the further down it points (nearly by the cube
- * of the angle), which is what lights a flat road evenly from a lamp at knee height instead of whitening the
- * few metres in front of the bumper.
- */
-function createBeamTexture() {
-  const width = 128;
-  const height = 256; // the cut-off wants the finer grid: a fifth of a degree a row
-  // half floats: the dim foreground is hundreds of times darker than the hot spot, and 8 bits would band
-  const data = new Uint16Array(width * height * 4);
-  const span = Math.tan(BEAM_ANGLE);
-  const deg = 180 / Math.PI;
-  const one = THREE.DataUtils.toHalfFloat(1);
-  for (let y = 0; y < height; y++) {
-    const up = Math.atan((((y + 0.5) / height) * 2 - 1) * span) * deg;
-    for (let x = 0; x < width; x++) {
-      const right = Math.atan((((x + 0.5) / width) * 2 - 1) * span) * deg;
-      const cutOff = -0.6 + Math.min(2.2, Math.max(0, right - 0.5) * Math.tan(15 / deg));
-      const edge = Math.min(1, Math.max(0, (cutOff - up) / 0.35 + 0.5)); // a third of a degree of softness
-      const depth = Math.min(1, 1.5 / Math.max(1.5, 0.3 - up)) ** 2.6; // full strength down to 1.2 degrees under the horizontal
-      const spread = Math.exp(-((right / 17) ** 2)) * 0.8 + Math.exp(-((right / 6) ** 2)) * 0.2;
-      const o = (y * width + x) * 4;
-      data[o] = data[o + 1] = data[o + 2] = THREE.DataUtils.toHalfFloat(edge * depth * spread);
-      data[o + 3] = one;
+/** Triangles over every other column and row of the sampled skin (both halves), leaving out the arches' holes. */
+function coarseIndex(samples, arch) {
+  const { columns, rows } = samples;
+  const half = columns * rows;
+  const index = [];
+  for (let i = 0; i < columns - 1; i += 2) {
+    const i2 = Math.min(i + 2, columns - 1);
+    for (let k = 0; k < rows - 1; k += 2) {
+      const k2 = Math.min(k + 2, rows - 1);
+      if (arch(i, k) && arch(Math.min(i + 1, columns - 2), Math.min(k + 1, rows - 2))) continue;
+      const [a, b, c, d] = [i * rows + k, i2 * rows + k, i * rows + k2, i2 * rows + k2];
+      index.push(a, b, c, b, d, c, a + half, c + half, b + half, b + half, c + half, d + half);
     }
   }
-  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat, THREE.HalfFloatType);
-  texture.minFilter = texture.magFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
-  return texture;
+  return new Uint32Array(index);
 }
 
 /**
- * A clear coat over a built-in material: a perfectly smooth layer that mirrors the reflection probe, as much as
- * a varnish does (4 % seen square on, everything at a glancing angle) and takes that much away from what lies under it.
- * @param {THREE.MeshStandardMaterial} material
- * @param {{ uProbe: { value: THREE.CubeTexture|null }, uCoat: { value: number } }} coat shared by every coated material of a car
- * @param {import('../../engine/caps.js').Caps} [caps]
+ * @param {{ paint?: string, plate?: string, tier?: 'low'|'medium'|'high', caps?: object, ghost?: boolean }} [options]
  */
-function addCoat(material, coat, caps) {
-  if (caps) Object.assign(material.defines, targetDefines(caps));
-  material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, coat);
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform samplerCube uProbe;\nuniform float uCoat;\n${GLSL_PROBE}`)
-      .replace(
-        '#include <opaque_fragment>',
-        /* glsl */ `
-        if (uCoat > 0.0) {
-          vec3 coatView = normalize(vViewPosition);
-          float coatFresnel = 0.04 + 0.96 * pow(1.0 - clamp(dot(normal, coatView), 0.0, 1.0), 5.0);
-          // the probe is looked up with a world-space direction
-          vec3 coatDir = inverseTransformDirection(reflect(-coatView, normal), viewMatrix);
-          outgoingLight = mix(outgoingLight, probeSample(uProbe, coatDir, 0.0), coatFresnel * uCoat);
-        }
-        #include <opaque_fragment>`,
-      );
-  };
-}
-
-/**
- * @param {object} [options]
- * @param {string} [options.paint] one of `paints`
- * @param {string} [options.plate] what the number plate says, default 'AI LAB03' (the placeholder has no plate)
- * @param {import('../../engine/caps.js').Tier} [options.tier] default 'high' (the placeholder is the same on every tier)
- * @param {import('../../engine/caps.js').Caps} [options.caps]
- * @returns {CarModel}
- */
-export function createCar({ paint = 'silver', caps } = {}) {
+export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false } = {}) {
+  const t0 = performance.now();
   const object = new THREE.Group();
+  object.name = ghost ? 'ghost car' : 'car';
   const disposables = [];
   const keep = (thing) => {
     disposables.push(thing);
     return thing;
   };
-  const addMesh = (parent, geometry, material, x = 0, y = 0, z = 0) => {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, y, z);
-    mesh.castShadow = mesh.receiveShadow = true;
-    parent.add(mesh);
+  const skin = createSkin();
+  const lay = createLayout(skin, MESH_EDGE[tier]);
+  const samples = sampleSkin(skin, lay);
+  const attributes = {
+    position: new THREE.BufferAttribute(samples.position, 3),
+    normal: new THREE.BufferAttribute(samples.normal, 3),
+    uv: new THREE.BufferAttribute(samples.uv, 2),
+  };
+  const { rows } = samples;
+  const P = samples.position;
+  const inside = (j) => inArch(P[j * 3], P[j * 3 + 1], P[j * 3 + 2], -0.012);
+  const arch = (i, k) => {
+    const a = i * rows + k;
+    return inside(a) && inside(a + 1) && inside(a + rows) && inside(a + rows + 1);
+  };
+  const skinMesh = (keepQuad, material) => {
+    const mesh = new THREE.Mesh(keep(skinGeometry(attributes, skinIndex(samples, (i, k) => !arch(i, k) && keepQuad(i, k)))), material);
+    object.add(mesh);
     return mesh;
   };
+  const archGeometry = createArchGeometry(skin);
+  keep(archGeometry.lip);
+  keep(archGeometry.liner);
 
-  // ---- body: a lower box from bumper to bumper, a cabin box on top
-  const paintMaterial = keep(new THREE.MeshStandardMaterial(PAINTS[paint] || PAINTS.silver));
-  const glassMaterial = keep(new THREE.MeshStandardMaterial({ color: 0x06080a, metalness: 0, roughness: 0.06 }));
-  const darkMaterial = keep(new THREE.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.8 }));
-  const coat = { uProbe: { value: null }, uCoat: { value: 0 } };
-  addCoat(paintMaterial, coat, caps);
-  addCoat(glassMaterial, coat, caps);
-  const beltline = 0.93;
-  const middle = (STATIONS.nose + STATIONS.tail) / 2;
-  addMesh(object, keep(new THREE.BoxGeometry(DIMS.width, beltline - 0.24, DIMS.length)), paintMaterial, 0, (beltline + 0.24) / 2, middle);
-  addMesh(object, keep(new THREE.BoxGeometry(DIMS.width - 0.02, 0.1, DIMS.length - 0.3)), darkMaterial, 0, 0.19, middle);
-  const cabin = keep(new THREE.BoxGeometry(DIMS.width - 0.28, DIMS.height - beltline, 2.25));
-  addMesh(object, cabin, glassMaterial, 0, (DIMS.height + beltline) / 2, -0.42);
-  addMesh(object, keep(new THREE.BoxGeometry(DIMS.width - 0.36, 0.03, 1.5)), paintMaterial, 0, DIMS.height + 0.005, -0.42);
-
-  // ---- wheels: hub (rides up and down) > steering knuckle (turns about +Y) > wheel (spins about the axle)
-  const tyreMaterial = keep(new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.85 }));
-  const rimMaterial = keep(new THREE.MeshStandardMaterial({ color: 0x9a9da2, metalness: 0.9, roughness: 0.35 }));
-  const wheels = WHEELS.map((spec) => {
-    const { radius, width, rim } = spec.tyre;
-    const hub = new THREE.Group();
-    hub.position.set(spec.x, radius, spec.z);
-    const knuckle = new THREE.Group();
-    const wheel = new THREE.Group();
-    // a cylinder's axis is Y: lay it along the axle
-    addMesh(wheel, keep(new THREE.CylinderGeometry(radius, radius, width, 28).rotateZ(Math.PI / 2)), tyreMaterial);
-    // spokes, so that the spin can be seen
-    const spoke = keep(new THREE.BoxGeometry(0.02, rim * 0.92, 0.05));
-    for (let k = 0; k < 5; k++) {
-      const s = addMesh(wheel, spoke, rimMaterial, Math.sign(spec.x) * (width / 2 + 0.004), 0, 0);
-      s.rotation.x = (k / 5) * Math.PI;
-    }
-    object.add(hub.add(knuckle.add(wheel)));
-    return { hub, knuckle, wheel, radius };
-  });
-
-  // ---- lamps: blocks that glow. `level` is what setLights last asked for.
-  const level = { drl: 0, low: 0, high: 0, tail: 0, brake: 0, reverse: 0, indicatorL: 0, indicatorR: 0, interior: 0 };
-  const lamp = (color) => keep(new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.3, emissive: color, emissiveIntensity: 0 }));
-  const lens = {
-    drl: lamp(0xdfe8ff),
-    beam: lamp(0xf2f5ff),
-    tail: lamp(0xff0a04),
-    brake: lamp(0xff0a04),
-    reverse: lamp(0xffffff),
-    indicatorL: lamp(0xff7a00),
-    indicatorR: lamp(0xff7a00),
-  };
-  const drlBlock = keep(new THREE.BoxGeometry(0.34, 0.025, 0.03));
-  const beamBlock = keep(new THREE.BoxGeometry(0.2, 0.07, 0.03));
-  const tailBlock = keep(new THREE.BoxGeometry(0.42, 0.09, 0.03));
-  const smallBlock = keep(new THREE.BoxGeometry(0.1, 0.05, 0.03));
-  for (const side of [1, -1]) {
-    const indicator = side > 0 ? lens.indicatorL : lens.indicatorR;
-    addMesh(object, drlBlock, lens.drl, side * LAMPS.head.x, LAMPS.head.y + 0.065, STATIONS.nose);
-    addMesh(object, beamBlock, lens.beam, side * LAMPS.head.x, LAMPS.head.y, STATIONS.nose);
-    addMesh(object, smallBlock, indicator, side * (LAMPS.head.x + 0.12), LAMPS.head.y - 0.08, STATIONS.nose);
-    addMesh(object, tailBlock, lens.tail, side * LAMPS.tail.x, LAMPS.tail.y, STATIONS.tail);
-    addMesh(object, smallBlock, indicator, side * (LAMPS.tail.x + 0.12), LAMPS.tail.y - 0.1, STATIONS.tail);
-    addMesh(object, smallBlock, lens.reverse, side * (LAMPS.tail.x - 0.25), LAMPS.tail.y - 0.1, STATIONS.tail);
+  let shared = null;
+  let shadow = null;
+  let lights = null;
+  let ghostMaterial = null;
+  if (ghost) {
+    ghostMaterial = keep(createGhostMaterial());
+    skinMesh(() => true, ghostMaterial);
+    object.add(new THREE.Mesh(archGeometry.lip, ghostMaterial));
+  } else {
+    const atlas = bakeAtlas(skin, lay, ATLAS_SIZE[tier]);
+    const textures = atlas.data.map((data) => {
+      const texture = keep(new THREE.DataTexture(data, atlas.width, atlas.height, THREE.RGBAFormat));
+      // no mip maps: a mip level would average a thin line's distances away. The shaders antialias every edge
+      // from the distance's own footprint, so the full-size level is right at any distance.
+      texture.magFilter = texture.minFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      texture.needsUpdate = true;
+      return texture;
+    });
+    // which materials a quad of the mesh can show: the atlas's extremes over the quad's rectangle
+    const { u, v } = lay;
+    const extremes = (channel, i, k) => atlas.extremes(channel, u.coords[i], u.coords[i + 1], v.coords[k], v.coords[k + 1]);
+    shared = createShared(textures);
+    const paintMaterial = keep(createPaintMaterial(shared, caps, paint));
+    const body = skinMesh((i, k) => extremes(GLASS, i, k)[1] > -0.012 && extremes(OPENING, i, k)[1] > 0, paintMaterial);
+    body.castShadow = body.receiveShadow = true;
+    // the glass and the lenses lie on the paint's own surface: drawn after it, at the same depth
+    skinMesh((i, k) => extremes(GLASS, i, k)[0] < 0.002, keep(createGlassMaterial(shared, caps, GLASS))).renderOrder = 1;
+    skinMesh((i, k) => extremes(LENS, i, k)[0] < 0.002, keep(createGlassMaterial(shared, caps, LENS))).renderOrder = 1;
+    // the shell, on every other vertex each way: a quarter of the triangles, and its chords stay inside the paint
+    object.add(new THREE.Mesh(keep(skinGeometry(attributes, coarseIndex(samples, arch))), keep(createDarkMaterial(THREE.BackSide))));
+    // behind each opening a dark surface 40 mm in: the skin itself, pushed in along its normal
+    const recessed = new Float32Array(samples.position.length);
+    for (let j = 0; j < recessed.length; j++) recessed[j] = samples.position[j] - samples.normal[j] * 0.04;
+    const recess = skinGeometry(
+      { ...attributes, position: new THREE.BufferAttribute(recessed, 3) },
+      skinIndex(samples, (i, k) => extremes(OPENING, i, k)[0] < 0.005),
+    );
+    object.add(new THREE.Mesh(keep(recess), keep(createDarkMaterial(THREE.FrontSide, 0.02, 0.6))));
+    const lip = new THREE.Mesh(archGeometry.lip, paintMaterial);
+    lip.castShadow = lip.receiveShadow = true;
+    object.add(lip, new THREE.Mesh(archGeometry.liner, keep(createDarkMaterial(THREE.DoubleSide, 0.012))));
+    shadow = createContactShadow(samples.position, samples.columns * samples.rows, tier);
+    disposables.push(shadow);
+    lights = createLampLights(object, keep);
   }
-  addMesh(object, keep(new THREE.BoxGeometry(0.5, 0.02, 0.02)), lens.brake, LAMPS.thirdBrake.x, LAMPS.thirdBrake.y, LAMPS.thirdBrake.z);
 
-  // ---- the lights the lamps cast
-  const beam = keep(createBeamTexture());
-  const headlights = [1, -1].map((side) => {
-    const light = new THREE.SpotLight(0xf1f4ff, 0, 0, BEAM_ANGLE, 0.25, 2);
-    light.map = beam;
-    light.position.set(side * LAMPS.head.x, LAMPS.head.y, LAMPS.head.z);
-    light.target.position.set(side * LAMPS.head.x, LAMPS.head.y, LAMPS.head.z + 10);
-    object.add(light, light.target);
-    return light;
+  const wheels = createPlaceholderWheels(object, keep);
+  let triangles = 0;
+  let drawCalls = 0;
+  object.traverse((o) => {
+    if (!o.isMesh) return;
+    if (ghostMaterial) o.material = ghostMaterial;
+    drawCalls++;
+    triangles += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
   });
-  // It sits under the boot floor, just ahead of the bumper's face: from there it reddens the road behind and
-  // cannot shine on the car's own tail (a point light this close to a panel would whiten it).
-  const taillight = new THREE.PointLight(0xff1408, 0, 12, 2);
-  taillight.position.set(0, 0.2, STATIONS.tail + 0.25);
-  object.add(taillight);
-
+  const level = { drl: 0, low: 0, high: 0, tail: 0, brake: 0, reverse: 0, indicatorL: 0, indicatorR: 0, interior: 0 };
+  const middle = (STATIONS.nose + STATIONS.tail) / 2;
   return {
     object,
-    headlights,
-    taillight,
+    headlights: lights ? lights.headlights : [],
+    taillight: lights ? lights.taillight : null,
     box: {
       center: new THREE.Vector3(0, DIMS.height / 2, middle),
       half: new THREE.Vector3(DIMS.widthWithMirrors / 2, DIMS.height / 2, DIMS.length / 2),
     },
     paints: Object.keys(PAINTS),
-
-    setWheel(i, { steer, spin, travel }) {
-      const w = wheels[i];
-      w.hub.position.y = w.radius + travel;
-      w.knuckle.rotation.y = steer;
-      w.wheel.rotation.x = spin;
+    /** The contact shadow: the game adds it to the scene (it is not part of `object`) and poses it. */
+    shadow: shadow ? shadow.mesh : new THREE.Group(),
+    poseShadow(point, normal, yaw, strength) {
+      if (shadow) shadow.pose(point, normal, yaw, strength);
     },
-
-    setLights(lights) {
-      Object.assign(level, lights);
-      lens.drl.emissiveIntensity = LENS.drl * level.drl;
-      lens.beam.emissiveIntensity = LENS.low * level.low + LENS.high * level.high;
-      lens.tail.emissiveIntensity = LENS.tail * level.tail + LENS.brake * level.brake;
-      lens.brake.emissiveIntensity = LENS.brake * level.brake;
-      lens.reverse.emissiveIntensity = LENS.reverse * level.reverse;
-      lens.indicatorL.emissiveIntensity = LENS.indicator * level.indicatorL;
-      lens.indicatorR.emissiveIntensity = LENS.indicator * level.indicatorR;
-      for (const light of headlights) {
-        light.intensity = THROW.low * level.low + THROW.high * level.high;
-        // main beam is the same picture tilted up, so its cut-off clears the horizon
-        light.target.position.y = light.position.y + 10 * HIGH_TILT * level.high;
-      }
-      taillight.intensity = THROW.tail * level.tail + THROW.brake * level.brake;
+    /** What the car cost to build, and costs to draw (the contact shadow is one more draw call). */
+    stats: { buildMs: performance.now() - t0, triangles, drawCalls },
+    setWheel: wheels.setWheel,
+    setLights(change) {
+      Object.assign(level, change);
+      if (!lights) return;
+      lights.apply(level);
+      shared.carLampsA.value.set(level.drl, level.low, level.high, level.tail);
+      shared.carLampsB.value.set(level.brake, level.reverse, level.indicatorL, level.indicatorR);
     },
-
     setReflections({ cube, sky }) {
-      coat.uProbe.value = cube;
-      coat.uCoat.value = cube ? 1 : 0;
-      // What lies under the coat mirrors the scene's sky map, blurred by its roughness: fade that where there is
-      // no sky overhead. The glass is all coat, so with a probe it needs nothing else.
-      paintMaterial.envMapIntensity = rimMaterial.envMapIntensity = 0.1 + 0.9 * sky;
-      glassMaterial.envMapIntensity = cube ? 0 : 0.1 + 0.9 * sky;
+      if (!shared) return;
+      shared.carProbe.value = cube || null;
+      shared.carProbeOn.value = cube ? 1 : 0;
+      shared.carSky.value = sky;
     },
-
     dispose() {
       for (const thing of disposables) thing.dispose();
     },
