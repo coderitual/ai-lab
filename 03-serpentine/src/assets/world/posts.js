@@ -108,7 +108,7 @@ export function createPosts({ track, atmosphere }) {
     const lat = -(kindAt(sw, -1) === EDGE.RAIL ? edge + 0.5 : Math.min(edge - 0.3, track.halfWidth + 1.4));
     track.pointAt(sw, lat, p);
     levelFrame(track, sw, frame);
-    triangles.push({ at: p.clone(), yaw: frame.yaw + Math.PI, mirror: turnSide > 0 });
+    triangles.push({ at: p.clone(), yaw: frame.yaw + Math.PI });
   }
 
   const chevron = chevronTexture();
@@ -131,7 +131,7 @@ export function createPosts({ track, atmosphere }) {
 
   // warning triangles: a pole and a board each
   const triangleTexture = warningTexture();
-  const triangleMaterial = retroReflective(standard({ map: triangleTexture, roughness: 0.4, transparent: false, alphaTest: 0.5 }));
+  const triangleMaterial = retroReflective(standard({ map: triangleTexture, roughness: 0.4, alphaTest: 0.5 }));
   const signs = triangles.map(({ at, yaw }) => upright(at.clone().setY(at.y + 1.45), yaw));
   const signPoles = triangles.map(({ at, yaw }) => upright(at.clone().setY(at.y - 0.3), yaw, 1, 2.6, 1));
   const triangleGeometry = new THREE.PlaneGeometry(0.9, 0.8).translate(0, 0.4, 0.03);
@@ -192,14 +192,12 @@ function warningTexture() {
     const x = u - 0.5;
     const y = v - 0.06;
     const k = Math.sqrt(3) / 2;
-    const inside = Math.min(y, (0.5 - Math.abs(x)) * k * 2 - y * 0.5 * 1.0 - 0.0, 0.86 - y) ;
     const d = Math.min(y, k * (0.5 - Math.abs(x)) - 0.5 * y);
-    if (d < 0 || inside < -0.01) return [0, 0, 0, 0];
+    if (d < 0) return [0, 0, 0, 0];
     let c = mix(RED, WHITE, cover((0.075 - d) * s, 1));
     // the bend: a thick curve up the middle
-    const cy = 0.18 + 0.42 * Math.min(1, Math.max(0, (y - 0.12) / 0.42));
     const bend = Math.abs(x - 0.07 * Math.sin((y - 0.16) * 7.5)) - 0.035;
-    if (y > 0.16 && y < 0.56 && cy > 0) c = mix(c, BLACK, cover(bend * s, 1));
+    if (y > 0.16 && y < 0.56) c = mix(c, BLACK, cover(bend * s, 1));
     return [...c, 255];
   });
 }
