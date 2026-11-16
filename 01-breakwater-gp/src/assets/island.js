@@ -9,7 +9,7 @@
 // in the haze, coloured per face.
 
 import * as THREE from 'three';
-import { fbm2, lerp, makeRng, smoothstep, TAU } from '../engine/math.js';
+import { fbm2, makeRng, smoothstep, TAU } from '../engine/math.js';
 import { facet } from './geo.js';
 import { withSkyFog } from './sky.js';
 import { PALETTE } from './palette.js';
@@ -43,12 +43,8 @@ const TERRAIN_COLOR = /* glsl */ `
   vec4 tFine = texture2D(uTerrainNoise, tP.xz * 0.45);                 // half a metre and less
   // the borders between one ground and the next are ragged, not the straight lines of the mesh
   float tEdge = (tMid - 0.5) * 0.7 + (tFine.b - 0.5) * 0.3;
-  // what the three weights leave over is paved: quays, streets and squares
-  float tPaved = smoothstep(0.35, 0.65, 1.0 - vColor.r - vColor.g - vColor.b + tEdge * 0.25);
-  float tAll = max(vColor.r + vColor.g + vColor.b, 1.0e-3);
-  vec3 tOf = vColor.rgb / tAll;
-  float tSand = smoothstep(0.38, 0.62, tOf.r + tEdge * 0.8 + (tFine.a - 0.45) * 0.35);       // (tufts of grass run out onto the sand)
-  float tRock = smoothstep(0.42, 0.58, tOf.b + tEdge * 0.7) * (1.0 - tSand);
+  float tSand = smoothstep(0.38, 0.62, vColor.r + tEdge * 0.8 + (tFine.a - 0.45) * 0.35);       // (tufts of grass run out onto the sand)
+  float tRock = smoothstep(0.42, 0.58, vColor.b + tEdge * 0.7) * (1.0 - tSand);
   float tGrass = 1.0 - tSand - tRock;
 
   // sand: pale gold where it is dry, darker and richer toward the sea
@@ -68,14 +64,6 @@ const TERRAIN_COLOR = /* glsl */ `
   vec3 tGrassCol = mix(vec3(0.30, 0.50, 0.14), vec3(0.15, 0.33, 0.10), smoothstep(0.3, 0.75, tMid));
   tGrassCol = mix(tGrassCol, vec3(0.50, 0.53, 0.20), smoothstep(0.5, 0.85, tSoft) * 0.45);
   tGrassCol *= 0.72 + 0.56 * tFine.b;
-  // the wind runs across the grass in long bright waves: blades leaning over show their pale, glossy backs
-  vec2 tWindAt = tP.xz * 0.018 + uTerrainTime * vec2(0.06, 0.035);
-  float tGust = texture2D(uTerrainNoise, tWindAt).r * 0.65 + texture2D(uTerrainNoise, tWindAt * 2.7 + 0.4).r * 0.35;
-  float tSheen = smoothstep(0.5, 0.72, tGust);
-  // (and the blades themselves: fine streaks, drawn out along the slope)
-  float tBlades = texture2D(uTerrainNoise, vec2(tP.x * 1.9 + tP.y * 0.6, tP.z * 0.5 + tP.y * 1.7)).b;
-  tGrassCol *= 0.82 + 0.36 * tBlades;
-  tGrassCol = mix(tGrassCol, vec3(0.50, 0.72, 0.22) * (0.8 + 0.4 * tBlades), tSheen * 0.55);
   vec3 tForestCol = mix(vec3(0.03, 0.10, 0.035), vec3(0.14, 0.32, 0.08), smoothstep(0.25, 0.75, tCanopy));
   tForestCol = mix(tForestCol, vec3(0.27, 0.40, 0.10), smoothstep(0.62, 0.85, tMid) * 0.4);
   tForestCol *= 0.75 + 0.5 * tFine.b;
@@ -88,21 +76,7 @@ const TERRAIN_COLOR = /* glsl */ `
   tRockCol = mix(tRockCol, vec3(0.22, 0.30, 0.12), smoothstep(0.5, 0.85, tFine.a) * smoothstep(2.0, 6.0, tP.y) * 0.55);   // moss
 
   diffuseColor.rgb = tSandCol * tSand + tGrassCol * tGrass + tRockCol * tRock;
-
-  // paved: pale slabs with dark joints; streets of asphalt between the blocks (the same grid the buildings stand on)
-  vec2 tBlock = vec2(fract((abs(tP.x) + 3.0) / 36.0), fract((tP.z - 13.5) / 36.0));
-  float tStreet = max(step(tBlock.x, 0.25), step(tBlock.y, 0.25));
-  vec2 tSlab = fract(tP.xz / 3.0);
-  float tJoint = max(step(0.955, tSlab.x), step(0.955, tSlab.y)) * (1.0 - smoothstep(0.3, 0.9, fwidth(tP.x) / 3.0));
-  vec3 tPavedCol = mix(vec3(0.46, 0.45, 0.43) * (0.9 + 0.2 * tFine.b) * (1.0 - 0.35 * tJoint), vec3(0.075, 0.08, 0.09) * (0.8 + 0.4 * tFine.b), tStreet * step(2.2, tP.y));
-  // the wall of the quay, dark and wet toward the water
-  tPavedCol = mix(tPavedCol, vec3(0.2, 0.2, 0.19) * (0.7 + 0.5 * tFine.b), smoothstep(2.3, 1.6, tP.y));
-  tPavedCol = mix(tPavedCol, tPavedCol * 0.5, smoothstep(0.9, 0.1, tP.y));
-  diffuseColor.rgb = mix(diffuseColor.rgb, tPavedCol, tPaved);
-  tSand *= 1.0 - tPaved;
-  tGrass *= 1.0 - tPaved;
-  tRock *= 1.0 - tPaved;
-  float tGloss = max(max(tSoaked * tSand, smoothstep(1.2, 0.2, tP.y) * tRock * 0.7), tSheen * tGrass * (1.0 - tForest) * 0.45);
+  float tGloss = max(tSoaked * tSand, smoothstep(1.2, 0.2, tP.y) * tRock * 0.7);
 `;
 
 // The small relief: after <normal_fragment_maps>.
@@ -167,15 +141,9 @@ export function createTerrainMaterial(extend) {
  * @param {'tropical'|'rock'|'far'} [def.style]
  * @param {number} [def.beach]                    beach width as a fraction of the radius
  * @param {THREE.Material} [def.material]         the ground material (see createTerrainMaterial)
- * @param {{ x: number, land: -1|1 }} [def.cut]   a straight quay: the island stops at the line x = cut.x, and the
- *                                                land is on the side `land` of it (-1: smaller x). Beyond it lies
- *                                                the river.
- * @param {[number, number]} [def.plateau]        with a cut: the ground is level and paved up to the first distance
- *                                                from the quay, and is the island's own shape past the second
- * @param {number} [def.quay]                     height of the quay above the water
  */
 export function createIsland(def) {
-  const { x, z, radius, height, seed = 1, style = 'tropical', beach = 0.16, cut = null, plateau = [40, 100], quay = 2.6 } = def;
+  const { x, z, radius, height, seed = 1, style = 'tropical', beach = 0.16 } = def;
   const rng = makeRng(seed * 7919 + 13);
   const lobes = [2, 3, 5].map((n, i) => ({ n, amp: (0.11 - i * 0.03) * (0.6 + rng() * 0.8), phase: rng() * TAU }));
   const peakAngle = rng() * TAU;
@@ -185,34 +153,18 @@ export function createIsland(def) {
   const rough = style === 'rock' ? 1.6 : style === 'far' ? 1.2 : 0.9;
   const spurs = style === 'far' ? 1.9 / radius : style === 'tropical' && radius > 50 ? 1.5 / radius : 0;
 
-  const blobRadiusAt = (angle) => {
+  const shoreRadiusAt = (angle) => {
     let r = 1;
     for (const l of lobes) r += l.amp * Math.sin(l.n * angle + l.phase);
     return radius * r;
   };
-  /** How far the land reaches from the centre in a direction (to its natural shore, or to the quay). */
-  const shoreRadiusAt = (angle) => {
-    let r = blobRadiusAt(angle);
-    if (cut) {
-      const t = (cut.x - x) / Math.cos(angle); // where this ray meets the quay line
-      if (t > 0 && t < r) r = t;
-    }
-    return r;
-  };
-  /** Metres inland from the quay (negative: out in the river). Infinity for an island with no quay. */
-  const inlandAt = (wx) => (cut ? (wx - cut.x) * cut.land : Infinity);
-  /** 0 on the paved level behind the quay .. 1 where the ground is the island's own. */
-  const wildAt = (wx) => (cut ? smoothstep(plateau[0], plateau[1], inlandAt(wx)) : 1);
 
   /** Terrain height at a world position (negative = sea bed). */
   function heightAt(wx, wz) {
     const dx = wx - x;
     const dz = wz - z;
     const r = Math.sqrt(dx * dx + dz * dz);
-    const R = blobRadiusAt(Math.atan2(dz, dx));
-    const inland = inlandAt(wx);
-    // across the quay line is the river: its bed, and (where the island stands behind it) the wall up to the quay
-    if (inland < 0) return r < R ? Math.max(-6, quay + inland * 4.3) : -6;
+    const R = shoreRadiusAt(Math.atan2(dz, dx));
     if (r >= R) return Math.max(-9, -(r - R) * 0.17);
     const s = 1 - r / R;
     // distance-to-summit term pulls the high ground off-centre
@@ -224,18 +176,15 @@ export function createIsland(def) {
     let relief = 1;
     if (spurs) {
       const crest = 1 - Math.abs(2 * fbm2(wx * spurs + seed * 1.3, wz * spurs + seed * 0.7, 3, seed + 2) - 1);
-      relief = 0.78 + 0.4 * crest * crest;
+      relief = 0.66 + 0.62 * crest * crest;
     }
-    const wild = shore + height * hill * (1 + n * rough) * relief + n * 2.2 * smoothstep(beach, beach * 2.2, s);
-    if (!cut) return wild;
-    // behind the quay the ground is level, and rises into the island's own shape farther in
-    return lerp(quay, Math.max(wild, quay), smoothstep(plateau[0], plateau[1], inland));
+    return shore + height * hill * (1 + n * rough) * relief + n * 2.2 * smoothstep(beach, beach * 2.2, s);
   }
 
   // ---- mesh: polar grid, denser around the shoreline
   const far = style === 'far';
-  const segments = far ? 28 : radius > 100 ? 200 : radius > 50 ? 144 : 80;
-  const rings = far ? 9 : radius > 100 ? 60 : radius > 50 ? 44 : 24;
+  const segments = far ? 28 : radius > 50 ? 144 : 80;
+  const rings = far ? 9 : radius > 50 ? 44 : 24;
   const ringUs = [];
   for (let i = 0; i <= rings; i++) {
     const t = i / rings;
@@ -298,19 +247,13 @@ export function createIsland(def) {
       if (style === 'rock') {
         sand = 0;
         rock = Math.max(smoothstep(0.03, 0.14, steep), smoothstep(2.6, 1.2, h));
-      } else if (cut && wildAt(wx) < 0.999) {
-        // (behind the quay nothing is beach just because it is low)
-        sand = smoothstep(3.3, 1.9, h) * smoothstep(0.6, 1, wildAt(wx));
-        rock = smoothstep(0.3, 0.48, steep) * (1 - sand);
       } else {
         sand = smoothstep(3.3, 1.9, h);
-        rock = smoothstep(0.3, 0.48, steep) * (1 - sand);
+        rock = smoothstep(0.2, 0.36, steep) * (1 - sand);
       }
-      // (what is left over when the three do not add up to one is paved: the quay and the town behind it)
-      const wild = inlandAt(wx) < 0 ? 0 : wildAt(wx);
-      grounds[i * 3] = sand * wild;
-      grounds[i * 3 + 1] = Math.max(0, 1 - sand - rock) * wild;
-      grounds[i * 3 + 2] = rock * wild;
+      grounds[i * 3] = sand;
+      grounds[i * 3 + 1] = Math.max(0, 1 - sand - rock);
+      grounds[i * 3 + 2] = rock;
     }
     geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(grounds, 3));
@@ -323,7 +266,7 @@ export function createIsland(def) {
   mesh.matrixAutoUpdate = false;
   mesh.updateMatrix();
 
-  return { mesh, x, z, radius, height, style, cut, quay, heightAt, shoreRadiusAt, inlandAt, wildAt };
+  return { mesh, x, z, radius, height, style, heightAt, shoreRadiusAt };
 }
 
 /** Find a spot on an island at roughly the requested height (for placing props). */

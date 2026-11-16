@@ -12,7 +12,6 @@ import { CRAFT_TUNE as T, HULL } from './config.js';
 
 const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
 const sMid = makeSurfaceSample();
-const RAMP_HIT = { y: 0, slope: 0, dirX: 0, dirZ: 1 };
 /** Where the hull meets the water: under each end of each hull ([to port, forward], m). */
 const FLOATS = [
   [HULL.beam, HULL.bow],
@@ -64,13 +63,8 @@ export class Craft {
     this.undisplacedX = 0; // sea-space coordinates under the stern (for wakes)
     this.undisplacedZ = 0;
     this.slip = 0; // angle between where the bows point and where the boat is going (> 0: sliding to port)
-    this.boost = 0; // seconds of boost left (a pad, a ramp, a nitro cell)
-    this.boostK = 0; // how hard it is boosting right now, 0..1 (eased in and out)
-    this.onRamp = false;
-    /** Set by the game: (x, z, out) => true if there is a ramp there, with its surface in `out`. */
-    this.rampAt = null;
 
-    /** One-shot events for effects / audio: 'land' (strength), 'bump' (strength), 'boost' (strength). */
+    /** One-shot events for effects / audio: 'land' (strength), 'bump' (strength). */
     this.events = [];
   }
 
@@ -79,12 +73,6 @@ export class Craft {
     const lo = Math.floor(i);
     const hi = Math.min(lo + 1, T.speedAtPower.length - 1);
     return lerp(T.speedAtPower[lo], T.speedAtPower[hi], i - lo) * this.speedFactor;
-  }
-
-  /** A push: at least `seconds` of boost from now. `strength` 0..1 says how big a moment it is (for effects). */
-  addBoost(seconds, strength = 0.5) {
-    if (this.boost < 0.25) this.events.push({ type: 'boost', strength });
-    if (seconds > this.boost) this.boost = seconds;
   }
 
   /** Teleport (grid, respawn). */
@@ -99,8 +87,6 @@ export class Craft {
     this.airborne = false;
     this.airTime = 0;
     this.grip = 1;
-    this.boost = 0;
-    this.boostK = 0;
     this.speed = Math.abs(speed);
     this.forwardSpeed = speed;
     this._syncQuat();
@@ -159,23 +145,11 @@ export class Craft {
     let ny = 0;
     let sternX = 0;
     let sternZ = 0;
-    let ramp = false;
     for (let i = 0; i < 4; i++) {
       const ox = FLOATS[i][0];
       const oz = FLOATS[i][1];
       const w = floats[i];
-      const sx = p.x + lx * ox + fx * oz;
-      const sz = p.z + lz * ox + fz * oz;
-      sampleSurface(sx, sz, time, w);
-      // a ramp, where there is one above the water: a surface that does not give, rising under the boat as it runs up
-      if (this.rampAt && this.rampAt(sx, sz, RAMP_HIT) && RAMP_HIT.y > w.y) {
-        w.y = RAMP_HIT.y;
-        w.vy = RAMP_HIT.slope * Math.max(0, v.x * RAMP_HIT.dirX + v.z * RAMP_HIT.dirZ);
-        w.nx = 0;
-        w.ny = 1;
-        w.nz = 0;
-        ramp = true;
-      }
+      sampleSurface(p.x + lx * ox + fx * oz, p.z + lz * ox + fz * oz, time, w);
       level += w.y;
       if (oz < 0) {
         // (the two under the tails also say where the wake starts, in the water's own frame)
@@ -214,10 +188,6 @@ export class Craft {
     const grip = clamp01(wet * 0.25);
     const gripAft = clamp01(wetAft * 0.5);
     this.grip = grip;
-    this.onRamp = ramp;
-    // boost runs down, and its push comes in and goes out smoothly
-    this.boost = Math.max(0, this.boost - dt);
-    this.boostK = damp(this.boostK, this.boost > 0 ? 1 : 0, this.boost > 0 ? 7 : 2.2, dt);
 
     const wasAir = this.airborne;
     v.y += (lift - T.gravity) * dt;
@@ -236,12 +206,10 @@ export class Craft {
     }
 
     // ---- drive and drag
-    // (boosting, the engines push harder and the boat tops out faster, whatever the throttle is doing)
-    const vmax = this.maxSpeed * (1 + T.boostSpeed * this.boostK);
-    const push = T.thrust * (1 + T.boostThrust * this.boostK);
+    const vmax = this.maxSpeed;
     const c1 = T.linearDrag;
-    const c2 = (push - c1 * vmax) / (vmax * vmax);
-    const thrust = push * Math.max(this.throttle, 0.92 * this.boostK) * Math.sqrt(gripAft);
+    const c2 = (T.thrust - c1 * vmax) / (vmax * vmax);
+    const thrust = T.thrust * this.throttle * Math.sqrt(gripAft);
     const dragF = (c1 * forward + c2 * forward * fwdAbs) * (0.12 + 0.88 * grip);
     const brakeF = this.brake * T.brakeDrag * clamp(forward / 3, -1, 1) * Math.sqrt(grip);
     // ---- going sideways. The hulls bite hard at first and then let go: past a
@@ -376,12 +344,18 @@ export class Craft {
     return true;
   }
 
-  /** Apply the interpolated pose to the model, and light the turbine as hard as it is being asked to burn. */
-  render(alpha, frameDt = 0, time = 0) {
+  /** Apply the interpolated pose to the model and swing the outboards with the helm. */
+  render(alpha, frameDt = 0) {
     const o = this.object;
     o.position.lerpVectors(this.prevPos, this.pos, alpha);
     o.quaternion.slerpQuaternions(this.prevQuat, this.quat, alpha);
-    o.userData.setThrust(Math.max(this.throttle, 0.9 * this.boostK), this.boostK, time);
+    // turning right swings the propellers to starboard
+    for (const engine of o.userData.engines) engine.rotation.y = this.steer * 0.42;
+    // and they turn: slowly at idle, a blur at full throttle
+    const spin = (4 + 34 * this.throttle) * frameDt;
+    const props = o.userData.propellers;
+    props[0].rotation.z += spin;
+    props[1].rotation.z -= spin; // the two turn opposite ways, as on a real pair
   }
 }
 

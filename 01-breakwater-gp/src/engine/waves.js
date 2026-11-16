@@ -74,8 +74,6 @@ export const sea = {
   shelterCalm: 0.5,
   /** Up to ISLAND_COUNT circles (x, z, shoreRadius). Waves die down near them. */
   islands: [],
-  /** A channel of water cut through the land: { ax, az, bx, bz, half } (a straight run and half its width), or null. */
-  canal: null,
 };
 
 // ---------------------------------------------------------------- uniforms
@@ -90,8 +88,6 @@ export const waveUniforms = {
   uWaveC: { value: allWaves.map((w) => Math.sqrt(1700 * w.len)) },
   uWaveTime: { value: 0 },
   uIslands: { value: Array.from({ length: ISLAND_COUNT }, () => new THREE.Vector3(FAR, FAR, 0)) },
-  uCanal: { value: new THREE.Vector4(0, 0, 0, 1) },
-  uCanalHalf: { value: 0 },
   uShelter: { value: new THREE.Vector4(sea.shelterDirX, sea.shelterDirZ, sea.shelterCalm, sea.scale) },
 };
 
@@ -105,15 +101,9 @@ export function setWaveMeshDensity(segments) {
   waveUniforms.uWaveB.value.forEach((v, i) => (v.w = allWaves[i].len * k));
 }
 
-/**
- * Register the island circles (also used for shallow-water tint and shore foam), and optionally a channel that
- * runs through them: inside it there is water again, and the shore is its banks.
- */
-export function setSeaIslands(list, canal = null) {
+/** Register the island circles (also used for shallow-water tint and shore foam). */
+export function setSeaIslands(list) {
   sea.islands = list.slice(0, ISLAND_COUNT);
-  sea.canal = canal;
-  if (canal) waveUniforms.uCanal.value.set(canal.ax, canal.az, canal.bx, canal.bz);
-  waveUniforms.uCanalHalf.value = canal ? canal.half : 0;
   waveUniforms.uIslands.value.forEach((v, i) => {
     const isl = sea.islands[i];
     if (isl) v.set(isl.x, isl.z, isl.r);
@@ -141,8 +131,6 @@ uniform vec4 uWaveB[WAVE_COUNT];
 uniform float uWaveC[WAVE_COUNT];
 uniform float uWaveTime;
 uniform vec3 uIslands[ISLAND_COUNT];
-uniform vec4 uCanal;
-uniform float uCanalHalf;
 uniform vec4 uShelter;
 
 // Distance to the nearest shore (negative on land).
@@ -151,23 +139,12 @@ float shoreDistance(vec2 p) {
   for (int i = 0; i < ISLAND_COUNT; i++) {
     d = min(d, distance(p, uIslands[i].xy) - uIslands[i].z);
   }
-  // a channel through the land: water again, as far from the shore as from its nearer bank
-  if (uCanalHalf > 0.0) {
-    vec2 ab = uCanal.zw - uCanal.xy;
-    float h = clamp(dot(p - uCanal.xy, ab) / dot(ab, ab), 0.0, 1.0);
-    d = max(d, uCanalHalf - distance(p, uCanal.xy + ab * h));
-  }
   return d;
 }
 
-// Wave height multiplier: calmer close to land and in the island's lee, and all but flat in the river.
+// Wave height multiplier: calmer close to land and in the island's lee.
 float waveAmpFromShore(vec2 p, float shore) {
   float a = 0.3 + 0.7 * smoothstep(0.0, 55.0, shore);
-  if (uCanalHalf > 0.0) {
-    vec2 ab = uCanal.zw - uCanal.xy;
-    float h = clamp(dot(p - uCanal.xy, ab) / dot(ab, ab), 0.0, 1.0);
-    a *= mix(0.2, 1.0, smoothstep(uCanalHalf, uCanalHalf + 70.0, distance(p, uCanal.xy + ab * h)));
-  }
   a *= mix(1.0, uShelter.z, smoothstep(-110.0, 150.0, dot(p, uShelter.xy)));
   return a * uShelter.w;
 }
@@ -247,28 +224,12 @@ function shoreDistance(x, z) {
     const di = Math.sqrt(dx * dx + dz * dz) - isl[i].r;
     if (di < d) d = di;
   }
-  const c = sea.canal;
-  if (c) {
-    const abx = c.bx - c.ax;
-    const abz = c.bz - c.az;
-    const h = Math.min(1, Math.max(0, ((x - c.ax) * abx + (z - c.az) * abz) / (abx * abx + abz * abz)));
-    const across = Math.hypot(x - c.ax - abx * h, z - c.az - abz * h);
-    if (c.half - across > d) d = c.half - across;
-  }
   return d;
 }
 
 /** Same field as waveAmpField() in GLSL. */
 export function waveAmpField(x, z) {
   let a = 0.3 + 0.7 * smoothstep(0, 55, shoreDistance(x, z));
-  const c = sea.canal;
-  if (c) {
-    const abx = c.bx - c.ax;
-    const abz = c.bz - c.az;
-    const h = Math.min(1, Math.max(0, ((x - c.ax) * abx + (z - c.az) * abz) / (abx * abx + abz * abz)));
-    const k = smoothstep(c.half, c.half + 70, Math.hypot(x - c.ax - abx * h, z - c.az - abz * h));
-    a *= 0.2 + 0.8 * k;
-  }
   const s = x * sea.shelterDirX + z * sea.shelterDirZ;
   a *= 1 + (sea.shelterCalm - 1) * smoothstep(-110, 150, s);
   return a * sea.scale;

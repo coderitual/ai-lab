@@ -1,83 +1,40 @@
-// The circuit: a closed loop described by its centre line. It runs north up the
-// river between the two islands, under the bridges, then out round the green
-// island by the open sea and back in at the river's southern mouth. Everything
-// else (slalom marks, boundary floats, grid, the bots' racing line, lap
-// counting, where the boosts and ramps are) is derived from positions *along*
-// that line.
+// The circuit: a closed loop around the main island, described by its centre
+// line. Everything else (slalom marks, boundary floats, grid, the bots' racing
+// line, lap counting) is derived from positions *along* that line.
 //
 // Track frame at arc length s:
 //   tangent  = direction of travel
 //   right    = (-tz, tx)  -> "lateral" > 0 is to the driver's right
 
 import * as THREE from 'three';
-import { smoothstep } from '../engine/math.js';
+import { DEG, smoothstep } from '../engine/math.js';
 
-/** The river: a straight run along x = 0, and half its width. The quays of both islands stand on its banks. */
-export const RIVER = { x: 0, z0: -190, z1: 190, half: 30 };
-
-// [x, z] in metres. The first point is the start line, in the river.
+// [angle around the island (deg), radius (m)] — a slightly lumpy circle.
 const CONTROL = [
-  [0, -42],
-  [0, 40],
-  [0, 120],
-  [-4, 198],
-  [-40, 258],
-  [-120, 284],
-  [-212, 252],
-  [-280, 178],
-  [-318, 70],
-  [-322, -46],
-  [-288, -156],
-  [-214, -246],
-  [-120, -284],
-  [-40, -258],
-  [-4, -198],
-  [0, -120],
+  [0, 172],
+  [36, 190],
+  [72, 160],
+  [108, 186],
+  [144, 204],
+  [180, 168],
+  [216, 150],
+  [252, 184],
+  [288, 200],
+  [324, 164],
 ];
 
 // Slalom marks: fraction of the lap, and the side you must pass on.
 const GATES = [
-  [0.07, 'right'],
-  [0.175, 'left'],
-  [0.29, 'right'],
-  [0.39, 'left'],
-  [0.52, 'right'],
-  [0.6, 'left'],
-  [0.705, 'right'],
-  [0.81, 'left'],
-  [0.915, 'right'],
+  [0.085, 'right'],
+  [0.19, 'left'],
+  [0.3, 'right'],
+  [0.405, 'left'],
+  [0.5, 'left'],
+  [0.61, 'right'],
+  [0.715, 'left'],
+  [0.82, 'right'],
+  [0.925, 'left'],
 ];
-
-/**
- * What lies on the water along the way: [fraction of the lap, metres to the right of the centre line].
- * Pads give a short push when driven over, cells a longer one when picked up (they are used at once), and ramps
- * throw the boat into the air.
- */
-export const BOOSTS = {
-  pads: [
-    [0.035, 0],
-    [0.115, -5],
-    [0.235, 6],
-    [0.43, -6],
-    [0.565, 5],
-    [0.73, -5],
-    [0.955, 0],
-  ],
-  cells: [
-    [0.09, 8],
-    [0.215, -9],
-    [0.35, 0],
-    [0.535, -10],
-    [0.68, 9],
-    [0.87, 0],
-  ],
-  ramps: [
-    [0.315, -7],
-    [0.475, 7],
-    [0.655, -4],
-    [0.775, 8],
-  ],
-};
 
 export const HALF_WIDTH = 26; // course half-width (m)
 const BUOY_LATERAL = 6.5; // how far off the centre line the marks sit
@@ -86,7 +43,7 @@ const LINE_HOLD = 15; // metres either side of a mark where the line stays put
 const SAMPLES = 800;
 
 export function createTrack() {
-  const points = CONTROL.map(([x, z]) => new THREE.Vector3(x, 0, z));
+  const points = CONTROL.map(([a, r]) => new THREE.Vector3(Math.cos(a * DEG) * r, 0, Math.sin(a * DEG) * r));
   const curve = new THREE.CatmullRomCurve3(points, true, 'centripetal');
   curve.arcLengthDivisions = 4000;
   const length = curve.getLength();

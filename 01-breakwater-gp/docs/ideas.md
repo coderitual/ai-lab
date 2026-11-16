@@ -18,14 +18,10 @@ Nothing here has been seen on a phone or in Safari (see
 
 ## The race
 
-- **A second course.** `game/track.js` is already data: control points, a
-  list of marks and where the boosts lie. A course needs its own land
-  (`game/World.js`), and ideally its own sea (the wave table in
-  `engine/waves.js` is global today; make it a property of the course).
-- **Boost you can keep.** Today every boost is used the moment it is
-  touched. A tank that nitro cells fill and a button that empties it would
-  add a decision.
-- **Traffic on the bridges, lights in the towers**, and an evening race.
+- **A second course.** `game/track.js` is already data: ten control points and
+  a list of marks. A course needs its own islands (`game/World.js`), and
+  ideally its own sea (the wave table in `engine/waves.js` is global today;
+  make it a property of the course).
 - **Time trial with a ghost.** The network code already records and replays a
   boat's state 20 times a second (`OnlinePlay._store`, `applyRemote`). Save
   the best lap to `localStorage` and feed it through the same path.

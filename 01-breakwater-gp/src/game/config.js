@@ -15,7 +15,7 @@ export const HULL = {
   beam: 0.77, // and this far to either side
   draft: 0.24, // keels below the waterline at rest
   circles: [-1.6, 0, 1.6], // collision shape: circles of CRAFT_TUNE.radius along the centre line
-  engines: 3.0, // where the jet churns the water, astern of the middle
+  engines: 3.25, // where the propellers churn, astern of the middle
   top: 1.15, // top of the canopy above the waterline
 };
 
@@ -40,11 +40,6 @@ export const CRAFT_TUNE = {
   bank: 0.2, // how far the hull leans into a turn (rad per rad/s of turning, at speed)
   planing: 0.09, // how far the hull climbs out of the water at speed (m)
   slopePush: 0.55, // how strongly wave faces push the boat downhill
-  boostThrust: 1.15, // how much harder the engines push while boosting (as a fraction more)
-  boostSpeed: 0.27, // and how much faster the boat tops out
 };
-
-/** Seconds of boost from each thing that gives it, and how long a nitro cell takes to come back for a boat. */
-export const BOOST = { pad: 1.5, ramp: 1.1, cell: 3.2, cellReturns: 7 };
 
 export const KMH = 3.6;

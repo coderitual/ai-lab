@@ -8,11 +8,10 @@ import { DEG } from '../engine/math.js';
 
 const c = (hex) => new THREE.Color(hex);
 
-// The sun stands over the open ocean to the south-west, low enough to shine
-// through the wave tops: it lights the green island's beaches and the faces
-// of the towers that look onto the river. (Unit vector *toward* the sun.)
-const SUN_AZIMUTH = 218 * DEG; // 0 = +X, 90 = +Z
-const SUN_ELEVATION = 33 * DEG;
+// The sun stands over the open ocean, low enough to shine through the wave
+// tops. (Unit vector *toward* the sun.)
+const SUN_AZIMUTH = 55 * DEG; // 0 = +X, 90 = +Z
+const SUN_ELEVATION = 27 * DEG;
 export const SUN_DIR = new THREE.Vector3(
   Math.cos(SUN_ELEVATION) * Math.cos(SUN_AZIMUTH),
   Math.sin(SUN_ELEVATION),
@@ -31,9 +30,9 @@ export const PALETTE = {
 
   // sea
   waterDeep: c('#052c52'), // troughs, looking down into deep water
-  waterMid: c('#0a80ad'), // the lit body of a wave
+  waterMid: c('#0a76a2'), // the lit body of a wave
   waterShallow: c('#3ad6c6'), // over sand near the islands
-  waterScatter: c('#3df0d8'), // light coming through the wave tops
+  waterScatter: c('#33e2cd'), // light coming through the wave tops
   foam: c('#f6fcff'),
 
   // land

@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { clamp01, lerp } from '../../engine/math.js';
 import { fan, mapUv, merge, part, skin } from '../geo.js';
-import { BOAT, CANOPY, NOSE, TIP_X, TUNNEL, UV_BLANK, V, bodyTopAt, canopyBase, canopyRadius, centreSection, chineAt, crownAt, deckEdgeAt, innerAt, mirror, outerAt, resample, sheerAt, sponsonSection, steps, tAt, uvPort, uvStbd, uvTop, uvTransom, zAt } from './lines.js';
+import { BOAT, CANOPY, NOSE, TUNNEL, UV_BLANK, V, bodyTopAt, canopyBase, canopyRadius, centreSection, chineAt, crownAt, deckEdgeAt, innerAt, mirror, outerAt, resample, sheerAt, sponsonSection, steps, tAt, uvPort, uvStbd, uvTop, uvTransom, zAt } from './lines.js';
 import { FILLER, teamColors } from './livery.js';
 
 const blank = () => UV_BLANK;
@@ -90,11 +90,11 @@ export function buildHullGeometry(team) {
   // ---- fins on the tails of the sponsons, swept back and leaning out a little
   {
     const shape = new THREE.Shape();
-    shape.moveTo(-0.4, 0);
-    shape.lineTo(0.5, 0);
-    shape.lineTo(-0.02, 0.44);
-    shape.quadraticCurveTo(-0.2, 0.56, -0.52, 0.56);
-    shape.lineTo(-0.4, 0);
+    shape.moveTo(-0.36, 0);
+    shape.lineTo(0.42, 0);
+    shape.lineTo(0.06, 0.31);
+    shape.quadraticCurveTo(-0.12, 0.42, -0.4, 0.42);
+    shape.lineTo(-0.36, 0);
     const fin = new THREE.ExtrudeGeometry(shape, { depth: 0.022, bevelEnabled: true, bevelThickness: 0.009, bevelSize: 0.009, bevelSegments: 3, curveSegments: 10 });
     fin.translate(0, 0, -0.011);
     for (const sx of [1, -1]) {
@@ -189,7 +189,7 @@ export function buildTrimGeometry() {
       pts.push(V(sx * (outerAt(t) + 0.01), sheerAt(t) - 0.03 * clamp01((sheerAt(t) - chineAt(t)) / 0.3), zAt(t)));
     }
     parts.push(part(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 60, 0.024, 6, false), rubber));
-    parts.push(part(new THREE.SphereGeometry(0.05, 12, 8), rubber, { pos: [sx * TIP_X, sheerAt(1) - 0.02, BOAT.bowZ], scale: [0.8, 1, 1.4] }));
+    parts.push(part(new THREE.SphereGeometry(0.05, 12, 8), rubber, { pos: [sx * 0.733, sheerAt(1) - 0.02, BOAT.bowZ], scale: [0.8, 1, 1.4] }));
     // cleats, pop-up style, and a filler cap on each deck
     for (const t of [0.34, 0.8]) {
       const x = sx * (outerAt(t) - 0.09);
@@ -200,10 +200,20 @@ export function buildTrimGeometry() {
     }
     parts.push(part(new THREE.CylinderGeometry(0.045, 0.048, 0.014, 18), steel, { pos: [sx * FILLER.x, sheerAt(tAt(FILLER.z)) + 0.05, FILLER.z] }));
     // a bow eye under each tip
-    parts.push(part(new THREE.TorusGeometry(0.03, 0.009, 6, 12), steel, { pos: [sx * (TIP_X + 0.01), sheerAt(0.985) - 0.09, zAt(0.985)], rot: [0, Math.PI / 2, 0] }));
+    parts.push(part(new THREE.TorusGeometry(0.03, 0.009, 6, 12), steel, { pos: [sx * 0.74, sheerAt(0.985) - 0.09, zAt(0.985)], rot: [0, Math.PI / 2, 0] }));
     // trim tabs on the tails: steel plates, hinged at the transom
     parts.push(part(new RoundedBoxGeometry(0.4, 0.012, 0.2, 1, 0.004), steel, { pos: [sx * 0.8, -0.085, BOAT.sternZ - 0.09], rot: [0.1, 0, sx * 0.28] }));
+    // brackets the engines hang on, and their rams
+    const zb = (BOAT.sternZ + BOAT.engineZ) / 2;
+    parts.push(part(new RoundedBoxGeometry(0.24, 0.26, BOAT.sternZ - BOAT.engineZ + 0.04, 2, 0.03), dark, { pos: [sx * BOAT.engineX, BOAT.engineY + 0.02, zb] }));
+    parts.push(part(new THREE.CylinderGeometry(0.022, 0.022, 0.2, 8), steel, { pos: [sx * (BOAT.engineX + 0.085), BOAT.engineY - 0.1, zb - 0.02], rot: [0.5, 0, 0] }));
+    parts.push(part(new THREE.CylinderGeometry(0.022, 0.022, 0.2, 8), steel, { pos: [sx * (BOAT.engineX - 0.085), BOAT.engineY - 0.1, zb - 0.02], rot: [0.5, 0, 0] }));
+    // a hose looping from the transom to each engine
+    const hose = [V(sx * 0.12, bodyTopAt(0, 0) - 0.07, BOAT.sternZ + 0.01), V(sx * 0.16, BOAT.engineY + 0.2, BOAT.sternZ - 0.1), V(sx * 0.24, BOAT.engineY + 0.24, BOAT.engineZ + 0.02), V(sx * 0.3, BOAT.engineY + 0.17, BOAT.engineZ - 0.03)];
+    parts.push(part(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hose, false, 'centripetal'), 14, 0.013, 5, false), rubber));
   }
+  // the bar that ties the two engines together
+  parts.push(part(new THREE.CylinderGeometry(0.014, 0.014, 2 * BOAT.engineX, 8), steel, { pos: [0, BOAT.engineY + 0.14, BOAT.engineZ + 0.05], rot: [0, 0, Math.PI / 2] }));
   // a towing eye on the nose
   parts.push(part(new THREE.TorusGeometry(0.035, 0.01, 6, 12), steel, { pos: [0, TUNNEL + 0.05, zAt(NOSE) - 0.02], rot: [0.5, 0, 0] }));
   return merge(parts);

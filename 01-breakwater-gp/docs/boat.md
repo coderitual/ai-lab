@@ -14,19 +14,15 @@ the reference for changing any of that. The ideas behind it are in
 
 ## What it is
 
-A tunnel-hull race catamaran from a few years ahead, 5.8 m long and 2.16 m
-wide, driven by a turbine.
+A tunnel-hull race catamaran, 5.8 m long and 2.16 m wide.
 
-- Two slim hulls (**sponsons**) run the full length and end in bows that draw
-  together like the points of a fork (1.2 m apart at the tips).
+- Two slim hulls (**sponsons**) run the full length and end in pointed bows.
 - A cambered **centre body** bridges them from the transom to a nose 1.2 m
   short of the bows. Under it, the **tunnel** is open from end to end.
 - On the centre body: an **engine hatch** with louvres and an air scoop, then
   a glass **canopy** over the cockpit with the driver under it.
-- Behind the canopy, on a swept pylon: the **turbine pod** that drives the
-  boat, an intake at the front and a nozzle at the back. A disc inside the
-  nozzle glows with the throttle and a cone of flame stands out behind it:
-  short at cruise, long and white under boost. There are no outboards.
+- On the transom: two **outboards** on brackets. They swing with the helm and
+  their propellers turn.
 - Fins on the tails of the sponsons, rub rails, cleats, fuel caps, mirrors,
   trim tabs, bow eyes.
 
@@ -40,13 +36,12 @@ Axes: +Z bow, +Y up, +X port. The origin is on the waterline amidships, so
 | `assets/boat.js` | `createBoat(team, number)`: builds the meshes, assigns materials, returns the group |
 | `assets/boat/lines.js` | the shape as numbers; cross-sections; the texture sheet's layout and the `uv…` functions |
 | `assets/boat/hull.js` | geometry: hull, canopy, cockpit, fittings |
-| `assets/boat/thruster.js` | the turbine pod, the glow in its nozzle, the flame and its material |
+| `assets/boat/outboard.js` | geometry of an engine and of the propeller; the cowl's label texture |
 | `assets/boat/livery.js` | the paintwork and the shared detail maps, drawn on canvases |
 | `assets/boat/materials.js` | paint, glass, cowl, trim, steel, cockpit materials |
 
-`createBoat` returns a `THREE.Group` with `userData.setThrust(throttle, boost,
-time)` (how hard the turbine burns: sets the glow and the flame) and
-`userData.details`.
+`createBoat` returns a `THREE.Group` with `userData.engines` (turn about Y to
+steer), `userData.propellers` (spin about Z) and `userData.details`.
 
 ## The lines
 
@@ -55,12 +50,12 @@ time)` (how hard the turbine burns: sets the glow and the flame) and
 
 | line | formula | meaning |
 | --- | --- | --- |
-| `outerAt` | `1.08 → 0.608` by `ramp(t, 0.4, 1)^1.55` | outer edge of a sponson (half beam) |
-| `innerAt` | `0.46 → 0.592` by `ramp(t, 0.62, 1)^2.2` | its tunnel side |
+| `outerAt` | `1.08 → 0.74` by `ramp(t, 0.5, 1)^1.7` | outer edge of a sponson (half beam) |
+| `innerAt` | `0.46 → 0.725` by `ramp(t, 0.6, 1)^2.4` | its tunnel side |
 | `keelAt` | `−0.24 + 0.64·ramp(t, 0.58, 1)^1.9` | bottom of the sponson |
 | `chineAt` | `−0.04 + 0.5·ramp(t, 0.5, 1)^1.7` | where bottom meets side |
-| `sheerAt` | `0.47 + 0.09·sin(π·min(t/0.92, 1)) − 0.05·ramp(t, 0.86, 1)` | top of the side |
-| `crownAt` | stern deck 0.03, engine hatch +0.3, cockpit −0.07, foredeck −0.22 (smooth steps) | how far the centre line stands above the deck edge |
+| `sheerAt` | `0.5 + 0.1·sin(π·min(t/0.92, 1)) − 0.03·ramp(t, 0.92, 1)` | top of the side |
+| `crownAt` | stern deck 0.03, engine hatch +0.27, cockpit −0.06, foredeck −0.2 (smooth steps) | how far the centre line stands above the deck edge |
 | `noseAt` | `smoothstep(0.7, 0.8, t)²` | the centre body rounding down into the tunnel |
 
 Constants: tunnel roof at `y = 0.3`; the centre body ends at `t = 0.8`.
@@ -146,15 +141,14 @@ is a `MeshStandardMaterial` with the mirror coat on top
 | --- | --- | --- | --- |
 | paint | hull | livery map × vertex colour, normal map, occlusion + roughness map | 1.2, 0.06, 0.44, 0.5 |
 | glass | canopy | dark tint, 46 % opaque, roughness 0.06 | 1.55, 0.09, 1.0, 0 |
-| pod | turbine pod | vertex colour (carbon, a band of the team's colour, bright lips), roughness 0.2, metalness 0.3 | 1.3, 0.08, 0.9, 0.15 |
-| glow | disc in the nozzle | unlit, the team's fire colour times the throttle | none |
-| flame | cone behind the nozzle | light added to the picture, hottest at the nozzle | none |
+| cowl | outboards | label map × vertex colour, roughness 0.2 | 1.3, 0.08, 0.9, 0.15 |
 | trim | rails, fittings, brackets | vertex colour, roughness 0.38, metalness 0.25 | 0.8, 0.05, 0.6, 1.4 |
+| steel | propellers | metalness 1, roughness 0.2, double-sided | 0.9, 0.5, 1.0, 0.6 |
 | cockpit | seat, driver, wheel | vertex colour, roughness 0.6 | none |
 
 Everything casts and receives the sun's shadow, except: the glass does
-neither, the cockpit receives but does not cast, the glow and the flame do
-neither.
+neither, the cockpit receives but does not cast, the propellers cast but do
+not receive.
 
 ## Budget
 
@@ -162,11 +156,11 @@ neither.
 | --- | --- | --- |
 | hull | 7 900 | 1 |
 | trim | 6 000 | 1 |
-| turbine pod | 1 500 | 1 |
-| glow, flame | 250 | 2 |
+| outboards | 2 × 2 700 | 2 |
+| propellers | 2 × 300 | 2 |
 | canopy | 1 300 | 1 |
 | cockpit | 1 150 | 1 |
-| **one boat** | **about 18 000** | **7** |
+| **one boat** | **about 22 000** | **8** |
 
 Textures per boat: one livery sheet. Shared by all boats: the normal sheet,
 the occlusion/roughness sheet, the engine label (512 × 256).
@@ -209,5 +203,5 @@ the livery's colour.
 - Paint on the steep flanks of the centre body is stretched by the top-down
   projection: keep lettering off them.
 - The glass is one layer: no reflections of the inside, no refraction.
-- The flame is a cone of added light, not a volume: seen exactly end-on it
-  is a bright ring.
+- The propellers turn at a rate chosen to look right at 60 frames a second,
+  not at engine speed.

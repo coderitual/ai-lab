@@ -55,8 +55,6 @@ export function createBoatMaterials(team, number, { scale = 1, anisotropy = 8 } 
   const glass = coat(new THREE.MeshStandardMaterial({ color: '#0b1a26', roughness: 0.06, metalness: 0, transparent: true, opacity: 0.46, depthWrite: false, envMapIntensity: 0.4 }), { strength: 1.55, base: 0.09, edge: 1, blur: 0 });
   // The engine cowls: gloss black, so what they mirror is nearly all you see of them.
   const cowl = (map) => coat(new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 0.2, metalness: 0, envMapIntensity: 0.6 }), { strength: 1.3, base: 0.08, edge: 0.9, blur: 0.15 });
-  // The turbine pod: lacquered carbon and paint.
-  const pod = coat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.2, metalness: 0.3, envMapIntensity: 0.7 }), { strength: 1.3, base: 0.08, edge: 0.9, blur: 0.15 });
   // Rubber, plastic and small steel fittings.
   const trim = coat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.25 }), { strength: 0.8, base: 0.05, edge: 0.6, blur: 1.4 });
   // Polished steel: the propellers.
@@ -69,5 +67,5 @@ export function createBoatMaterials(team, number, { scale = 1, anisotropy = 8 } 
     livery.image = paintLivery(team, number, scale);
     livery.needsUpdate = true;
   };
-  return { paint, glass, cowl, pod, trim, steel, cockpit, livery, repaint };
+  return { paint, glass, cowl, trim, steel, cockpit, livery, repaint };
 }
