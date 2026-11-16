@@ -45,6 +45,17 @@ export const RULES = {
   attractIdle: 25,
 };
 
+/** The HUD's moments (s of the race clock) and when its warnings and hints show. */
+export const HUD = {
+  /** The gap at a line stays this long; the lap's banner this long. */
+  flash: 3,
+  banner: 4,
+  /** Driving the wrong way this long before the warning shows (s). */
+  wrongWay: 1.2,
+  /** The first-time hint shows until the car has covered this much road in a run (m). */
+  hintDistance: 25,
+};
+
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */
 export const DRIVERS = [
   { paint: 'silver', plate: 'AI LAB03', keys: 'wasd', bias: 1.4 },
