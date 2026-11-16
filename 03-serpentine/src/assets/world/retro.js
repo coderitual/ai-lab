@@ -72,13 +72,15 @@ float retroReturn(vec3 P, vec3 N) {
     float up = degrees(atan(dot(-L, u), x));
     float spread = 0.8 * exp(-(right / 17.0) * (right / 17.0)) + 0.2 * exp(-(right / 6.0) * (right / 6.0));
     float cut = -0.6 + clamp((right - 0.5) * 0.268, 0.0, 2.2);
-    float low = mix(0.025, 1.0, clamp((cut - up) / 0.35 + 0.5, 0.0, 1.0));
+    float low = mix(0.05, 1.0, clamp((cut - up) / 0.35 + 0.5, 0.0, 1.0));
     float high = mix(0.02, 1.0, clamp((cut + 3.5 - up) / 1.5 + 0.5, 0.0, 1.0));
     float E = (power.x * low + power.y * high) * spread * facing / (d * d);
     // the angle at the sheeting between the lamp and the eye, in degrees: the coefficient of retroreflection
-    // (cd per lux per square metre) is a few hundred within a fifth of a degree and a few beyond two
+    // (cd per lux per square metre) is a few hundred within half a degree and falls to a few by five degrees.
+    // The tail is kept generous: the chase camera rides 6 m behind the lamps, two or three degrees off them
+    // at the distances that matter, and must still see what the driver sees.
     float a = degrees(acos(clamp(dot(L, toEye), -1.0, 1.0)));
-    float coefficient = 250.0 * exp(-(a / 0.75) * (a / 0.75)) + 5.0 * exp(-a / 2.5);
+    float coefficient = 250.0 * exp(-(a / 0.75) * (a / 0.75)) + 40.0 * exp(-a / 2.0);
     sum += E * coefficient * (0.35 + 0.65 * facing);
   }
   return sum;

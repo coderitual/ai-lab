@@ -8,11 +8,13 @@
 
 import * as THREE from 'three';
 import { disposeGroup } from './furniture.js';
+import { createStart } from './gantry.js';
 import { createLamps } from './lamps.js';
 import { createPosts } from './posts.js';
 import { createRails } from './rails.js';
 import { setRetroBeams } from './retro.js';
 import { createTunnels } from './tunnel.js';
+import { createViaducts } from './viaduct.js';
 
 /**
  * @param {object} options
@@ -41,12 +43,16 @@ export function createStructures({ track, terrain, caps, tier, atmosphere }) {
   lap('rails');
   const posts = createPosts({ track, atmosphere });
   lap('posts');
-  const parts = [lamps, tunnels, rails, posts];
+  const viaducts = createViaducts({ track, terrain, atmosphere });
+  lap('viaduct');
+  const start = createStart({ track, terrain, atmosphere });
+  lap('start');
+  const parts = [lamps, tunnels, rails, posts, viaducts, start];
   for (const part of parts) group.add(part.group);
 
   return {
     group,
-    stats: { ms, lamps: lamps.stats, rails: rails.stats, posts: posts.stats },
+    stats: { ms, lamps: lamps.stats, rails: rails.stats, posts: posts.stats, viaducts: viaducts.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {
       for (const part of parts) part.setTime?.(time);

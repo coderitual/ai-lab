@@ -17,7 +17,7 @@
 
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE } from '../../engine/glsl.js';
-import { levelFrame, stripGeometry } from './furniture.js';
+import { levelFrame, row, stripGeometry, upright } from './furniture.js';
 import { LAMP_KINDS, SPOT_GLSL } from './lamps.js';
 import { extend, withBake } from './shading.js';
 
@@ -30,6 +30,8 @@ const BAND = 1.4;
 /** The portal: how far the face reaches beyond the walls and above the road, and the collar round the opening. */
 const FACE_WIDE = 9;
 const COLLAR = { width: 0.7, depth: 0.6 };
+/** An emergency niche (a lit recess under a green sign) every this many metres. */
+const NICHE = 60;
 /** How far daylight carries into the bore (m to fall to a third). */
 const DAYLIGHT = 5;
 /** The Track's tunnel walls stand this far beyond the pavement (TUNNEL.wallOffset in game/trackLayout.js). */
@@ -146,6 +148,26 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
     boreMaterial.shadowSide = THREE.DoubleSide;
     group.add(boreMesh);
     disposables.push(bore, boreMaterial);
+
+    // small accents: an emergency niche every NICHE metres, alternating sides, a green sign glowing over it and
+    // a recess with a lit back
+    const signs = [];
+    const niches = [];
+    const count = Math.max(1, Math.round((t.s1 - t.s0) / NICHE));
+    for (let k = 0; k < count; k++) {
+      const s = t.s0 + ((k + 0.5) * (t.s1 - t.s0)) / count;
+      const side = k % 2 === 0 ? 1 : -1;
+      levelFrame(track, s, frame);
+      const at = (lat, h) => new THREE.Vector3(frame.pos.x + frame.flat.x * lat, frame.pos.y + h, frame.pos.z + frame.flat.z * lat);
+      const facing = frame.yaw + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      signs.push(upright(at(side * (W - 0.02), 2.35), facing, 0.6, 0.28, 0.04));
+      niches.push(upright(at(side * (W - 0.01), 0.2), facing, 1.3, 1.9, 0.02));
+    }
+    const green = atmosphere.patch(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.25, 2.6, 0.9) }));
+    const recess = atmosphere.patch(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.1, 0.09, 0.07) }));
+    const unit = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+    group.add(row(unit, green, signs, { shadow: false, name: 'tunnel-signs' }), row(unit, recess, niches, { shadow: false, name: 'tunnel-niches' }));
+    disposables.push(green, recess, unit);
 
     // ---- the portals
     const concrete = atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0x8d8a83, roughness: 0.88, side: THREE.DoubleSide }));
@@ -272,7 +294,7 @@ totalEmissiveRadiance += diffuseColor.rgb * RECIPROCAL_PI * boreLampLight(vLocal
 }
 
 /** Board-marked concrete for the portals: soft stains in a small texture-free shader edit. */
-function concreteDetail(material) {
+export function concreteDetail(material) {
   return extend(material, 'portal-concrete', (shader) => {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vPortalWorld;')
