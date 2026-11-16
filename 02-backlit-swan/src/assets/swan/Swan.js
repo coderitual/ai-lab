@@ -1,131 +1,49 @@
-// The swan. PLACEHOLDER: a stand-in with the right size, the right interface
-// and a first version of the feather material, so that the mirror, the bloom
-// and the grade have something white and backlit to work on. The real bird
-// (modelled body, wings, neck with a skeleton, head, feather detail) replaces
-// the contents of this file and keeps what createSwan() returns.
+// The swan: three meshes (the body with its few feather shapes, the neck
+// with head and bill, the fringe of down along the neck) that share one way
+// of taking the light, and a pose that is applied without rebuilding
+// anything.
 //
-// Coordinates of `group`: the origin is on the water plane under the middle of
-// the body, +Z is the way the swan faces, +Y is up. Metres.
+//   anatomy.js   every dimension, measured from the film
+//   poses.js     the pose's fields, the film's seven neck shapes, the solver
+//   body.js      the body mesh (wings arched and relaxed)
+//   neck.js      the neck, head and bill, and the fringe
+//   feathers.js  the feathers that show as shapes
+//   material.js  the shaders
+//
+// Coordinates of `group` ("bird space"): the origin is on the water plane
+// under the middle of the body, +Z is the way the swan faces, +Y is up, +X
+// is the bird's left. Metres.
+//
+// Why the neck is posed in the vertex shader and not rebuilt in JavaScript:
+// a pose is 49 rings, each a position and an orientation, worked out by the
+// solver in a few microseconds. The skin, the head and the fringe (several
+// thousand vertices on the highest tier) all just name the ring they ride
+// on, so the same 600 numbers pose all of them, in the main picture and in
+// the mirror alike, and no vertex buffer is ever written after start.
 
 import * as THREE from 'three';
+import { L, U_ORIGIN, BOW_DROP, BODY_STRETCH, TAIL_SWING, TAIL_PIVOT, NECK_LENGTH, NECK_SUNK, NECK_CORE, PROXY_TAIL, BILL_START, bowShape, neckRadius, proxyShapes } from './anatomy.js';
+import { NECK_RINGS, POSES, createPose, copyPose, blendPose, mixPoses, createNeckSolution, solveNeck, measurePose, ringArc } from './poses.js';
+import { buildBody } from './body.js';
+import { buildNeck, buildFringe } from './neck.js';
+import { BODY_VERTEX, NECK_VERTEX, FRINGE_VERTEX, feather, N_ELLIPSOIDS, N_SEGMENTS } from './material.js';
 
-const FEATHER_VERTEX = /* glsl */ `
-out vec3 vWorldPos;
-out vec3 vNormal;
-void main() {
-  vec4 world = modelMatrix * vec4(position, 1.0);
-  vWorldPos = world.xyz;
-  // the model is only ever turned and moved, never squashed, so the model matrix will do for normals
-  vNormal = mat3(modelMatrix) * normal;
-  gl_Position = projectionMatrix * viewMatrix * world;
-}
-`;
+export { POSES, createPose, copyPose, blendPose, mixPoses, measurePose };
 
 /**
- * Feathers lit from behind, first version.
- *
- *   wrap:     sunlight creeping round the form, as it does on anything soft
- *   through:  light that enters the far side and comes out toward the eye;
- *             strongest where the body is thin when seen from the camera
- *             (the edges) and when looking toward the sun
- *   fuzz:     the bright line of lit down standing off the silhouette
- *   fill:     cool sky light on the shadow side, which the grade turns teal
+ * What each feather-detail level (ctx.quality.counts.featherDetail) builds.
+ * Triangles: about 9,000 / 18,000 / 38,000.
  */
-const feather = (light) => /* glsl */ `
-${light.glsl}
-uniform vec3 uAlbedo;
-uniform vec3 uThroughTint;
-in vec3 vWorldPos;
-in vec3 vNormal;
-void main() {
-  vec3 n = normalize(vNormal);
-  vec3 v = normalize(cameraPosition - vWorldPos);
-  float ndv = clamp(dot(n, v), 0.0, 1.0);
-  float edge = 1.0 - ndv;
-  float back = towardSun(v);
+const DETAIL = [
+  { stations: 44, section: 0.75, sides: 16, perRing: 1, strips: 16, fringePerRing: 1 },
+  { stations: 64, section: 1, sides: 20, perRing: 1, strips: 24, fringePerRing: 2 },
+  { stations: 112, section: 1.5, sides: 28, perRing: 2, strips: 36, fringePerRing: 2 },
+];
 
-  vec3 sun = uSunColor * sunWrap(n, 0.35);
-  float thin = edge * edge;
-  vec3 through = uSunColor * uThroughTint * back * back * (0.006 + 0.5 * thin) * sunWrap(-n, 0.8);
-  float rim = pow(edge, 4.0) * (0.25 + 0.75 * back * back) * sunWrap(n, 0.9);
+/** Teeth of the fringe: one every 2.2 % of L (the film shows bumps every 2 to 3 %). */
+const TOOTH_SPACING = 0.022;
 
-  vec3 col = uAlbedo * (sun * 0.32 + fillLight(n)) + through + uSunColor * rim * 0.9;
-  outColor = toTarget(vec4(col, 1.0));
-}
-`;
-
-const DARK_FRAGMENT = (light) => /* glsl */ `
-${light.glsl}
-uniform vec3 uAlbedo;
-in vec3 vWorldPos;
-in vec3 vNormal;
-void main() {
-  vec3 n = normalize(vNormal);
-  vec3 col = uAlbedo * (uSunColor * sunWrap(n, 0.1) * 0.3 + fillLight(n));
-  outColor = toTarget(vec4(col, 1.0));
-}
-`;
-
-/** An egg-like body: a sphere pulled into the proportions of a floating swan. */
-function bodyGeometry() {
-  const g = new THREE.SphereGeometry(1, 40, 24);
-  const p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i);
-    const y = p.getY(i);
-    const z = p.getZ(i);
-    // fuller toward the tail, which also lifts into a point
-    const tail = Math.max(0, -z);
-    const width = 0.21 * (1 + 0.12 * tail - 0.1 * Math.max(0, z));
-    const top = 0.3 * (1 - 0.25 * z * z) + 0.1 * tail * tail * tail;
-    p.setXYZ(i, x * width, y > 0 ? y * top : y * 0.09, z * 0.41 - 0.02 + 0.05 * tail * tail * (y > 0 ? 1 : 0));
-  }
-  g.computeVertexNormals();
-  return g;
-}
-
-/**
- * A tube along a curve lying in the YZ plane, with a radius that changes along it.
- * @param {THREE.Curve<THREE.Vector3>} curve
- * @param {(t: number) => number} radius
- */
-function tubeGeometry(curve, radius, segments = 28, sides = 12) {
-  const positions = [];
-  const indices = [];
-  const point = new THREE.Vector3();
-  const tangent = new THREE.Vector3();
-  const side = new THREE.Vector3(1, 0, 0);
-  const up = new THREE.Vector3();
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
-    curve.getPoint(t, point);
-    curve.getTangent(t, tangent);
-    up.crossVectors(tangent, side).normalize();
-    const r = radius(t);
-    for (let j = 0; j < sides; j++) {
-      const a = (j / sides) * Math.PI * 2;
-      positions.push(
-        point.x + (side.x * Math.cos(a) + up.x * Math.sin(a)) * r,
-        point.y + (side.y * Math.cos(a) + up.y * Math.sin(a)) * r,
-        point.z + (side.z * Math.cos(a) + up.z * Math.sin(a)) * r,
-      );
-    }
-  }
-  for (let i = 0; i < segments; i++) {
-    for (let j = 0; j < sides; j++) {
-      const a = i * sides + j;
-      const b = i * sides + ((j + 1) % sides);
-      const c = a + sides;
-      const d = b + sides;
-      indices.push(a, b, c, b, d, c);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  g.setIndex(indices);
-  g.computeVertexNormals();
-  return g;
-}
+const _quat = new THREE.Quaternion();
 
 /**
  * @typedef {object} Swan
@@ -133,7 +51,17 @@ function tubeGeometry(curve, radius, segments = 28, sides = 12) {
  * @property {THREE.Vector3} billTip world position of the tip of the bill; valid after update()
  * @property {THREE.Vector3} headPosition world position of the middle of the head; valid after update()
  * @property {{ length: number, width: number }} footprint the ellipse where the body cuts the water, metres
- * @property {object} pose numbers the animation writes before update(); see the fields below
+ * @property {import('./poses.js').SwanPose} pose the numbers the animation writes before update()
+ * @property {typeof POSES} poses the film's seven neck shapes (A, B, C, D, E, G, F), read-only
+ * @property {typeof blendPose} blendPose blendPose(out, a, b, t)
+ * @property {typeof mixPoses} mixPoses mixPoses(out, poses, weights)
+ * @property {typeof copyPose} copyPose copyPose(to, from)
+ * @property {typeof createPose} createPose a fresh pose object
+ * @property {(pose: import('./poses.js').SwanPose) => { billTip: THREE.Vector3, head: THREE.Vector3 }} measure
+ *   where a pose would put the bill tip and the head, in world space, without posing the swan
+ *   (uses the group's transform as it is now; the two vectors are reused between calls)
+ * @property {{ rate: number, depth: number }} breathing the swan breathes by itself: breaths per second and
+ *   how deep (1 is 2.5 mm of swell); added to pose.breath
  * @property {(dt: number, time: number) => void} update apply the pose; dt and time are in slowed-down seconds
  * @property {() => void} dispose
  */
@@ -143,85 +71,188 @@ function tubeGeometry(curve, radius, segments = 28, sides = 12) {
  * @returns {Swan}
  */
 export function createSwan(ctx) {
+  const rng = ctx.rng.fork('swan');
+  const detail = DETAIL[Math.min(2, Math.max(0, ctx.quality.counts.featherDetail | 0))];
+  const look = ctx.look;
   const group = new THREE.Group();
   group.name = 'swan';
 
-  const featherMaterial = ctx.createMaterial({
-    vertexShader: FEATHER_VERTEX,
-    fragmentShader: feather(ctx.light),
-    uniforms: {
-      ...ctx.light.uniforms,
-      uAlbedo: { value: new THREE.Vector3(0.9, 0.89, 0.86) },
-      uThroughTint: { value: new THREE.Vector3(1.0, 0.86, 0.6) },
-    },
+  const solution = createNeckSolution();
+  const uniforms = {
+    ...ctx.uniforms,
+    ...ctx.light.uniforms,
+    uSunLocal: { value: new THREE.Vector3(0, 0.3, -1) },
+    uEllM: { value: new Float32Array(9 * N_ELLIPSOIDS) },
+    uEllC: { value: new Float32Array(4 * N_ELLIPSOIDS) },
+    uEllPlane: { value: new Float32Array(4 * N_ELLIPSOIDS) },
+    uSeg: { value: new Float32Array(4 * (N_SEGMENTS + 1)) },
+    uSegDensity: { value: 2 },
+    // the solver's own arrays: posing the neck is writing these
+    uRingPos: { value: solution.positions },
+    uRingRot: { value: solution.frames },
+    uRingBend: { value: solution.bends },
+    uBody: { value: new THREE.Vector4(1, 0, 1, 0) },
+    uTailSwing: { value: new THREE.Vector3(TAIL_PIVOT[1] * L, (U_ORIGIN - TAIL_PIVOT[0]) * L, 0) },
+    uFringe: { value: new THREE.Vector4(0.0036, 2.2, 0, 0) },
+    uAbsorb: { value: new THREE.Vector3(20, 30, 48) },
+    uFeather: { value: new THREE.Vector4(0.45, 0.35, 0.22, 0.2) },
+    uSky: { value: new THREE.Vector4(0.1, 0.45, 1, 0) },
+    uAlbedo: { value: new THREE.Vector3(0.93, 0.92, 0.9) },
+    uStain: { value: new THREE.Vector3(0.92, 0.86, 0.72) },
+    uBillColor: { value: new THREE.Vector3(0.8, 0.24, 0.035) },
+  };
+
+  const fragment = feather(ctx.light);
+  const bodyMaterial = ctx.createMaterial({ vertexShader: BODY_VERTEX, fragmentShader: fragment, uniforms });
+  const neckMaterial = ctx.createMaterial({ vertexShader: NECK_VERTEX, fragmentShader: fragment, uniforms });
+  // The fringe is cut out of its strips by alpha. Where the target is
+  // multisampled, alpha-to-coverage turns the soft edge of each tooth into
+  // partly covered pixels (smooth, sorted by the depth buffer, no blending);
+  // elsewhere the edge is simply cut, and the picture's edge smoothing has
+  // to do.
+  const msaa = ctx.quality.msaa > 0;
+  const fringeMaterial = ctx.createMaterial({
+    vertexShader: FRINGE_VERTEX,
+    fragmentShader: fragment,
+    uniforms,
+    defines: { FRINGE: 1, TOOTH: TOOTH_SPACING.toFixed(4) },
+    side: THREE.DoubleSide,
+    alphaToCoverage: msaa,
   });
-  const darkMaterial = ctx.createMaterial({
-    vertexShader: FEATHER_VERTEX,
-    fragmentShader: DARK_FRAGMENT(ctx.light),
-    uniforms: { ...ctx.light.uniforms, uAlbedo: { value: new THREE.Vector3(0.25, 0.09, 0.02) } },
-  });
+  fringeMaterial.alphaTest = 0; // the shader discards what is all but transparent itself
 
-  const body = new THREE.Mesh(bodyGeometry(), featherMaterial);
-  group.add(body);
+  const body = new THREE.Mesh(buildBody({ stations: detail.stations, detail: detail.section, seed: rng.int(1 << 30), rng, featherDetail: ctx.quality.counts.featherDetail | 0 }), bodyMaterial);
+  body.name = 'swan-body';
+  const neck = new THREE.Mesh(buildNeck({ sides: detail.sides, perRing: detail.perRing }), neckMaterial);
+  neck.name = 'swan-neck';
+  const fringe = new THREE.Mesh(buildFringe({ strips: detail.strips, perRing: detail.fringePerRing, rng: rng.fork('fringe') }), fringeMaterial);
+  fringe.name = 'swan-fringe';
+  // the shaders move the vertices: three.js cannot know where they end up
+  for (const mesh of [body, neck, fringe]) mesh.frustumCulled = false;
+  group.add(body, neck, fringe);
 
-  // The neck swings about its base when the swan reaches down; the placeholder
-  // moves it as one stiff piece.
-  const neckPivot = new THREE.Group();
-  neckPivot.position.set(0, 0.16, 0.27);
-  group.add(neckPivot);
-  const curve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, -0.04, -0.02),
-    new THREE.Vector3(0, 0.14, 0.13),
-    new THREE.Vector3(0, 0.34, 0.12),
-    new THREE.Vector3(0, 0.52, 0.05),
-    new THREE.Vector3(0, 0.61, 0.09),
-    new THREE.Vector3(0, 0.6, 0.17),
-  ]);
-  const neck = new THREE.Mesh(tubeGeometry(curve, (t) => 0.062 - 0.03 * Math.min(1, t * 1.4)), featherMaterial);
-  neckPivot.add(neck);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), featherMaterial);
-  head.scale.set(0.036, 0.04, 0.055);
-  head.position.set(0, 0.585, 0.2);
-  head.rotation.x = 0.45;
-  neckPivot.add(head);
-
-  const bill = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.085, 8), darkMaterial);
-  // a cone points along +Y; lay it forward and a little down
-  bill.rotation.x = Math.PI / 2 + 0.45;
-  bill.position.set(0, 0.555, 0.265);
-  neckPivot.add(bill);
-
-  // where the tip of the bill is, in the neck's own space
-  const billTipLocal = new THREE.Vector3(0, 0.537, 0.303);
-  const headLocal = head.position.clone();
+  // The sun in the bird's own space. Worked out when a mesh is about to be
+  // drawn, not in update(), so that a sun moved after the step (or a swan
+  // turned after it) is right in the very next picture.
+  const sunLocal = uniforms.uSunLocal.value;
+  body.onBeforeRender = neck.onBeforeRender = fringe.onBeforeRender = () => {
+    group.getWorldQuaternion(_quat).invert();
+    sunLocal.copy(ctx.light.uniforms.uSunDir.value).applyQuaternion(_quat);
+  };
 
   ctx.showInMirror(group);
+
+  const pose = copyPose(createPose(), POSES.A);
+  const measured = { billTip: new THREE.Vector3(), head: new THREE.Vector3() };
+
+  /** Put the stand-in shapes (anatomy.js, proxyShapes) where the pose has the body, as the shader wants them. */
+  function writeProxies() {
+    const shapes = proxyShapes(pose.wingLift);
+    const stretch = 1 + BODY_STRETCH * pose.bodyStretch;
+    const M = uniforms.uEllM.value;
+    const C = uniforms.uEllC.value;
+    const P = uniforms.uEllPlane.value;
+    for (let i = 0; i < N_ELLIPSOIDS; i++) {
+      const s = shapes[i];
+      let tilt = s.tilt;
+      let y = (s.centre[1] - BOW_DROP * pose.bow * bowShape(s.centre[0])) * L;
+      let z = (U_ORIGIN - s.centre[0]) * L;
+      if (i === PROXY_TAIL) {
+        // swing with the tail, about the same hinge as the mesh
+        const a = TAIL_SWING * pose.tail;
+        const hy = TAIL_PIVOT[1] * L;
+        const hz = (U_ORIGIN - TAIL_PIVOT[0]) * L;
+        const ry = y - hy;
+        const rz = z - hz;
+        y = hy + ry * Math.cos(a) - rz * Math.sin(a);
+        z = hz + ry * Math.sin(a) + rz * Math.cos(a);
+        tilt += a;
+      }
+      z *= stretch;
+      const ra = s.radii[0] * L * stretch;
+      const rb = s.radii[1] * L;
+      const rc = s.radii[2] * L;
+      const sn = Math.sin(tilt);
+      const cs = Math.cos(tilt);
+      // rows: the long axis (0, sin, -cos), the short upright one (0, cos, sin), across (1, 0, 0); column-major for GLSL
+      M.set([0, 0, 1 / rc, sn / ra, cs / rb, 0, -cs / ra, sn / rb, 0], i * 9);
+      C.set([s.centre[2] * L, y, z, s.density], i * 4);
+      if (s.plane) {
+        const w = s.plane.width;
+        P.set([0, -s.plane.m / (L * w), -1 / (L * stretch * w), (U_ORIGIN - s.plane.u0) / w], i * 4);
+      } else {
+        P.set([0, 0, 0, 1], i * 4);
+      }
+    }
+    // the neck and head: every sixth ring, then the base of the bill
+    const seg = uniforms.uSeg.value;
+    const step = (NECK_RINGS - 1) / (N_SEGMENTS - 1);
+    for (let i = 0; i < N_SEGMENTS; i++) {
+      const ring = Math.round(i * step);
+      const o = ring * 4;
+      const s = (ringArc(ring) * (NECK_LENGTH + NECK_SUNK) - NECK_SUNK) / NECK_LENGTH;
+      seg.set([solution.positions[o], solution.positions[o + 1], solution.positions[o + 2], neckRadius(s) * L * NECK_CORE * solution.positions[o + 3]], i * 4);
+    }
+    const last = (NECK_RINGS - 1) * 4;
+    const reach = BILL_START * L;
+    const q = solution.frames;
+    // the head's long axis is the last ring's z axis
+    const ax = 2 * (q[last] * q[last + 2] + q[last + 3] * q[last + 1]);
+    const ay = 2 * (q[last + 1] * q[last + 2] - q[last + 3] * q[last]);
+    const az = 1 - 2 * (q[last] * q[last] + q[last + 1] * q[last + 1]);
+    seg.set([solution.positions[last] + ax * reach, solution.positions[last + 1] + ay * reach, solution.positions[last + 2] + az * reach, 0.065 * L], N_SEGMENTS * 4);
+  }
+
+  /** Copy the tunables (LOOK.swan*) into the uniforms. Cheap; done every step so that they are live. */
+  function applyLook() {
+    const a = look.swanAbsorb;
+    uniforms.uAbsorb.value.set(a[0], a[1], a[2]).divideScalar(look.swanFreePath);
+    uniforms.uFeather.value.set(look.swanThrough, look.swanWrap, look.swanSkyAtWater, look.swanSkyHeight);
+    uniforms.uSky.value.set(look.swanSkyTilt[0], look.swanSkyTilt[1], look.swanSkyTilt[2], look.swanSkyTilt[3]);
+    uniforms.uAlbedo.value.fromArray(look.swanAlbedo);
+    uniforms.uStain.value.fromArray(look.swanStain);
+    uniforms.uBillColor.value.fromArray(look.swanBill);
+    uniforms.uSegDensity.value = look.swanNeckDensity;
+    uniforms.uFringe.value.set(look.swanFringe, look.swanFringeBend, 0, 0);
+  }
 
   const swan = {
     group,
     billTip: new THREE.Vector3(),
     headPosition: new THREE.Vector3(),
-    footprint: { length: 0.8, width: 0.42 },
-    /**
-     * dip: 0 neck upright .. 1 bill in the water just ahead of the breast.
-     * (Placeholder pose. The real swan will define more: neck curl, head
-     * turn, wing lift, tail wag...)
-     */
-    pose: { dip: 0 },
-    update() {
-      neckPivot.rotation.x = swan.pose.dip * 1.4;
+    footprint: { length: 1.02 * L, width: 0.64 * L },
+    pose,
+    poses: POSES,
+    blendPose,
+    mixPoses,
+    copyPose,
+    createPose,
+    breathing: { rate: 0.28, depth: 1 },
+    measure(p) {
+      const m = measurePose(p);
       group.updateMatrixWorld(true);
-      swan.billTip.copy(billTipLocal).applyMatrix4(neckPivot.matrixWorld);
-      swan.headPosition.copy(headLocal).applyMatrix4(neckPivot.matrixWorld);
+      measured.billTip.fromArray(m.billTip).applyMatrix4(group.matrixWorld);
+      measured.head.fromArray(m.head).applyMatrix4(group.matrixWorld);
+      return measured;
+    },
+    update(dt, time) {
+      applyLook();
+      solveNeck(pose, solution);
+      writeProxies();
+      const breath = pose.breath + swan.breathing.depth * Math.sin(time * swan.breathing.rate * Math.PI * 2);
+      uniforms.uBody.value.set(pose.wingLift, BOW_DROP * L * pose.bow, 1 + BODY_STRETCH * pose.bodyStretch, breath * 0.0025);
+      uniforms.uTailSwing.value.z = TAIL_SWING * pose.tail;
+      group.updateMatrixWorld(true);
+      swan.billTip.fromArray(solution.billTip).applyMatrix4(group.matrixWorld);
+      swan.headPosition.fromArray(solution.head).applyMatrix4(group.matrixWorld);
     },
     dispose() {
       body.geometry.dispose();
       neck.geometry.dispose();
-      head.geometry.dispose();
-      bill.geometry.dispose();
-      featherMaterial.dispose();
-      darkMaterial.dispose();
+      fringe.geometry.dispose();
+      bodyMaterial.dispose();
+      neckMaterial.dispose();
+      fringeMaterial.dispose();
     },
   };
   swan.update(0, 0);

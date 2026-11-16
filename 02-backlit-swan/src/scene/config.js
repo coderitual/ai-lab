@@ -61,9 +61,41 @@ export const LOOK = {
   grainSize: 1.25, // in CSS pixels
   chroma: 0.0, // 0.002 is already visible
 
-  // Water
-  waterColor: [0.0015, 0.004, 0.0045], // what is seen looking down into it
-  ambientRipple: 0.007, // slope of the always-present tiny ripples
+  // Water (assets/pond/Water.js)
+  waterColor: [0.005, 0.0055, 0.009], // what is seen looking down into it where the sun does not reach
+  waterSunColor: [0.01, 0.01, 0.012], // added to that where it does
+  waterLowAngle: 0.4, // exponent by which that colour fades as the view flattens, on top of what the mirror takes (measured)
+  ambientRipple: 0.0075, // slope (root mean square) of the fine ripples on calm water
+  agitatedRipple: 0.07, // slope they gain per unit of agitation (RippleField.js)
+  mirrorTint: [0.93, 1.0, 0.79], // a reflection loses a little blue (measured)
+  mirrorBase: 0.02, // share of light mirrored looking straight down
+  mirrorRise: 2.6, // exponent of its rise toward grazing; 5 is the textbook, 2.6 gives the film's 0.57 at 10 to 13 degrees
+  mirrorFarDistance: 14, // metres along a reflected ray to the surroundings
+  glintStrength: 14.0, // the sun in the water, as a multiple of what sunColor alone would give
+  glintCalm: 0.008, // roughness (spread of slopes) of calm water, the sun's own size included
+  glintSteep: 2.5, // roughness added per unit of simulated slope
+  glintSun: 0.2, // how far leaves and haze spread the sun (as a roughness): bounds how bright its own image in calm water is
+  glintMax: 40, // brightest a glint may be
+  // What floats on it (assets/pond/Specks.js)
+  speckBrightness: 0.52, // the middle speck, in the sun
+  speckShade: 0.04, // share of that left where the sun does not reach
+  speckColor: [0.7, 0.76, 1.0], // cool white: the print warms it to the film's neutral
+  leafColor: [0.26, 0.19, 0.11], // share of the sun a floating leaf lets through
+
+  // The swan (assets/swan/). How its feathers take the light; shapes and sizes are in assets/swan/anatomy.js.
+  swanAlbedo: [0.93, 0.92, 0.9], // white feather
+  swanStain: [0.92, 0.86, 0.72], // head and upper neck, as stained as a mute swan's usually are
+  swanFreePath: 0.048, // metres of plain feather that take red light down to 1/e (0.08 L)
+  swanAbsorb: [1.0, 1.45, 2.3], // green and blue are taken faster than red by these factors: thin is cream, thicker amber
+  swanThrough: 0.38, // share of the light inside the plumage that leaves through a surface facing away from the sun
+  swanWrap: 0.12, // how far direct sun creeps past the terminator on something this soft
+  swanNeckDensity: 3.0, // the neck and head, relative to plain feather
+  swanSkyAtWater: 0.5, // share of the sky's light that reaches the skin at the waterline...
+  swanSkyHeight: 0.2, // ...rising to all of it this many metres up
+  swanSkyTilt: [0.05, 0.4, 1.0, 0.35], // share of it on surfaces facing down, facing the horizon, tilted up; the tilt (normal's y) that gets it all
+  swanFringe: 0.0036, // metres the down stands off the neck on a straight run (0.006 L)
+  swanFringeBend: 2.2, // how much taller it stands on the outside of a tight bend
+  swanBill: [0.8, 0.24, 0.035], // orange; black parts are fixed
 };
 
 /** The default view and what the camera may do. Angles as in OrbitRig.js. */
@@ -108,13 +140,14 @@ export const TIERS = {
     mirrorMsaa: 0,
     farScale: 0.4,
     farMirrorScale: 0.25,
-    mirrorScale: 0.4,
+    mirrorScale: 0.5,
     blurTaps: 12,
     blurFillTaps: 6,
     bloomLevels: 5,
     fxaaSteps: 5,
-    rippleSize: 128,
-    counts: { specks: 1500, leaves: 2500, trunks: 80, droplets: 192, featherDetail: 0 },
+    rippleSize: 256,
+    waterDetail: 0, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
+    counts: { specks: 7000, leaves: 2500, trunks: 80, droplets: 192, featherDetail: 0 },
   },
   medium: {
     pixelRatio: 2,
@@ -122,13 +155,14 @@ export const TIERS = {
     mirrorMsaa: 4,
     farScale: 0.5,
     farMirrorScale: 0.3,
-    mirrorScale: 0.5,
+    mirrorScale: 0.75,
     blurTaps: 16,
     blurFillTaps: 8,
     bloomLevels: 6,
     fxaaSteps: 7,
-    rippleSize: 256,
-    counts: { specks: 3500, leaves: 5000, trunks: 140, droplets: 384, featherDetail: 1 },
+    rippleSize: 384,
+    waterDetail: 1, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
+    counts: { specks: 13000, leaves: 5000, trunks: 140, droplets: 384, featherDetail: 1 },
   },
   high: {
     pixelRatio: 2,
@@ -136,12 +170,13 @@ export const TIERS = {
     mirrorMsaa: 4,
     farScale: 0.5,
     farMirrorScale: 0.4,
-    mirrorScale: 0.6,
+    mirrorScale: 1,
     blurTaps: 24,
     blurFillTaps: 10,
     bloomLevels: 7,
     fxaaSteps: 10,
     rippleSize: 512,
-    counts: { specks: 7000, leaves: 9000, trunks: 220, droplets: 768, featherDetail: 2 },
+    waterDetail: 2, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
+    counts: { specks: 16000, leaves: 9000, trunks: 220, droplets: 768, featherDetail: 2 },
   },
 };

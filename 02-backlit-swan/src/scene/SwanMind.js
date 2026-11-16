@@ -11,6 +11,38 @@ import { angleDiff, damp } from '../engine/math.js';
 const _forward = new THREE.Vector3();
 const _velocity = new THREE.Vector3();
 
+/**
+ * Staging for pictures, from the URL (read here so that the placeholder can
+ * be replaced without touching the engine's parameter list):
+ *
+ *   ?heading=10   which way the swan faces, as the film is described: 0 side-on
+ *                 facing the left of the default picture, 90 facing the camera, 180 facing right
+ *   ?pose=A       one of the film's neck shapes (A B C D E G F, see assets/swan/poses.js)
+ *   ?still        no drifting, no turning, no breathing: the swan stays exactly as staged
+ *   ?turn= ?look= ?bill= ?sway=    degrees, written over the pose
+ *   ?wing= ?bow= ?stretch= ?bodystretch= ?tail=    plain numbers, written over the pose
+ */
+function readStage() {
+  const q = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
+  const num = (key) => {
+    const v = parseFloat(q.get(key));
+    return Number.isFinite(v) ? v : undefined;
+  };
+  const DEG = Math.PI / 180;
+  const over = {};
+  for (const [key, field, scale] of [['turn', 'turn', DEG], ['look', 'look', DEG], ['bill', 'bill', DEG], ['sway', 'sway', DEG], ['wing', 'wingLift', 1], ['bow', 'bow', 1], ['stretch', 'stretch', 1], ['bodystretch', 'bodyStretch', 1], ['tail', 'tail', 1]]) {
+    const v = num(key);
+    if (v !== undefined) over[field] = v * scale;
+  }
+  const heading = num('heading');
+  return {
+    heading: heading === undefined ? undefined : (heading - 90) * DEG,
+    pose: (q.get('pose') || '').toUpperCase(),
+    still: q.has('still'),
+    over,
+  };
+}
+
 export class SwanMind {
   /**
    * @param {object} ctx the shared context (see World.js)
@@ -33,6 +65,12 @@ export class SwanMind {
     this._wander = 0;
     this._sinceWake = 0;
     this._billWet = false;
+    this._dip = 0;
+    this._stage = readStage();
+    if (this._stage.heading !== undefined) this.heading = this._stage.heading;
+    /** The neck shape the swan rests in (the placeholder has only this and the dip). */
+    this._rest = swan.poses[this._stage.pose] || swan.poses.A;
+    if (this._stage.still) swan.breathing.depth = 0;
     this._write();
   }
 
@@ -87,6 +125,11 @@ export class SwanMind {
       // stay well inside the pond: turn back toward the middle when far out
       if (this.position.length() > 9) wantHeading = Math.atan2(-this.position.x, -this.position.z);
     }
+    if (this._stage.still) {
+      wantHeading = this.heading;
+      wantSpeed = 0;
+      this.speed = 0;
+    }
     this.heading += angleDiff(this.heading, wantHeading) * Math.min(1, dt * 0.8);
     this.speed = damp(this.speed, wantSpeed, 0.8, dt);
     _forward.set(Math.sin(this.heading), 0, Math.cos(this.heading));
@@ -106,7 +149,7 @@ export class SwanMind {
         if (this._state === 'feed') this._state = 'drift';
       }
     }
-    swan.pose.dip = damp(swan.pose.dip, dip, 4, dt);
+    this._dip = damp(this._dip, dip, 4, dt);
     this._write();
 
     // the bill going into and coming out of the water
@@ -129,15 +172,19 @@ export class SwanMind {
       ctx.ripple.disturb(this.position.x + _forward.x * reach, this.position.z + _forward.z * reach, 0.11, 0.0035 + this.speed * 0.02);
     }
     // and it never sits perfectly still: a slow breath of a ripple under the body
-    if (Math.floor(time * 0.7) !== Math.floor((time - dt) * 0.7)) {
+    if (!this._stage.still && Math.floor(time * 0.7) !== Math.floor((time - dt) * 0.7)) {
       ctx.ripple.disturb(this.position.x, this.position.z, 0.3, 0.0012);
     }
   }
 
   _write() {
-    const g = this.swan.group;
+    const { swan } = this;
+    const g = swan.group;
     g.position.copy(this.position);
     g.rotation.y = this.heading;
-    this.swan.update(0, 0);
+    // the placeholder's whole repertoire: the resting shape, and the hook of the first dip blended over it
+    swan.blendPose(swan.pose, this._rest, swan.poses.E, this._dip);
+    Object.assign(swan.pose, this._stage.over);
+    swan.update(0, 0);
   }
 }
