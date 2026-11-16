@@ -73,10 +73,10 @@ export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false
     const atlas = bakeAtlas(skin, lay, ATLAS_SIZE[tier]);
     const textures = atlas.data.map((data) => {
       const texture = keep(new THREE.DataTexture(data, atlas.width, atlas.height, THREE.RGBAFormat));
-      texture.magFilter = THREE.LinearFilter;
-      texture.minFilter = THREE.LinearMipmapLinearFilter;
-      texture.generateMipmaps = true;
-      texture.anisotropy = 4;
+      // no mip maps: a mip level would average a thin line's distances away. The shaders antialias every edge
+      // from the distance's own footprint, so the full-size level is right at any distance.
+      texture.magFilter = texture.minFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
       texture.needsUpdate = true;
       return texture;
     });
@@ -90,7 +90,7 @@ export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false
     // the glass and the lenses lie on the paint's own surface: drawn after it, at the same depth
     skinMesh((i, k) => extremes(GLASS, i, k)[0] < 0.002, keep(createGlassMaterial(shared, caps, GLASS))).renderOrder = 1;
     skinMesh((i, k) => extremes(LENS, i, k)[0] < 0.002, keep(createGlassMaterial(shared, caps, LENS))).renderOrder = 1;
-    skinMesh(() => true, keep(createShellMaterial())).receiveShadow = true;
+    skinMesh(() => true, keep(createShellMaterial()));
     const lip = new THREE.Mesh(archGeometry.lip, paintMaterial);
     lip.castShadow = lip.receiveShadow = true;
     object.add(lip, new THREE.Mesh(archGeometry.liner, keep(new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 }))));

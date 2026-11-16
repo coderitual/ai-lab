@@ -54,11 +54,13 @@ const VERTEX_PARS = /* glsl */ `
 varying vec2 vSkinUv;
 varying vec3 vCarPos;
 varying vec3 vCarNormal;
+varying mat3 vCarToView;
 `;
 const VERTEX_MAIN = /* glsl */ `
 vSkinUv = uv;
 vCarPos = position;
 vCarNormal = normal;
+vCarToView = normalMatrix;
 `;
 
 const FRAGMENT_PARS = /* glsl */ `
@@ -73,6 +75,7 @@ uniform vec4 carLampsB;
 varying vec2 vSkinUv;
 varying vec3 vCarPos;
 varying vec3 vCarNormal;
+varying mat3 vCarToView;
 ${GLSL_HASH}
 ${GLSL_PROBE}
 vec4 carAtlas(sampler2D t) { return (texture2D(t, vSkinUv) * 255.0 - 127.5) / 127.5 * carRange; }
@@ -159,6 +162,51 @@ uniform float paintFlake;
 vec3 cBase; float cMetal; float cRough; float cCoat; vec3 cEmit; float cShut; float cPaint;
 #define CAR_REGION(w, col, met, rough, coat) { float w_ = (w); cBase = mix(cBase, col, w_); cMetal = mix(cMetal, met, w_); cRough = mix(cRough, rough, w_); cCoat = mix(cCoat, coat, w_); cPaint *= 1.0 - w_; }
 
+/**
+ * The smaller forms of the body, as a tilt of the normal (car space) rather than as geometry: they are a few
+ * millimetres high but have sharp edges, which no affordable mesh would carry. The power domes on the bonnet,
+ * the lower crease of the doors, the side skirt's groove and blade, the flat band round the wheel arches.
+ */
+vec3 carForm(vec3 p, vec3 n) {
+  vec3 tilt = vec3(0.0);
+  float side = sign(vCarPos.x);
+  // power domes: crests at x 0.27 at the cowl converging to 0.20 at z 1.9, 9 mm high, the outer flank sharper
+  if (n.y > 0.5 && p.z > 0.72 && p.z < 2.0) {
+    float crest = mix(0.27, 0.20, clamp((p.z - 0.8) / 1.1, 0.0, 1.0));
+    float s = p.x < crest ? 0.055 : 0.028;
+    float t = (p.x - crest) / s;
+    float a = 0.009 * smoothstep(0.74, 0.9, p.z) * (1.0 - smoothstep(1.6, 1.95, p.z));
+    float slope = a * exp(-t * t) * (-2.0 * t / s);
+    tilt.x -= side * slope;
+  }
+  if (abs(n.x) > 0.55) {
+    float between = smoothstep(1.06, 1.02, p.z) * smoothstep(-1.06, -1.02, p.z);
+    // the lower crease ("light catcher"): below it the door turns under by about 10 degrees
+    float yc = p.z > 0.4 ? mix(0.41, 0.385, (p.z - 0.4) / 0.65) : mix(0.462, 0.41, (p.z + 1.02) / 1.42);
+    float below = carInside(p.y - yc) * (1.0 - carInside(p.y - 0.297));
+    tilt.y -= 0.18 * below * between;
+    // the side skirt: an upright face, a groove at 0.245, a blade from 0.19 to 0.235 that looks up at the sky
+    float blade = carInside(p.y - 0.232) * (1.0 - carInside(p.y - 0.19)) * smoothstep(0.85, 0.75, p.z) * between;
+    tilt.y += 0.3 * blade;
+    tilt.y -= 0.35 * carInside(abs(p.y - 0.2455) - 0.004) * between;
+  }
+  if (abs(n.x) > 0.5) {
+    // the band round each arch, 35 mm wide and raised: its outer edge falls away, which catches a highlight
+    vec2 c = p.z > 0.0 ? vec2(1.4325, 0.32) : vec2(-1.4325, 0.315);
+    vec2 ab = p.z > 0.0 ? vec2(0.385, 0.372) : vec2(0.39, 0.355);
+    vec2 q = (p.zy - c) / ab;
+    if (q.y > -0.45) {
+      float rho = length(q);
+      float d = (rho - 1.0) * ab.y - 0.035;
+      vec2 radial = normalize(q / ab);
+      float w = exp(-(d / 0.007) * (d / 0.007));
+      tilt.z += radial.x * 0.35 * w;
+      tilt.y += radial.y * 0.35 * w;
+    }
+  }
+  return tilt;
+}
+
 /** The lamp units, until they are modelled: what shows through the lens, and what lights up. */
 void carLamp(float lens, float w) {
   if (w <= 0.0) return;
@@ -200,7 +248,7 @@ void carLamp(float lens, float w) {
     float fins = upper * finsU * (x > 0.6 ? 1.0 : 0.5) + lower * finsL;
     float band = carInside(0.022 - edge) * carInside(abs(p.y - mid) - 0.012);
     float reverse = carInside(carBox(p.xy, vec2(0.41, 0.864), vec2(0.022, 0.009), 0.003));
-    vec3 col = mix(vec3(0.25, 0.012, 0.018), vec3(0.45, 0.03, 0.03), fins);
+    vec3 col = mix(vec3(0.1, 0.006, 0.009), vec3(0.3, 0.02, 0.02), fins);
     col = mix(col, vec3(0.5), reverse * 0.6);
     CAR_REGION(w, col, 0.0, 0.12, 1.0);
     float indicator = (left ? carLampsB.z : carLampsB.w) * step(0.6, x);
@@ -249,7 +297,8 @@ void carLamp(float lens, float w) {
     shut = min(shut, abs(flap));
   }
   float shutW = max(fwidth(shut), 1e-5);
-  cShut = clamp(0.5 - (shut - 0.0015) / shutW, 0.0, 1.0) * clamp(0.004 / shutW, 0.35, 1.0);
+  // a gap 3 mm wide: at least a pixel wide once a pixel is wider than that, and fainter in proportion
+  cShut = clamp(0.5 - (shut - max(0.0015, 0.5 * shutW)) / shutW, 0.0, 1.0) * clamp(0.003 / shutW, 0.45, 1.0);
   cBase *= (1.0 - 0.9 * cShut) * (1.0 - 0.25 * (1.0 - smoothstep(0.0, 0.005, shut)));
   cCoat *= 1.0 - cShut;
   }`,
@@ -258,8 +307,13 @@ void carLamp(float lens, float w) {
       ['#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = cRough;'],
       ['#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n  metalnessFactor = cMetal;'],
       [
-        '#include <normal_fragment_maps>',
-        /* glsl */ `#include <normal_fragment_maps>
+        '#include <clearcoat_normal_fragment_maps>',
+        /* glsl */ `#include <clearcoat_normal_fragment_maps>
+  {
+    vec3 tilt = vCarToView * carForm(vec3(abs(vCarPos.x), vCarPos.yz), vCarNormal) * cPaint;
+    normal = normalize(normal + tilt);
+    clearcoatNormal = normalize(clearcoatNormal + tilt);
+  }
   {
     // flake: each cell of 0.4 mm tilts the base layer's normal a little; it fades out before a cell gets smaller
     // than a pixel, so it sparkles close up and never shimmers further away
@@ -319,7 +373,8 @@ export function createGlassMaterial(shared, caps, channel) {
   float band = frit > 0.0 ? 1.0 - carCover(d + frit) : 0.0;
   glassAlpha = mix(1.0 - transmit, 1.0, band);
   // the roof's seam, and the gap between the tail lamp's two pieces, are shut lines on the glass
-  glassAlpha = mix(glassAlpha, 1.0, clamp(0.5 - (A.b - 0.0015) / max(fwidth(A.b), 1e-5), 0.0, 1.0));
+  float lineW = max(fwidth(A.b), 1e-5);
+  glassAlpha = mix(glassAlpha, 1.0, clamp(0.5 - (A.b - max(0.0015, 0.5 * lineW)) / lineW, 0.0, 1.0));
   }`,
       ],
       ['#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = vec3(0.01);'],
@@ -334,10 +389,13 @@ export function createGlassMaterial(shared, caps, channel) {
   return material;
 }
 
-/** The inside of the body: dark, seen only through the glass and the openings (its back faces). */
+/**
+ * The inside of the body: seen only through the glass and the openings (its back faces). Unlit: the cabin is
+ * black, and the lamps' lights, which stand inside the body, must not light it.
+ */
 export function createShellMaterial() {
-  const material = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, side: THREE.BackSide });
-  material.color.setRGB(0.015, 0.015, 0.016, THREE.LinearSRGBColorSpace);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.BackSide });
+  material.color.setRGB(0.012, 0.012, 0.013, THREE.LinearSRGBColorSpace);
   return material;
 }
 
