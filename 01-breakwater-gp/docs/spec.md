@@ -436,9 +436,12 @@ screen has fewer than 1.5 device pixels per CSS pixel the picture is drawn at
 and the browser scales it down, which is where the "4K" crispness on an
 ordinary monitor comes from.
 
-**Giving ground.** If frames take longer than 1/42 s for 75 frames, the game
-first gives back that extra resolution, if it had any, and nothing else. If
-frames are still slow it takes a step down (at most two):
+**Giving ground.** The extra resolution is a luxury: it is given back as soon
+as sixty frames a second cannot be held with it (frames longer than 1/55 s
+adding up to 1.2 s, faster frames paying that back at twice their length),
+and nothing else is given up until it has gone.
+After that, if frames take longer than 1/42 s for 75 frames, the game takes a
+step down (at most two):
 
 | step | resolution | given up |
 | --- | --- | --- |

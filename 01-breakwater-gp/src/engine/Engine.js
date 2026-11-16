@@ -52,6 +52,8 @@ export class Engine {
     this.frame = 0;
     this._last = 0;
     this._slowFrames = 0;
+    this._overTime = 0;
+    this._extraPixels = false; // drawing finer than the screen at the moment
     this._qualitySteps = 0;
     this._resizeListeners = [];
     this._restoreListeners = [];
@@ -120,7 +122,9 @@ export class Engine {
     if (pr == null) {
       // more pixels than the screen has, if asked for, but never an enormous picture (about six million pixels at most)
       const over = this.supersample > 1 ? Math.min(this.supersample, Math.sqrt(6e6 / (w * h))) : 1;
-      pr = Math.min(Math.max(window.devicePixelRatio || 1, over), this.maxPixelRatio);
+      const own = Math.min(window.devicePixelRatio || 1, this.maxPixelRatio);
+      pr = Math.min(Math.max(own, over), this.maxPixelRatio);
+      this._extraPixels = pr > own;
     }
     if (w === this.width && h === this.height && pr === this.pixelRatio) return;
     this.width = w;
@@ -195,17 +199,27 @@ export class Engine {
    * Power Mode runs at 30 fps) should not be driven down to a blurry picture.
    */
   _adaptQuality(dt) {
-    if (this.options.pixelRatio != null || this.frame < 90 || this._qualitySteps >= 2) return;
+    if (this.options.pixelRatio != null) return;
+    if (this.supersample > 1 && this._extraPixels) {
+      // The extra pixels are a luxury: they go as soon as sixty frames a second cannot be held with them, and
+      // nothing else is given up until they have gone. Slow frames are counted by the time they took (a second or
+      // so of them is enough), so that a machine drawing five frames a second is not kept waiting for sixty.
+      if (this.frame < 20) return;
+      if (dt > 1 / 55) this._overTime += Math.min(dt, 0.25);
+      else this._overTime = Math.max(0, this._overTime - dt * 2);
+      if (this._overTime > 1.2) {
+        this.supersample = 1;
+        this._slowFrames = 0;
+        this.resize();
+      }
+      return;
+    }
+    if (this.frame < 90) return;
+    if (this._qualitySteps >= 2) return;
     if (dt > 1 / 42) this._slowFrames++;
     else this._slowFrames = Math.max(0, this._slowFrames - 2);
     if (this._slowFrames > 75) {
       this._slowFrames = 0;
-      if (this.supersample > 1) {
-        // first give back the extra pixels: nothing else is lost by that
-        this.supersample = 1;
-        this.resize();
-        return;
-      }
       this._qualitySteps++; // the game sheds its costlier effects at each step as well
       if (this.maxPixelRatio > 1) {
         this.maxPixelRatio = Math.max(1, this.maxPixelRatio * 0.82);

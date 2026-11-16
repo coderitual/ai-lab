@@ -566,7 +566,9 @@ reflection map and the lens pass.
 
 Before either step, a desktop gives back the extra resolution it was drawing
 at (it starts at up to 1.5× the screen's own, scaled down by the browser:
-the cheapest way to make edges and highlights calm).
+the cheapest way to make edges and highlights calm). That goes on a stricter
+test than the steps do, as soon as sixty frames a second cannot be held: a
+sharper picture is not worth a slower one.
 
 Two steps only, on purpose: a browser that caps the frame rate itself (low
 power mode) must not be driven down to a blurry picture.
