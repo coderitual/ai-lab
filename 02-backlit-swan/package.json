@@ -1,0 +1,19 @@
+{
+  "name": "backlit-swan",
+  "private": true,
+  "version": "0.1.0",
+  "displayName": "Backlit Swan",
+  "description": "A mute swan on a dark forest pond, backlit by low sun: an interactive real-time scene built with three.js, for phones and desktops.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}

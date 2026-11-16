@@ -1,0 +1,12 @@
+/* The overlay. For now only the veil that hides the canvas until the first
+   frame has been drawn; the controls come later. (The veil's first styles are
+   inline in index.html so that it is there before this file arrives.) */
+
+#loading {
+  transition: opacity 0.9s ease;
+}
+
+#loading.done {
+  opacity: 0;
+  pointer-events: none;
+}
