@@ -76,6 +76,18 @@
   gap: 6px;
 }
 
+.hud.wide .bar,
+.hud.tall .bar {
+  top: 50%;
+  transform: translateY(-50%);
+}
+.hud.wide .bar {
+  right: auto;
+  left: 50%;
+  flex-direction: column;
+  transform: translate(-50%, -50%);
+}
+
 .hud .view {
   position: absolute;
   overflow: hidden;

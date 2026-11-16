@@ -86,9 +86,9 @@ export const CAMERA = {
     narrowLift: 1.25,
   },
   far: { distance: 9.5, height: 2.6, lookAhead: 10, lookHeight: 1.0 },
-  /** Fixed to the body: [x left, y up, z forward] of the eye, and how far ahead it looks. */
-  bonnet: { eye: [0, 1.32, 0.35], lookAhead: 20, fov: 60 },
-  bumper: { eye: [0, 0.55, 2.55], lookAhead: 20, fov: 62 },
+  /** Fixed to the body at the car's own viewpoints (VIEWPOINTS in assets/car/spec.js): how far ahead they look, and the lens. */
+  bonnet: { lookAhead: 20, fov: 60 },
+  bumper: { lookAhead: 20, fov: 62 },
   /** The title's slow circle round the parked car (rate in rad/s). */
   orbit: { distance: 7.2, height: 1.6, rate: 0.12, lookHeight: 0.7, fov: 42 },
   /** The camera modes C steps through. */

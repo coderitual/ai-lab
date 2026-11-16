@@ -292,6 +292,14 @@ export class Hud {
     return `<div>Best laps, ${time}</div><table>${body}</table>${best3}`;
   }
 
+  /** How the screen is shared: '' one view, 'wide' side by side, 'tall' stacked (the page's buttons sit on the seam). */
+  setSplit(kind) {
+    if (kind === this._split) return;
+    this._split = kind;
+    this.root.classList.toggle('wide', kind === 'wide');
+    this.root.classList.toggle('tall', kind === 'tall');
+  }
+
   setTitleBoard(html) {
     if (this._titleBoard !== html) this.titleBoard.innerHTML = this._titleBoard = html;
   }

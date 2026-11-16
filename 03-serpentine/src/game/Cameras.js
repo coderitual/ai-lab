@@ -17,6 +17,7 @@
 
 import * as THREE from 'three';
 import { angleDiff, clamp01, damp, dampAngle, lerp } from '../engine/math.js';
+import { STATIONS, VIEWPOINTS } from '../assets/car/spec.js';
 import { CAMERA } from './config.js';
 
 const NARROW = 4 / 3;
@@ -107,8 +108,11 @@ export class CameraRig {
       fov = o.fov;
     } else if (this.mode === 'bonnet' || this.mode === 'bumper') {
       const m = CAMERA[this.mode];
+      const at = VIEWPOINTS[this.mode];
       quat.slerpQuaternions(vehicle.prevQuaternion, vehicle.quaternion, alpha);
-      eye.set(m.eye[0], m.eye[1], this.lookBack ? -m.eye[2] * 0.6 : m.eye[2]).applyQuaternion(quat).add(p);
+      // looking back from the bonnet or the bumper: at the same height, over the boot lid or behind the rear bumper
+      const z = this.lookBack ? STATIONS.tail + (this.mode === 'bumper' ? -0.03 : 0.3) : at.z;
+      eye.set(at.x, at.y, z).applyQuaternion(quat).add(p);
       ahead.set(0, 0, this.lookBack ? -m.lookAhead : m.lookAhead).applyQuaternion(quat);
       camera.position.copy(eye);
       camera.up.set(0, 1, 0).applyQuaternion(quat);

@@ -295,6 +295,7 @@ export class Game {
       view.hud.setZone(view.zone);
     });
     this.input.zones = views.map((view) => view.zone);
+    this.hud.setSplit(two ? (sideBySide ? 'wide' : 'tall') : '');
   }
 
   // ------------------------------------------------------------------ flow
