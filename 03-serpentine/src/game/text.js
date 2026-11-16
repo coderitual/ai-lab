@@ -1,0 +1,101 @@
+// Every word the page shows, in one place, so that it could be translated.
+// The HUD and the panels read these; nothing else puts text on the screen.
+// Functions are for words that carry a number or a name.
+
+export const TEXT = {
+  name: 'Serpentine',
+  tagline: 'A time trial over a mountain pass, three laps against the clock.',
+  loading: 'Loading',
+  noWebgl: 'This device could not start WebGL 2. Try a recent version of Safari or Chrome.',
+
+  drive: 'Drive',
+  twoPlayers: 'Two players',
+  onePlayer: 'One player',
+  day: 'Day',
+  night: 'Night',
+  soundOn: 'Sound on',
+  soundOff: 'Sound off',
+  resume: 'Resume',
+  restart: 'Restart',
+  menu: 'Menu',
+  again: 'Again',
+  paused: 'Paused',
+  results: 'Results',
+  timeOfDay: 'Time of day',
+
+  lap: 'Lap',
+  finalLap: 'Final lap',
+  finished: 'Finished',
+  best: 'Best',
+  bestLap: 'Best lap',
+  newBest: 'New best',
+  total: 'Total',
+  toBeat: 'To beat',
+  allBeaten: 'Board cleared',
+  boardTitle: (time) => `Best laps · ${time === 'night' ? 'night' : 'day'}`,
+  you: 'you',
+  medal: { gold: 'gold', silver: 'silver', bronze: 'bronze' },
+  noMedal: 'no medal',
+  medalWon: (m) => `${m} medal`,
+  fromGrid: 'grid',
+  putBack: 'reset',
+  kmh: 'km/h',
+  rpm: '×1000 rpm',
+  gear: (g) => (g < 0 ? 'R' : g === 0 ? 'N' : String(g)),
+  place: (p) => (p === 1 ? '1st' : p === 2 ? '2nd' : p === 3 ? '3rd' : `${p}th`),
+  driver: (i) => `Player ${i + 1}`,
+  wins: (i) => `Player ${i + 1} wins`,
+  dnf: 'did not finish',
+  gapTo: 'gap',
+
+  wrongWay: 'Wrong way',
+  offer: { roof: 'On its roof', stuck: 'Stuck', wrong: 'Wrong way' },
+  resetKeys: 'R to reset',
+  resetTouch: 'Tap to reset',
+  resetSplit: (key) => `${key} to reset`,
+
+  lamps: { abs: 'ABS', tc: 'TC', esc: 'ESC', hand: 'P', high: 'High beam' },
+  buttons: { camera: 'Camera', lights: 'High beam', reset: 'Reset', pause: 'Pause' },
+
+  hint: {
+    touch: 'Touch and drag to steer, pull down to brake',
+    keys: 'W or ↑ to drive, A D or ← → to steer, S or ↓ to brake',
+    pad: 'Right trigger to drive, left stick to steer, left trigger to brake',
+  },
+
+  /** The title's legend: [key, what] pairs per device. */
+  legend: {
+    keys: [
+      ['W A S D / ← ↑ → ↓', 'drive'],
+      ['Space', 'handbrake'],
+      ['C', 'camera'],
+      ['B', 'look back'],
+      ['R', 'reset'],
+      ['H', 'high beam'],
+      ['N', 'day / night'],
+      ['P', 'pause'],
+    ],
+    split: [
+      ['W A S D · Space', 'player 1'],
+      ['← ↑ → ↓ · R Shift', 'player 2'],
+      ['C / .', 'camera'],
+      ['R / /', 'reset'],
+      ['N', 'day / night'],
+      ['P', 'pause'],
+    ],
+    pad: [
+      ['RT / LT', 'drive / brake'],
+      ['Left stick', 'steer'],
+      ['A', 'handbrake, start'],
+      ['X', 'look back'],
+      ['Y', 'camera'],
+      ['B', 'reset'],
+      ['Start', 'pause'],
+    ],
+    touch: [
+      ['Drag', 'steer'],
+      ['Pull down', 'brake'],
+      ['Second finger', 'brake'],
+    ],
+  },
+};

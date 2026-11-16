@@ -59,6 +59,8 @@ const ACTIONS = {
 };
 /** Keys whose browser default (scrolling, focus moves) must not happen while driving. */
 const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Slash', 'Enter']);
+/** Keys a focused button takes for itself. */
+const PRESSES = new Set(['Enter', 'NumpadEnter', 'Space']);
 /** Pad buttons (standard mapping) that are actions. */
 const PAD_ACTIONS = [
   [3, 'camera'], // Y
@@ -96,6 +98,8 @@ export class Input {
 
     this._keydown = (e) => {
       if (isTyping(e)) return;
+      // Enter or Space on a focused button presses that button and nothing else (not the start, not the handbrake)
+      if (PRESSES.has(e.code) && e.target instanceof Element && e.target.closest('button')) return;
       if (PREVENT.has(e.code)) e.preventDefault();
       if (e.repeat) return;
       this.keys.add(e.code);
@@ -235,6 +239,16 @@ export class Input {
     return this.touch[i] ? this.touch[i].stick : null;
   }
 
+  /** How hard zone `i`'s thumbs brake right now, 0..1 (the pull of the stick, or a second finger). */
+  brakeOf(i) {
+    const z = this.touch[i];
+    if (!z) return 0;
+    let brake = z.brake ? 1 : 0;
+    const s = z.stick;
+    if (s) brake = Math.max(brake, clamp((s.y - s.originY - BRAKE_DEAD) / BRAKE_RANGE, 0, 1));
+    return brake;
+  }
+
   /** The pad driver `d` holds, or null. */
   _pad(d) {
     if (typeof navigator === 'undefined' || !navigator.getGamepads) return null;
@@ -329,11 +343,10 @@ export class Input {
     const z = this.touch[zone] || this.touch[0];
     const s = z.stick;
     let steer = 0;
-    let brake = z.brake ? 1 : 0;
+    const brake = this.brakeOf(this.touch[zone] ? zone : 0);
     if (s) {
       const v = clamp((s.x - s.originX) / STEER_RANGE, -1, 1);
       steer = Math.sign(v) * Math.pow(Math.abs(v), 1.25);
-      brake = Math.max(brake, clamp((s.y - s.originY - BRAKE_DEAD) / BRAKE_RANGE, 0, 1));
     }
     out.steer = steer;
     out.brake = brake;
@@ -351,3 +364,6 @@ export class Input {
     window.removeEventListener('blur', this._blur);
   }
 }
+
+/** Thumb travel for full lock (px): the drawn stick's ring is this wide either side. */
+export { STEER_RANGE as STICK_RANGE };
