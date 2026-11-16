@@ -77,11 +77,21 @@ import { ROW_STEP, createTerrain } from './terrain.js';
  */
 export function createWorld({ renderer, caps, tier, track, rng, params }) {
   const scene = new THREE.Scene();
+  /** Start-up milliseconds of each part (world.stats.ms). */
+  const ms = {};
+  let clock = performance.now();
+  const lap = (name) => {
+    const now = performance.now();
+    ms[name] = Math.round(now - clock);
+    clock = now;
+  };
   const atmosphere = createAtmosphere(caps);
   const sky = createSky({ tier, rng: rng.fork('sky'), atmosphere });
+  lap('sky');
   const environment = createEnvironment({ renderer, caps, sky, atmosphere });
   const sun = createSun({ renderer, tier, shadows: params.shadows });
   const groundMaterial = createGroundMaterial({ caps, tier, atmosphere });
+  lap('groundMaterial');
   const terrain = createTerrain({
     track,
     tier,
@@ -89,11 +99,15 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     material: groundMaterial.material,
     lights: { day: TIMES.day.sun.dir, night: TIMES.night.sun.dir },
   });
+  lap('terrain');
   const road = createRoad({ track, caps, tier, atmosphere, terrain, rowStep: ROW_STEP[tier] ?? 1 });
+  lap('road');
   const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock') });
+  lap('rock');
   const bore = createPlaceholderBore({ track, atmosphere });
   const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
   const ground = createPlaceholderGround({ caps, tier, track, rng: rng.fork('ground'), atmosphere, heightAt: terrain.heightAt });
+  lap('placeholders');
 
   scene.add(terrain.group, road.group, rock.group, bore.group, lake.mesh, ground.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
@@ -121,6 +135,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     probeHidden: [sky.stars],
     atmosphere,
     terrain,
+    /** Start-up milliseconds per part, and the terrain's own counts. */
+    stats: { ms, terrain: terrain.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -208,7 +224,9 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
 
   world.wetness = params.wet;
   environment.build();
+  lap('environment');
   world.setTime(params.time);
   world.update(0, 0);
+  ms.total = Object.values(ms).reduce((a, b) => a + b, 0);
   return world;
 }
