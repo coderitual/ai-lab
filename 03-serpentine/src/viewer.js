@@ -9,6 +9,7 @@
 //   asset=car      the car, standing on the road in the world (on the grid, or at s=)
 //   asset=world    the world alone, looking at the same spot
 //   asset=wheel    a front and a rear wheel alone (side=left|right, only=front|rear, steer, spin, travel, omega)
+//   ghost=1        the best-lap ghost instead of the car
 //   time=day|night   q=low|medium|high   paint=NAME   plate=TEXT   manual   post=0   dpr=N   (as in the game)
 //   lights=off|drl|low|high|brake|all    the car's lamps (default: what the time of day asks for); or a list of
 //                  setLights names, each at full strength: lights=tail,reverse,indicatorL
@@ -140,7 +141,7 @@ function lampPreset(name) {
  */
 const ASSETS = {
   car() {
-    const car = createCar({ paint: params.paint ?? undefined, plate: params.plate ?? undefined, tier, caps });
+    const car = createCar({ paint: params.paint ?? undefined, plate: params.plate ?? undefined, tier, caps, ghost: query.get('ghost') === '1' });
     car.setLights(lampPreset(given.lights));
     car.setReflections({ cube: null, sky: 1 });
     stand.add(car.object);

@@ -167,7 +167,15 @@ export function createCar({ paint = 'silver', plate = 'AI LAB03', tier = 'high',
 
   // the corners: each wheel's origin is its centre, at the tyre's radius above the ground when the car stands
   const wheels = WHEELS.map((spec) => {
-    const wheel = keep(createWheel({ front: spec.front, left: spec.left, tier, caps }));
+    const wheel = keep(createWheel({ front: spec.front, left: spec.left, tier: ghost ? 'low' : tier, caps }));
+    if (ghost) {
+      // the ghost's wheels are a tyre and spokes: the brake, barrel and blur shell would only add busy layers
+      const drop = [];
+      wheel.object.traverse((o) => {
+        if (o.isMesh && (o.material === wheel.materials[1] || o.material === wheel.materials[3])) drop.push(o);
+      });
+      for (const o of drop) o.removeFromParent();
+    }
     wheel.object.position.set(spec.x, spec.tyre.radius, spec.z);
     wheel.object.name = `wheel ${spec.name}`;
     object.add(wheel.object);

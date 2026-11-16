@@ -25,7 +25,7 @@ import { ARCHES } from './features.js';
 
 /** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
 export const PAINTS = {
-  silver: { color: [0.63, 0.65, 0.67], metal: 1, rough: 0.38, flop: 0.42, flake: 1 }, // high-tech silver: this car
+  silver: { color: [0.45, 0.452, 0.455], metal: 1, rough: 0.3, flop: 0.35, flake: 1 }, // high-tech silver: this car
   graphite: { color: [0.16, 0.17, 0.18], metal: 1, rough: 0.34, flop: 0.45, flake: 1 },
   blue: { color: [0.018, 0.045, 0.19], metal: 0.85, rough: 0.32, flop: 0.35, flake: 1 },
   red: { color: [0.36, 0.014, 0.014], metal: 0.35, rough: 0.3, flop: 0.6, flake: 0.5 },
@@ -352,13 +352,13 @@ void carLamp(float lens, float w) {
     float browW = carInside(brow - 0.006);
     col = mix(col, vec3(0.62, 0.63, 0.65), browW); met = mix(met, 0.0, browW); rough = mix(rough, 0.45, browW);
     cTilt *= 1.0 - browW;
-    vec3 drl = mix(vec3(1.0, 0.97, 0.93) * 30.0 * carLampsA.x, vec3(1.0, 0.42, 0.04) * 40.0, indicator);
+    vec3 drl = mix(vec3(1.0, 0.97, 0.93) * 3.5 * carLampsA.x, vec3(1.0, 0.42, 0.04) * 8.0, indicator);
     emit += browW * drl + carInside(brow - 0.012) * (1.0 - browW) * drl * 0.08;
     // dipped beam: the projector glows from within; main beam lights the matrix module's rows too
     float beam = min(carLampsA.y + carLampsA.z, 1.0);
-    emit += vec3(0.95, 0.97, 1.0) * lensP * beam * (1.2 * (1.0 - 0.6 * rp * rp) + 0.3);
+    emit += vec3(0.95, 0.97, 1.0) * lensP * beam * (0.5 * (1.0 - 0.8 * rp * rp) + 0.06);
     emit += vec3(0.95, 0.97, 1.0) * lensM * (carLampsA.z + 0.15 * carLampsA.y) * (0.8 + 4.0 * dots.r);
-    emit += vec3(0.95, 0.97, 1.0) * (1.0 - lensP) * (1.0 - lensM) * beam * 0.02 * (1.0 - browW);
+    emit += vec3(0.95, 0.97, 1.0) * (1.0 - lensP) * (1.0 - lensM) * beam * 0.006 * (1.0 - browW);
   } else {
     // ---- tail lamp (6.2): two rows of slanted blades 8 mm in, a smooth light guide between them 14 mm in, the
     // reversing lamp's window by the inner tip, and a dark red mirror of a housing 25 mm in
