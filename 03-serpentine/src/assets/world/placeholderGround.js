@@ -1,6 +1,6 @@
-// PLACEHOLDER ROADSIDE. Cones for spruces where the
-// Track says trees stand (on the terrain), guide posts and the street lamps'
-// poles: until the forest and the roadside exist.
+// PLACEHOLDER FOREST. Cones for spruces where the
+// Track says trees stand (on the terrain), until the forest exists. (The
+// guide posts and the street lamps are structures.js's now.)
 //
 // It stands in for the terrain, the road, the forest and the roadside until
 // those exist, so that the light can be judged on the real course: the
@@ -40,7 +40,7 @@ export function createPlaceholderGround({ caps, tier, track, rng, atmosphere, he
   const inside = (s, ranges, margin) => ranges.some((r) => s > r.s0 - margin && s < r.s1 + margin);
   const material = (options) => atmosphere.patch(new THREE.MeshStandardMaterial(options));
 
-  // ---- things that stand: spruces along the tree lines, blocks, guide posts, lamp poles
+  // ---- spruces along the tree lines
   const matrix = new THREE.Matrix4();
   const quat = new THREE.Quaternion();
   const scale = new THREE.Vector3();
@@ -79,22 +79,9 @@ export function createPlaceholderGround({ caps, tier, track, rng, atmosphere, he
   });
   forest.castShadow = forest.receiveShadow = true;
 
-  const postSpacing = 25;
-  const postList = [];
-  for (let s = 0; s < track.length - postSpacing / 2; s += postSpacing) {
-    if (inside(s, track.tunnels, 0) || inside(s, track.bridges, 0)) continue;
-    postList.push([s, 1], [s, -1]);
-  }
-  const posts = new THREE.InstancedMesh(box, material({ color: 0xd8d8d2, roughness: 0.6 }), postList.length);
-  postList.forEach(([s, side], i) => {
-    track.frameAt(s, frame);
-    quat.setFromAxisAngle(up, Math.atan2(frame.tan.x, frame.tan.z));
-    posts.setMatrixAt(i, matrix.compose(at(s, side * (track.halfWidth + 0.5)), quat, scale.set(0.12, 1.0, 0.06)));
-  });
-  posts.castShadow = posts.receiveShadow = true;
 
 
-  group.add(forest, posts);
+  group.add(forest);
 
   return {
     group,
