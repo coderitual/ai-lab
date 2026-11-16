@@ -51,7 +51,10 @@ src/
     environment.js     sea + sky + sun + shadows, assembled
     boat.js, boat/     the boat (see boat.md)
     buoys.js           marks, course floats, start arch
-    island.js          land: height function, mesh, the ground material (sand, grass, rock)
+    island.js          land: height function, mesh, the ground material (sand, grass, rock, paving)
+    city.js            towers: one instanced box and a facade drawn by its material
+    bridge.js          the bridges over the river
+    boosts.js          boost pads, nitro cells, ramps
     palm.js            coconut palms: trunks, fronds, their textures, the wind
     scenery.js         rocks, lighthouse, pier, sailboats
     geo.js             modelling helpers (part, merge, loft, skin, fan, facet)
@@ -123,9 +126,14 @@ lengths 4.3, 3.3, 2.6, 2.05, 1.6, 1.25 m; amplitudes 0.072 … 0.017 m.
 
 Every amplitude is scaled by a field that depends on place:
 
-- **Shelter.** Along the direction 225°, amplitude falls smoothly from 1 on
-  the open side to **0.5** in the lee (`smoothstep(−110, 150)` of the distance
-  along that direction).
+- **Shelter.** Along +X (toward the town), amplitude falls smoothly from 1 on
+  the open western side to **0.5** in the lee (`smoothstep(−110, 150)` of the
+  distance along that direction).
+- **The river.** Inside it the amplitude is a fifth of its value, easing back
+  to full 70 m beyond its banks: the city stretch is nearly flat water.
+  (The river is a straight run of water through the land that the sea is
+  told about, `setSeaIslands(circles, canal)`: inside it the shore is its
+  nearer bank.)
 - **Shores.** Within 55 m of an island's shore circle the amplitude falls to
   0.3 of its value.
 - **`sea.scale`**: a global multiplier (`?sea=`), 1 by default.
@@ -181,6 +189,23 @@ the current power:
 Braking adds `8.5·brake·√grip` of drag. Wave faces push the hull downhill with
 `0.55·gravity·slope`.
 
+**Boost.** A boat has `boost` seconds of it left; while it has, thrust is
+115 % greater and top speed 27 % higher, whatever the throttle is doing (the
+push eases in over about 0.15 s and out over about 0.5 s). It comes from:
+
+| from | seconds |
+| --- | --- |
+| a pad driven over | 1.5 |
+| a ramp (while on it) | 1.1 |
+| a nitro cell picked up (used at once) | 3.2; the cell is back for that boat 7 s later |
+
+**Ramps.** A ramp is 9 m wide and 13 m long, rising from 0.35 m under the
+water to 2.5 m above it. Under a boat it is water that does not give: each of
+the four buoyancy points over it feels the ramp's surface instead of the
+sea's, rising at `slope × speed`, so the boat runs up it and leaves the lip
+with the ramp's rise in its vertical speed (about 5 m/s at 100 km/h: a
+second in the air).
+
 **Going sideways.** The water resists sideways speed `u` with
 `most·tanh(5·u / most)`, where `most = 17 m/s² × (1 + 0.35·brake) × grip`.
 Below about 2 m/s of sideways speed that is a firm 5 /s of damping, and the
@@ -231,25 +256,45 @@ along its centre line.
 
 ## 5. The course
 
-A closed loop round the main island, **1144 m** long: a centripetal
-Catmull–Rom curve through ten points at angle/radius (degrees, metres)
-0/172, 36/190, 72/160, 108/186, 144/204, 180/168, 216/150, 252/184, 288/200,
-324/164, sampled at 800 points.
+The place is two islands with a straight river between them. The course is a
+closed loop **1477 m** long: north up the river, out round the green
+(western) island by the open sea, and back in at the river's southern mouth.
+It is a centripetal Catmull–Rom curve through sixteen points (x, z in
+metres), sampled at 800 points:
 
-- Half-width 26 m, marked by 96 orange floats (one pair every 24 m).
+(0, −42) start line · (0, 40) · (0, 120) · (−4, 198) · (−40, 258) ·
+(−120, 284) · (−212, 252) · (−280, 178) · (−318, 70) · (−322, −46) ·
+(−288, −156) · (−214, −246) · (−120, −284) · (−40, −258) · (−4, −198) ·
+(0, −120)
+
+- Half-width 26 m, marked by 122 orange floats (one pair every 24 m).
+- **The river** runs along x = 0 from z = −190 to +190, 60 m wide. Its banks
+  are quays 2.6 m high.
+- **Bridges** cross it at z = −90 (cable-stayed, roadway 12 m up), z = 18
+  (twin steel arches, 11 m) and z = 90 (truss, 11 m). Boats pass under.
 - Nine slalom marks, 6.5 m off the centre line on alternating sides:
 
 | mark | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| at, m | 97 | 217 | 343 | 463 | 572 | 698 | 818 | 938 | 1058 |
-| pass on its | right | left | right | left | left | right | left | right | left |
+| at, m | 103 | 259 | 428 | 576 | 768 | 886 | 1042 | 1197 | 1352 |
+| pass on its | right | left | right | left | right | left | right | left | right |
 
-- Start/finish arch at `s = 0`. Grid: four slots at lateral −9, −3, +3, +9 m,
-  14 m before the line.
-- Land: the main island (radius 78 m, 30 m high) at the origin; a rocky islet
-  with the lighthouse at (−92, 250); a sandy islet at (253, −146); six far
-  hills on the horizon. Props: palms, sea stacks, a pier, moored boats (which
-  can be hit), sailboats.
+- **Boost pads** at 52, 170, 347, 635, 835, 1078 and 1411 m; **nitro cells**
+  at 133, 318, 517, 790, 1005 and 1285 m; **ramps** at 465, 702, 968 and
+  1145 m (`BOOSTS` in `game/track.js`, as fraction of the lap and metres off
+  the centre line).
+- Start/finish arch at `s = 0`, in the river. Grid: four slots at lateral −9,
+  −3, +3, +9 m, 14 m before the line.
+- Land: the green island (centre (−120, 0), radius 150 m, hill 58 m) and the
+  town island (centre (120, 0), radius 150 m), each cut off straight at its
+  quay (x = ∓30); behind a quay the ground is level and paved (for 42–74 m on
+  the green island, 165–236 m on the town island) before it becomes the
+  island's own shape. A rocky islet with the lighthouse at (−468, 196); a
+  sandy islet at (−476, −150); six far hills on the horizon.
+- The city: 78 boxes making some 50 buildings on a 36 m street grid, 24 to
+  186 m tall, tallest downtown; a row of houses on the green island's quay.
+- Props: palms (46 on the green island, rows along both quays), sea stacks,
+  a pier, moored sailboats (which can be hit).
 
 ## 6. The race
 
@@ -317,18 +362,28 @@ Chase pose, relative to the boat:
 
 | | landscape | portrait |
 | --- | --- | --- |
-| distance behind | 6.3 + 0.7·k | 7.4 + 0.7·k |
-| height above its lazy height | 1.7 | 1.9 |
-| looks at a point | 7 m ahead, 0.2 m up | 7 m ahead, 0.3 m up |
-| field of view | 54° → 64° with k² | the same horizontal view as 4:3 would have, at most 96° |
+| distance behind | 5.5 + 0.6·k + back | 6.9 + 0.6·k + back |
+| height above its lazy height | 1.5 + 0.12·k | 1.85 + 0.12·k |
+| looks at a point | 7 m ahead, 0.15 m up | 7 m ahead, 0.3 m up |
+| field of view | 56° → 67° with k², +10° under boost | the same horizontal view as 4:3 would have, at most 96° |
 
 `k = speed / 28`. Yaw follows heading plus 55 % of the angle to the direction
 of travel, at 4.6 /s. Height follows at 3 /s (1.6 /s in the air) and is kept
 within −1.0 … +0.45 m of the boat. The lens never goes below the water at its
-own position plus 0.75 m. Roll follows yaw rate and hull roll a little. Bumps
-and landings shake it.
+own position plus 0.75 m.
 
-Orbit pose (title, after the flag): a circle of 10.5 m (13.5 m in portrait)
+What makes it lively:
+
+- **Swing.** In a turn the camera moves up to 1.75 m to the outside of it
+  (`−1.25 × turn`, `turn = yaw rate × (0.35 + 0.65·k)` limited to ±1.4), and
+  the point it looks at moves `2.6 × turn` into the turn.
+- **Lean.** Roll follows `0.085 × yaw rate − 0.12 × hull roll`, to ±0.16 rad.
+- **Boost.** `back` rises to 1.5 m while the boat boosts (the boat pulls
+  away) and closes again more slowly; the field of view opens 10°.
+- **Tremble.** A small smooth shake, `0.012·k³ + 0.03·boost` m.
+- Bumps, landings and boosts kick it.
+
+Orbit pose (title, after the flag): a circle of 9.6 m (13 m in portrait)
 round the boat, 0.22 rad/s. The two poses blend over about a second.
 
 ## 9. Controls
@@ -382,28 +437,42 @@ band-pass for the water.
 - **Spray**: 2200 point sprites (1500 on phones), 1.5–11 px.
 - **Mist**: 420 soft puffs (220 on phones), up to 300 px (150 px), for the
   plumes at speed and the cloud after a landing.
-- **Rain on the lens**: one number per view, `wet` (0 dry … 1 soaked), plus
-  `sheet` for the second after a hard landing. It rises by `0.05 /s` at speed
-  (`0.085` in a full slide), by `0.34 /s × (1 − behind/18) × (1 − side/3.4)`
-  in another boat's plume (2–18 m astern of it, within 3.4 m of its line), by
-  `0.02 + 0.22·strength` on a landing and `0.06 + 0.2·strength` on a bump. It
-  dries at `(0.09 + 0.12·speed) × (0.35 + wet)` per second: soaked glass
-  clears in about 6 s at speed. Drops run down the glass below 28 km/h and
-  are blown outward above 70 km/h. Above `wet` 0.45 the glass mists over
-  except where a drop has just passed.
+- **Rain on the glass**: up to 460 drops per view, simulated 60 times a second.
+  Each unit of wetness the game adds lands 130 droplets (radius 0.6–1.8 % of
+  the view's height); one that lands on another joins it. A sitting drop
+  swells while water keeps arriving and dries when it does not (small ones
+  first, and faster at speed); past its own limit (1.6–2.5 %) it hangs on for
+  up to 1.5 s and then runs down, at up to 0.95 view-heights a second, bigger
+  ones faster, small ones catching now and then. At speed the wind bears it
+  outward by up to 0.85 of its fall. A running drop gathers up what it
+  touches, loses radius as it goes, and leaves a bead every few radii and a
+  wet track that takes about 7 s to dry. Wetness arrives at `0.02 /s` at
+  speed (`0.06` in a full slide), `0.3 /s × (1 − behind/18) × (1 − side/3.4)`
+  in another boat's plume, `0.02 + 0.22·strength` on a landing and
+  `0.06 + 0.2·strength` on a bump; a hard landing also throws 3–12 big drops
+  that run at once and shakes loose whatever was sitting. A separate number,
+  `wet`, mists the glass over above 0.45 and dries at
+  `(0.09 + 0.12·speed) × (0.35 + wet)` per second.
 - **The finish** (desktop only): glow from what is brighter than 0.8 of white
   (taken at half size, spread over three widths), sharpening of soft detail
   (not of hard edges), 8 % more colour, a gentle S-curve, corners 16 % darker.
+- **The sun** stands in the south-west: 218° round from +X toward +Z, 33°
+  above the horizon (`assets/palette.js`). It lights the green island's
+  western beaches and the faces of the towers that look onto the river.
 - **Sun shadows on boats**: one 2048² map (1024²) over a 52 m (40 m) square
   that follows the view's boat.
-- **Sun shadows on land**: one map per island, drawn once (2048² for the main
-  island, 1024² for the islets; half that on phones). Land, palms, the pier
-  and the lighthouse cast into it; land and palms read it.
-- **Palms**: 44 on the main island, 11 on the sand islet. Each has 22–26
-  fronds of 7 segments and a 9-ring trunk, about 930 triangles. The three
-  islands themselves are 20 000 triangles. They lean
-  0.1 m with the wind and up to 0.3 m in gusts at the crown; fronds bob
+- **Sun shadows on land**: one 4096² map (2048² on phones) for the two
+  islands, the river and everything standing there, drawn once; a 1024² one
+  (512²) for each islet. Land, towers, bridges, palms, the pier and the
+  lighthouse cast into them; land, towers, bridges and palms read them.
+- **Palms**: about 75 in all (46 on the green island, 10 on the town island,
+  9 on the sand islet, a row along each quay); fewer on phones. Each has
+  22–26 fronds of 7 segments and a 9-ring trunk, about 930 triangles. They
+  lean 0.1 m with the wind and up to 0.3 m in gusts at the crown; fronds bob
   ±0.13 m at the tip.
+- **The turbine**: the glow in the nozzle is `0.3 + 0.75·throttle + 2.4·boost`
+  times the team's fire colour; the flame is `0.12 + 0.42·throttle +
+  1.25·boost` m long, flickering ±10 %.
 
 ## 13. Drawing a frame
 
@@ -419,16 +488,18 @@ In order, per frame:
       camera mirrored in the plane at the height of the water under this
       view's boat, at 0.5 scale (0.4 on phones);
    4. the view itself, into its viewport;
-   5. the lens: the view is copied to a texture, its highlights are drawn at
-      half size into a second one, and one full-screen pass puts back the
-      picture with glow, sharpening, grade and, if the glass is wet, rain.
+   5. the lens: the view is copied to a texture; if there is water on the
+      glass, the drops are drawn into the glass map (four fifths of the
+      view's size); the view's highlights are drawn at half size into a
+      third texture; and one full-screen pass puts back the picture with
+      glow, sharpening, grade and rain.
       On phones this happens only while the glass is wet, and without the
       finish.
 
-A solo frame is about 165 draw calls and 640 000 triangles; split screen about
-285 and 1 030 000; a phone, with its coarser sea, about 135 and 470 000. (The
-island and its 55 palms are about 70 000 of those, drawn again in the water
-mirror.)
+A solo frame is about 245 draw calls and 820 000 triangles; split screen about
+400 and 1 400 000; a phone, with its coarser sea and fewer palms, about 155
+and 630 000. (The land, the city and the palms are about 150 000 of those,
+drawn again in the water mirror.)
 
 **Resolution.** Pixel ratio is the device's, capped at 2. On a desktop whose
 screen has fewer than 1.5 device pixels per CSS pixel the picture is drawn at

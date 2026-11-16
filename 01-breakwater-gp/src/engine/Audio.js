@@ -77,7 +77,7 @@ class Voice {
     const speedK = clamp01(craft.speed / 28);
     let revs = 0.16 + 0.5 * craft.throttle + 0.34 * speedK;
     if (craft.airborne) revs += 0.22; // the propellers come out of the water and the engines race
-    const f = (41 + 106 * revs) * this.pitch; // two big outboards: a deeper note than a small engine's
+    const f = (41 + 106 * revs) * this.pitch; // a big turbine: a deeper note than a small engine's
     for (const o of this.oscs) o.osc.frequency.setTargetAtTime(f * o.ratio, t, 0.05);
     this.engineFilter.frequency.setTargetAtTime(260 + 1900 * revs * revs, t, 0.06);
     this.engineGain.gain.setTargetAtTime((active ? 0.035 + 0.075 * revs : 0.02) * level, t, 0.08);
@@ -238,6 +238,30 @@ export class GameAudio {
     [523, 659, 784, 1047].forEach((f, i) => this._tone(f, 0.3, { type: 'triangle', gain: 0.2, when: i * 0.13, pan }));
   }
 
+  /** A boost cutting in: a rising rush of air with a tone climbing under it. `strength` 0…1. */
+  boost(strength = 0.5, pan = 0) {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const k = clamp01(strength);
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 1.4;
+    filter.frequency.setValueAtTime(500, t);
+    filter.frequency.exponentialRampToValueAtTime(2600 + 1800 * k, t + 0.35);
+    filter.frequency.exponentialRampToValueAtTime(900, t + 0.9 + 0.5 * k);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05 + 0.09 * k, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.95 + 0.5 * k);
+    src.connect(filter).connect(g).connect(this._to(pan));
+    src.start(t, Math.random());
+    src.stop(t + 1.5 + 0.5 * k);
+    this._tone(180, 0.5 + 0.3 * k, { type: 'sawtooth', gain: 0.018 + 0.025 * k, slideTo: 520 + 260 * k, pan });
+  }
+
   /**
    * A slap of water for landings and bumps. Light ones are little more than
    * texture; a hard landing is plainly heard over the engine and thumps.
@@ -257,12 +281,12 @@ export class GameAudio {
     filter.frequency.exponentialRampToValueAtTime(350, t + 0.5);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.1 + 0.95 * k * Math.sqrt(k), t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.1 + 0.68 * k * Math.sqrt(k), t + 0.015);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
     src.connect(filter).connect(g).connect(this._to(pan));
     src.start(t, Math.random());
     src.stop(t + 0.65);
     // the hull hitting the water
-    if (k > 0.4) this._tone(110, 0.2, { gain: 0.3 * k, slideTo: 46, pan });
+    if (k > 0.4) this._tone(110, 0.2, { gain: 0.22 * k, slideTo: 46, pan });
   }
 }

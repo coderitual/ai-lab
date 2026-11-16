@@ -1,8 +1,9 @@
 # Breakwater GP
 
 An original powerboat slalom race for the browser, built with
-[three.js](https://threejs.org). One island circuit, three laps, four race
-boats, and a simulated sea that the boats genuinely ride on. Everything you see
+[three.js](https://threejs.org). A course up a city river and round a green
+island by the open sea, three laps, four turbine-driven race boats, and a
+simulated sea that the boats genuinely ride on. Everything you see
 and hear is generated in code: there are no model, texture or audio files.
 
 Race alone against three bots, or against friends: split screen on one
@@ -15,8 +16,9 @@ keyboard, or online with up to four players and no game server.
 | | |
 | --- | --- |
 | ![Racing: the view from the chase camera](docs/images/race.jpg) | ![Off the top of a swell](docs/images/jump.jpg) |
-| ![Sliding through a turn](docs/images/drift.jpg) | ![In the pack: other boats' spray as rain on the lens](docs/images/rain.jpg) |
-| ![The island](docs/images/island.jpg) | ![Palms, their shadows, and ripples in the sand](docs/images/beach.jpg) |
+| ![Sliding through a turn](docs/images/drift.jpg) | ![In the pack: other boats' spray as rain on the glass](docs/images/rain.jpg) |
+| ![The start, in the river](docs/images/city.jpg) | ![The two islands](docs/images/island.jpg) |
+| ![Off a ramp](docs/images/ramp.jpg) | ![Palms, their shadows, and ripples in the sand](docs/images/beach.jpg) |
 | ![The boat from astern](docs/images/boat-rear.jpg) | ![The four liveries](docs/images/fleet.jpg) |
 | ![Two players on one keyboard](docs/images/split-screen.jpg) | ![Phone, one thumb on the glass](docs/images/phone.jpg) |
 
@@ -24,10 +26,14 @@ keyboard, or online with up to four players and no game server.
 
 - **A sea you can read.** One set of waves drives both the picture and the
   physics, so the crest you see is the crest that launches you. Rough on the
-  ocean side of the island, calmer in its lee.
-- **Race boats modelled and painted in code**: tunnel-hull catamarans, each
-  team's to its own design, with numbers and lettering, a driver under glass,
-  twin outboards that swing with the helm.
+  ocean side of the green island, nearly flat in the river.
+- **Race boats modelled and painted in code**: tunnel-hull catamarans from a
+  few years ahead, each team's to its own design, with a driver under glass
+  and a turbine whose nozzle glows with the throttle.
+- **Boost**: pads, nitro cells (used the moment you take them) and jump ramps
+  on the water.
+- **A city to race through**: glass towers, quays lined with palms and three
+  bridges over the river the course runs up.
 - **Handling with weight in it**: the boat lies on four points of buoyancy,
   so it pitches, rolls and lands as the sea makes it; lean on the helm and
   the hulls let go into a drift.
@@ -35,11 +41,11 @@ keyboard, or online with up to four players and no game server.
   they go by; the water mirrors the boats, the marks and the island.
 - **Water that behaves**: light through the wave tops, caustics, foam that
   lingers behind breaking crests, wakes that age from white water to lace,
-  spray plumes, and rain running across the camera lens when you sit in
-  somebody's spray.
+  spray plumes, and rain on the glass when you sit in somebody's spray:
+  droplets that land, swell, run down and leave tracks, as on a windscreen.
 - **An island worth looking at**: rippled sand that goes dark and glossy at
-  the water's edge, a forested hill, coconut palms swaying over their own
-  long shadows.
+  the water's edge, grass the wind runs across, a forested hill, coconut
+  palms swaying over their own long shadows.
 - **Multiplayer**: split screen, and online for up to four with no server:
   browsers connect directly, and you pass the invite along in any chat app.
 - **Phones**: one thumb is enough. Written for iPhone Safari.

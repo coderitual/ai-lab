@@ -72,7 +72,8 @@ export class BakedShadow {
             this._cut.set(key, material);
           }
         }
-        const copy = new THREE.Mesh(o.geometry, material);
+        const copy = o.isInstancedMesh ? new THREE.InstancedMesh(o.geometry, material, o.count) : new THREE.Mesh(o.geometry, material);
+        if (o.isInstancedMesh) copy.instanceMatrix = o.instanceMatrix;
         copy.matrixAutoUpdate = false;
         copy.matrix.copy(o.matrixWorld);
         copy.matrixWorld.copy(o.matrixWorld);
@@ -122,8 +123,14 @@ export function withBakedShadow(material, baked) {
         /* glsl */ `
         #include <project_vertex>
         {
-          vec3 bakedNormal = normalize(mat3(modelMatrix) * objectNormal);
-          vec4 bakedAt = modelMatrix * vec4(transformed, 1.0);
+          vec3 bakedNormal = objectNormal;
+          vec4 bakedAt = vec4(transformed, 1.0);
+          #ifdef USE_INSTANCING
+            bakedNormal = mat3(instanceMatrix) * bakedNormal;
+            bakedAt = instanceMatrix * bakedAt;
+          #endif
+          bakedNormal = normalize(mat3(modelMatrix) * bakedNormal);
+          bakedAt = modelMatrix * bakedAt;
           bakedAt.xyz += bakedNormal * uBakedInfo.z;
           vBaked = (uBakedMatrix * bakedAt).xyz;
           vBaked.z -= uBakedInfo.y;

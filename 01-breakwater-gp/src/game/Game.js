@@ -20,7 +20,8 @@ import { Race } from './Race.js';
 import { Hud } from './Hud.js';
 import { Mist, Spray, WakeField } from './effects.js';
 import { Lens } from './Lens.js';
-import { HULL, RULES } from './config.js';
+import { BOOST, HULL, RULES } from './config.js';
+import { PAD } from '../assets/boosts.js';
 import { ReflectionProbe } from '../engine/ReflectionProbe.js';
 import { WaterMirror } from '../engine/WaterMirror.js';
 import { OnlinePlay } from '../net/OnlinePlay.js';
@@ -87,6 +88,7 @@ export class Game {
     this.input = new Input(hud.touchLayer);
     this.crafts = TEAMS.slice(0, RULES.racers).map((team, i) => {
       const craft = new Craft({ team, number: i + 1 });
+      craft.rampAt = world.rampAt;
       engine.scene.add(craft.object);
       return craft;
     });
@@ -193,7 +195,7 @@ export class Game {
     this.views = locals.map((racer, n) => {
       const camera = new THREE.PerspectiveCamera(62, 1, 0.3, 9000);
       const chase = new ChaseCamera(camera);
-      if (!this.lenses[n]) this.lenses[n] = new Lens(this.engine.renderer, this._lensOptions);
+      if (!this.lenses[n]) this.lenses[n] = new Lens(this.engine.renderer, { ...this._lensOptions, seed: n });
       this.lenses[n].clear();
       return {
         lens: this.lenses[n],
@@ -213,6 +215,7 @@ export class Game {
     for (const v of this.views) if (auto) v.racer.driver = v.auto;
 
     race.reset(this.engine.simTime);
+    for (const cell of world.cells) cell.ready.fill(0);
     this.wake.reset();
     this.spray.reset();
     this.mist.reset();
@@ -446,6 +449,32 @@ export class Game {
 
   // ------------------------------------------------------------ fixed step
 
+  /** What a boat has just driven over: a pad, a ramp, a nitro cell (used at once). */
+  _boosts(racer, time) {
+    const { world } = this;
+    const c = racer.craft;
+    if (c.onRamp) c.addBoost(BOOST.ramp, 0.5);
+    if (c.grip > 0.15) {
+      for (const pad of world.pads) {
+        const dx = c.pos.x - pad.x;
+        const dz = c.pos.z - pad.z;
+        if (dx * dx + dz * dz > 90) continue;
+        const u = dx * pad.dirX + dz * pad.dirZ;
+        const v = dx * -pad.dirZ + dz * pad.dirX;
+        if (Math.abs(u) < PAD.length / 2 + 1.2 && Math.abs(v) < PAD.width / 2 + 0.9) c.addBoost(BOOST.pad, 0.45);
+      }
+    }
+    for (const cell of world.cells) {
+      if (time < cell.ready[racer.index]) continue;
+      const dx = c.pos.x - cell.x;
+      const dz = c.pos.z - cell.z;
+      if (dx * dx + dz * dz < 3.4 * 3.4 && c.pos.y - c.waterY < 3.5) {
+        cell.ready[racer.index] = time + BOOST.cellReturns;
+        c.addBoost(BOOST.cell, 1);
+      }
+    }
+  }
+
   update(dt, time) {
     const { race, world } = this;
     const racers = race.racers;
@@ -471,6 +500,7 @@ export class Game {
         if (dx * dx + dz * dz < reach * reach) c.collideCircle(col.x, col.z, col.r, col.bounce, col.soft);
       }
       c.collideTerrain(world.terrainHeightAt);
+      this._boosts(r, time);
     }
     for (let i = 0; i < racers.length; i++) {
       for (let j = i + 1; j < racers.length; j++) {
@@ -520,7 +550,7 @@ export class Game {
     for (const v of this.views) {
       const me = v.racer.craft;
       const speedK = clamp01((me.speed - 12) / 14);
-      let rate = me.grip > 0.3 ? speedK * (0.05 + 0.035 * clamp01(Math.abs(me.slip) / 0.45)) : 0;
+      let rate = me.grip > 0.3 ? speedK * (0.02 + 0.04 * clamp01(Math.abs(me.slip) / 0.45)) : 0;
       for (const c of this.crafts) {
         if (c === me || c.grip < 0.3 || c.speed < 8) continue;
         const dx = me.pos.x - c.pos.x;
@@ -530,7 +560,7 @@ export class Game {
         const behind = -(dx * fx + dz * fz);
         const side = Math.abs(dx * fz - dz * fx);
         if (behind > 2 && behind < 18 && side < 3.4) {
-          rate += 0.34 * (1 - behind / 18) * (1 - side / 3.4) * clamp01(c.speed / 20) * (0.4 + 0.6 * c.throttle);
+          rate += 0.3 * (1 - behind / 18) * (1 - side / 3.4) * clamp01(c.speed / 20) * (0.4 + 0.6 * c.throttle);
         }
       }
       if (rate > 0) v.lens.splash(rate * dt, 0);
@@ -709,6 +739,12 @@ export class Game {
             const d = Math.hypot(c.pos.x - v.racer.craft.pos.x, c.pos.z - v.racer.craft.pos.z);
             if (d < 8) v.lens.splash((0.05 + 0.3 * ev.strength) * (1 - d / 8), 0);
           }
+        } else if (ev.type === 'boost') {
+          if (view) {
+            this.audio.boost(ev.strength, view.pan);
+            view.chase.kick(0.12 + 0.2 * ev.strength);
+            if (this.phase === 'race') view.hud.say(ev.strength > 0.8 ? 'Nitro!' : 'Boost', 'good', 0.9);
+          }
         } else if (ev.type === 'bump' && view) {
           view.chase.kick(0.2 + ev.strength * 0.6);
           this.audio.splash(0.2 + ev.strength * 0.5, view.pan);
@@ -725,7 +761,7 @@ export class Game {
   render(frameDt, alpha, time) {
     const { race, hud, world } = this;
 
-    for (const c of this.crafts) c.render(alpha, frameDt);
+    for (const c of this.crafts) c.render(alpha, frameDt, time);
     world.update(time, frameDt);
 
     // foam + shadows for the wake field (drawn per view in draw())
@@ -794,6 +830,7 @@ export class Game {
       wakeDrawn = true;
       world.prepareView(time, this.probe.camera, p.x, p.z);
       for (let i = 0; i < world.buoys.length; i++) world.buoys[i].userData.pose(time, v.emphasis[i]);
+      for (const cell of world.cells) cell.mesh.visible = time >= cell.ready[v.racer.index];
       this.spray.points.visible = this.mist.points.visible = false;
       world.env.coarseWater(true);
       this.probe.update(engine.scene, p.x, p.y + 0.9, p.z, [boat]);
@@ -818,6 +855,7 @@ export class Game {
       this.spray.setProjection(h * engine.pixelRatio, v.camera.fov);
       this.mist.setProjection(h * engine.pixelRatio, v.camera.fov);
       for (let i = 0; i < world.buoys.length; i++) world.buoys[i].userData.pose(time, v.emphasis[i]);
+      for (const cell of world.cells) cell.mesh.visible = time >= cell.ready[v.racer.index];
       // boats, marks and land mirrored in the water (not on devices that are struggling)
       if (this._mirrorScale > 0 && engine._qualitySteps < 1) {
         const mirror = this._mirrors[n] || (this._mirrors[n] = new WaterMirror(renderer, this._mirrorScale));

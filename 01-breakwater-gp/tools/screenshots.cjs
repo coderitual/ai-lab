@@ -63,24 +63,24 @@ const cam = (back, side, up, ahead, lift, fov) => ({ back, side, up, ahead, lift
 //   sheet   the boat's painted texture sheets, laid out for the docs
 const SHOTS = [
   // ---- the boat
-  { name: 'boat-rear', kind: 'viewer', size: DESKTOP, query: 'asset=craft&flat&sea=0.06&fov=40&ty=0.45&az=250&el=17&dist=8.5', caption: 'The boat from astern, into the sun' },
+  { name: 'boat-rear', kind: 'viewer', size: DESKTOP, query: 'asset=craft&flat&sea=0.06&fov=40&ty=0.45&az=250&el=17&dist=8.5&thrust=0.9', caption: 'The boat from astern' },
   { name: 'boat-front', kind: 'viewer', size: DESKTOP, query: 'asset=craft&flat&sea=0.06&fov=40&ty=0.45&az=58&el=12&dist=6.9', caption: 'The boat from the port bow' },
   { name: 'boat-above', kind: 'viewer', size: DESKTOP, query: 'asset=craft&flat&sea=0.06&fov=40&ty=0.4&az=120&el=30&dist=7.2', caption: 'The boat from above the starboard bow' },
-  { name: 'boat-engines', kind: 'viewer', size: DESKTOP, query: 'asset=craft&flat&sea=0.06&fov=36&tx=0&ty=0.55&tz=-2.5&az=243&el=14&dist=3.6', caption: 'Outboards, transoms and the engine hatch' },
+  { name: 'boat-engines', kind: 'viewer', size: DESKTOP, query: 'asset=craft&flat&sea=0.06&fov=36&tx=0&ty=0.7&tz=-2.2&az=238&el=14&dist=3.9&thrust=1&boost=0.5', caption: 'The turbine pod, the transoms and the engine hatch' },
   { name: 'boat-cockpit', kind: 'viewer', size: DESKTOP, query: 'asset=craft&flat&sea=0.06&fov=36&tx=0&ty=0.95&tz=0.05&az=38&el=24&dist=3.3', caption: 'Canopy, driver and foredeck' },
   { name: 'fleet', kind: 'viewer', size: DESKTOP, query: 'asset=crafts&sea=0.06&fov=42&ty=0.4&az=118&el=26&dist=13.5', caption: 'The four liveries' },
   { name: 'livery-sheet', kind: 'sheet', caption: 'The painted sheet, and the detail sheets every boat shares' },
 
-  // ---- the island
-  { name: 'island', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=62&ty=5&tz=20&az=20&el=7&dist=70', caption: 'The island from beyond the pier' },
-  { name: 'beach', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=-52&ty=5&tz=-30&az=200&el=5&dist=26', caption: 'Palms, their shadows, and ripples in the sand' },
-  { name: 'shore', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=64&ty=4&tz=34&az=-10&el=5&dist=24', caption: 'The sunny side: surf running up the sand' },
+  // ---- the place
+  { name: 'island', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=-10&ty=10&tz=0&az=255&el=17&dist=455', caption: 'The two islands and the river between them' },
+  { name: 'city', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=55&tx=0&ty=14&tz=-20&az=268&el=4&dist=150', caption: 'The river through the city, from the start line' },
+  { name: 'beach', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=-262&ty=4&tz=-34&az=172&el=5&dist=30', caption: 'Palms, their shadows, and ripples in the sand' },
 
   // ---- the game as played
   { name: 'title', kind: 'game', size: DESKTOP, query: '', at: 6, caption: 'Title screen' },
   { name: 'race', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 31, caption: 'Racing: the view from the chase camera' },
   { name: 'race-open-sea', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 40, caption: 'On the open-ocean side' },
-  { name: 'rain', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 13, caption: "In the pack: other boats' spray as rain on the lens" },
+  { name: 'rain', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 12, settle: 3, caption: "In the pack: other boats' spray as rain on the glass" },
   { name: 'split-screen', kind: 'game', size: DESKTOP, query: 'mode=split&auto', drive: true, at: 22, caption: 'Two players on one keyboard' },
   { name: 'phone', kind: 'game', size: PHONE, query: 'auto&ap', at: 31, thumb: [660, 262, 688, 268], scale: 0.75, caption: 'Phone, held sideways, one thumb on the glass' },
   { name: 'phone-portrait', kind: 'game', size: PHONE_TALL, query: 'auto&ap', at: 24, scale: 0.75, caption: 'Phone, held upright' },
@@ -90,6 +90,7 @@ const SHOTS = [
   { name: 'pursuit', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 31.4, camera: cam(7.2, -3.0, 1.3, 4.5, 0.5, 38), caption: "In the leader's wake" },
   { name: 'plumes', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 40, camera: cam(2.2, 9.5, 1.3, 0.3, 0.7, 40), caption: 'Spray plumes at full power' },
   { name: 'drift', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 30, until: 'sliding', camera: cam(-8.5, 4.6, 1.2, 0.5, 0.5, 38), caption: 'Sliding through a turn' },
+  { name: 'ramp', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 16, until: 'ramp', camera: cam(-3.5, -9.5, 1.3, 1.5, 0.9, 40), caption: 'Off a ramp' },
   { name: 'jump', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 44, until: 'airborne', camera: cam(-2.5, -8.5, 0.9, 0.5, 0.5, 38), caption: 'Off the top of a swell' },
   { name: 'wakes', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 30, camera: cam(16, 0, 26, 14, 0, 44), caption: 'Wakes from above' },
   { name: 'reflections', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0&sea=0.3', at: 9, camera: cam(8, -2.5, 1.3, 14, 0.2, 40), caption: 'Calm water: rocks, marks and boats mirrored in it' },
@@ -198,7 +199,7 @@ async function downscale(page, pngBuffer, scale, quality = 0.88) {
       }
       // draw the last moments: the chase camera settles and the reflections get drawn all the way round
       // (a staged shot brings its own camera, so it needs fewer)
-      const settle = shot.kind === 'staged' ? 0.5 : 0.8;
+      const settle = shot.settle || (shot.kind === 'staged' ? 0.5 : 0.8);
       await page.evaluate(`window.__bw.skip(${Math.max(0, shot.at - settle)})`);
       await page.evaluate(`window.__bw.advance(${settle}, 12)`);
       if (shot.until === 'airborne') {
@@ -209,6 +210,24 @@ async function downscale(page, pngBuffer, scale, quality = 0.88) {
           for (let i = 0; i < 1800; i++) {
             g.engine.advance(1 / 60, 1 / 60, i % 5 === 0);
             if (c.airborne && c.pos.y - c.waterY > 0.75 && c.vel.y > -0.5) break;
+          }
+          g.engine.advance(1 / 60);
+        })()`);
+      }
+      if (shot.until === 'ramp') {
+        // put the boat in front of the first ramp at full speed, and carry on until it has left the lip and is well up
+        await page.evaluate(`(() => {
+          const g = window.__bw.game;
+          const c = g.views[0].racer.craft;
+          const r = g.world.ramps[0];
+          c.place(r.x - r.dirX * 34, r.z - r.dirZ * 34, r.heading, g.engine.simTime, 27);
+          c.power = 5;
+          g.views[0].racer.driver = { update() { Object.assign(c.input, { analog: true, steer: 0, throttle: 1, brake: 0 }); } };
+          let was = false;
+          for (let i = 0; i < 600; i++) {
+            g.engine.advance(1 / 60, 1 / 60, i % 6 === 0);
+            if (c.onRamp) was = true;
+            if (was && c.airborne && c.pos.y - c.waterY > 1.5) break;
           }
           g.engine.advance(1 / 60);
         })()`);

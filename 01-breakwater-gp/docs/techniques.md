@@ -26,6 +26,9 @@ where to take it next. For exact numbers see [spec.md](spec.md).
 - [20. Shadows drawn once](#20-shadows-drawn-once)
 - [21. Sand that is mostly shader](#21-sand-that-is-mostly-shader)
 - [22. Palms from a strip and a picture](#22-palms-from-a-strip-and-a-picture)
+- [23. A city from one box](#23-a-city-from-one-box)
+- [24. A river that the sea and the land agree on](#24-a-river-that-the-sea-and-the-land-agree-on)
+- [25. Ramps are water that does not give](#25-ramps-are-water-that-does-not-give)
 
 ---
 
@@ -395,44 +398,54 @@ from behind (rim light).
 
 ## 12. Rain on the lens, and the finish
 
-**Problem.** Screen-space "drops" that are just blurred blobs look pasted on;
-simulated drops cost more the wetter it gets; and a picture that goes
-straight from the renderer to the screen looks rendered.
+**Problem.** Screen-space "drops" that are just blurred blobs look pasted on,
+and drops that follow a formula never behave like water: real rain on glass
+lands, sits, swells, lets go, runs down in fits and starts, eats what is in
+its way and leaves a wet track that dries.
 
 **Trick.** After a view is drawn it is copied to a texture and drawn back
 through one full-screen shader (`game/Lens.js`) that does both jobs.
 
-*Rain.* Nothing is simulated. The glass is divided into tall cells, and where
-the drop in a cell is at any moment is a formula of time and of the cell's
-number: it starts near the top, slides in three fits with pauses between,
-wanders a little sideways, and is gone at the bottom; then the cell deals
-itself another. Behind it lies a rivulet that narrows and dries with distance,
-and on the rivulet a row of beads that shrink with age. A coarser and a finer
-layer of cells overlap, and a third pattern holds beads that sit where they
-landed. The game supplies one number, how wet the glass is, which says what
-share of the cells have a drop, so a downpour costs exactly what a drizzle
-does.
+*Rain.* The drops are simulated: a few hundred per view, as parallel arrays,
+stepped 60 times a second from the game's fixed step (so the glass is in the
+same state however fast the game is being run). A droplet lands where chance
+puts it, or on a drop that is already there, which swallows it. A sitting
+drop swells while spray keeps arriving and dries when it stops; past its own
+limit it hangs on a moment and then runs: faster the bigger it is, catching
+and starting again when it is small, wandering sideways, leaning toward
+drops just beside its path, borne outward by the wind at speed. It gathers up
+what it touches, thins as it goes, drops a bead behind it every few radii,
+and stops when there is too little of it left. A jolt (a hard landing) shakes
+loose everything that was sitting.
 
-- *Which way they run.* Two sets of cells: one runs down the glass, the other
-  is turned to run outward from the middle and a little upward, mirrored
-  left and right. Speed cross-fades between them: at the start line the
-  drops run down, at 70 km/h the wind has them.
-- *A drop is a lens.* Inside a drop the shader does not show what is behind
-  it but the whole scene, upside down and small (a look-up at a coarse mip
-  level, toward the far side of the screen). That is what real drops do, and
-  it is why each one has sky at the bottom and sea at the top. A darker rim,
-  a glint toward the sun and a line of sky along the lower edge finish it.
-  A rivulet is a long thin lens: it turns the view over across its width.
-- *Mist.* Above a certain wetness the glass mists over (the picture is read
-  from a coarser mip level), least in the middle, and not at all where a drop
-  or its track has just wiped it.
-- *Where the water comes from.* Mostly another boat's plume: sit within 18 m
-  of a stern and the glass fills in seconds. Also a little of your own spray
-  at speed, more in a slide, a burst on a hard landing (with a sheet of water
-  that wobbles and blurs everything for a second) and on a bump.
-- Wetting and drying both happen in the game's fixed step, not when a
-  picture is drawn, so the glass is in the same state however fast the game
-  is being stepped. Only the drops' motion uses the time between pictures.
+They are drawn each frame into a small texture, the *glass map*:
+
+- **Red is a field, not a picture of drops.** Each drop adds a smooth bump
+  (1 at its middle, 0.4 at its rim, nothing a little beyond). The finishing
+  shader calls "drop" wherever the field is above 0.4. So drops are smooth at
+  any size although the map is coarser than the screen; two that touch flow
+  into one shape instead of overlapping; and because the field keeps four
+  fifths of itself from one frame to the next, a drop that has just landed
+  swells into place and one that is running draws a tail behind it. The
+  slope of the field says which way the rim is, and its height how far out
+  a pixel is, which is all the shading needs.
+- **Alpha is the wet track.** A running drop stamps the line from where it was
+  last frame to where it is now, narrower than itself, and that channel is
+  not wiped between frames: it has a fixed amount taken off it per second
+  (in whole 8-bit levels as they fall due, so it really reaches zero). Two
+  blend equations in one draw call do it: add for the field, maximum for the
+  track.
+
+The look is water on glass that the camera is not focused on: soft-edged
+drops through which the view is blurred, turned over and a little brighter,
+with light gathered along the lower edge; tracks that shift what is seen
+through their flanks and catch the sun on one side; and, on a soaked glass,
+mist everywhere a drop has not just wiped.
+
+Where the water comes from: mostly another boat's plume (sit within 18 m of a
+stern and it rains), a little of your own spray at speed, more in a slide, a
+burst on a hard landing (with a sheet of water that wobbles and blurs
+everything for a second) and on a bump.
 
 *The finish* (desktop). The same pass adds a glow round whatever is nearly
 white (the highlights are first drawn at half size into a second texture
@@ -448,11 +461,12 @@ is dry.
 **Limits.** The glow works on what the screen can show: a glint that was ten
 times brighter than white before tone mapping glows no more than one that was
 just white. One full-frame copy and one full-screen pass per view per frame
-on desktop. Drops do not merge or collide.
+on desktop. Wet tracks only exist where they were drawn: after a fast-forward
+without drawing, the drops are right but their tracks start afresh.
 
 **Next.** Render to a floating-point target and tone-map in this pass, so the
-glow knows how bright things really were; streaks along the direction of
-travel at the edges of the frame at full power.
+glow knows how bright things really were; let running drops prefer old
+tracks, as real ones do.
 
 ## 13. A camera that does not follow
 
@@ -640,12 +654,13 @@ driver can choose to slide.
 ## 20. Shadows drawn once
 
 **Problem.** The patch of sun shadow that follows a boat (section 10) is
-52 m across. The island is 200 m across and never moves; palms without
-shadows float on the sand.
+52 m across. The islands are 500 m across and never move; palms without
+shadows float on the sand, and towers without them look pasted on.
 
-**Trick.** Each island is drawn once, from the sun, into a depth texture
-(`engine/BakedShadow.js`): the land, the palms (through their cut-out
-texture, so the shadow has leaflets), the pier, the lighthouse. Any material
+**Trick.** The two islands and everything standing on them are drawn once,
+from the sun, into one depth texture (`engine/BakedShadow.js`): the land, the
+towers, the bridges, the palms (through their cut-out texture, so the shadow
+has leaflets), the pier. (Each far islet has a small one of its own.) Any material
 can then be patched (`withBakedShadow`) to ask that picture how much of the
 sun reaches a point, and to scale the sun's part of its light by the answer.
 Reading it uses the graphics card's own depth comparison with filtering, nine
@@ -653,9 +668,10 @@ times, which gives a soft edge for almost nothing. The receiving point is
 moved a little along its normal and toward the sun before the test, which is
 what stops a surface shadowing itself.
 
-It costs three small renders at start-up (and again if the context is lost)
-and nine texture reads per pixel of land. The hill shades its own far side
-and throws a long shadow across the beach in the afternoon light.
+It costs three renders at start-up (and again if the context is lost) and
+nine texture reads per pixel of land. The hill shades its own far side, the
+towers shade each other and the streets, and a bridge lays its shadow on the
+quay.
 
 **Limits.** Static: the palms' shadows do not sway with the palms. The sea
 does not receive it.
@@ -734,3 +750,81 @@ A grove is two draw calls (wood, fronds).
 detail: a palm on the horizon costs what one on the beach does.
 
 **Next.** Bend along the spine with the gust; a cheaper far model.
+
+## 23. A city from one box
+
+**Problem.** A skyline is hundreds of buildings, each with thousands of
+windows.
+
+**Trick.** Every building is the same unit box, drawn many times in one
+instanced draw call (`assets/city.js`): a tower is a box or a few stacked
+boxes, each narrower than the one below, and perhaps a mast. What makes a box
+a building is its material, which draws the facade from where on the box a
+pixel is (the box's own coordinates times the instance's scale, so metres):
+floors every 3.7 m, bays every 2.4–4 m, mullions and spandrels between them,
+a plain band at the foot and under the roof. Glass is mirror-like metal with
+a tint; frames are matt. Each pane gets a random number from its bay and
+floor, used three ways: its tint, its roughness, and a tiny tilt of its
+normal, so the sky the panes mirror breaks up as on a real curtain wall.
+Where a pane would be smaller than a pixel the pattern is replaced by its
+own average, so distant towers do not shimmer.
+
+Two per-instance attributes carry a building's look (glass tint, frame
+colour, how much of the wall is frame); the street grid the lots stand on is
+the same one the ground material paves.
+
+**Limits.** Boxes only: no round towers, no balconies; roofs are bare.
+
+**Next.** Roof plant and helipads as a second instanced mesh; lit windows
+for an evening race.
+
+## 24. A river that the sea and the land agree on
+
+**Problem.** The islands are round blobs described by a radius per direction,
+and the sea knows them as circles (to calm the waves near them, tint the
+shallows and draw surf). A straight river between two islands fits neither.
+
+**Trick.** One line, two readings.
+
+- *The land.* An island may have a `cut`: a straight line it stops at
+  (`assets/island.js`). Its outline in a direction is then the nearer of its
+  own shore and that line, so the same polar mesh serves, with one edge
+  straight. Across the line the height function says "river": the bed, and,
+  where the island stands behind it, a wall up to the quay. Behind the quay
+  the ground is level for a way and then blends into the island's own shape,
+  and its three ground weights (sand, grass, rock) are scaled down by the
+  same blend: what they leave over, the material paves.
+- *The sea.* The circles overlap the river, so the sea is also told about
+  the river itself: a straight run and its half-width (`setSeaIslands(..,
+  canal)`). Inside it the distance to the shore is the distance to the
+  nearer bank, which puts the shallow tint and the surf along the quays for
+  free, and the waves are a fifth of their height.
+
+One trap is worth remembering: each island also answers for the sea bed
+beyond its own shore, and that slope must not be allowed across the line, or
+it lays a phantom shoal in the river that the boats run aground on.
+
+**Limits.** One straight river. Its water does not take the towers' shadows.
+
+**Next.** Let the water read the baked shadow map; a river that bends.
+
+## 25. Ramps are water that does not give
+
+**Problem.** A boat's whole contact with the world is four points of
+buoyancy on a moving sea. A ramp is a solid.
+
+**Trick.** Nothing new is added to the physics. Where one of the four points
+is over a ramp, it is given the ramp's surface in place of the sea's
+(`Craft.rampAt`), and the surface's vertical speed is set to the ramp's
+slope times the boat's speed along it. The springs and dampers that hold the
+boat on a swell then hold it on the ramp: it runs up, each end in turn, and
+leaves the lip with the ramp's rise in its vertical speed. The landing is the
+ordinary one.
+
+Boost is as plain: a number of seconds, during which thrust and top speed are
+scaled. Pads, ramps and nitro cells only differ in how many seconds they
+give; a cell remembers per boat when it will be back, so nothing has to be
+sent between machines online.
+
+**Limits.** A ramp has no sides: drive at it across its width and the boat is
+thrown rather than stopped.

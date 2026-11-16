@@ -14,10 +14,6 @@ export const BOAT = {
   sternZ: -2.7,
   bowZ: 3.1,
   halfBeam: 1.08,
-  /** Where the outboards pivot, behind the transom. */
-  engineX: 0.36,
-  engineY: 0.36,
-  engineZ: -2.94,
 };
 
 export const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -40,17 +36,19 @@ export function resample(points, params) {
 // ---- lines
 export const zAt = (t) => lerp(BOAT.sternZ, BOAT.bowZ, t);
 export const tAt = (z) => (z - BOAT.sternZ) / BOAT.length;
-export const outerAt = (t) => lerp(BOAT.halfBeam, 0.74, Math.pow(ramp(t, 0.5, 1), 1.7)); // outer edge of a sponson
-export const innerAt = (t) => lerp(0.46, 0.725, Math.pow(ramp(t, 0.6, 1), 2.4)); // its tunnel side
+/** Half the beam at the tips of the bows: they draw in toward each other like the points of a fork. */
+export const TIP_X = 0.6;
+export const outerAt = (t) => lerp(BOAT.halfBeam, TIP_X + 0.008, Math.pow(ramp(t, 0.4, 1), 1.55)); // outer edge of a sponson
+export const innerAt = (t) => lerp(0.46, TIP_X - 0.008, Math.pow(ramp(t, 0.62, 1), 2.2)); // its tunnel side
 export const keelAt = (t) => -0.24 + 0.64 * Math.pow(ramp(t, 0.58, 1), 1.9);
 export const chineAt = (t) => -0.04 + 0.5 * Math.pow(ramp(t, 0.5, 1), 1.7);
-export const sheerAt = (t) => 0.5 + 0.1 * Math.sin(Math.PI * Math.min(t / 0.92, 1)) - 0.03 * ramp(t, 0.92, 1);
+export const sheerAt = (t) => 0.47 + 0.09 * Math.sin(Math.PI * Math.min(t / 0.92, 1)) - 0.05 * ramp(t, 0.86, 1);
 export const deckEdgeAt = (t) => sheerAt(t) + 0.02;
 
 export const TUNNEL = 0.3; // underside of the centre body
 export const NOSE = 0.8; // the centre body ends here; ahead of it the tunnel is open to the sky
 /** How far the centre line stands above the deck edge: stern deck, engine cowl, cockpit, foredeck. */
-export const crownAt = (t) => 0.03 + 0.27 * smoothstep(0.05, 0.2, t) - 0.06 * smoothstep(0.28, 0.4, t) - 0.2 * smoothstep(0.56, 0.76, t);
+export const crownAt = (t) => 0.03 + 0.3 * smoothstep(0.04, 0.18, t) - 0.07 * smoothstep(0.28, 0.4, t) - 0.22 * smoothstep(0.54, 0.76, t);
 /** 0 along the body, 1 at the nose, where the centre body rounds down into the tunnel. */
 export const noseAt = (t) => Math.pow(smoothstep(0.7, NOSE, t), 2);
 /** Height of the centre body's surface at (x, t): used to stand things on it. */

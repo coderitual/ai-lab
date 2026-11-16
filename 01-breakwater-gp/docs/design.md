@@ -7,11 +7,13 @@ by number, see [spec.md](spec.md).
 
 ## The game in one paragraph
 
-Four race boats, three laps round an island, on a sea that is really there.
-The swell lifts the hulls, throws them into the air and drops them again, and
-the same waves you see are the ones the boat rides. Slalom marks along the
-course are the one rule: pass each on its proper side and the engines give
-more; miss, and they give less. It plays in a browser, with a keyboard or with
+Four turbine-driven race boats, three laps up a city river and round a green
+island, on a sea that is really there. The swell lifts the hulls, throws them
+into the air and drops them again, and the same waves you see are the ones
+the boat rides. Slalom marks along the course are the one rule: pass each on
+its proper side and the turbine gives more; miss, and it gives less. Boost
+pads, nitro cells and ramps lie on the water for whoever can reach them
+without breaking that rule. It plays in a browser, with a keyboard or with
 one thumb, alone, with a friend on the same keyboard, or with up to three
 friends on their own devices and no server in between.
 
@@ -23,7 +25,7 @@ names, characters, courses or art.
 
 1. **The sea is the other player.** A race on flat water would be a time
    trial with scenery. Here the surface is the difficulty and the fun: crests
-   launch you, troughs hide the next mark, the lee of the island is calm and
+   launch you, troughs hide the next mark, the river is nearly flat and
    the open side is not. That only works if the water is honest, so one set of
    waves drives both the picture and the physics.
 2. **One rule, visible from a distance.** Red can: pass to its right. Green
@@ -31,8 +33,8 @@ names, characters, courses or art.
    course) follows from that, and each consequence is shown the moment it
    happens.
 3. **The boat fills the frame.** The camera sits low and close, so you see the
-   hull working: the engines swinging, the propellers clearing the water, the
-   paint mirroring the wake. A boat that small in the frame would be a marker
+   hull working: the turbine's nozzle glowing with the throttle, the tails
+   clearing the water, the paint mirroring the wake. A boat that small in the frame would be a marker
    on a map.
 4. **Playable wherever you are.** Arrow keys; or one thumb anywhere on a
    phone, with throttle automatic. Split screen on one keyboard. Online
@@ -47,7 +49,7 @@ names, characters, courses or art.
 - **Grid.** Four boats abreast, fourteen metres short of the arch, idling on
   the swell.
 - **Countdown.** Three beeps and a higher one. The lights on the arch go out.
-- **Three laps** round the island, about 50 seconds each. Nine
+- **Three laps** of the course, about a minute each. Nine
   slalom marks per lap alternate sides, so the fast line swings from one side
   of the course to the other and crosses the swell at changing angles.
 - **Flag.** The first boat home wins; the rest are classified as they finish.
@@ -94,34 +96,52 @@ names, characters, courses or art.
 
 ## The camera
 
-Behind and a little above the stern, 6 to 7 metres from the middle of the
+Behind and a little above the stern, 5 to 6 metres from the middle of the
 boat, looking slightly down: the transom sits near the bottom of the frame
 and the horizon above the middle, so the water ahead takes up most of the
 picture. It follows height lazily, so the boat visibly rises and falls on the
 swell and floats up the frame in a jump; it follows the direction of travel
-more than the heading, so slides read as slides; and the lens widens a little
-with speed. Before the start and after the flag it orbits the boat instead.
+more than the heading, so slides read as slides; it swings to the outside of
+a turn and leans with it, so the boat is seen from its flank as it carves;
+the lens widens with speed; and under boost the boat pulls away from it for a
+moment while the picture stretches and trembles. Before the start and after
+the flag it orbits the boat instead.
 
 ## The boats
 
-Tunnel-hull catamarans with a closed canopy and twin outboards. That shape was
-chosen for what it shows from behind: two hulls and an open tunnel give the
-spray and the wake something to do, a wide stance reads as stable, and the
-outboards put moving parts (swinging with the helm, propellers turning) right
-in front of the camera. All four boats are the same boat, each painted to a
-design of its own (slashed bands, a wave, shards, racing stripes) so that
-they can be told apart at a glance from any side; the race is decided by
-driving. See [boat.md](boat.md).
+Tunnel-hull catamarans from a few years ahead: a closed canopy, bows that
+draw together like the points of a fork, and a turbine in a pod behind the
+driver instead of outboards. That shape was chosen for what it shows from
+behind: two hulls and an open tunnel give the spray and the wake something to
+do, a wide stance reads as stable, and the turbine's nozzle, glowing with the
+throttle and throwing a flame under boost, sits right in front of the camera
+and says how hard the boat is working. All four boats are the same boat, each
+painted to a design of its own (slashed bands, a wave, shards, racing
+stripes) so that they can be told apart at a glance from any side; the race
+is decided by driving. See [boat.md](boat.md).
 
 ## The course
 
-One island, one loop of about 1.1 km round it. The island is the thing you
-look at when you are not looking at the water: a forested hill with a rock
-face, a beach of rippled sand going dark and glossy where the sea reaches it,
-and groves of coconut palms laying long afternoon shadows across it. The swell comes from the open
-ocean on one side; the island shelters the other. So each lap has a rough
-half, where the boat is in the air a good part of the time, and a calm half,
-where you can make up places. The start arch stands on the calm side.
+Two islands and the river between them; one loop of about 1.5 km. The race
+starts in the river, in the middle of a city: towers of glass on the east
+bank, a waterfront town on the west, palms along both quays, three bridges
+overhead. There the water is nearly flat and the walls are close: it is the
+fast, tight part, with boost pads to line up for. At the river's mouth the
+course swings out round the green island by the open sea, where the swell
+comes in, the boat is in the air a good part of the time, and ramps and
+nitro cells reward a driver who can hold a line across the waves. Then back
+in at the southern mouth, under the first bridge, to the line.
+
+The green island is the thing you look at when you are not looking at the
+water: a forested hill, grass that the wind runs across in bright waves, a
+beach of rippled sand going dark and glossy where the sea reaches it, and
+groves of coconut palms laying long shadows.
+
+**Going faster.** Three things on the water give boost, all used the moment
+they are touched: *pads* (a short push), *nitro cells* (a long one; a cell
+you have taken is back a few seconds later) and *ramps* (a push and a jump).
+None of it is stored or aimed: the skill is in the line that strings them
+together without missing a mark.
 
 ## Opponents
 
@@ -147,10 +167,11 @@ tops are lit from behind and glow turquoise. Colour is saved for the things
 that matter: the four liveries, the red and green marks, the orange floats.
 Reflections do the rest of the work of making the boats sit in the scene: the
 paint and glass mirror what is really around them, and the water mirrors the
-boats back. Spray hangs in plumes behind a boat at speed. Sit in another
-boat's plume and it rains on the lens: drops run across the glass, each one a
-little upside-down picture of the race, and the way to clear it is to get out
-of the spray. The picture is finished like a photograph: a glow round the sun
+boats back, and in the river the towers and the bridges too. Spray hangs in
+plumes behind a boat at speed. Sit in another boat's plume and it rains on
+the glass, the way it does on a windscreen: droplets land and sit, swell,
+let go and run down leaving wet tracks that dry; the way to clear it is to
+get out of the spray. The picture is finished like a photograph: a glow round the sun
 on the water, crisp detail, slightly darker corners.
 
 Sound is engines (deeper for the bigger hulls), water rushing past, and a

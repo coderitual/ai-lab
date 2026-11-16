@@ -25,8 +25,8 @@ function floatOnWater(obj, { tilt = 1 } = {}) {
 function boat(i, q) {
   const team = TEAMS[i % TEAMS.length];
   const b = createBoat(team, i + 1);
-  const steer = parseFloat(q.get('steer') || '0');
-  for (const engine of b.userData.engines) engine.rotation.y = steer * 0.45;
+  // how hard the turbine burns in the picture: ?thrust=0..1, ?boost=0..1
+  b.userData.setThrust(parseFloat(q.get('thrust') || '0.5'), parseFloat(q.get('boost') || '0'), 0);
   return b;
 }
 

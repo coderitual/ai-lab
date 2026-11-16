@@ -66,8 +66,9 @@ waves, `manual` stops the loop (step with `__viewer.frames(n)`).
 
 With the scripts above, in headless Chromium on software WebGL.
 
-- **Solo.** A full three-lap bot race (about 2 min 30 s, no missed marks, no
-  boat outside the floats, hulls in the water except for the tenth of the
+- **Solo.** A full three-lap bot race on the river course (about 2 min 50 s,
+  no missed marks, nobody put back on the course; bots do run wide of the
+  floats for a second or two at the river's southern mouth, hulls in the water except for the tenth of the
   time they are in the air). Handling on a calm sea by scripted helm
   (`tools/handling.cjs`): carve at half lock, drift at full lock, recovery
   on release, powerslide under brake (the figures are in
@@ -81,7 +82,8 @@ With the scripts above, in headless Chromium on software WebGL.
   rematch, back to the menu.
 - **Drawing.** Solo, split screen and a phone-sized view draw all their
   passes (reflection map, sun shadows, a mirror image per view, the lens
-  with and without rain) without WebGL errors or console warnings.
+  with and without rain, the city and its baked shadows) without WebGL
+  errors or console warnings.
 - **Sound**, by measurement: every start signal and mark chime is found at
   its moment; in split screen each driver's engines, chimes and hard landings
   sit on their side (about 10 dB stronger there) while start signals are

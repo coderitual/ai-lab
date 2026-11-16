@@ -188,7 +188,7 @@ const run = (page, seconds) => page.evaluate(`window.__bw.skip(${seconds})`);
   // ---------------------------------------------- finish, results, race again
   {
     const { context, page, problems } = await open(browser, { width: 844, height: 390, mobile: true, query: '?manual&ap&laps=1&auto' });
-    await page.evaluate('window.__bw.skip(64)');
+    await page.evaluate('window.__bw.skip(82)'); // (a lap of the course takes about a minute)
     await run(page, 3.5);
     let s = await page.evaluate(state);
     check('results: shown after the flag', s.phase === 'results' && !s.resultsHidden, `phase=${s.phase} race=${s.race}`);
@@ -260,7 +260,7 @@ const run = (page, seconds) => page.evaluate(`window.__bw.skip(${seconds})`);
     const { context, page, problems } = await open(browser, { width: 1280, height: 720, query: '?manual&dpr=1&ap&laps=1&mode=split&auto' });
     const st = `(() => { const g = window.__bw.game; return { mode: g.mode, phase: g.phase, race: g.race.state, views: g.views.length, finished: g.views.map((v) => v.racer.finished),
       resultsHidden: g.hud.results.hidden, titleHidden: g.hud.title.hidden, head: document.getElementById('bw-rpos').textContent, rows: document.querySelectorAll('#bw-rbody tr').length, split: g.hud.root.classList.contains('split') }; })()`;
-    await page.evaluate('window.__bw.skip(72)');
+    await page.evaluate('window.__bw.skip(90)');
     let s = await page.evaluate(st);
     check('split: results come up once both drivers are in', s.phase === 'results' && !s.resultsHidden && s.finished.every(Boolean) && s.rows === 4, `${s.phase} ${s.head}`);
     await page.waitForTimeout(300);
@@ -268,7 +268,7 @@ const run = (page, seconds) => page.evaluate(`window.__bw.skip(${seconds})`);
     await page.click('#bw-again');
     s = await page.evaluate(st);
     check('split: Race again keeps both drivers', s.phase === 'race' && s.race === 'countdown' && s.views === 2 && s.mode === 'split');
-    await page.evaluate('window.__bw.skip(72)');
+    await page.evaluate('window.__bw.skip(90)');
     await page.click('#bw-menu');
     s = await page.evaluate(st);
     check('split: Back to menu returns to the solo title screen', s.phase === 'title' && !s.titleHidden && s.views === 1 && s.mode === 'solo' && !s.split);

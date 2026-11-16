@@ -275,12 +275,20 @@ export class ViewHud {
     c.strokeStyle = 'rgba(255,248,234,0.9)';
     c.lineWidth = size * 0.022;
     c.stroke();
-    // island
-    const [ix, iy] = this._toMap(0, 0);
-    c.fillStyle = 'rgba(127,176,76,0.85)';
-    c.beginPath();
-    c.arc(ix, iy, 70 * scale, 0, Math.PI * 2);
-    c.fill();
+    // the islands, under the course
+    c.globalCompositeOperation = 'destination-over';
+    for (const land of track.land || []) {
+      c.fillStyle = land.town ? 'rgba(150,170,186,0.85)' : 'rgba(127,176,76,0.85)';
+      c.beginPath();
+      land.outline.forEach(([x, z], i) => {
+        const [mx, my] = this._toMap(x, z);
+        if (i) c.lineTo(mx, my);
+        else c.moveTo(mx, my);
+      });
+      c.closePath();
+      c.fill();
+    }
+    c.globalCompositeOperation = 'source-over';
     // start line
     const a = track.pointAt(0, -track.halfWidth * 0.8);
     const [ax, ay] = this._toMap(a.x, a.z);
@@ -375,7 +383,7 @@ export class Hud {
     this.title.innerHTML = `
       <div class="bw-panel" role="dialog" aria-label="Breakwater GP">
         <h1 class="bw-title">BREAKWATER <span>GP</span></h1>
-        <p class="bw-sub">${RULES.laps} laps · ${RULES.racers} boats · one island</p>
+        <p class="bw-sub">${RULES.laps} laps · ${RULES.racers} boats · two islands · one river</p>
         <ul class="bw-rules">
           <li><i class="bw-ico can"></i><span><b>Red can</b> — pass on its <b>right</b></span></li>
           <li><i class="bw-ico cone"></i><span><b>Green cone</b> — pass on its <b>left</b></span></li>
