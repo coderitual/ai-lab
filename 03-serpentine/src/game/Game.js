@@ -34,6 +34,7 @@ import { CameraRig } from './Cameras.js';
 import { CAMERA, DRIVERS, EXPOSURE, LIGHTS, RULES, VIEW } from './config.js';
 import { AutoDriver, PlayerDriver } from './drivers.js';
 import { Effects } from './effects.js';
+import { Ghost } from './Ghost.js';
 import { Hud } from './Hud.js';
 import { Race, formatMs, medalOf } from './Race.js';
 import { createTrack } from './track.js';
@@ -111,7 +112,10 @@ export class Game {
     this.input = new Input(container);
     this.input.onAction = (name, driver) => this.action(name, driver);
     this.input.onTouchChange = () => (this._touchDirty = true);
-    this.input.onAnyInput = () => this._unlockSound();
+    this.input.onAnyInput = () => {
+      this._woke = true;
+      this._unlockSound();
+    };
     this.hud = new Hud(container, {
       enabled: params.ui,
       onAction: (name, driver) => {
@@ -141,6 +145,10 @@ export class Game {
     this.race = null;
     this.runs = 0;
     this.highBeam = false;
+    /** The best lap's ghost (solo): its recordings, whether it shows (G), and the car that shows it. */
+    this.ghost = new Ghost(this.track.length);
+    this.ghostOn = true;
+    this.ghostCar = null;
     /** Per driver: the camera mode they chose. */
     this.cameraModes = [params.camera, params.camera];
     /** Drivers whose car is to be put back in the next step. */
@@ -148,6 +156,11 @@ export class Game {
     /** The day-night fade: { t, to, switched } or null. */
     this._fade = null;
     this._touchDirty = false;
+    /** The title's attract lap: the autopilot drives behind the menu after a while with nobody at the controls. */
+    this.attract = false;
+    this._idle = 0;
+    this._attractDist = 0;
+    this._woke = false;
     this._fxCars = [];
     this._events = [];
     /** @type {Racer[]} */
@@ -184,6 +197,11 @@ export class Game {
       racer.car.dispose();
     }
     for (const view of this.views) if (view.probe) view.probe.dispose();
+    if (this.ghostCar) {
+      world.scene.remove(this.ghostCar.object);
+      this.ghostCar.dispose();
+      this.ghostCar = null;
+    }
     this.mode = mode;
     const split = mode === 'split';
     const n = split ? 2 : 1;
@@ -233,7 +251,19 @@ export class Game {
       this._place(racer);
       return racer;
     });
+    if (!split) {
+      this.ghostCar = createCar({ ghost: true, paint: DRIVERS[0].paint, plate: '', tier: this.tier, caps: this.caps });
+      this.ghostCar.object.visible = false;
+      world.scene.add(this.ghostCar.object);
+    }
     const sharp = this.racers.map((racer) => racer.sharp);
+    // the ghost moves by itself too: its own box (empty while it is not shown)
+    this.ghostSharp = null;
+    if (this.ghostCar) {
+      const box = this.ghostCar.box;
+      this.ghostSharp = { matrix: new THREE.Matrix4(), prevMatrix: new THREE.Matrix4(), center: box.center.clone(), half: new THREE.Vector3() };
+      sharp.push(this.ghostSharp);
+    }
     this.beams = this.racers.map((racer) => racer.beam);
     this._fxCars = this.racers.map((racer) => ({ vehicle: racer.vehicle, impacts: racer.impacts }));
 
@@ -303,6 +333,7 @@ export class Game {
   /** A new run from the grid, in the current mode and time of day. */
   start() {
     this.engine.paused = false;
+    this.attract = false;
     this.runs++;
     for (const racer of this.racers) this._place(racer);
     this.race = new Race(this.track, {
@@ -315,6 +346,7 @@ export class Game {
     this.phase = 'countdown';
     this._resets.clear();
     this.effects.reset();
+    this.ghost.begin();
     this.world.setStartLights(0);
     this.views.forEach((view, i) => {
       view.rig.setMode(this.cameraModes[i]);
@@ -327,6 +359,8 @@ export class Game {
   leave() {
     this.engine.paused = false;
     this.phase = 'title';
+    this.attract = false;
+    this._idle = 0;
     this.race = null;
     this.world.setStartLights(0);
     for (const racer of this.racers) this._place(racer);
@@ -342,6 +376,7 @@ export class Game {
    * @param {number} driver -1: nobody in particular
    */
   action(name, driver = -1) {
+    this._woke = true;
     const d = Math.max(0, Math.min(this.racers.length - 1, driver));
     const racing = this.phase === 'countdown' || this.phase === 'run' || this.phase === 'results';
     const paused = this.engine.paused;
@@ -375,6 +410,9 @@ export class Game {
         break;
       case 'time':
         if (!this._fade) this._fade = { t: 0, to: TIME_NAMES[(TIME_NAMES.indexOf(this.world.time.name) + 1) % TIME_NAMES.length], switched: false };
+        break;
+      case 'ghost':
+        this.ghostOn = !this.ghostOn;
         break;
       case 'high':
         this.highBeam = !this.highBeam;
@@ -461,6 +499,7 @@ export class Game {
 
   update(dt, simTime) {
     this._tickFade(dt);
+    if (this.phase === 'title') this._attractStep(dt);
     const { race, racers } = this;
     const time = this.world.time;
     const phase = this.phase;
@@ -471,7 +510,7 @@ export class Game {
         prevWheels[i].steer = vehicle.wheels[i].steer;
         prevWheels[i].travel = vehicle.wheels[i].travel;
       }
-      if (phase === 'title') Object.assign(controls, HELD);
+      if (phase === 'title' && !this.attract) Object.assign(controls, HELD);
       else {
         racer.driver.drive(vehicle, dt, controls);
         // on the grid the car is held until the lamps go out
@@ -494,6 +533,8 @@ export class Game {
       race.update(dt, racers.map((r) => r.vehicle));
       for (const e of race.drain(this._events)) this._onRaceEvent(e);
       this._events.length = 0;
+      // the ghost: this lap of the solo car, sampled on the lap's own clock
+      if (this.ghostCar && race.clock >= 0 && !race.cars[0].finished) this.ghost.record(race.lapClock(0), racers[0].vehicle);
       if (this.phase === 'countdown' && race.state !== 'countdown') this.phase = 'run';
       if (this.phase === 'run' && race.state === 'done') this.phase = 'results';
       this.world.setStartLights(race.lit);
@@ -562,6 +603,37 @@ export class Game {
     this.world.update(dt, simTime);
   }
 
+  /** The title: after RULES.attractIdle s with nobody at the controls the autopilot drives a lap; any input ends it. */
+  _attractStep(dt) {
+    const woke = this._woke;
+    this._woke = false;
+    if (this.attract) {
+      const v = this.racers[0].vehicle;
+      this._attractDist += Math.abs(this.track.delta(this._attractS, v.s));
+      this._attractS = v.s;
+      if (woke || this._attractDist > this.track.length) {
+        this.attract = false;
+        this._idle = 0;
+        for (const racer of this.racers) this._place(racer);
+        for (const view of this.views) {
+          view.rig.setMode('orbit');
+          view.rig.snap(view.racer.vehicle);
+        }
+      }
+      return;
+    }
+    this._idle = woke ? 0 : this._idle + dt;
+    if (this._idle < RULES.attractIdle) return;
+    this.attract = true;
+    this._attractDist = 0;
+    this._attractS = this.racers[0].vehicle.s;
+    for (const racer of this.racers) racer.driver = racer.auto;
+    for (const view of this.views) {
+      view.rig.setMode('chase');
+      view.rig.snap(view.racer.vehicle);
+    }
+  }
+
   /** Stereo position of a driver's sounds: split screen puts each car on its own side. */
   _pan(i) {
     if (this.racers.length < 2) return 0;
@@ -588,6 +660,13 @@ export class Game {
         const label = e.type === 'lap' ? `Lap ${formatMs(e.ms)}${e.best ? '  best' : ''}${e.gap === null ? '' : '  ' + text}` : text;
         if (view) view.hud.flashLine(label, e.gap === null ? '' : ahead ? 'ahead' : 'behind', race.clock + 2);
         if (sound) sound.cue(e.type, pan, { ahead });
+        if (e.type === 'lap' && this.ghostCar) {
+          // the race has just put the lap on the board if it is the best of its kind: then it is the new ghost
+          const kind = e.lap === 1 ? 'standing' : 'flying';
+          const ref = race.table[kind];
+          if (ref && ref.ms === e.ms && !race.cars[0].times[e.lap - 1].putBack) this.ghost.keep(race.time, kind, e.ms);
+          this.ghost.begin();
+        }
         break;
       }
       case 'finish': {
@@ -670,6 +749,8 @@ export class Game {
       b.high = racer.lamps.high;
     }
 
+    this._poseGhost(alpha);
+
     const fade = this._fadeLevel;
     for (const view of this.views) {
       view.rig.apply(view.camera, alpha);
@@ -697,6 +778,26 @@ export class Game {
         }),
       );
     }
+  }
+
+  /** The ghost where the best lap was at this moment of the lap being driven (solo, during the run, G not off). */
+  _poseGhost(alpha) {
+    const g = this.ghostCar;
+    if (!g) return;
+    const race = this.race;
+    let show = false;
+    if (this.ghostOn && race && this.phase === 'run' && !race.cars[0].finished && race.clock > 0) {
+      const seconds = race.lapClock(0) / 1000 - (1 - alpha) * FIXED_DT;
+      show = this.ghost.pose(race.time, race.cars[0].lap === 1 ? 'standing' : 'flying', seconds, g.object);
+    }
+    const box = this.ghostSharp;
+    if (show) {
+      g.object.updateMatrixWorld();
+      box.prevMatrix.copy(g.object.visible ? box.matrix : g.object.matrixWorld);
+      box.matrix.copy(g.object.matrixWorld);
+      box.half.copy(g.box.half);
+    } else box.half.set(0, 0, 0);
+    g.object.visible = show;
   }
 
   /** The HUD's readouts: every call is cheap, the DOM is only touched where something changed. */
@@ -764,6 +865,7 @@ export class Game {
           if (r.car.shadow && r.car === car) probeHidden.push(r.car.shadow);
         }
         probeHidden.push(...this.world.probeHidden);
+        if (this.ghostCar) probeHidden.push(this.ghostCar.object);
         view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces);
       }
       this.pipeline.render(this.world.scene, view.camera, view.rect, view.frame);
@@ -783,9 +885,11 @@ export class Game {
       time: this.world.time.name,
       paused: this.engine.paused,
       fading: !!this._fade,
+      attract: this.attract,
       clock: race ? Math.round(race.clock * 1000) / 1000 : null,
       lamps: race ? race.lit : 0,
       highBeam: this.highBeam,
+      ghost: { on: this.ghostOn, has: this.ghost.has(this.world.time.name), visible: !!this.ghostCar?.object.visible },
       drivers: this.racers.map((r, i) => {
         const v = r.vehicle;
         const c = race ? race.cars[i] : null;

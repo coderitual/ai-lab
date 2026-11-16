@@ -41,6 +41,8 @@ export const RULES = {
   /** How hard the autopilot drives: ?ap, and the lap home after the flag. */
   autopilotPace: 0.9,
   cooldownPace: 0.6,
+  /** Nobody at the controls on the title this long (s) and the autopilot drives a lap behind the menu. */
+  attractIdle: 25,
 };
 
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */

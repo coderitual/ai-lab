@@ -307,7 +307,8 @@ export class Race {
     table.laps.length = Math.min(table.laps.length, RULES.boardRows);
     const kind = lap.standing ? 'standing' : 'flying';
     if (!table[kind] || lap.ms < table[kind].ms) table[kind] = { ms: lap.ms, splits: lap.splits, at: c.at.slice() };
-    if (c.times.length === this.laps && c.times.every((l) => !l.putBack)) {
+    // the three-lap total: only from a run of the standard length, every lap clean
+    if (this.laps === RULES.laps && c.times.length === this.laps && c.times.every((l) => !l.putBack)) {
       const total = c.times.reduce((sum, l) => sum + l.ms, 0);
       if (table.best3 === null || total < table.best3) table.best3 = total;
     }

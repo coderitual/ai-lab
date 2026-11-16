@@ -16,7 +16,7 @@
 //
 // Steering, pedals and the held look back are read by the drivers in the
 // fixed step (read). Everything else is a moment: an action ('camera',
-// 'reset', 'pause', 'time', 'high', 'mute', 'start') delivered to onAction as
+// 'reset', 'pause', 'time', 'high', 'ghost', 'mute', 'start') delivered to onAction as
 // it happens, with the driver it belongs to (-1: nobody in particular). The
 // engine knows nothing about cars: these are only names.
 
@@ -50,6 +50,7 @@ const ACTIONS = {
   Slash: ['reset', 'arrows'],
   KeyN: ['time', null],
   KeyH: ['high', null],
+  KeyG: ['ghost', null],
   KeyM: ['mute', null],
   KeyP: ['pause', null],
   Escape: ['pause', null],
