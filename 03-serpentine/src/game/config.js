@@ -93,15 +93,19 @@ export const CAMERA = {
      * `inside` m per radian of it towards the inside.
      */
     bendReach: 22,
-    bendRoad: 0.22,
+    bendRoad: 0.3,
     bendYawRate: 0.08,
-    bendMax: 0.2,
+    bendMax: 0.3,
     bendRate: 2.5,
-    inside: 2.5,
+    inside: 1.5,
+    /** ...and rises this much per radian of it, to see over the inside of a tight bend. */
+    bendLift: 1.2,
     /** Height: followed at `heightRate` (never more than `heightSlack` m behind), the grade lazily at `gradeRate`. */
     heightRate: 5,
     heightSlack: 0.5,
     gradeRate: 1.6,
+    /** How much of the climb behind the car lowers the camera (1: it keeps its height over the road behind it). */
+    uphill: 0.8,
     /** The distance spring: this far back per g of acceleration (closer under braking), its frequency and damping. */
     pullPerG: 0.35,
     pullOmega: 6,

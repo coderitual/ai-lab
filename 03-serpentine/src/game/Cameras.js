@@ -336,16 +336,19 @@ export class CameraRig {
     const grade = (back ? -1 : 1) * at(GRADE);
     const y = at(Y);
     const distance = (m.distance + feel * c.pullBack + at(PULL)) * lerp(1, c.narrowBack, narrow) * lerp(1, c.wideBack, wide);
-    const height = (m.height - feel * c.drop) * lerp(1, c.narrowLift, narrow) * lerp(1, c.wideLift, wide);
+    const height = (m.height - feel * c.drop + Math.abs(bend) * c.bendLift) * lerp(1, c.narrowLift, narrow) * lerp(1, c.wideLift, wide);
     // behind the car along the swung heading, a little to the inside of the bend
     const bx = Math.sin(yaw);
     const bz = Math.cos(yaw);
     const side = bend * c.inside;
-    eyeOut.set(p.x - bx * distance + bz * side, y + height - grade * distance, p.z - bz * distance - bx * side);
+    // on a climb the camera sits above the road behind it by less than its height, so the car stays low in the
+    // frame and the road ahead in view; on a descent it keeps its full height over the road behind
+    const sink = grade * distance * (grade > 0 ? c.uphill : 1);
+    eyeOut.set(p.x - bx * distance + bz * side, y + height - sink, p.z - bz * distance - bx * side);
     // looking at a point ahead, turned into the bend
     const ly = yaw + bend;
     const ahead = m.lookAhead * lerp(1, c.narrowAhead, narrow);
-    targetOut.set(p.x + Math.sin(ly) * ahead, y + m.lookHeight * lerp(1, c.narrowLook, narrow) + grade * ahead, p.z + Math.cos(ly) * ahead);
+    targetOut.set(p.x + Math.sin(ly) * ahead, y + m.lookHeight * lerp(1, c.narrowLook, narrow) + grade * ahead * 0.5, p.z + Math.cos(ly) * ahead);
     return lerp(c.fov, c.fovFast, feel);
   }
 
