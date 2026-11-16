@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { fbm2, lerp, makeRng, TAU } from '../engine/math.js';
 import { facet, loft, merge, part } from './geo.js';
+import { crag } from './rocks.js';
 import { withSkyFog } from './sky.js';
 import { PALETTE, TEAMS } from './palette.js';
 
@@ -12,24 +13,9 @@ const lit = (opts = {}) => withSkyFog(new THREE.MeshStandardMaterial({ vertexCol
 
 // ------------------------------------------------------------------ rocks
 
-/** Faceted sea stack. Returns a geometry sitting on y = 0. */
+/** A sea stack: a small crag (see rocks.js) standing in the water. Returns a geometry sitting on y = 0. */
 export function rockGeometry(seed, radius, tallness = 1.3) {
-  const g = new THREE.IcosahedronGeometry(1, 2);
-  const pos = g.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const n = fbm2(v.x * 1.7 + seed * 5.1, v.z * 1.7 + v.y * 2.3 - seed * 2.3, 3, seed);
-    const r = radius * (0.72 + n * 0.62);
-    const flat = v.y < -0.35 ? 0.4 : 1;
-    pos.setXYZ(i, v.x * r, (v.y * tallness * flat + 0.42 * tallness) * r, v.z * r);
-  }
-  return facet(g, (c, normal, out) => {
-    const k = fbm2(c.x * 0.8, c.z * 0.8 + c.y, 2, seed + 3);
-    out.copy(PALETTE.rock).lerp(PALETTE.rockDark, 0.25 + k * 0.6);
-    if (c.y < radius * 0.28) out.lerp(new THREE.Color('#2b2a2e'), 0.55); // wet line
-    if (normal.y > 0.78 && c.y > radius * 0.9) out.lerp(PALETTE.grassDark, 0.55); // moss cap
-  });
+  return crag(seed, { radius: radius * 1.04, height: radius * tallness * 1.6, blocks: tallness > 1.45 ? 3 : 2, moss: 0.45, wet: radius * 0.34 });
 }
 
 /** `stacks` = [{x, z, r, tall?}] — merged into one mesh; also returns colliders. */

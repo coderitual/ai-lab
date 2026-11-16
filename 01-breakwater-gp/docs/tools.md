@@ -57,7 +57,8 @@ node tools/capture.cjs --url "http://localhost:4173/?mode=split&manual&dpr=1" --
 viewer.html?asset=craft&team=0&flat&sea=0.05&az=250&el=17&dist=8.5&fov=40&ty=0.45
 ```
 
-`asset` is `sea`, `craft`, `crafts` (the four liveries) or `world`. `az`, `el`
+`asset` is `sea`, `craft`, `crafts` (the four liveries), `rocks` (a study of
+the chiselled rock: crags and boulders) or `world`. `az`, `el`
 and `dist` place the camera round the target (`tx`, `ty`, `tz`); `az=270` is
 astern, `az=90` ahead of the bow. `flat` holds a boat level, `sea` scales the
 waves, `manual` stops the loop (step with `__viewer.frames(n)`).

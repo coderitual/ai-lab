@@ -71,7 +71,7 @@ const TERRAIN_COLOR = /* glsl */ `
 
   // rock: grey strata, darker and wet near the water
   float tStrata = 0.5 + 0.5 * sin(tP.y * 1.7 + tMid * 9.0 + tSoft * 14.0 + tFine.r * 3.0);
-  vec3 tRockCol = mix(vec3(0.17, 0.15, 0.135), vec3(0.44, 0.39, 0.33), tStrata * 0.3 + tFine.b * 0.45 + tMid * 0.25);
+  vec3 tRockCol = mix(vec3(0.21, 0.14, 0.09), vec3(0.56, 0.40, 0.24), tStrata * 0.3 + tFine.b * 0.45 + tMid * 0.25);   // (the tones of assets/rocks.js)
   tRockCol = mix(tRockCol, tRockCol * 0.45, smoothstep(1.4, 0.2, tP.y));
   tRockCol = mix(tRockCol, vec3(0.22, 0.30, 0.12), smoothstep(0.5, 0.85, tFine.a) * smoothstep(2.0, 6.0, tP.y) * 0.55);   // moss
 

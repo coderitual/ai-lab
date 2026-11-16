@@ -246,10 +246,21 @@ Catmull–Rom curve through ten points at angle/radius (degrees, metres)
 
 - Start/finish arch at `s = 0`. Grid: four slots at lateral −9, −3, +3, +9 m,
   14 m before the line.
-- Land: the main island (radius 78 m, 30 m high) at the origin; a rocky islet
-  with the lighthouse at (−92, 250); a sandy islet at (253, −146); six far
-  hills on the horizon. Props: palms, sea stacks, a pier, moored boats (which
-  can be hit), sailboats.
+- Land: the main island (radius 78 m, its hill 26 m high) at the origin; a
+  rocky islet with the lighthouse at (−92, 250); a sandy islet at
+  (253, −146); six far hills on the horizon. Props: palms, sea stacks, a
+  pier, moored boats (which can be hit), sailboats.
+- Rock on the main island (`assets/rocks.js`, placed in `game/World.js`): a
+  massif of three crags on the high ground (54 m, 34 m and 24 m tall, of 6, 4
+  and 3 blocks; the tallest stands on the summit, so its top is some 75 m
+  above the sea), five lesser crags of 9 to 20 m round them, up to 26
+  outcrops on the slopes, and eight clusters of 4 to 7 boulders (0.9 to
+  4.3 m) where the grass meets the sand. Over the hill and along the back of
+  the beach, a thicket: 130 clumps of bush (70 on phones), each of two or
+  three masses. The lighthouse islet has two small crags and 16 boulders. All
+  of it stands on ground no boat can reach: it is scenery, and nothing in the
+  physics knows it is there. The eight sea stacks are crags of two or three
+  blocks; they are hit as circles, as before.
 
 ## 6. The race
 
@@ -397,11 +408,14 @@ band-pass for the water.
 - **Sun shadows on boats**: one 2048² map (1024²) over a 52 m (40 m) square
   that follows the view's boat.
 - **Sun shadows on land**: one map per island, drawn once (2048² for the main
-  island, 1024² for the islets; half that on phones). Land, palms, the pier
-  and the lighthouse cast into it; land and palms read it.
+  island, 1024² for the islets; half that on phones). Land, rock, thicket,
+  palms, the pier and the lighthouse cast into it; land, rock, thicket and
+  palms read it.
 - **Palms**: 44 on the main island, 11 on the sand islet. Each has 22–26
   fronds of 7 segments and a 9-ring trunk, about 930 triangles. The three
-  islands themselves are 20 000 triangles. They lean
+  islands themselves are 23 000 triangles; the rock of the main island is
+  12 000 and its thicket 43 000 (14 000 on phones, where the clumps are fewer
+  and cut from a coarser ball). Palms lean
   0.1 m with the wind and up to 0.3 m in gusts at the crown; fronds bob
   ±0.13 m at the tip.
 
@@ -425,10 +439,10 @@ In order, per frame:
       On phones this happens only while the glass is wet, and without the
       finish.
 
-A solo frame is about 165 draw calls and 640 000 triangles; split screen about
-285 and 1 030 000; a phone, with its coarser sea, about 135 and 470 000. (The
-island and its 55 palms are about 70 000 of those, drawn again in the water
-mirror.)
+A solo frame is about 170 draw calls and 770 000 triangles; split screen about
+295 and 1 160 000; a phone, with its coarser sea, about 140 and 570 000. (The
+islands with their rock, thicket and 55 palms are about 130 000 of those on a
+desktop and 100 000 on a phone, drawn again in the water mirror.)
 
 **Resolution.** Pixel ratio is the device's, capped at 2. On a desktop whose
 screen has fewer than 1.5 device pixels per CSS pixel the picture is drawn at

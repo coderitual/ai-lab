@@ -42,8 +42,8 @@ All in [`images/`](images/), all made by `tools/screenshots.cjs`.
 | ![](images/race.jpg) Racing: the view from the chase camera | ![](images/race-open-sea.jpg) On the open-ocean side |
 | ![](images/plumes.jpg) Spray plumes at full power | ![](images/jump.jpg) Off the top of a swell |
 | ![](images/drift.jpg) Sliding through a turn | ![](images/rain.jpg) In the pack: other boats' spray as rain on the lens |
-| ![](images/island.jpg) The island from beyond the pier | ![](images/beach.jpg) Palms, their shadows, and ripples in the sand |
-| ![](images/shore.jpg) The sunny side: surf running up the sand | |
+| ![](images/island.jpg) The island from beyond the pier | ![](images/peaks.jpg) The rock massif from the open sea |
+| ![](images/beach.jpg) Boulders, thicket and palms at the back of the beach | ![](images/shore.jpg) The sunny side: surf running up the sand |
 | ![](images/wakes.jpg) Wakes from above | ![](images/reflections.jpg) Calm water: rocks, marks and boats mirrored in it |
 | ![](images/split-screen.jpg) Two players on one keyboard | ![](images/title.jpg) Title screen |
 | ![](images/phone.jpg) Phone, held sideways, one thumb on the glass | ![](images/phone-portrait.jpg) Phone, held upright |
