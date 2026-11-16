@@ -95,7 +95,7 @@ export const CAMERA = {
     bendReach: 22,
     bendRoad: 0.3,
     bendYawRate: 0.08,
-    bendMax: 0.3,
+    bendMax: 0.25,
     bendRate: 2.5,
     inside: 1.5,
     /** ...and rises this much per radian of it, to see over the inside of a tight bend. */
@@ -115,10 +115,10 @@ export const CAMERA = {
     rollYawRate: 0.012,
     rollRate: 4,
     /** On a picture narrower than 4:3 (a phone held upright, a side-by-side half) it backs off and lifts by up to: */
-    narrowBack: 1.3,
-    narrowLift: 1.45,
+    narrowBack: 1.45,
+    narrowLift: 2.3,
     narrowAhead: 1.3,
-    narrowLook: 1.0,
+    narrowLook: 1.5,
     /** ...and on one wider than 16:9 (a stacked half): */
     wideBack: 1.1,
     wideLift: 1.15,
@@ -128,8 +128,8 @@ export const CAMERA = {
    * Fixed to the body at the car's own viewpoints (VIEWPOINTS in assets/car/spec.js): the lens (widening with speed),
    * how far below level it looks (rise per metre), and how firmly it follows the body's pitch and roll.
    */
-  bonnet: { fov: 56, fovFast: 62, lookDown: -0.04, firm: 30 },
-  bumper: { fov: 62, fovFast: 68, lookDown: -0.01 },
+  bonnet: { fov: 56, fovFast: 62, lookDown: -0.04, narrowUp: 0.12, firm: 30 },
+  bumper: { fov: 62, fovFast: 68, lookDown: -0.01, narrowUp: 0.12 },
   /** Shake, in radians of turn: the road at speed, more on the verge, and the knocks (strength in m/s for the full). */
   shake: { road: 0.0012, verge: 0.006, roadHz: 9, impact: 0.02, impactMove: 0.1, impactHz: 14, impactFull: 12, decay: 0.6, kick: 0.3 },
   /**
@@ -157,7 +157,7 @@ export const CAMERA = {
   /** Keeping clear: of a solid edge, of the ground, of the tunnel's roof (and this far beyond the portals). */
   clear: { wall: 0.6, ground: 0.45, roof: 1.2, portal: 3 },
   /** Lens limits: pictures narrower than `narrow` or wider than `wide` keep that shape's width of view. */
-  lens: { narrow: 4 / 3, wide: 16 / 9, max: 100 },
+  lens: { narrow: 4 / 3, wide: 16 / 9, max: 84 },
   /** The camera modes C steps through. */
   modes: ['chase', 'far', 'bonnet', 'bumper'],
 };
