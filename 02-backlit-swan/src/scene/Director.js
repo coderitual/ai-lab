@@ -115,13 +115,22 @@ export function createDirector(ctx, { rig, mind, staged = false, view = {} }) {
         rig.target.set(mind.position.x + (t[0] ?? 0), t[1] ?? CAMERA.target[1], mind.position.z + (t[2] ?? 0));
         return;
       }
+      const playing = mind.filmTime !== null;
+      // The film is over, or was cut short (the swan was steered, called or
+      // asked to do something): the camera stays exactly where the operator
+      // had it, and now goes round the swan like any other.
+      if (mode === 'film' && filmWasPlaying && !playing) {
+        mode = 'free';
+        ctx.events.emit('camera', { mode });
+      }
       // The point the camera looks at trails the swan a little, as a hand on
-      // a tripod head does, so that the picture breathes instead of being nailed to it.
-      const lag = mode === 'film' ? 3.2 : 2.2;
+      // a tripod head does, so that the picture breathes instead of being
+      // nailed to it. From close up the picture holds less water, and a
+      // swimming swan would leave it: the hand follows more tightly there.
+      const lag = mode === 'film' ? 3.2 : 2.2 * clamp(CAMERA.dist / rig.dist, 1, 2.5);
       follow.x = damp(follow.x, mind.position.x, lag, dt);
       follow.z = damp(follow.z, mind.position.z, lag, dt);
 
-      const playing = mind.filmTime !== null;
       if (mode === 'film') {
         // stand where the operator stands and aim at the swan from there
         const t = playing ? mind.filmTime : FILM.duration;
@@ -137,11 +146,6 @@ export function createDirector(ctx, { rig, mind, staged = false, view = {} }) {
           el: clamp(Math.atan2(dy, flat) / DEG, rig.limits.minEl, rig.limits.maxEl),
           dist: Math.hypot(flat, dy),
         });
-        // the film is over: the camera stays where it ended, and now goes round the swan like any other
-        if (filmWasPlaying && !playing) {
-          mode = 'free';
-          ctx.events.emit('camera', { mode });
-        }
       } else {
         rig.target.set(follow.x, CAMERA.target[1], follow.z);
       }

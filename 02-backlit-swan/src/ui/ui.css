@@ -135,22 +135,97 @@
   letter-spacing: 0.02em;
 }
 
-/* ---- what the swan does, bottom middle */
+/* ---- the stick that swims the swan, bottom left under a thumb */
+
+.ui-stick {
+  pointer-events: auto;
+  position: absolute;
+  /* a little further in than the buttons: a thumb at the very edge of the glass, or on the home bar, is awkward */
+  left: max(18px, calc(env(safe-area-inset-left) + 6px));
+  bottom: max(22px, calc(env(safe-area-inset-bottom) + 8px));
+  width: 120px;
+  height: 120px;
+  box-sizing: border-box;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  background: rgba(9, 15, 15, 0.3);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  color: var(--dim);
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color 0.2s ease,
+    opacity 0.4s ease;
+}
+
+.ui-stick svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* The knob is 40 % of the base and is moved by up to 75 % of its own size:
+   30 % of the base, which keeps it just inside the rim. Ui.js writes --sx
+   and --sy (-1..1, right and down) and counts on these two proportions. */
+.ui-stick-knob {
+  position: absolute;
+  left: 30%;
+  top: 30%;
+  width: 40%;
+  height: 40%;
+  box-sizing: border-box;
+  border: 1px solid rgba(226, 238, 228, 0.3);
+  border-radius: 50%;
+  background: rgba(233, 239, 230, 0.13);
+  pointer-events: none;
+  transform: translate(calc(var(--sx, 0) * 75%), calc(var(--sy, 0) * 75%));
+  /* let go, it springs back and settles */
+  transition:
+    transform 0.24s cubic-bezier(0.2, 1.5, 0.4, 1),
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.ui-stick.on {
+  border-color: rgba(243, 223, 166, 0.3);
+}
+
+.ui-stick.on .ui-stick-knob {
+  border-color: rgba(243, 223, 166, 0.7);
+  background: rgba(243, 223, 166, 0.2);
+}
+
+.ui-stick.held {
+  cursor: grabbing;
+}
+
+/* under a finger it follows the finger exactly */
+.ui-stick.held .ui-stick-knob {
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+/* ---- what the swan does: a block of four, bottom right under the other thumb */
 
 .ui-actions {
   position: absolute;
-  left: 50%;
-  bottom: max(18px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  display: flex;
-  gap: 10px;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(22px, calc(env(safe-area-inset-bottom) + 8px));
+  display: grid;
+  grid-template-columns: repeat(2, 58px);
+  gap: 8px;
   transition: opacity 0.4s ease;
 }
 
 .ui-act {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -201,8 +276,9 @@
   display: none;
 }
 
-/* while the sheet is up the action row would sit under it */
-.ui.panel-open .ui-actions {
+/* while the sheet is up the stick and the actions would sit under it */
+.ui.panel-open .ui-actions,
+.ui.panel-open .ui-stick {
   opacity: 0;
   pointer-events: none;
 }
@@ -356,6 +432,7 @@
 
 .ui.hidden .ui-head,
 .ui.hidden .ui-actions,
+.ui.hidden .ui-stick,
 .ui.hidden .ui-tool:not(:last-child) {
   opacity: 0;
   pointer-events: none;
@@ -377,12 +454,9 @@
     max-height: calc(100% - 96px);
   }
 
-  .ui.panel-open .ui-actions {
+  /* the card is on the right: the stick, on the left, stays in use */
+  .ui.panel-open .ui-stick {
     opacity: 1;
-    pointer-events: none;
-  }
-
-  .ui.panel-open .ui-actions button {
     pointer-events: auto;
   }
 
@@ -391,14 +465,64 @@
   }
 }
 
-/* ---- a phone on its side: little height, so the actions go down the left edge */
+/* ---- wide and tall (a desktop, a tablet): the keyboard swims the swan, so
+   the stick is smaller, and the actions are a row along the bottom middle,
+   which the card on the right does not reach */
+
+@media (min-width: 760px) and (min-height: 481px) {
+  .ui-stick {
+    width: 104px;
+    height: 104px;
+  }
+
+  .ui-actions {
+    left: 50%;
+    right: auto;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    grid-template-columns: repeat(4, 64px);
+    gap: 10px;
+  }
+
+  .ui-act {
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+  }
+
+  .ui.panel-open .ui-actions {
+    opacity: 1;
+    pointer-events: none;
+  }
+
+  .ui.panel-open .ui-actions button {
+    pointer-events: auto;
+  }
+}
+
+/* Between 760 and 1020 px wide the row would reach under the card if the
+   card came all the way down: it stops above the row (82 px and a gap). */
+
+@media (min-width: 760px) and (max-width: 1019px) and (min-height: 481px) {
+  .ui-panel {
+    max-height: calc(100% - 68px - 96px);
+  }
+}
+
+/* ---- a phone on its side: little height. The stick and the block of four
+   keep their corners, a little smaller; the panel is a card down the right
+   side, over the actions (which go while it is up), clear of the stick. */
 
 @media (max-height: 480px) and (orientation: landscape) {
+  .ui-stick {
+    bottom: max(14px, calc(env(safe-area-inset-bottom) + 4px));
+    width: 112px;
+    height: 112px;
+  }
+
   .ui-actions {
-    left: max(12px, env(safe-area-inset-left));
-    bottom: max(12px, env(safe-area-inset-bottom));
-    transform: none;
-    gap: 8px;
+    bottom: max(14px, calc(env(safe-area-inset-bottom) + 4px));
+    grid-template-columns: repeat(2, 54px);
   }
 
   .ui-act {
@@ -415,6 +539,11 @@
     display: none;
   }
 
+  .ui.panel-open .ui-stick {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .ui-panel {
     left: auto;
     top: 62px;
@@ -424,22 +553,11 @@
   }
 }
 
-/* ---- very narrow phones: four actions must still fit */
-
-@media (max-width: 340px) {
-  .ui-actions {
-    gap: 6px;
-  }
-
-  .ui-act {
-    width: 58px;
-    height: 58px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .ui,
   .ui button,
+  .ui-stick,
+  .ui-stick-knob,
   .ui-hint,
   #loading {
     transition-duration: 0.01s;

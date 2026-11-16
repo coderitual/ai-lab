@@ -25,6 +25,16 @@ export const LOOK = {
   shadeSoftness: 0.9,
   shadeWander: 0.5,
   shadeWanderLength: 2.9,
+  // That edge is the shadow of leaves: this share of its width is broken into
+  // flecks of sun and shade this many metres across (0: one smooth gradient).
+  shadeDapple: 0.7,
+  shadeDappleSize: 0.45,
+  // The wood (assets/forest/). All of it is lit by the sun and the sky above;
+  // these only say how much of each there is.
+  canopyOpen: 0.42, // share of the canopy the sun comes through: how much of the foliage is lit (0 hardly any .. 1 nearly all)
+  haze: 1.0, // how much the air in the wood glows: aerial perspective, and what shows behind the last trunk
+  shafts: 1.0, // strength of the shafts of light in the haze
+  leafLight: 1.0, // brightness of leaves the sun comes through
 
   // Lens
   aperture: 0.08, // 0..1: how far out of focus the background is (the film's is only a little: its lit leaves are dapples a few pixels across)
@@ -159,7 +169,7 @@ export const TIERS = {
     fxaaSteps: 5,
     rippleSize: 256,
     waterDetail: 0, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 7000, leaves: 4800, trunks: 80, droplets: 192, featherDetail: 0 },
+    counts: { specks: 7000, leaves: 4800, sprays: 1000, trunks: 80, droplets: 192, featherDetail: 0 },
   },
   medium: {
     pixelRatio: 2,
@@ -175,7 +185,7 @@ export const TIERS = {
     fxaaSteps: 7,
     rippleSize: 384,
     waterDetail: 1, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 13000, leaves: 9000, trunks: 140, droplets: 384, featherDetail: 1 },
+    counts: { specks: 13000, leaves: 9000, sprays: 1800, trunks: 140, droplets: 384, featherDetail: 1 },
   },
   high: {
     pixelRatio: 2,
@@ -191,6 +201,6 @@ export const TIERS = {
     fxaaSteps: 10,
     rippleSize: 512,
     waterDetail: 2, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 16000, leaves: 13500, trunks: 220, droplets: 768, featherDetail: 2 },
+    counts: { specks: 16000, leaves: 13500, sprays: 2800, trunks: 220, droplets: 768, featherDetail: 2 },
   },
 };

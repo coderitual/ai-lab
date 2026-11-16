@@ -6,14 +6,16 @@
 // reference, which the swan plays when the demo opens and whenever it is asked
 // to. The second is a swan left to itself: it glides about the sunlit part of
 // the pond, and now and then dunks its bill, reaches, looks round or shakes;
-// it comes when the water is touched and feeds there.
+// it comes when the water is touched and feeds there. And it can be taken in
+// hand: while steer() is being called it swims where it is pointed, and when
+// the calls stop it glides to rest and goes back to its own life.
 //
 // Either way this file only decides where the bird is, which way it faces and
 // what shape its neck is in. The shapes themselves are assets/swan/poses.js;
 // the drops are assets/fx/Droplets.js; the rings are the ripple field.
 
 import * as THREE from 'three';
-import { POSES, createPose, copyPose, blendPose } from '../assets/swan/Swan.js';
+import { POSES, createPose, copyPose, blendPose, mixPoses } from '../assets/swan/Swan.js';
 import { L } from '../assets/swan/anatomy.js';
 import { angleDiff, clamp, damp } from '../engine/math.js';
 
@@ -128,6 +130,49 @@ const FILM_POSES = FILM.pose.map(([t, name]) => [t, SHAPES[name]]);
 /** The patch of sunlit water the swan keeps to when left alone: centre and radii, metres. */
 const HOME = { x: 0, z: 0.7, rx: 3.2, rz: 1.9 };
 
+/**
+ * Swimming where it is steered (steer()). Metres, seconds, radians.
+ */
+export const STEER = {
+  /** Metres a second at full strength: a mute swan's unhurried cruise, two and a half times the film's fastest (0.22 m/s). */
+  speed: 0.55,
+  /** How quickly it gathers way, 1/s: nine tenths of its speed in about two seconds. */
+  gather: 1.1,
+  /** How quickly it loses way once let go, 1/s, for `coastFor` seconds: a heavy bird runs on. */
+  coast: 0.7,
+  coastFor: 4,
+  /** Let go away from its own patch of water, it keeps its course while it runs on, and only over this many seconds more does the pull back there return. */
+  homeAfter: 8,
+  /** The fastest it turns, radians a second: paddling round at rest, and at full speed (a circle 0.6 m in radius, one body length). */
+  turnSlow: 1.5,
+  turnFast: 0.9,
+  /** Rate of turn asked for per radian still to turn, 1/s, and how quickly the turn itself builds and dies, 1/s. */
+  turnGain: 2.4,
+  turnEase: 5,
+  /** Share of its speed it keeps while pointing 90 degrees or more off the way it was told to go: it turns first, then goes. */
+  askew: 0.3,
+  /** It stays this many metres inside the shore's outline (the same margin a call to the water keeps)... */
+  margin: 1.5,
+  /** ...and from this many metres short of that line a push toward the bank is bent along it. */
+  shy: 0.8,
+  /** A dunk or a reach asked for on the move waits until it has been let go and has slowed to this, m/s (or `coastFor` seconds have passed). */
+  settle: 0.22,
+};
+
+/** The dents the breast leaves in the water: one every `every` metres travelled, deepening with speed up to `full` m/s (see where they are made, in update()). */
+const BOW = { every: 0.045, full: 0.32 };
+
+/**
+ * The carriage of a swan that is going somewhere, as weights of four of the
+ * film's shapes (A, C, B, G) at a paddle and at full speed: the proud S
+ * drawn up taller, the bill lifted and the wings let down a little as it
+ * presses on.
+ */
+const SWIM_SHAPES = [POSES.A, POSES.C, POSES.B, POSES.G];
+const SWIM_SLOW = [0.62, 0.38, 0, 0];
+const SWIM_FAST = [0.2, 0.1, 0.5, 0.2];
+const _weights = [0, 0, 0, 0];
+
 export class SwanMind {
   /**
    * @param {object} ctx the shared context (see World.js)
@@ -157,6 +202,12 @@ export class SwanMind {
     this._lookFor = 0;
     this._goal = null; // { x, z } while called somewhere
     this._queued = null;
+    this._steer = { x: 0, z: 0, strength: 0 }; // where it is told to go while steered: a unit direction on the water
+    this._steering = false; // being steered
+    this._steerHeld = false; // steer() has been called since the last step
+    this._steerFor = 0; // seconds it has been steered
+    this._turnSpeed = 0; // radians a second
+    this._sinceSteer = 1e9; // seconds since it was let go
     this._wander = this.rng.range(0, 100);
     this._nextAct = this.rng.range(4, 7);
     this._sinceWake = 0;
@@ -183,8 +234,9 @@ export class SwanMind {
     this._tip.copy(swan.billTip);
   }
 
-  /** 'film' | 'idle' | 'swim' | 'shake' | 'dunk' | 'reach' | 'look' */
+  /** 'film' | 'steer' | 'idle' | 'swim' | 'shake' | 'dunk' | 'reach' | 'look' */
   get state() {
+    if (this._steering) return 'steer';
     if (this.filmTime !== null) return 'film';
     if (this._shake) return 'shake';
     if (this._track) return this._track.name;
@@ -207,6 +259,9 @@ export class SwanMind {
     this._shake = null;
     this._goal = null;
     this._queued = null;
+    this._steering = this._steerHeld = false;
+    this._turnSpeed = 0;
+    this._sinceSteer = 1e9;
     this._look = this._lookWant = this._lookFor = 0;
     this._wet = 0.5;
     this._dripsDone = 0;
@@ -220,10 +275,48 @@ export class SwanMind {
     this.filmTime = null;
   }
 
+  /**
+   * Swim this way. Call it every step for as long as a control is held: the
+   * swan is steered from the first call until a step passes without one.
+   *
+   * Taking it in hand ends the film where it is (the swan carries on from
+   * there), drops a call to the water, and breaks off whatever the neck was
+   * doing, except a shake, which it finishes on the move.
+   * @param {number} dirX the way to go, on the water in world space (any length)
+   * @param {number} dirZ
+   * @param {number} [strength] 0..1: how hard the control is pushed; its speed is in proportion
+   */
+  steer(dirX, dirZ, strength = 1) {
+    if (this._stage.still) return;
+    const length = Math.hypot(dirX, dirZ);
+    if (!(length > 1e-6) || !(strength > 0)) return;
+    this._steer.x = dirX / length;
+    this._steer.z = dirZ / length;
+    this._steer.strength = Math.min(1, strength);
+    this._steerHeld = true;
+    if (this._steering) return;
+    this._steering = true;
+    this._steerFor = 0;
+    this.endFilm();
+    this._goal = null;
+    this._queued = null;
+    this._lookFor = 0;
+    if (this._track && this._track.name !== 'shake') this._track = null;
+  }
+
+  /** Let go: it runs on, slows, and is on its own again. */
+  _release() {
+    this._steering = false;
+    this._sinceSteer = 0;
+    this._lookWant = 0;
+    // it has been made to work: it does something of its own soon after
+    this._nextAct = this.rng.range(3, 6);
+  }
+
   /** Swim to a point on the water and feed there. */
   callTo(x, z) {
-    if (this._stage.still) return;
-    if (this.ctx.pond.shoreDistance(x, z) > -1.5) return; // not onto the bank
+    if (this._stage.still || this._steering) return;
+    if (this.ctx.pond.shoreDistance(x, z) > -STEER.margin) return; // not onto the bank
     this.endFilm();
     this._goal = { x, z };
     // whatever it was doing with its head, it stops
@@ -232,7 +325,9 @@ export class SwanMind {
 
   /**
    * Do one of the things the swan does in the film. If it is busy the request
-   * waits its turn (only the latest one is kept).
+   * waits its turn (only the latest one is kept). While it is steered it will
+   * shake or look round as it swims, but a dunk or a reach waits until it has
+   * been let go and has slowed: it does not put its bill down at speed.
    * @param {'shake'|'dunk'|'dip'|'reach'|'look'|'lift'} name
    */
   act(name) {
@@ -241,7 +336,7 @@ export class SwanMind {
     if (name === 'lift') name = 'look';
     if (!['shake', 'dunk', 'reach', 'look'].includes(name)) return;
     this.endFilm();
-    if (this.busy) {
+    if (this.busy || (this._steering && (name === 'dunk' || name === 'reach'))) {
       this._queued = name;
       return;
     }
@@ -251,7 +346,7 @@ export class SwanMind {
   _start(name) {
     const rng = this.rng;
     const now = copyPose(createPose(), this._pose);
-    const rest = this._restPose(createPose());
+    const rest = this._steering ? this._swimPose(createPose()) : this._restPose(createPose());
     if (name === 'dunk') {
       const hold = rng.range(0.7, 1.5);
       const keys = [[0, now], [0.14, SHAPES.D], [0.3, SHAPES.E], [0.3 + hold, SHAPES.E2], [0.52 + hold, SHAPES.H]];
@@ -284,6 +379,14 @@ export class SwanMind {
     return blendPose(out, out, POSES.G, 0.3 + 0.3 * Math.sin(w * 0.071 + 2.0));
   }
 
+  /** The shape the neck is carried in while it is steered: between SWIM_SLOW and SWIM_FAST by how fast it is going. */
+  _swimPose(out) {
+    const u = clamp(this.speed / STEER.speed, 0, 1);
+    const fast = u * u * (3 - 2 * u);
+    for (let i = 0; i < _weights.length; i++) _weights[i] = SWIM_SLOW[i] + (SWIM_FAST[i] - SWIM_SLOW[i]) * fast;
+    return mixPoses(out, SWIM_SHAPES, _weights);
+  }
+
   /**
    * @param {number} dt seconds (already slowed, if time is)
    * @param {number} time seconds since the start
@@ -295,6 +398,9 @@ export class SwanMind {
       return;
     }
     this._wander += dt;
+    // steered for as long as steer() keeps being called: one step without it lets go
+    if (this._steering && !this._steerHeld) this._release();
+    this._steerHeld = false;
 
     let wantHeading = this.heading;
     let wantSpeed = 0.07;
@@ -323,8 +429,46 @@ export class SwanMind {
       wantHeading = this.heading;
       wantSpeed = this.speed;
     } else {
-      // ---- on its own
-      if (this._goal) {
+      // ---- on its own, or steered
+      if (this._steering) {
+        const st = this._steer;
+        this._steerFor += dt;
+        let dx = st.x;
+        let dz = st.z;
+        // Near the bank, the part of the push that points at it is taken
+        // away, so the swan turns and swims along the shore instead of
+        // paddling against a wall; held straight at the bank it stops.
+        const px = this.position.x;
+        const pz = this.position.z;
+        const r = Math.hypot(px, pz);
+        const room = -STEER.margin - ctx.pond.shoreDistance(px, pz); // metres of water left
+        if (room < STEER.shy && r > 1e-3) {
+          const toBank = (dx * px + dz * pz) / r;
+          if (toBank > 0) {
+            const k = (1 - clamp(room / STEER.shy, 0, 1)) * toBank;
+            dx -= (px / r) * k;
+            dz -= (pz / r) * k;
+          }
+        }
+        const push = Math.hypot(dx, dz); // what is left of it: 1 in open water
+        if (push > 0.05) wantHeading = Math.atan2(dx, dz);
+        const off = angleDiff(this.heading, wantHeading);
+        // A head that is down comes up before anything else: until the bill
+        // is well clear of the water the swan does not set off and barely turns.
+        const up = clamp((swan.billTip.y + 0.02) / 0.2, 0, 1);
+        // It turns first and then goes: little way on while it points the wrong way.
+        const facing = STEER.askew + (1 - STEER.askew) * clamp(Math.cos(off), 0, 1);
+        wantSpeed = STEER.speed * st.strength * push * facing * up;
+        glide = STEER.gather;
+        // The turn: quicker the further there is to go, up to what a swan
+        // manages (less at speed), building and dying smoothly.
+        const way = clamp(this.speed / STEER.speed, 0, 1);
+        const most = (STEER.turnSlow + (STEER.turnFast - STEER.turnSlow) * way) * (0.5 + 0.5 * st.strength) * (0.3 + 0.7 * up);
+        this._turnSpeed = damp(this._turnSpeed, clamp(off * STEER.turnGain, -most, most), STEER.turnEase, dt);
+        turnRate = 0; // the heading is turned below, by _turnSpeed alone
+        // the head leads into a turn, unless it is looking round at something
+        if (this._lookFor <= 0) this._lookWant = clamp(off * 0.6, -0.55, 0.55);
+      } else if (this._goal) {
         const dx = this._goal.x - this.position.x;
         const dz = this._goal.z - this.position.z;
         // stop with the bill, not the breast, over the place
@@ -346,7 +490,9 @@ export class SwanMind {
         const out = hx * hx + hz * hz;
         if (out > 0.55) {
           const home = Math.atan2(HOME.x - this.position.x, HOME.z - this.position.z);
-          wantHeading = this.heading + angleDiff(this.heading, home) * clamp((out - 0.55) * 2.5, 0, 1) + (wantHeading - this.heading) * 0.3;
+          // (just let go somewhere else, it does not turn for home at once)
+          const homesick = clamp((this._sinceSteer - STEER.coastFor) / STEER.homeAfter, 0, 1);
+          wantHeading = this.heading + angleDiff(this.heading, home) * clamp((out - 0.55) * 2.5, 0, 1) * homesick + (wantHeading - this.heading) * 0.3;
         }
         turnRate = 0.45;
       }
@@ -361,10 +507,22 @@ export class SwanMind {
         if (tr.slow && tr.t > tr.slow[0] && tr.t < tr.slow[1]) wantSpeed = Math.min(wantSpeed, 0.06);
         if (tr.name === 'dunk' && tr.t < 2) wantSpeed = Math.min(wantSpeed, 0.11);
         if (tr.t >= tr.end) this._track = null;
+      } else if (this._steering) {
+        // The swimming carriage. From wherever the neck was (the film may
+        // have been cut off with the bill under water) it goes there
+        // smoothly, and in a hurry while the bill is still near the surface.
+        const low = 1 - clamp(swan.billTip.y / 0.2, 0, 1);
+        const rate = (2.4 + 5 * low) * clamp(this._steerFor / 0.15, 0.2, 1);
+        blendPose(this._pose, this._pose, this._swimPose(this._rest), 1 - Math.exp(-dt * rate));
+        if (this._queued === 'shake' || this._queued === 'look') {
+          const name = this._queued;
+          this._queued = null;
+          this._start(name);
+        }
       } else {
         // settle toward the resting shape
         blendPose(this._pose, this._pose, this._restPose(this._rest), 1 - Math.exp(-dt * 1.4));
-        if (this._queued) {
+        if (this._queued && (this._sinceSteer > STEER.coastFor || this.speed < STEER.settle)) {
           const name = this._queued;
           this._queued = null;
           this._start(name);
@@ -382,7 +540,13 @@ export class SwanMind {
         }
       }
 
-      this.heading += angleDiff(this.heading, wantHeading) * Math.min(1, dt * turnRate);
+      if (!this._steering) {
+        // let go in the middle of a turn, it does not stop turning dead
+        this._turnSpeed = damp(this._turnSpeed, 0, 2.5, dt);
+        this._sinceSteer += dt;
+        if (this._sinceSteer < STEER.coastFor && wantSpeed < this.speed) glide = STEER.coast;
+      }
+      this.heading += angleDiff(this.heading, wantHeading) * Math.min(1, dt * turnRate) + this._turnSpeed * dt;
       this.speed = damp(this.speed, wantSpeed, glide, dt);
     }
 
@@ -417,6 +581,17 @@ export class SwanMind {
 
     _forward.set(Math.sin(this.heading), 0, Math.cos(this.heading));
     this.position.addScaledVector(_forward, this.speed * dt);
+    if (this.filmTime === null) {
+      // It cannot leave the water: a point past the line it keeps from the
+      // shore is put back on it, toward the pond's centre (shoreDistance is
+      // measured along that line), so what is left of its movement slides
+      // it along the bank.
+      const over = ctx.pond.shoreDistance(this.position.x, this.position.z) + STEER.margin;
+      if (over > 0) {
+        const r = Math.hypot(this.position.x, this.position.z);
+        this.position.multiplyScalar(Math.max(0, r - over) / r);
+      }
+    }
     this._write(turn);
 
     // ---- the bill and the water
@@ -457,12 +632,15 @@ export class SwanMind {
     // The breast pushes water aside as it moves: a small dent every few
     // centimetres travelled, which the ripple field turns into the bow line.
     // (The churned water behind the tail is laid down by pond/surface.js,
-    // from the body's movement alone.)
+    // from the body's movement alone.) Up to BOW.full, half as fast again
+    // as the film's fastest, the dents deepen with speed; beyond it they
+    // stay as they are and come no more often, or a swan steered at full
+    // speed would light up a sheet of glints either side of itself.
     this._sinceWake += this.speed * dt;
-    if (this._sinceWake > 0.045) {
+    if (this._sinceWake > BOW.every * Math.max(1, this.speed / BOW.full)) {
       this._sinceWake = 0;
       const reach = swan.footprint.length * 0.42;
-      ctx.ripple.disturb(this.position.x + _forward.x * reach, this.position.z + _forward.z * reach, 0.1, 0.0005 + this.speed * 0.004);
+      ctx.ripple.disturb(this.position.x + _forward.x * reach, this.position.z + _forward.z * reach, 0.1, 0.0005 + Math.min(this.speed, BOW.full) * 0.004);
     }
     // and it never sits perfectly still: a slow breath of a ripple under the body
     if (Math.floor(time * 0.7) !== Math.floor((time - dt) * 0.7)) {
