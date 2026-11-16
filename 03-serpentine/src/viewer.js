@@ -37,7 +37,20 @@
 //                  the whole bounding box with 6 % to spare on each side. One CSS pixel is span / width metres;
 //                  that number is in the page title and in what __viewer.view() returns.
 //
+// The world (asset=world). The camera does not circle anything: it stands on the real road.
+//   s, lat         where: track distance from the start line and metres left of the centre line (default 0, 0)
+//   h              the camera's height above the road (default 1.45, the chase camera's)
+//   look, pitch    degrees it is turned off the road's direction (positive: to the left) and above the horizontal
+//   fov            the lens, top to bottom (default 50)
+//   back           metres before s at which it stands (default 0; 5.7 with car=1 or card=)
+//   top=200        instead: a view from straight above, this many metres across, a true map (+Z up, +X left)
+//   car=1          parks the car at (s, lat), lamps as `lights` says: its head lamps light the scene
+//   card=sun|shade a grey card (18 %), a white card, a chrome ball and a matt ball at (s, lat); with `shade`
+//                  a screen stands between them and the light. __viewer.lightTest.points has their middles.
+//   focus=130      track distance the shadow map is centred on, if not s
+//
 // The handle
+//   __viewer.read(x, y, half)  the picture's colour round a CSS pixel as the screen gets it, [r, g, b] in 0..255
 //   __viewer.view()            the camera as it is: { az, el, dist, fov, target, ortho, span, width, height,
 //                              metresPerPixel, pixelsPerMetre, origin }  (origin: the CSS pixel where the
 //                              asset's own origin lands, from the top left; the scale fields are null in perspective)
@@ -48,6 +61,7 @@
 
 import * as THREE from 'three';
 import { createCar } from './assets/car/index.js';
+import { createLightTest, placeOnRoad, roadCamera } from './assets/world/dev.js';
 import { createWorld } from './assets/world/index.js';
 import { Engine } from './engine/Engine.js';
 import { FramePipeline } from './engine/FramePipeline.js';
@@ -57,17 +71,20 @@ import { DEG } from './engine/math.js';
 import { parseParams } from './engine/params.js';
 import { createRng } from './engine/rng.js';
 import { LAMPS } from './game/config.js';
-import { createPlaceholderTrack } from './game/placeholder.js';
+import { createTrack } from './game/track.js';
 
 const params = parseParams();
 const given = params.viewer;
+// the world mode's own parameters (see "The world" above)
+const query = new URLSearchParams(location.search);
+const number = (key, fallback) => (Number.isFinite(parseFloat(query.get(key))) ? parseFloat(query.get(key)) : fallback);
 
 const engine = new Engine(document.getElementById('app'), { manual: params.manual, pixelRatio: params.dpr });
 const caps = probeCaps(engine.renderer, { ldr: params.ldr });
 const tier = params.quality ?? caps.tier;
 engine.setMaxPixelRatio(TIERS[tier].pixelRatio);
 const pipeline = new FramePipeline(engine.renderer, caps, { tier, post: params.post });
-const track = createPlaceholderTrack();
+const track = createTrack();
 const world = createWorld({ renderer: engine.renderer, caps, tier, track, rng: createRng(params.seed), params });
 const time = world.time;
 
@@ -114,11 +131,48 @@ const ASSETS = {
   },
   world() {
     const box = { center: new THREE.Vector3(0, 1.2, 0), half: new THREE.Vector3(6, 1.2, 6) };
-    return { box, view: { az: 180, el: 10, dist: 14, fov: 50 } };
+    const made = { box, view: { az: 180, el: 10, dist: 14, fov: 50 } };
+    // the road's own frame at (s, lat): whatever is parked there stands on the surface
+    placeOnRoad(track, road.s, road.lat, stand);
+    if (query.get('car') === '1') {
+      made.car = createCar({ paint: params.paint ?? undefined, plate: params.plate ?? undefined, tier, caps });
+      made.car.setLights(lampPreset(given.lights));
+      made.car.setReflections({ cube: null, sky: 1 });
+      stand.add(made.car.object);
+    }
+    if (query.has('card')) {
+      const towardsLight = new THREE.Vector3().fromArray(time.sun.dir).transformDirection(stand.matrixWorld.clone().invert());
+      made.lightTest = createLightTest({ mode: query.get('card') === 'shade' ? 'shade' : 'sun', towardsLight: towardsLight.toArray() });
+      stand.add(made.lightTest.group);
+    }
+    return made;
   },
+};
+/** Where the world mode's camera stands (see roadCamera() in assets/world/dev.js). */
+const road = {
+  s: given.s ?? 0,
+  lat: number('lat', 0),
+  // a car or the cards are looked at from where the chase camera would be
+  back: number('back', query.get('car') === '1' || query.has('card') ? 5.7 : 0),
+  h: number('h', 1.45),
+  look: number('look', 0),
+  pitch: number('pitch', 0),
+  top: number('top', null),
+  /** Track distance the shadow map is centred on (default: s). */
+  focus: number('focus', null),
 };
 const assetName = ASSETS[given.asset] ? given.asset : 'car';
 const asset = ASSETS[assetName]();
+// a parked car's head lamps, for whatever in the world answers them (the paint's glass beads)
+const beams = [];
+if (asset.car) {
+  stand.updateMatrixWorld(true);
+  const lamps = lampPreset(given.lights);
+  const pos = new THREE.Vector3();
+  for (const light of asset.car.headlights) pos.add(light.getWorldPosition(new THREE.Vector3()).multiplyScalar(0.5));
+  const dir = new THREE.Vector3(0, 0, 1).transformDirection(stand.matrixWorld);
+  beams.push({ pos, dir, low: lamps.low ?? 0, high: lamps.high ?? 0 });
+}
 
 // ---- the camera
 const view = {
@@ -132,6 +186,7 @@ const view = {
   ortho: given.ortho,
   span: given.span ?? null,
 };
+if (assetName === 'world') Object.assign(view, road);
 
 /** Each ortho view: where the camera stands, which way is up in the picture, and the box's width and height in it. */
 const ORTHO = {
@@ -169,6 +224,19 @@ const up = new THREE.Vector3();
 const point = new THREE.Vector3();
 
 function placeCamera() {
+  if (assetName === 'world' && !ORTHO[view.ortho]) {
+    // the world is looked at from the road itself
+    placeOnRoad(track, view.s, view.lat, stand);
+    camera = view.top ? orthographic : perspective;
+    perspective.fov = view.fov;
+    perspective.aspect = engine.aspect;
+    roadCamera(track, view, camera, engine.aspect);
+    for (const object of scenery) object.visible = true;
+    world.scene.background = null;
+    frame.look = time.look;
+    document.title = `viewer · world · s ${view.s} lat ${view.lat}${view.top ? ` · ${view.top} m across` : ` look ${view.look} pitch ${view.pitch}`}`;
+    return;
+  }
   const ortho = ORTHO[view.ortho] || null;
   const az = (ortho ? ortho.az : view.az) * DEG;
   const el = (ortho ? ortho.el : view.el) * DEG;
@@ -243,9 +311,28 @@ engine.onContextRestored(() => world.restore());
 engine.onUpdate = (dt, simTime) => world.update(dt, simTime);
 engine.onRender = placeCamera;
 engine.onDraw = () => {
-  world.prepareView(camera, stand.getWorldPosition(focus));
+  if (Number.isFinite(view.focus)) track.pointAt(view.focus, view.lat, focus);
+  else stand.getWorldPosition(focus);
+  world.prepareView(camera, focus, beams);
   pipeline.render(world.scene, camera, rect, frame);
 };
+
+/**
+ * The picture's colour round a CSS pixel, as the screen gets it: [r, g, b] in 0..255, averaged over a square of
+ * 2 * half + 1 pixels. Draws a frame first: the canvas keeps its picture only until the browser has shown it.
+ */
+function read(x, y, half = 2) {
+  engine.advance(0);
+  const gl = engine.renderer.getContext();
+  const n = 2 * half + 1;
+  const bytes = new Uint8Array(n * n * 4);
+  const px = Math.round(x * engine.pixelRatio) - half;
+  const py = engine.bufferHeight - 1 - Math.round(y * engine.pixelRatio) - half;
+  gl.readPixels(px, py, n, n, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+  const sum = [0, 0, 0];
+  for (let i = 0; i < n * n; i++) for (let c = 0; c < 3; c++) sum[c] += bytes[i * 4 + c];
+  return sum.map((v) => Math.round((v / (n * n)) * 10) / 10);
+}
 
 window.__viewer = {
   engine,
@@ -253,6 +340,9 @@ window.__viewer = {
   world,
   stand,
   car: asset.car ?? null,
+  track,
+  lightTest: asset.lightTest ?? null,
+  read,
   /** Run and draw `n` frames, a sixtieth of a second apart. */
   frames(n = 1) {
     for (let i = 0; i < n; i++) engine.advance(1 / 60);
