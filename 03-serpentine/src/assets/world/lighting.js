@@ -1,26 +1,39 @@
-// The light, defined once. One table per time of day; everything that shades,
-// glows or exposes reads it, and nobody keeps a copy. Weather, when it comes,
-// is more tables of the same shape.
+// The light, defined once. One table per time of day; the sky, the haze, the
+// sun's shadow, the environment map, the lamps, the cars' automatic lights and
+// the frame's grade all read it, and nobody keeps a copy. Weather, when it
+// comes, is more tables of the same shape.
 //
-// Units. Light is in scene units chosen so that an exposure of 1 suits a
-// sunlit afternoon:
-//   - a light's `intensity` is what it lays on a surface facing it (what
-//     THREE.DirectionalLight.intensity means); a matt surface sends back
-//     albedo * intensity / PI. The day's sun is 10: a white wall square to it
-//     shows about 3, sunlit asphalt about 0.2.
-//   - sky and fog colours are what a camera pointed at them sees, before
-//     exposure.
-//   - the frame pipeline multiplies everything by `exposure` and then applies
-//     the tone curve, which turns about 0.18 into middle grey.
-// Night is not day tinted blue. Its light really is a few hundred times
-// weaker (the moon is 0.03 against the sun's 10) and the exposure opens five
-// stops (x32) to look at it. A lamp does not change with the time of day, so
-// the same lamp that is a pale dot at noon glares at night, as it does to a
-// camera. (The true gap between sun and moon is nearer twenty stops; five is
-// what leaves the road readable on a screen.)
+// UNITS. Light is in scene units chosen so that an exposure of 1 suits the
+// afternoon: a sheet of white paper lying in the open sun sends back about 1.
+//   - An `intensity` is what a light lays on a surface facing it (irradiance;
+//     what THREE.DirectionalLight.intensity means). A matt surface of albedo a
+//     sends back a * E / PI.
+//   - A radiance (every sky, haze, cloud, disc and ground colour here) is what
+//     a camera pointed at the thing records before exposure. A whole sky of
+//     radiance L lays PI * L on the ground.
+//   - The frame pipeline multiplies by `exposure` and applies the tone curve,
+//     which leaves 0.18 at middle grey.
+// By day the flat ground gets about 2.2 from the sun (5.4 on a surface facing
+// it, times the sine of 24 degrees) and about 0.9 from the sky: 3.1 in all,
+// PI within a hair, so an 18 % grey card in the sun reads 0.18 and lands on
+// middle grey, and in open shade it is 1.8 stops down and blue.
+//
+// NIGHT is not day tinted blue. Its light really is a few hundred times
+// weaker and the exposure opens five stops (x32) to look at it. Lamps do not
+// change with the time of day, so the lamp that is a pale dot in the afternoon
+// glares at night, as it does to a camera. (The true gap between sun and moon
+// is nearer twenty stops; eight is what leaves a moonlit road readable on a
+// screen, and five of them are taken up by the exposure.)
+//
+// THE DISCS are the one place the ratios are not real. A sun true to its
+// light would be about 90 000 here, beyond what a half-float target holds,
+// and a moon true to its light would be a white hole with no phase. Both are
+// set to what a camera with some highlight recovery shows: the sun still
+// thousands of times brighter than paper, so that it blooms.
 //
 // Directions are unit vectors from the ground towards the light, in world
-// space (+Y up).
+// space (+Y up). On the track map (+Z up the page, +X to the left) the
+// lakeside straight is driven towards +X.
 
 /**
  * @typedef {[number, number, number]} Rgb linear, scene units
@@ -33,29 +46,61 @@
  * @property {Rgb} sun.color its colour (the brightest channel is 1)
  * @property {number} sun.intensity what it lays on a surface facing it
  *
- * @property {object} sky what the sky dome and the environment map are drawn from
- * @property {Rgb} sky.zenith straight up
- * @property {Rgb} sky.horizon at the horizon, away from the sun
- * @property {Rgb} sky.ground what the dome shows below the horizon (distant land, for reflections)
- * @property {number} sky.glow how much the sky brightens towards the sun or moon (times the light's colour)
- * @property {number} sky.discSize angular radius of the sun's or moon's disc, degrees
- * @property {number} sky.disc brightness of the disc (times the light's colour)
- * @property {number} sky.stars brightness of the stars (0: none)
+ * @property {object} sky what the dome draws, and with it the environment map that lights the scene from all round
+ * @property {Rgb} sky.zenith radiance straight up
+ * @property {Rgb} sky.horizon radiance of clear air at the horizon, a right angle away from the sun (the haze of
+ *   `fog` is laid over it, so the very horizon shows the haze's colour, not this one)
+ * @property {number} sky.falloff how quickly the zenith's colour gives way to the horizon's as the path through the
+ *   air lengthens (per air mass: 0.15 keeps the blue down to about 20 degrees)
+ * @property {number} sky.phase 0..1 how much darker the sky is at a right angle to the sun than towards and away
+ *   from it (the shape of Rayleigh scattering)
+ * @property {object} sky.glow the brightening round the sun or moon: light scattered forwards by haze
+ * @property {Rgb} sky.glow.color
+ * @property {[number, number]} sky.glow.wide radiance added at the sun itself, and how tight the lobe is (0..1;
+ *   0.7 has fallen to half about 16 degrees out)
+ * @property {[number, number]} sky.glow.tight the aureole: the same, for the few degrees round the disc
+ * @property {object} sky.disc the sun's or the moon's disc
+ * @property {number} sky.disc.size angular radius, degrees (both are drawn larger than life: 0.27 is true)
+ * @property {number} sky.disc.radiance brightness at its centre, times `sun.color`
+ * @property {number} sky.disc.limb how much darker its rim is than its centre (the sun), 0..1
+ * @property {number} sky.disc.phase the lit share of its width, 0..1 (1: a full disc; the moon: 0.75)
+ * @property {number} sky.disc.tilt degrees the lit side is turned from "towards the horizon below it"
+ * @property {number} sky.disc.seas 0..1 how dark the moon's seas are
+ * @property {Rgb} sky.ground what the dome shows below the horizon: distant land in this light, for reflections
+ * @property {number} sky.stars what a star of magnitude 0 lays on the lens (0: no stars); the faintest drawn are
+ *   about 1/400 of it
+ * @property {number} sky.milkyWay radiance of the brightest part of the band of unresolved stars
+ * @property {Rgb} sky.airglow radiance added low in the sky by the upper air's own faint light
+ * @property {object} sky.clouds
+ * @property {number} sky.clouds.cover 0..1 share of the sky the cumulus layer covers
+ * @property {number} sky.clouds.wisps 0..1 how strong the high streaks are
+ * @property {number} sky.clouds.lit share of the sun's light a cloud facing it sends on (times sun colour and
+ *   intensity): what the bright edges are made of
+ * @property {number} sky.clouds.silver how much brighter those edges get when the sun is behind the cloud
+ * @property {Rgb} sky.clouds.shade radiance of a cloud's body where the sun does not reach
+ * @property {[number, number]} sky.clouds.drift how fast they move, in sky widths per second (x, z): a few
+ *   thousandths at most, or the environment map made at start-up shows clouds that have left
  *
- * @property {object} ambient fill light from all round: the sky above, light bounced off the land below
- * @property {Rgb} ambient.sky
- * @property {Rgb} ambient.ground
- * @property {number} ambient.intensity
+ * @property {object} env the environment map made from the sky
+ * @property {number} env.intensity 1: surfaces are lit by the sky exactly as it is drawn
  *
- * @property {object} fog haze: the colour distance fades to, and how fast
- * @property {Rgb} fog.color
- * @property {number} fog.density per metre, at the level of the lake
+ * @property {object} ambient a fill on top of the sky's own light (a HemisphereLight): light bounced about by the
+ *   land, and a floor under the shadows. Where a device cannot make an environment map it also stands in for it.
+ * @property {Rgb} ambient.sky colour of the fill from above
+ * @property {Rgb} ambient.ground colour of the fill from below
+ * @property {number} ambient.intensity what the fill from above lays on level ground
+ *
+ * @property {object} fog haze: what distance fades to, and how fast
+ * @property {Rgb} fog.color radiance of deep haze seen away from the sun: the colour of the horizon
+ * @property {Rgb} fog.sun radiance added to it looking straight at the sun
+ * @property {number} fog.sunLobe how tightly that is gathered round the sun (a power of the cosine: 4 is broad)
+ * @property {number} fog.density share of light lost per metre at the level of the lake (y = 0)
  * @property {number} fog.heightFalloff per metre of height: how quickly the haze thins above the valleys
  *
  * @property {number} exposure under the open sky
  * @property {number} tunnelExposure inside the tunnel; the game eases between the two with track.sky
  *
- * @property {import('../../engine/FramePipeline.js').Look} look the grade of the finished picture
+ * @property {import('../../engine/FramePipeline.js').Look & { ghosts?: number }} look the grade of the finished picture
  *
  * @property {{ street: number, tunnel: number, windows: number }} lamps how far each kind of lamp is turned up, 0..1
  * @property {'drl'|'low'} carLights what a car's automatic lamps do under the open sky (in the tunnel: always low)
@@ -63,58 +108,101 @@
 
 const DEG = Math.PI / 180;
 
-/** A unit vector from a compass bearing (0 = +Z, 90 = +X) and a height above the horizon, both in degrees. */
-function towards(bearing, elevation) {
+/**
+ * A unit vector from a bearing on the track map and a height above the horizon, both in degrees. Bearing 0 is +Z
+ * (up the map), 90 is +X (the way the lakeside straight is driven), 180 is -Z (out over the lake).
+ */
+export function towards(bearing, elevation) {
   const c = Math.cos(elevation * DEG);
   return [Math.sin(bearing * DEG) * c, Math.sin(elevation * DEG), Math.cos(bearing * DEG) * c];
 }
 
+/**
+ * Where the sun stands, chosen on the track map for the pictures round the lap (bearing of travel in brackets):
+ *   lakeside straight (90)   60 degrees to the left, over the lake: it rakes across the road from ahead-left; the
+ *                            gantry and the lamp posts throw shadows three times their height across both lanes
+ *   sweeper, esses (70..-15) from the left and behind, square to the road for most of it: the spruces of the
+ *                            downhill side lay their shadows across the pavement, bend after bend
+ *   viaduct, ramp (-28)      dead astern: the car, the deck and the hill ahead are lit full on, the sky ahead is
+ *                            at its deepest blue
+ *   hairpins                 the legs driven at 152 look straight into it, the one between has it behind
+ *   summit (177..-130)       ahead and to the right, swinging out of the picture round the crest
+ *   descent (-100..172)      to the right and ahead, behind the rock face: the road runs in the mountain's shade
+ *                            with the valley bright beyond the rail, and looks into the sun on the two straights
+ *                            that point at it (-22 and -35 degrees off the nose)
+ *   hook (133)               17 degrees off the nose on the way back down to the shore
+ */
+const SUN = towards(150, 24);
+
+/**
+ * The moon: opposite the sun on the map and high. On the straight it is behind and to the right, over the wood,
+ * so the tail of the car is moonlit and the moon rides in the rear screen; over the viaduct it is dead ahead; on
+ * the descent it lights the rock face that the afternoon leaves in shade.
+ */
+const MOON = towards(330, 50);
+
 /** @type {{ day: TimeOfDay, night: TimeOfDay }} */
 export const TIMES = {
-  // A clear afternoon late in the year: the sun 24 degrees up, warm, well to one side; long soft shadows.
+  // A clear afternoon late in the year: the sun 24 degrees up, warm, well to one side; long shadows; haze in the
+  // valleys; a few clouds that catch the light.
   day: {
     name: 'day',
-    sun: { dir: towards(125, 24), color: [1.0, 0.86, 0.68], intensity: 10 },
+    sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 6.2 },
     sky: {
-      zenith: [0.11, 0.25, 0.62],
-      horizon: [0.78, 0.9, 1.05],
-      ground: [0.16, 0.17, 0.15],
-      glow: 0.9,
-      discSize: 0.6,
-      disc: 4000,
+      zenith: [0.075, 0.165, 0.42],
+      horizon: [0.3, 0.4, 0.56],
+      falloff: 0.15,
+      phase: 0.4,
+      glow: { color: [1.0, 0.87, 0.68], wide: [0.75, 0.74], tight: [7, 0.975] },
+      disc: { size: 0.4, radiance: 3000, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
+      // grass, rock and forest of albedo 0.11 under the 3.1 the sun and sky lay on them
+      ground: [0.105, 0.112, 0.09],
       stars: 0,
+      milkyWay: 0,
+      airglow: [0, 0, 0],
+      clouds: { cover: 0.44, wisps: 0.6, lit: 0.2, silver: 1.6, shade: [0.27, 0.31, 0.39], drift: [0.0011, 0.0004] },
     },
-    ambient: { sky: [0.5, 0.66, 1.0], ground: [0.42, 0.38, 0.3], intensity: 0.7 },
-    fog: { color: [0.6, 0.72, 0.88], density: 0.0011, heightFalloff: 0.02 },
+    env: { intensity: 1 },
+    // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
+    // back off sunlit land
+    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.1 },
+    fog: { color: [0.38, 0.47, 0.6], sun: [1.05, 0.72, 0.38], sunLobe: 5, density: 0.00036, heightFalloff: 0.011 },
     exposure: 1,
-    // about two and a half stops more inside, where only the lamps and the portals' daylight reach
+    // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
-    look: { toe: 0.012, shoulder: 1.6, contrast: 1.08, saturation: 1.06, tint: [1.0, 0.99, 0.965], vignette: 0.22, grain: 0.6, bloom: 0.06 },
+    look: { toe: 0.012, shoulder: 1.6, contrast: 1.08, saturation: 1.06, tint: [1.0, 0.99, 0.965], vignette: 0.22, grain: 0.6, bloom: 0.1 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     carLights: 'drl',
   },
 
-  // A clear night under a three-quarter moon, high on the other side. The moon draws the ridges and the edges
-  // of the road; everything else is lamps.
+  // A clear night under a three-quarter moon. The moon draws the ridges, the edges of the road and the car's
+  // outline; everything else is lamps.
   night: {
     name: 'night',
-    sun: { dir: towards(305, 58), color: [0.62, 0.76, 1.0], intensity: 0.03 },
+    sun: { dir: MOON, color: [0.6, 0.75, 1.0], intensity: 0.036 },
     sky: {
-      zenith: [0.0005, 0.001, 0.0026],
-      horizon: [0.0016, 0.0023, 0.0042],
-      ground: [0.0004, 0.0005, 0.0007],
-      glow: 0.012,
-      discSize: 0.7,
-      disc: 2.5,
-      stars: 0.05,
+      zenith: [0.00022, 0.00042, 0.0011],
+      horizon: [0.0008, 0.0013, 0.0026],
+      falloff: 0.12,
+      phase: 0.25,
+      glow: { color: [0.62, 0.77, 1.0], wide: [0.002, 0.7], tight: [0.012, 0.95] },
+      disc: { size: 0.9, radiance: 0.055, limb: 0.1, phase: 0.75, tilt: -25, seas: 0.5 },
+      ground: [0.0003, 0.0004, 0.00065],
+      stars: 1.5e-6,
+      milkyWay: 0.0005,
+      airglow: [0.0003, 0.00055, 0.0004],
+      clouds: { cover: 0.44, wisps: 0.6, lit: 0.2, silver: 2.2, shade: [0.00016, 0.00024, 0.0005], drift: [0.0011, 0.0004] },
     },
-    ambient: { sky: [0.4, 0.56, 1.0], ground: [0.2, 0.22, 0.28], intensity: 0.0035 },
-    fog: { color: [0.0011, 0.0016, 0.003], density: 0.0013, heightFalloff: 0.02 },
+    env: { intensity: 1 },
+    // the night sky lays only about a tenth of the moon's light on the ground; this keeps the moon's shadows
+    // from being holes
+    ambient: { sky: [0.45, 0.6, 1.0], ground: [0.3, 0.36, 0.5], intensity: 0.003 },
+    fog: { color: [0.001, 0.0015, 0.0027], sun: [0.0007, 0.0009, 0.0013], sunLobe: 4, density: 0.00042, heightFalloff: 0.011 },
     // five stops above day
     exposure: 32,
     // the lit tunnel is two stops brighter than the moonlit road outside
     tunnelExposure: 8,
-    look: { toe: 0.03, shoulder: 1.5, contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], vignette: 0.32, grain: 1.2, bloom: 0.1 },
+    look: { toe: 0.02, shoulder: 1.5, contrast: 1.1, saturation: 0.94, tint: [0.95, 0.985, 1.05], vignette: 0.32, grain: 1.2, bloom: 0.15 },
     lamps: { street: 1, tunnel: 1, windows: 1 },
     carLights: 'low',
   },
