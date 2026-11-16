@@ -126,6 +126,8 @@ function lampPreset(name) {
   if (name === 'high') return { ...off, ...LAMPS.low, high: 1 };
   if (name === 'brake') return { ...off, ...auto, brake: 1 };
   if (name === 'all') return { drl: 1, low: 1, high: 1, tail: 1, brake: 1, reverse: 1, indicatorL: 1, indicatorR: 1, interior: 1 };
+  // a list of single functions at full strength, e.g. lights=tail,reverse,indicatorL
+  if (name && name.split(',').every((k) => k in off)) return { ...off, ...Object.fromEntries(name.split(',').map((k) => [k, 1])) };
   return { ...off, ...auto };
 }
 
