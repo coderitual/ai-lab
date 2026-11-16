@@ -144,6 +144,10 @@ const REFLECTIONS = (coat) => /* glsl */ `
 
 function patch(material, shared, caps, { vertex = true, vertexPars = '', vertexMain = '', fragmentPars = '', replace = [] }) {
   material.defines = { ...(material.defines || {}), ...(caps ? targetDefines(caps) : {}) };
+  // three.js caches programs by the source of onBeforeCompile, which is this same closure for every car material:
+  // without a key of its own a material can be handed another's program
+  const key = JSON.stringify([vertex, vertexPars, vertexMain, fragmentPars, replace]);
+  material.customProgramCacheKey = () => key;
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, shared);
     if (vertex) {
@@ -371,7 +375,7 @@ void carLamp(float lens, float w) {
     // the reversing lamp's clear window
     float rev = carInside(carBox(qg.xy, vec2(0.407, 0.858), vec2(0.021, 0.008), 0.003));
     col = mix(col, vec3(0.55), rev); met = mix(met, 0.7, rev); rough = mix(rough, 0.15, rev);
-    emit = mix(emit, vec3(1.0, 0.98, 0.95) * 40.0 * carLampsB.y, rev);
+    emit = mix(emit, vec3(1.0, 0.98, 0.95) * 14.0 * carLampsB.y, rev);
     // blades: 22 x 5 mm, leaning 35 degrees, 37 mm apart; the upper row leans out, the lower row in
     x = qf.x;
     yu = TAIL_UP(x); yl = TAIL_LOW(x);
@@ -631,8 +635,8 @@ export function createEmitterMaterial(shared, caps) {
   {
     int f = int(vLampFn + 0.5);
     vec3 e = vec3(0.0);
-    if (f == ${LAMP_FN.thirdBrake}) e = vec3(1.0, 0.02, 0.01) * 160.0 * carLampsB.x;
-    else if (f == ${LAMP_FN.plate}) e = vec3(1.0, 0.97, 0.92) * 25.0 * carLampsA.w;
+    if (f == ${LAMP_FN.thirdBrake}) e = vec3(1.0, 0.02, 0.01) * 50.0 * carLampsB.x;
+    else if (f == ${LAMP_FN.plate}) e = vec3(1.0, 0.97, 0.92) * 5.0 * carLampsA.w;
     else if (f == ${LAMP_FN.screen}) e = vec3(0.55, 0.7, 1.0) * 1.2 * carLampsC.x;
     totalEmissiveRadiance += e;
   }`,

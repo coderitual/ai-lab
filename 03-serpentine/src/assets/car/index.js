@@ -146,7 +146,7 @@ export function createCar({ paint = 'silver', plate = 'AI LAB03', tier = 'high',
     const details = buildDetails(samples, { tier, plate });
     const trim = {
       chrome: () => createTrimMaterial(shared, caps, { color: [0.83, 0.84, 0.86], metal: 1, rough: 0.08 }),
-      gloss: () => createTrimMaterial(shared, caps, { color: [0.01, 0.01, 0.012], metal: 0, rough: 0.05 }),
+      gloss: () => createTrimMaterial(shared, caps, { color: [0.01, 0.01, 0.012], metal: 0, rough: 0.06, coat: 1 }),
       matte: () => createTrimMaterial(shared, caps, { color: [0.02, 0.02, 0.022], metal: 0, rough: 0.65 }),
       glass: () => createTrimMaterial(shared, caps, { color: [0.62, 0.63, 0.64], metal: 1, rough: 0.02 }),
       emit: () => createEmitterMaterial(shared, caps),

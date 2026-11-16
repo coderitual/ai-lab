@@ -470,7 +470,8 @@ export function buildDetails(samples, { tier, plate }) {
   }
 
   // ---- the third brake light behind the top of the rear screen, and the plate lamps over the plate
-  const tb = hit(V(0, 2, LAMPS.thirdBrake.z), V(0, -1, 0));
+  // (30 mm further down the glass than the sheet's place: there the screen's black band, 35 mm, would hide it)
+  const tb = hit(V(0, 2, LAMPS.thirdBrake.z - 0.03), V(0, -1, 0));
   const tbFrame = frame(tb.point.clone().addScaledVector(tb.normal, -0.014), tb.normal, V(0, 0, -1).negate());
   emit.add(new THREE.BoxGeometry(0.32, 0.016, 0.006), tbFrame, LAMP_FN.thirdBrake);
   for (const s of [1, -1]) {
