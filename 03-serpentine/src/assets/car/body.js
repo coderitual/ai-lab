@@ -82,7 +82,10 @@ export function createLayout(skin, edge) {
     while (i < spans - 1 && atlas[i + 1] < coord) i++;
     return (i + (coord - atlas[i]) / (atlas[i + 1] - atlas[i])) / spans;
   };
-  return { u, v, toU: inverse(u.atlas), toV: inverse(v.atlas) };
+  const sum = (list) => list.reduce((a, b) => a + b, 0);
+  // metres of skin the atlas spans each way (round the section, the floor counted at its weight)
+  const extent = [sum(along), sum(round.map((l, k) => Math.max(l, 0.012) * weights[k]))];
+  return { u, v, toU: inverse(u.atlas), toV: inverse(v.atlas), extent };
 }
 
 /** Is a point of the left half inside the hole a wheel arch cuts through the body? `grow` enlarges the hole (m). */

@@ -58,6 +58,7 @@ import { createCar } from './assets/car/index.js';
 import { createWorld } from './assets/world/index.js';
 import { Engine } from './engine/Engine.js';
 import { FramePipeline } from './engine/FramePipeline.js';
+import { ReflectionProbe } from './engine/ReflectionProbe.js';
 import { TIERS, probeCaps } from './engine/caps.js';
 import { encodeForTarget } from './engine/glsl.js';
 import { DEG } from './engine/math.js';
@@ -117,7 +118,12 @@ const ASSETS = {
     car.setLights(lampPreset(given.lights));
     car.setReflections({ cube: null, sky: 1 });
     stand.add(car.object);
-    return { car, box: car.box, view: { az: 150, el: 12, dist: 7.5, fov: 40 } };
+    // its contact shadow lies on the road, and its reflection probe (probe=0: none) is redrawn whole every frame
+    world.scene.add(car.shadow);
+    car.poseShadow(stand.position, new THREE.Vector3(0, 1, 0), stand.rotation.y, 1);
+    const probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[tier].probeSize) : null;
+    if (probe) car.setReflections({ cube: probe.texture, sky: 1 });
+    return { car, probe, box: car.box, view: { az: 150, el: 12, dist: 7.5, fov: 40 } };
   },
   world() {
     const box = { center: new THREE.Vector3(0, 1.2, 0), half: new THREE.Vector3(6, 1.2, 6) };
@@ -302,6 +308,10 @@ engine.onUpdate = (dt, simTime) => world.update(dt, simTime);
 engine.onRender = placeCamera;
 engine.onDraw = () => {
   world.prepareView(camera, stand.getWorldPosition(focus));
+  if (asset.probe) {
+    const at = asset.car.box.center.clone().applyMatrix4(stand.matrixWorld);
+    asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...world.probeHidden], 6);
+  }
   pipeline.render(world.scene, camera, rect, frame);
 };
 
