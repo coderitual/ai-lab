@@ -9,13 +9,16 @@ const MAX_FRAME_DT = 0.1;
 export class Engine {
   /**
    * @param {HTMLElement} container element the canvas fills
-   * @param {{ maxPixelRatio?: number, pixelRatio?: number, manual?: boolean, draw?: boolean }} [options]
-   *   `draw: false` runs the loop without rendering (automated checks).
+   * @param {{ maxPixelRatio?: number, pixelRatio?: number, supersample?: number, manual?: boolean, draw?: boolean }} [options]
+   *   `draw: false` runs the loop without rendering (automated checks). `supersample`: draw up to this many
+   *   times the screen's own resolution (each way) and let the browser scale the picture down, for as long as
+   *   frames keep up: finer edges, calmer highlights.
    */
   constructor(container, options = {}) {
     this.container = container;
     this.options = options;
     this.maxPixelRatio = options.maxPixelRatio ?? 2;
+    this.supersample = options.supersample ?? 1;
     this.manual = !!options.manual;
 
     const renderer = new THREE.WebGLRenderer({
@@ -113,7 +116,12 @@ export class Engine {
     const rect = this.container.getBoundingClientRect();
     const w = Math.max(1, Math.round(rect.width));
     const h = Math.max(1, Math.round(rect.height));
-    const pr = this.options.pixelRatio ?? Math.min(window.devicePixelRatio || 1, this.maxPixelRatio);
+    let pr = this.options.pixelRatio;
+    if (pr == null) {
+      // more pixels than the screen has, if asked for, but never an enormous picture (about six million pixels at most)
+      const over = this.supersample > 1 ? Math.min(this.supersample, Math.sqrt(6e6 / (w * h))) : 1;
+      pr = Math.min(Math.max(window.devicePixelRatio || 1, over), this.maxPixelRatio);
+    }
     if (w === this.width && h === this.height && pr === this.pixelRatio) return;
     this.width = w;
     this.height = h;
@@ -192,6 +200,12 @@ export class Engine {
     else this._slowFrames = Math.max(0, this._slowFrames - 2);
     if (this._slowFrames > 75) {
       this._slowFrames = 0;
+      if (this.supersample > 1) {
+        // first give back the extra pixels: nothing else is lost by that
+        this.supersample = 1;
+        this.resize();
+        return;
+      }
       this._qualitySteps++; // the game sheds its costlier effects at each step as well
       if (this.maxPixelRatio > 1) {
         this.maxPixelRatio = Math.max(1, this.maxPixelRatio * 0.82);

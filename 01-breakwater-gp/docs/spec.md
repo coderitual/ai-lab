@@ -41,6 +41,7 @@ src/
     Audio.js           synthesised sound
     ReflectionProbe.js live cube map and the mirror coat for materials
     WaterMirror.js     planar reflection of what stands on the water
+    BakedShadow.js     sun shadows of things that never move, drawn once
     math.js            small helpers
   assets/            everything visible, generated
     palette.js         colours, sun direction, teams
@@ -50,7 +51,9 @@ src/
     environment.js     sea + sky + sun + shadows, assembled
     boat.js, boat/     the boat (see boat.md)
     buoys.js           marks, course floats, start arch
-    island.js, scenery.js   land, palms, rocks, lighthouse, pier, sailboats
+    island.js          land: height function, mesh, the ground material (sand, grass, rock)
+    palm.js            coconut palms: trunks, fronds, their textures, the wind
+    scenery.js         rocks, lighthouse, pier, sailboats
     geo.js             modelling helpers (part, merge, loft, skin, fan, facet)
     registry.js        what the viewer can show
   game/
@@ -61,7 +64,7 @@ src/
     drivers.js         player and bot drivers
     Race.js            rules and bookkeeping
     effects.js         wake field, spray, mist
-    LensDrops.js       water on the camera lens
+    Lens.js            rain on the camera lens, and the finish of the picture
     Hud.js, hud.css    DOM HUD, minimap, panels, lobby
     Game.js            wires it together; solo, split screen, online
   net/
@@ -137,47 +140,77 @@ as well as up and down, so it first finds which bit of water is at (x, z) now
 Dimensions: 5.8 m long (z from −2.7 to +3.1), 2.16 m beam. See
 [boat.md](boat.md) for the model. The physics treats it as follows.
 
-**Feeling the sea.** Five samples per step: under the middle, 2.3 m ahead,
-2.2 m astern, 0.85 m to each side. The water level under the hull is
-`0.4·mid + 0.2·(bow + stern) + 0.1·(port + starboard)`.
+**Feeling the sea.** Four points, one under each end of each hull: ±0.77 m
+from the centre line, 1.9 m ahead of and behind the middle (`HULL` in
+`game/config.js`). Each step, each point asks the sea for its height, its
+vertical speed and its slope there.
 
-**Heave.** A one-sided spring. With `depth = level + planing + floatDepth − y`
-(`planing` rises to 0.09 m by 18 m/s; `floatDepth = gravity / buoyancy`):
+**Buoyancy.** At each point, with `keel` the height of that bit of the hull's
+bottom (from the boat's height, pitch and roll, 0.24 m below the waterline)
+and `depth = water + planing − keel` (`planing` rises to 0.09 m by 18 m/s):
 
-- `depth ≤ 0`: the hull is out of the water. Only gravity (12.5 m/s²) acts.
-- `depth > 0`: add `55·min(depth, 1.2) + 260·deep² − 9·v_rel·grip`, where
-  `deep` is how far past the float line plus 4 cm the hull is and `v_rel` its
-  vertical speed relative to the water. A hull driving down into the water
-  also meets `2.2·v_rel²` of drag.
-- `grip = clamp(depth / (0.9·floatDepth))` scales thrust, drag, steering and
-  attitude: all fade as the hull leaves the water.
-- Out of the water for more than 0.05 s counts as airborne. Coming down after
-  more than 0.16 s with an impact over 1.2 m/s is a *landing*: strength
-  `impact / 9`, and up to 16 % of horizontal speed is lost.
+- `depth ≤ 0`: that point is out of the water and feels nothing.
+- `depth > 0`: it is pushed up by
+  `55·min(depth, 1.2) + 260·deep² − 9·rise·hold`, where `deep` is how far past
+  the float line (`gravity / buoyancy` = 0.227 m) plus 4 cm it is, `rise` its
+  vertical speed relative to the water and `hold = clamp(depth / 0.205)`. A
+  point driving down into the water also meets `2.2·rise²` of drag.
 
-**Drive.** Thrust `9.2·throttle·√grip`. Drag `c1·v + c2·v|v|` with `c1 = 0.12`
-and `c2` chosen so thrust and drag balance at the top speed for the current
-power:
+A quarter of the sum of the four lifts the boat against gravity (12.5 m/s²).
+Their differences turn it: pitch with inertia 2.6, roll with inertia 0.62.
+Nothing else tells the hull what attitude to take.
+
+- `grip` (the mean `hold` of the four) scales drag, the bite of the hulls and
+  the weathercock; `gripAft` (the mean of the two under the tails) scales
+  thrust and the helm. All fade as the boat leaves the water.
+- No point in the water for more than 0.05 s counts as airborne. Coming down
+  after more than 0.16 s with an impact over 1.4 m/s is a *landing*: strength
+  `(impact − 0.6) / 10`, and up to 14 % of horizontal speed is lost.
+- In the air the hull levels out and settles 0.07 rad bow-up, so it comes
+  down tails first.
+
+**Drive.** Thrust `9.2·throttle·√gripAft`. Drag `c1·v + c2·v|v|` with
+`c1 = 0.12` and `c2` chosen so thrust and drag balance at the top speed for
+the current power:
 
 | power | 0 | 1 | 2 | 3 | 4 | 5 |
 | --- | --- | --- | --- | --- | --- | --- |
 | top speed, m/s | 22.6 | 23.8 | 24.9 | 26.0 | 27.1 | 28.4 |
 | km/h | 81 | 86 | 90 | 94 | 98 | 102 |
 
-Braking adds `7.5·brake` of drag. Sideways speed is damped at 3.3 /s (more
-under braking) and scrubs a little forward speed. Wave faces push the hull
-downhill with `0.55·gravity·slope`.
+Braking adds `8.5·brake·√grip` of drag. Wave faces push the hull downhill with
+`0.55·gravity·slope`.
 
-**Steering.** Wanted yaw rate `−steer × 1.28 rad/s × authority`, where
-authority rises with speed up to 6 m/s, eases off to 76 % by 28 m/s, and gains
-28 % under full brake. Reversed when going astern. In the air only 22 % of it
-remains.
+**Going sideways.** The water resists sideways speed `u` with
+`most·tanh(5·u / most)`, where `most = 17 m/s² × (1 + 0.35·brake) × grip`.
+Below about 2 m/s of sideways speed that is a firm 5 /s of damping, and the
+boat carves; past it the force stops growing, the boat needs more than the
+water will give, and it slides. Sliding scrubs `0.055·|u|` off the forward
+speed.
 
-**Attitude.** On the water, pitch and roll are sprung toward the slope of the
-sea measured between the bow/stern and port/starboard samples, plus: a bank
-into turns of `0.2 rad per rad/s` of yaw rate at speed, bows lifting under
-acceleration and a little at speed, dipping under braking. In the air the
-hull levels out and settles 0.07 rad bow-up.
+**Steering.** The helm asks for a yaw rate of `−steer × 1.3 rad/s × authority`,
+where authority rises with speed up to 6 m/s, eases off to 80 % by 28 m/s,
+and gains 30 % under full brake; reversed when going astern; 22 % of it is
+left with the tails out of the water. A boat going sideways also wants to
+point the way it is going: `1.15 × slip` rad/s is added (slip being the angle
+between heading and course), 45 % less under full brake. The yaw rate
+follows the sum at 8 /s (2 /s in the air).
+
+What that gives, measured on a calm sea from about 100 km/h by
+`tools/handling.cjs` (run it again after changing `CRAFT_TUNE`):
+
+| helm | result |
+| --- | --- |
+| half lock, 3 s | a clean carve: 6° of slip, 69 m radius, no speed lost |
+| full lock, 3 s | a drift: 20° of slip after 1 s, 33° after 3 s, 101 → 78 km/h, radius closing from 40 m to 31 m |
+| then let go | slip back to 14° in half a second and to nothing within a second and a half |
+| full lock and brake, 0.9 s | a tight powerslide: 34° of slip, 105 → 60 km/h, 17 m radius |
+| flick one way, then the other | 15° of slip one way, 18° the other, speed kept |
+
+**Trim.** On the water the bows are asked up `0.055 rad × throttle` while
+accelerating and 0.04 rad at speed, down 0.04 rad under braking, and the hull
+is asked to lean into a turn by `0.2 rad per rad/s` of yaw rate, through the
+same springs the four points make.
 
 **Inputs are smoothed**: keys ramp the helm at 3.6 /s toward a side and 6 /s
 back to centre; an analogue thumb follows at 14 /s; throttle at 5.5 /s; brake
@@ -194,7 +227,7 @@ along its centre line.
 - Boat against land: where the sea bed is shallower than 0.55 m under any of
   three points along the hull, the hull is pushed back down the slope.
 - A closing speed over about 1.2–1.5 m/s raises a *bump* event (camera kick,
-  splash sound, drops on the lens).
+  splash sound, water on the lens).
 
 ## 5. The course
 
@@ -265,8 +298,12 @@ the mark and swapping sides in between), plus its own offset:
   the other side.
 - The aim is never allowed onto the wrong side of the next mark (at least
   4.2 m clear of it).
+- A sliding boat is not going where it points, so 75 % of its slip angle is
+  added to the heading it steers for.
 - Heading error over 1.1 rad: throttle 0.35; over 0.8 rad at more than
   12 m/s: brake.
+- Running wide (moving outward at `o` m/s with less than `2.5 + 1.6·o` m to
+  the floats): throttle 0.45, and brake inside `1.5 + 0.8·o` m.
 - Under 2.5 m/s for 3.5 s: put back on the line.
 
 An autopilot of the same kind drives a player's boat with `?ap`, in tests,
@@ -345,9 +382,28 @@ band-pass for the water.
 - **Spray**: 2200 point sprites (1500 on phones), 1.5–11 px.
 - **Mist**: 420 soft puffs (220 on phones), up to 300 px (150 px), for the
   plumes at speed and the cloud after a landing.
-- **Lens drops**: up to 220 per view.
-- **Sun shadows**: boats only, one 2048² map (1024²) over a 52 m (40 m)
-  square that follows the view's boat.
+- **Rain on the lens**: one number per view, `wet` (0 dry … 1 soaked), plus
+  `sheet` for the second after a hard landing. It rises by `0.05 /s` at speed
+  (`0.085` in a full slide), by `0.34 /s × (1 − behind/18) × (1 − side/3.4)`
+  in another boat's plume (2–18 m astern of it, within 3.4 m of its line), by
+  `0.02 + 0.22·strength` on a landing and `0.06 + 0.2·strength` on a bump. It
+  dries at `(0.09 + 0.12·speed) × (0.35 + wet)` per second: soaked glass
+  clears in about 6 s at speed. Drops run down the glass below 28 km/h and
+  are blown outward above 70 km/h. Above `wet` 0.45 the glass mists over
+  except where a drop has just passed.
+- **The finish** (desktop only): glow from what is brighter than 0.8 of white
+  (taken at half size, spread over three widths), sharpening of soft detail
+  (not of hard edges), 8 % more colour, a gentle S-curve, corners 16 % darker.
+- **Sun shadows on boats**: one 2048² map (1024²) over a 52 m (40 m) square
+  that follows the view's boat.
+- **Sun shadows on land**: one map per island, drawn once (2048² for the main
+  island, 1024² for the islets; half that on phones). Land, palms, the pier
+  and the lighthouse cast into it; land and palms read it.
+- **Palms**: 44 on the main island, 11 on the sand islet. Each has 22–26
+  fronds of 7 segments and a 9-ring trunk, about 930 triangles. The three
+  islands themselves are 20 000 triangles. They lean
+  0.1 m with the wind and up to 0.3 m in gusts at the crown; fronds bob
+  ±0.13 m at the tip.
 
 ## 13. Drawing a frame
 
@@ -363,18 +419,31 @@ In order, per frame:
       camera mirrored in the plane at the height of the water under this
       view's boat, at 0.5 scale (0.4 on phones);
    4. the view itself, into its viewport;
-   5. lens drops, bending a copy of what was just drawn.
+   5. the lens: the view is copied to a texture, its highlights are drawn at
+      half size into a second one, and one full-screen pass puts back the
+      picture with glow, sharpening, grade and, if the glass is wet, rain.
+      On phones this happens only while the glass is wet, and without the
+      finish.
 
-A solo frame is about 160 draw calls and 580 000 triangles; split screen about
-285 and 1 060 000; a phone, with its coarser sea, about 135 and 500 000.
+A solo frame is about 165 draw calls and 640 000 triangles; split screen about
+285 and 1 030 000; a phone, with its coarser sea, about 135 and 470 000. (The
+island and its 55 palms are about 70 000 of those, drawn again in the water
+mirror.)
 
-**Giving ground.** Pixel ratio is the device's, capped at 2. If frames take
-longer than 1/42 s for 75 frames, the game takes one step down (at most two):
+**Resolution.** Pixel ratio is the device's, capped at 2. On a desktop whose
+screen has fewer than 1.5 device pixels per CSS pixel the picture is drawn at
+1.5× anyway (less on a big window: never more than about six million pixels)
+and the browser scales it down, which is where the "4K" crispness on an
+ordinary monitor comes from.
+
+**Giving ground.** If frames take longer than 1/42 s for 75 frames, the game
+first gives back that extra resolution, if it had any, and nothing else. If
+frames are still slow it takes a step down (at most two):
 
 | step | resolution | given up |
 | --- | --- | --- |
 | 1 | × 0.82 if above 1 | water mirror, sun shadows |
-| 2 | × 0.82 again | reflection map (boats mirror a plain sky), lens drops |
+| 2 | × 0.82 again | reflection map (boats mirror a plain sky), the lens pass |
 
 Fixed `?dpr=` turns this off.
 
@@ -448,7 +517,8 @@ Query string:
 | `?laps=1` | number of laps |
 | `?dpr=1` | fix the pixel ratio (and turn adaptive quality off) |
 | `?sea=0.8` | wave height multiplier |
-| `?drops=0` | no water on the lens |
+| `?drops=0` | no rain on the lens |
+| `?look=0` | no finishing of the picture (glow, sharpening, grade) |
 | `?reflect=0` | no reflection map and no water mirror |
 | `?shadows=0` | no sun shadows |
 | `?manual` | do not run the frame loop |

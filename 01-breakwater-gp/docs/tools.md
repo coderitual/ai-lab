@@ -27,6 +27,7 @@ while a test is running against the preview.
 | `tools/soundtest.cjs URL [dir]` | Renders the soundtrack offline and looks for every cue: moment, side, level. 16 checks. With `dir`, keeps the WAV files. |
 | `tools/nettest.cjs URL [dir] [--only=a\|b\|c\|d]` | Online play between pages of one browser: A the whole two-player flow, B a slow lossy link, C real time, D four players. 61 checks. |
 | `tools/screenshots.cjs` | Regenerates every picture in the README and these documents. `--list`, `--only a,b`. |
+| `tools/handling.cjs [URL]` | Scripted helm on a calm sea: carve, drift, recovery, powerslide, flick. Prints slip angles, speeds and turn radii (the table in [spec.md](spec.md#4-the-boat)). |
 | `tools/capture.cjs` | Stills (`--at 9,24`) or a frame-accurate recording (`--from --seconds --fps`), optionally with sound (`--sound --mp4 file`). `--drive` lets bots drive for the players. |
 | `tools/shot.cjs` | One screenshot of any URL (used with `viewer.html`). |
 | `tools/soundcap.cjs` | The offline-audio rig the two tools above share. |
@@ -65,8 +66,12 @@ waves, `manual` stops the loop (step with `__viewer.frames(n)`).
 
 With the scripts above, in headless Chromium on software WebGL.
 
-- **Solo.** A full three-lap bot race (about 2 min 40 s, no missed marks,
-  hulls in the water except for the sixth of the time they are in the air).
+- **Solo.** A full three-lap bot race (about 2 min 30 s, no missed marks, no
+  boat outside the floats, hulls in the water except for the tenth of the
+  time they are in the air). Handling on a calm sea by scripted helm
+  (`tools/handling.cjs`): carve at half lock, drift at full lock, recovery
+  on release, powerslide under brake (the figures are in
+  [spec.md](spec.md#4-the-boat)).
   The keyboard path. The touch path on iPhone-sized viewports in both
   orientations: the stick appears under the thumb, drag steering, pull-down
   and second-finger braking, panels fit. The rules: clean pass, miss,
@@ -75,8 +80,8 @@ With the scripts above, in headless Chromium on software WebGL.
 - **Split screen.** Separate keys, rules and readouts per driver; results,
   rematch, back to the menu.
 - **Drawing.** Solo, split screen and a phone-sized view draw all their
-  passes (reflection map, sun shadows, a mirror image per view, lens drops)
-  without WebGL errors or console warnings.
+  passes (reflection map, sun shadows, a mirror image per view, the lens
+  with and without rain) without WebGL errors or console warnings.
 - **Sound**, by measurement: every start signal and mark chime is found at
   its moment; in split screen each driver's engines, chimes and hard landings
   sit on their side (about 10 dB stronger there) while start signals are
@@ -86,8 +91,10 @@ With the scripts above, in headless Chromium on software WebGL.
   rematch, one side leaving); four players (names, seats, positions relayed
   through the host, name tags, a friend leaving mid-race, back to the lobby,
   the next race); a simulated bad link (80–120 ms each way, 5 % lost: the
-  other boat is drawn about 0.1 m from where it really is on average and
-  under 1 m at worst, and a 1.5 s stall on one machine leaves both clocks in
+  guest's sea clock is within 40 ms of the host's straight after joining and
+  within a few milliseconds once more round trips have come in, the other
+  boat is drawn about 0.1 m from where it really is on average and under 1 m
+  at worst, and a 1.5 s stall on one machine leaves both clocks in
   agreement); both pages in real time (the two sea clocks stay within a few
   milliseconds of each other).
 
@@ -101,6 +108,10 @@ With the scripts above, in headless Chromium on software WebGL.
   frames run long, but what a given phone actually manages is not known.
 - **Whether it sounds good.** The measurements say what is played, when,
   where and how loud. Nobody has listened to it.
+- **Whether it drives well.** The handling figures say what the boat does
+  for a given helm. Nobody has held the helm: how a drift feels under a
+  thumb or a key, and whether the rain on the lens helps or annoys, are
+  untested.
 - **Online between two real devices.** Whether two networks let the browsers
   reach each other cannot be tried from one machine; nor can the system share
   sheet on a phone.

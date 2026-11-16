@@ -15,13 +15,17 @@ where to take it next. For exact numbers see [spec.md](spec.md).
 - [9. The water as a mirror](#9-the-water-as-a-mirror)
 - [10. One patch of shadow](#10-one-patch-of-shadow)
 - [11. Spray in two sizes](#11-spray-in-two-sizes)
-- [12. Water on the lens](#12-water-on-the-lens)
+- [12. Rain on the lens, and the finish](#12-rain-on-the-lens-and-the-finish)
 - [13. A camera that does not follow](#13-a-camera-that-does-not-follow)
 - [14. Sound from nothing, and how to test it](#14-sound-from-nothing-and-how-to-test-it)
 - [15. Online without a server](#15-online-without-a-server)
 - [16. Tests and pictures that do not depend on the clock](#16-tests-and-pictures-that-do-not-depend-on-the-clock)
 - [17. Giving ground gracefully](#17-giving-ground-gracefully)
 - [18. Smaller things worth knowing](#18-smaller-things-worth-knowing)
+- [19. A drift from one curve](#19-a-drift-from-one-curve)
+- [20. Shadows drawn once](#20-shadows-drawn-once)
+- [21. Sand that is mostly shader](#21-sand-that-is-mostly-shader)
+- [22. Palms from a strip and a picture](#22-palms-from-a-strip-and-a-picture)
 
 ---
 
@@ -152,28 +156,43 @@ fourth channel and added to the vertex shader.
 
 ## 5. Jumps nobody scripted
 
-**Problem.** Scripted jumps feel the same every time, and a spring that pulls
-the hull down to the water as well as up makes boats stick to the surface.
+**Problem.** Scripted jumps feel the same every time, a spring that pulls the
+hull down to the water as well as up makes boats stick to the surface, and a
+hull whose attitude is simply set to the slope of the sea looks like a cursor
+sliding over a picture.
 
-**Trick.** Buoyancy is a *one-sided* spring (`game/Craft.js`). Water pushes
-up; only gravity pulls down. Run a hull at a crest fast enough and it simply
-leaves, flies, and comes down, with no jump code anywhere. Around it:
+**Trick.** Four floats (`game/Craft.js`), one under each end of each hull.
+Each is pushed up by the water it is in and by nothing when it is out of it:
+water pushes, only gravity pulls. Their sum lifts the boat; their differences
+pitch and roll it. Nothing in the code says what attitude the hull should
+have. It lies along a wave because that is where the four forces balance;
+run it at a crest fast enough and it leaves, flies, and comes down tails
+first or one hull first, because that is what happened. Around it:
 
-- "Grip" (how deep the hull sits) scales thrust, drag, steering and how hard
-  the hull's attitude follows the sea, so everything fades out together as
-  the boat leaves the water.
-- Landing uses velocity-squared drag on a hull driving down into the water,
+- Each float is damped against the water's own vertical speed there, so the
+  hull rides a swell instead of being hit by it. This is what makes contact
+  with the water smooth: there is no moment at which the boat is "placed".
+- Landing uses velocity-squared drag on a float driving down into the water,
   which stops a hard landing near the surface instead of bouncing it back out.
-- The hull's attitude is fitted to samples a hull length apart, which filters
-  out waves shorter than the boat for free.
+- "Grip" is how deep the floats sit. The two under the tails gate thrust and
+  helm (the propellers are there); all four gate drag and the bite of the
+  hulls. Everything fades out together as the boat leaves the water, and
+  comes back a corner at a time.
+- What the driver does to the attitude (bows up under power, down under
+  braking, a lean into the turn) goes in through the same springs, as a
+  target, rather than being added to the angle afterwards.
+- The spring constants for pitch and roll are not free numbers: they follow
+  from where the floats are (`PITCH_SPRING`, `ROLL_SPRING`), so moving a
+  float changes the handling consistently.
+- Floats a hull length apart filter out waves shorter than the boat for free.
 - Physics is stepped at a fixed 120 Hz and drawn interpolated, so handling
   (and bots, and jumps) are identical at any frame rate.
 
-**Limits.** The hull is a point mass with an attitude that follows the sea; it
-has no moment of inertia, cannot trip over a chine, cannot stuff its bows.
+**Limits.** Four points are not a hull: it cannot trip over a chine or stuff
+its bows, and the floats do not know about the tunnel between them.
 
-**Next.** Per-sponson buoyancy (two floats, real roll dynamics); air under the
-tunnel lifting the bows at speed, with a blow-over if you overdo it.
+**Next.** Air packed under the tunnel lifting the bows at speed, with a
+blow-over if you overdo it; a float under each bow that can dig in.
 
 ## 6. A hull from equations
 
@@ -374,24 +393,66 @@ sorting, clipped when their centre leaves the screen.
 **Next.** Soft particles against a depth texture; spray lit by the low sun
 from behind (rim light).
 
-## 12. Water on the lens
+## 12. Rain on the lens, and the finish
 
-**Problem.** Screen-space "drops" that are just blurred blobs look pasted on.
+**Problem.** Screen-space "drops" that are just blurred blobs look pasted on;
+simulated drops cost more the wetter it gets; and a picture that goes
+straight from the renderer to the screen looks rendered.
 
-**Trick.** After a view is drawn, the frame is copied to a texture and each
-drop is drawn as a tiny lens over it (`game/LensDrops.js`): the scene upside
-down and squeezed inside it (a real drop is a strong lens), a dark rim, a
-glint. Drops are simulated: small ones sit and dry; big ones are pushed
-outward by the airflow at speed or run down at a standstill, stretch, swallow
-the small ones in their way and leave beads behind. They come from landings,
-bumps, your own spray at speed, and following a rooster tail too closely.
+**Trick.** After a view is drawn it is copied to a texture and drawn back
+through one full-screen shader (`game/Lens.js`) that does both jobs.
 
-Nothing is copied or drawn while the lens is dry.
+*Rain.* Nothing is simulated. The glass is divided into tall cells, and where
+the drop in a cell is at any moment is a formula of time and of the cell's
+number: it starts near the top, slides in three fits with pauses between,
+wanders a little sideways, and is gone at the bottom; then the cell deals
+itself another. Behind it lies a rivulet that narrows and dries with distance,
+and on the rivulet a row of beads that shrink with age. A coarser and a finer
+layer of cells overlap, and a third pattern holds beads that sit where they
+landed. The game supplies one number, how wet the glass is, which says what
+share of the cells have a drop, so a downpour costs exactly what a drizzle
+does.
 
-**Limits.** One full-frame copy per wet view per frame.
+- *Which way they run.* Two sets of cells: one runs down the glass, the other
+  is turned to run outward from the middle and a little upward, mirrored
+  left and right. Speed cross-fades between them: at the start line the
+  drops run down, at 70 km/h the wind has them.
+- *A drop is a lens.* Inside a drop the shader does not show what is behind
+  it but the whole scene, upside down and small (a look-up at a coarse mip
+  level, toward the far side of the screen). That is what real drops do, and
+  it is why each one has sky at the bottom and sea at the top. A darker rim,
+  a glint toward the sun and a line of sky along the lower edge finish it.
+  A rivulet is a long thin lens: it turns the view over across its width.
+- *Mist.* Above a certain wetness the glass mists over (the picture is read
+  from a coarser mip level), least in the middle, and not at all where a drop
+  or its track has just wiped it.
+- *Where the water comes from.* Mostly another boat's plume: sit within 18 m
+  of a stern and the glass fills in seconds. Also a little of your own spray
+  at speed, more in a slide, a burst on a hard landing (with a sheet of water
+  that wobbles and blurs everything for a second) and on a bump.
+- Wetting and drying both happen in the game's fixed step, not when a
+  picture is drawn, so the glass is in the same state however fast the game
+  is being stepped. Only the drops' motion uses the time between pictures.
 
-**Next.** Streaks drawn by the wipe of a drop's path; fogging after a big
-splash.
+*The finish* (desktop). The same pass adds a glow round whatever is nearly
+white (the highlights are first drawn at half size into a second texture
+whose mip levels stand in for three widths of blur), sharpens soft detail
+while leaving hard edges alone (push each pixel away from its neighbours'
+average, less the more they already differ), adds a little colour and
+contrast, darkens the corners, and adds a grain of half a level so that the
+gradients it has made do not band.
+
+Phones get the rain only, and nothing is copied or drawn while their glass
+is dry.
+
+**Limits.** The glow works on what the screen can show: a glint that was ten
+times brighter than white before tone mapping glows no more than one that was
+just white. One full-frame copy and one full-screen pass per view per frame
+on desktop. Drops do not merge or collide.
+
+**Next.** Render to a floating-point target and tone-map in this pass, so the
+glow knows how bright things really were; streaks along the direction of
+travel at the edges of the frame at full power.
 
 ## 13. A camera that does not follow
 
@@ -501,7 +562,11 @@ map redrawn half as often. *Dynamically* (`Engine._adaptQuality`): if frames
 stay slow, the game takes a step down, at most twice; each step lowers the
 resolution (if there is any to give) and drops effects in order of how little
 they will be missed: first the water mirror and the sun shadows, then the
-reflection map and the lens drops.
+reflection map and the lens pass.
+
+Before either step, a desktop gives back the extra resolution it was drawing
+at (it starts at up to 1.5× the screen's own, scaled down by the browser:
+the cheapest way to make edges and highlights calm).
 
 Two steps only, on purpose: a browser that caps the frame rate itself (low
 power mode) must not be driven down to a blurry picture.
@@ -524,8 +589,146 @@ frame time.
 - **Split screen** is two viewports of one canvas, each with its own camera,
   dense patch of sea, wake field, mirror image and lens.
 - **A lost WebGL context** is survived: render targets and the sky map are
-  rebuilt, and the reflection map starts over.
+  rebuilt, the reflection map starts over, and the islands' shadows are
+  baked again.
 - **Materials are compiled twice.** Drawing into a render target (no tone
   mapping, linear) and to the screen (tone mapped, sRGB) need different
   shader variants; three.js caches both per material, so the passes of
   sections 8 and 9 cost a program switch, not a recompile.
+
+## 19. A drift from one curve
+
+**Problem.** With sideways speed simply damped, a boat goes where it points:
+it corners as if on rails, and "drift" has to be faked. With no damping it is
+a puck.
+
+**Trick.** The water's resistance to going sideways is one saturating curve,
+`most · tanh(bite · u / most)` (`game/Craft.js`). At small sideways speeds it
+is a stiff damper and the boat carves. But it can never exceed `most`: ask for
+a tighter turn than that much sideways force can hold and the hulls let go,
+the boat keeps turning its nose and slides. Three things make that a drift
+rather than a spin:
+
+- A hull going sideways wants to point the way it is going (a weathercock
+  term proportional to the slip angle). Against a held helm it settles at an
+  angle; with the helm released it straightens the boat in about a second and
+  a half.
+- Sliding scrubs speed, so a slide tightens its own line.
+- Braking digs the hulls in: more bite and a higher limit, but less
+  weathercock. Brake and full lock is the tight powerslide; lifting off it is
+  the way out.
+
+Because the limit scales with how much of the boat is in the water, a boat
+landing sideways or crossing a crest mid-corner steps out, and nothing had to
+be written for that.
+
+The bots drive the same boat. Their steering aims the *course*, not the nose
+(most of the slip angle is added to the heading they steer for), and they
+back off when they are sliding toward the floats (`game/drivers.js`).
+
+Spray follows: the bow on the leading side throws more water in a slide, the
+plumes thicken, the water noise rises, and the lens gets wetter.
+
+**Limits.** One curve for the whole hull: no difference between the bows
+biting and the tails biting, so no spin from lifting the tails.
+
+**Next.** Bite at the bow and at the stern separately; trim on the helm so a
+driver can choose to slide.
+
+## 20. Shadows drawn once
+
+**Problem.** The patch of sun shadow that follows a boat (section 10) is
+52 m across. The island is 200 m across and never moves; palms without
+shadows float on the sand.
+
+**Trick.** Each island is drawn once, from the sun, into a depth texture
+(`engine/BakedShadow.js`): the land, the palms (through their cut-out
+texture, so the shadow has leaflets), the pier, the lighthouse. Any material
+can then be patched (`withBakedShadow`) to ask that picture how much of the
+sun reaches a point, and to scale the sun's part of its light by the answer.
+Reading it uses the graphics card's own depth comparison with filtering, nine
+times, which gives a soft edge for almost nothing. The receiving point is
+moved a little along its normal and toward the sun before the test, which is
+what stops a surface shadowing itself.
+
+It costs three small renders at start-up (and again if the context is lost)
+and nine texture reads per pixel of land. The hill shades its own far side
+and throws a long shadow across the beach in the afternoon light.
+
+**Limits.** Static: the palms' shadows do not sway with the palms. The sea
+does not receive it.
+
+**Next.** Let the water shader read the main island's map, so the hill
+shadows the lagoon.
+
+## 21. Sand that is mostly shader
+
+**Problem.** A beach is smooth at the scale of a mesh and intricate at the
+scale of a hand. A mesh fine enough for ripples would be millions of
+triangles.
+
+**Trick.** The mesh (`assets/island.js`) carries only the shape of the land,
+with normals taken from the height function itself, and at each vertex three
+numbers in place of a colour: how much sand, grass and rock. The material
+does the rest from the world position and one small tiling noise texture:
+
+- *Borders.* The three weights are pushed through thresholds perturbed by
+  noise, so grass runs out onto the sand in tufts and rock breaks through in
+  patches instead of following the triangles.
+- *Sand.* Pale gold where dry, with patches; darker and richer toward the
+  sea by height above the water. Wind ripples are a sine across a fixed
+  direction, bent by noise, added to the normal, and faded out where they
+  would be finer than a pixel (by the screen-space rate of change of their
+  phase), so they never shimmer in the distance. A lower-frequency tilt of
+  the normal gives the dunes. Grains glint: a fine noise looked up at a
+  position nudged by the direction to the eye, thresholded, so the glints
+  change as the camera moves.
+- *The water's edge.* The height the last wave reached is a slow sine of
+  time and noise. Below it the sand is glossy (low roughness, so it mirrors
+  the sky at a glancing angle), and along it lies a line of foam lace.
+- *Higher up.* Grass with paler dry patches; above a few metres the dark
+  crowns of forest, with their own bumpy normal; rock in strata, wet and dark
+  near the water, mossy higher.
+
+The hills on the horizon keep their flat-shaded facets: at that distance a
+silhouette is all there is.
+
+**Limits.** No geometry in the detail: a ripple casts no shadow, and from
+very close the sand is a smooth surface with a picture on it.
+
+**Next.** Tracks: write where boats have beached into a texture and read it
+in the sand.
+
+## 22. Palms from a strip and a picture
+
+**Problem.** A palm frond is a spine with ninety leaflets. Modelled, a grove
+is millions of triangles; as a flat card it looks like one.
+
+**Trick.** A frond is a strip of fourteen quads folded along its spine
+(`assets/palm.js`): the two halves stand up in a V near the stem and hang
+toward the tip, and the spine arcs over under its own weight. What makes it a
+frond is the picture on it, painted on a canvas: a spine and 92 tapering
+leaflets, each with its midrib and the shade of its neighbour, and a second
+canvas with their outline, which cuts the gaps between them. Colour and
+outline are separate textures so that nothing dark bleeds in at the cut
+edges; with multisampling the cut is anti-aliased (alpha to coverage).
+
+- A crown is 22–26 fronds placed round the trunk by the golden angle, so no
+  two lie over each other, running from new (standing, yellow-green) through
+  prime (arching, deep green) to old (hanging, yellowed, then brown).
+- The trunk leans out from its foot and then grows straight toward the
+  light; a tiling bark texture with its own normal map gives it the rings
+  where fronds once grew.
+- Wind is in the vertex shader. Every vertex knows how far it may move
+  (nothing at the foot, most at a frond's tip); the tree leans with slow
+  gusts and the fronds bob faster. A grove is one merged mesh, so positions
+  are world positions and every tree is at a different point in the gust.
+- The sun through a leaf: seen from its shaded side a frond is lit yellow-
+  green by the light coming through it.
+
+A grove is two draw calls (wood, fronds).
+
+**Limits.** The fronds do not bend in the wind, only move. No level of
+detail: a palm on the horizon costs what one on the beach does.
+
+**Next.** Bend along the spine with the gust; a cheaper far model.

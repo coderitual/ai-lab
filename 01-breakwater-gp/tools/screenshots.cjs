@@ -71,10 +71,16 @@ const SHOTS = [
   { name: 'fleet', kind: 'viewer', size: DESKTOP, query: 'asset=crafts&sea=0.06&fov=42&ty=0.4&az=118&el=26&dist=13.5', caption: 'The four liveries' },
   { name: 'livery-sheet', kind: 'sheet', caption: 'The painted sheet, and the detail sheets every boat shares' },
 
+  // ---- the island
+  { name: 'island', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=62&ty=5&tz=20&az=20&el=7&dist=70', caption: 'The island from beyond the pier' },
+  { name: 'beach', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=-52&ty=5&tz=-30&az=200&el=5&dist=26', caption: 'Palms, their shadows, and ripples in the sand' },
+  { name: 'shore', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=64&ty=4&tz=34&az=-10&el=5&dist=24', caption: 'The sunny side: surf running up the sand' },
+
   // ---- the game as played
   { name: 'title', kind: 'game', size: DESKTOP, query: '', at: 6, caption: 'Title screen' },
   { name: 'race', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 31, caption: 'Racing: the view from the chase camera' },
   { name: 'race-open-sea', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 40, caption: 'On the open-ocean side' },
+  { name: 'rain', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 13, caption: "In the pack: other boats' spray as rain on the lens" },
   { name: 'split-screen', kind: 'game', size: DESKTOP, query: 'mode=split&auto', drive: true, at: 22, caption: 'Two players on one keyboard' },
   { name: 'phone', kind: 'game', size: PHONE, query: 'auto&ap', at: 31, thumb: [660, 262, 688, 268], scale: 0.75, caption: 'Phone, held sideways, one thumb on the glass' },
   { name: 'phone-portrait', kind: 'game', size: PHONE_TALL, query: 'auto&ap', at: 24, scale: 0.75, caption: 'Phone, held upright' },
@@ -83,6 +89,7 @@ const SHOTS = [
   { name: 'hero', kind: 'staged', size: WIDE, query: 'auto&ap&drops=0', at: 7.6, camera: cam(-13, -5.5, 1.5, -4, 0.6, 36), og: true, caption: 'The pack a few seconds after the start' },
   { name: 'pursuit', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 31.4, camera: cam(7.2, -3.0, 1.3, 4.5, 0.5, 38), caption: "In the leader's wake" },
   { name: 'plumes', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 40, camera: cam(2.2, 9.5, 1.3, 0.3, 0.7, 40), caption: 'Spray plumes at full power' },
+  { name: 'drift', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 30, until: 'sliding', camera: cam(-8.5, 4.6, 1.2, 0.5, 0.5, 38), caption: 'Sliding through a turn' },
   { name: 'jump', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 44, until: 'airborne', camera: cam(-2.5, -8.5, 0.9, 0.5, 0.5, 38), caption: 'Off the top of a swell' },
   { name: 'wakes', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0', at: 30, camera: cam(16, 0, 26, 14, 0, 44), caption: 'Wakes from above' },
   { name: 'reflections', kind: 'staged', size: DESKTOP, query: 'auto&ap&drops=0&sea=0.3', at: 9, camera: cam(8, -2.5, 1.3, 14, 0.2, 40), caption: 'Calm water: rocks, marks and boats mirrored in it' },
@@ -206,6 +213,20 @@ async function downscale(page, pngBuffer, scale, quality = 0.88) {
           g.engine.advance(1 / 60);
         })()`);
       }
+      let lean = 1;
+      if (shot.until === 'sliding') {
+        // carry on until the boat is well into a slide, and stand on the side it is sliding toward
+        lean = await page.evaluate(`(() => {
+          const g = window.__bw.game;
+          const c = g.views[0].racer.craft;
+          for (let i = 0; i < 3600; i++) {
+            g.engine.advance(1 / 60, 1 / 60, i % 5 === 0);
+            if (!c.airborne && c.speed > 20 && Math.abs(c.slip) > 0.3) break;
+          }
+          g.engine.advance(1 / 60);
+          return c.slip > 0 ? 1 : -1;
+        })()`);
+      }
       if (shot.thumb) {
         const [ox, oy, x, y] = shot.thumb;
         await page.evaluate(`(() => {
@@ -239,7 +260,7 @@ async function downscale(page, pngBuffer, scale, quality = 0.88) {
             document.head.appendChild(style);
             g.draw(g.engine.simTime + g.engine.accumulator);
           },
-          { c: shot.camera },
+          { c: { ...shot.camera, side: shot.camera.side * lean } },
         );
       }
       await page.waitForTimeout(400); // CSS transitions

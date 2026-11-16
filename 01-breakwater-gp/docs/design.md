@@ -76,9 +76,16 @@ names, characters, courses or art.
   lift; you do not fly the boat. In the air there is no thrust and no
   steering, and a hard landing costs speed, so reading the swell matters more
   than reflexes.
-- **Slides are part of turning.** Grip is finite on purpose: the stern steps
-  out, the camera follows the direction of travel rather than the bow, and you
-  see the slide.
+- **Slides are part of turning.** Grip is finite on purpose. A gentle helm
+  carves; a hard one makes the hulls let go and the boat drifts, nose inside
+  the turn, throwing water off the outside bow, until you ease the helm and
+  it straightens. Braking in a turn digs the hulls in for a tight powerslide.
+  The camera follows the direction of travel rather than the bow, so you see
+  the slide.
+- **The boat lies on the water.** Nothing sets its attitude: four points
+  under the hulls are pushed up by the water they are in, and the boat
+  pitches and rolls as those forces balance. It rides a swell, lands tails
+  first, and comes down on one hull when it took off crooked.
 - **Fast is smooth.** The quickest way through the slalom is wide and early,
   not sharp and late.
 - **Nothing is hidden.** Position, lap, time, power, misses, speed, the next
@@ -101,12 +108,17 @@ Tunnel-hull catamarans with a closed canopy and twin outboards. That shape was
 chosen for what it shows from behind: two hulls and an open tunnel give the
 spray and the wake something to do, a wide stance reads as stable, and the
 outboards put moving parts (swinging with the helm, propellers turning) right
-in front of the camera. All four boats are the same boat in different paint;
-the race is decided by driving. See [boat.md](boat.md).
+in front of the camera. All four boats are the same boat, each painted to a
+design of its own (slashed bands, a wave, shards, racing stripes) so that
+they can be told apart at a glance from any side; the race is decided by
+driving. See [boat.md](boat.md).
 
 ## The course
 
-One island, one loop of about 1.1 km round it. The swell comes from the open
+One island, one loop of about 1.1 km round it. The island is the thing you
+look at when you are not looking at the water: a forested hill with a rock
+face, a beach of rippled sand going dark and glossy where the sea reaches it,
+and groves of coconut palms laying long afternoon shadows across it. The swell comes from the open
 ocean on one side; the island shelters the other. So each lap has a rough
 half, where the boat is in the air a good part of the time, and a calm half,
 where you can make up places. The start arch stands on the calm side.
@@ -135,8 +147,11 @@ tops are lit from behind and glow turquoise. Colour is saved for the things
 that matter: the four liveries, the red and green marks, the orange floats.
 Reflections do the rest of the work of making the boats sit in the scene: the
 paint and glass mirror what is really around them, and the water mirrors the
-boats back. Spray hangs in plumes behind a boat at speed, and drops land on
-the lens when you come down hard.
+boats back. Spray hangs in plumes behind a boat at speed. Sit in another
+boat's plume and it rains on the lens: drops run across the glass, each one a
+little upside-down picture of the race, and the way to clear it is to get out
+of the spray. The picture is finished like a photograph: a glow round the sun
+on the water, crisp detail, slightly darker corners.
 
 Sound is engines (deeper for the bigger hulls), water rushing past, and a
 handful of signals: count, go, clean pass, miss, lap, flag, and the thump of

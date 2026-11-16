@@ -172,6 +172,232 @@ function sidePoint(t, v) {
   return [zAt(t), lerp(low, high, v)];
 }
 
+// ---- the four designs
+//
+// Each team's boat is painted to a different design, not the same one in other colours. A design paints the
+// decks (`top`, once per side, in the plan view) and the flanks (`side`, in the side view); everything the
+// boats have in common (number plates, step pads, the hatch, the lettering) goes on afterwards.
+//   c: { H hull colour, A accent, T third colour }
+
+const midAt = (t) => (outerAt(t) + innerAt(t)) / 2;
+/** A leaning band on a flank: between z0 and z1 at the top, raked aft by `rake` metres at the bottom. */
+const rakedBand = (z0, z1, rake = 0.42) => [
+  [z0, PORT.yTop],
+  [z1, PORT.yTop],
+  [z1 - rake, PORT.yBottom],
+  [z0 - rake, PORT.yBottom],
+];
+/** The usual run of colour along the bottom of a flank, tall at the stern and running out toward the bow. */
+function lowerBand(ctx, fill, line, tall = 1) {
+  const lower = [];
+  const upper = [];
+  const pin = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    lower.push([zAt(t), PORT.yBottom]);
+    upper.push(sidePoint(t, sideBandAt(t) * tall));
+    pin.push(sidePoint(t, sideBandAt(t) * tall + 0.055));
+  }
+  ctx.fillStyle = fill;
+  path(ctx, [...lower, ...upper.slice().reverse()]);
+  ctx.fill();
+  ctx.fillStyle = line;
+  path(ctx, [...upper, ...pin.slice().reverse()]);
+  ctx.fill();
+}
+function chequers(ctx, side, rows = 2) {
+  const sq = 0.062;
+  for (let r = 0; r < rows; r++) {
+    for (let k = 0; k < 10; k++) {
+      ctx.fillStyle = (r + k) % 2 ? INK : WHITE;
+      ctx.fillRect(BOAT.sternZ + r * sq, side * (0.46 + k * sq) - (side < 0 ? sq : 0), sq, sq);
+    }
+  }
+}
+const fillPath = (ctx, colour, points) => {
+  ctx.fillStyle = colour;
+  path(ctx, points);
+  ctx.fill();
+};
+
+const PATTERNS = {
+  // Broad bands slashed across the boat, raked back like a blade.
+  slash: {
+    top(ctx, side, c) {
+      fillPath(ctx, c.T, deckBand(side, TIP, [1, 1]));
+      fillPath(ctx, c.A, deckBand(side, [TIP[0] - 0.05, TIP[1] - 0.05], [TIP[0] - 0.022, TIP[1] - 0.022]));
+      fillPath(ctx, c.T, deckBand(side, [0.262, 0.4], [0.288, 0.426]));
+      fillPath(ctx, c.A, deckBand(side, [0.305, 0.443], [0.47, 0.608]));
+      fillPath(ctx, c.A, deckBand(side, [0.5, 0.638], [0.545, 0.683]));
+      fillPath(ctx, c.T, deckBand(side, [0.562, 0.7], [0.578, 0.716]));
+      // the stern quarter in the third colour, behind a raked edge
+      fillPath(ctx, c.T, deckBand(side, [0, 0], [0.04, 0.178]));
+      chequers(ctx, side);
+    },
+    side(ctx, c) {
+      lowerBand(ctx, c.T, c.A, 0.8);
+      fillPath(ctx, c.T, [sidePoint(TIP[0], 0), [BOAT.bowZ + 0.05, PORT.yBottom], [BOAT.bowZ + 0.05, PORT.yTop], sidePoint(TIP[0] + 0.03, 1.3)]);
+      fillPath(ctx, c.T, rakedBand(zAt(0.262), zAt(0.288)));
+      fillPath(ctx, c.A, rakedBand(zAt(0.305), zAt(0.47)));
+      fillPath(ctx, c.A, rakedBand(zAt(0.5), zAt(0.545)));
+      fillPath(ctx, c.T, rakedBand(zAt(0.562), zAt(0.578)));
+    },
+  },
+
+  // One long sweep of dark water curling along each hull, edged in white.
+  wave: {
+    top(ctx, side, c) {
+      const sweep = (t) => {
+        const k = smoothstep(0.0, 0.72, t);
+        return lerp(innerAt(t) + 0.03, outerAt(t) + 0.02, k * k * (3 - 2 * k) * 0.999);
+      };
+      const inner = [];
+      const pin = [];
+      for (let i = 0; i <= N; i++) {
+        const t = lerp(0, 0.72, i / N);
+        inner.push([zAt(t), side * sweep(t)]);
+        pin.push([zAt(t), side * (sweep(t) - 0.035)]);
+      }
+      fillPath(ctx, c.A, [...edge(outerAt, side, 0, 0.72), ...inner.slice().reverse()]);
+      fillPath(ctx, c.T, [...inner, ...pin.slice().reverse()]);
+      // a second, smaller curl over the bows
+      const curl = [];
+      for (let i = 0; i <= N; i++) {
+        const t = lerp(0.76, 1, i / N);
+        curl.push([zAt(t), side * lerp(outerAt(t), innerAt(t) - 0.01, Math.pow(i / N, 0.6))]);
+      }
+      fillPath(ctx, c.A, [...curl, ...edge(innerAt, side, 1, 0.9)]);
+      fillPath(ctx, c.T, [...curl, ...curl.map(([z, x]) => [z - 0.045, x]).reverse()]);
+    },
+    side(ctx, c) {
+      // the wave: high at the stern, falling, lifting once more before it runs out at the bow
+      const crest = (t) => lerp(0.92, 0.06, smoothstep(0.0, 0.8, t)) + 0.16 * Math.sin(t * 9.5 + 0.6) * (1 - t) * smoothstep(0.02, 0.2, t);
+      const lower = [];
+      const upper = [];
+      const pin = [];
+      const foam = [];
+      for (let i = 0; i <= N * 2; i++) {
+        const t = i / (N * 2);
+        lower.push([zAt(t), PORT.yBottom]);
+        upper.push(sidePoint(t, crest(t)));
+        pin.push(sidePoint(t, crest(t) + 0.07));
+        foam.push(sidePoint(t, crest(t) + 0.13));
+      }
+      fillPath(ctx, c.A, [...lower, ...upper.slice().reverse()]);
+      fillPath(ctx, c.T, [...upper, ...pin.slice().reverse()]);
+      ctx.strokeStyle = c.T;
+      ctx.lineWidth = 0.012;
+      path(ctx, foam.slice(4, 62), false);
+      ctx.stroke();
+    },
+  },
+
+  // Black shards, as if the paint had been cut with a knife.
+  shard: {
+    top(ctx, side, c) {
+      const o = (t, inset = 0) => [zAt(t), side * (outerAt(t) - inset)];
+      const n = (t, inset = 0) => [zAt(t), side * (innerAt(t) + inset)];
+      const shards = [
+        [o(0.0), o(0.3), n(0.1)],
+        [o(0.34), o(0.66), n(0.6), n(0.5)],
+        [n(0.2), n(0.44), o(0.3)],
+        [o(0.7), o(0.86), n(0.93), n(0.84)],
+        [o(0.9), o(1), n(1), n(0.97)],
+      ];
+      for (const [i, pts] of shards.entries()) fillPath(ctx, i === 2 ? c.T : c.A, pts);
+      ctx.strokeStyle = c.T;
+      ctx.lineWidth = 0.018;
+      ctx.lineJoin = 'miter';
+      for (const i of [0, 1, 3]) {
+        path(ctx, shards[i]);
+        ctx.stroke();
+      }
+    },
+    side(ctx, c) {
+      const up = (z0, z1, zTop, top = PORT.yTop) => [
+        [z0, PORT.yBottom],
+        [z1, PORT.yBottom],
+        [zTop, top],
+      ];
+      const shards = [up(-2.75, -1.2, -2.3), up(-1.5, 0.2, -0.35, 0.5), up(0.0, 1.5, 1.25, 0.56), up(1.3, 3.2, 3.15)];
+      for (const pts of shards) fillPath(ctx, c.A, pts);
+      ctx.strokeStyle = c.T;
+      ctx.lineWidth = 0.018;
+      for (const pts of shards) {
+        path(ctx, [pts[0], pts[2], pts[1]], false);
+        ctx.stroke();
+      }
+      fillPath(ctx, c.T, [
+        [-1.1, PORT.yBottom],
+        [-0.72, PORT.yBottom],
+        [-0.98, 0.26],
+      ]);
+    },
+  },
+
+  // Twin racing stripes from stern to stem.
+  stripe: {
+    top(ctx, side, c) {
+      const run = (from, to, t0 = 0, t1 = 0.9) => [...edge(midAt, side, t0, t1, from), ...edge(midAt, side, t1, t0, to)];
+      fillPath(ctx, c.A, run(-0.2, -0.045));
+      fillPath(ctx, c.A, run(0.045, 0.2));
+      fillPath(ctx, c.T, run(-0.02, 0.02));
+      // a dark nose with a white chevron across it
+      fillPath(ctx, c.A, deckBand(side, [0.86, 0.9], [1, 1]));
+      fillPath(ctx, c.T, deckBand(side, [0.82, 0.86], [0.84, 0.88]));
+      chequers(ctx, side, 3);
+    },
+    side(ctx, c) {
+      const strip = (v0, v1, t0 = 0, t1 = 0.93) => {
+        const a = [];
+        const b = [];
+        for (let i = 0; i <= N; i++) {
+          const t = lerp(t0, t1, i / N);
+          a.push(sidePoint(t, v0));
+          b.push(sidePoint(t, v1));
+        }
+        return [...a, ...b.reverse()];
+      };
+      fillPath(ctx, c.A, strip(-0.2, 0.3));
+      fillPath(ctx, c.A, strip(0.4, 0.58));
+      fillPath(ctx, c.T, strip(0.32, 0.38));
+      fillPath(ctx, c.A, [sidePoint(0.86, -0.3), [BOAT.bowZ + 0.05, PORT.yBottom], [BOAT.bowZ + 0.05, PORT.yTop], sidePoint(0.89, 1.3)]);
+      // the stripes break up into squares toward the stern
+      const sq = 0.07;
+      for (let r = 0; r < 4; r++) {
+        for (let k = 0; k < 7 - r; k++) {
+          if ((r + k) % 2) continue;
+          ctx.fillStyle = c.T;
+          ctx.fillRect(BOAT.sternZ + 0.04 + k * sq, 0.26 + r * sq, sq, sq);
+        }
+      }
+    },
+  },
+};
+
+/** A carbon-fibre weave to fill dark panels with (the pattern is in pixels whatever space it is used in). */
+function weave(ctx) {
+  const tile = document.createElement('canvas');
+  tile.width = tile.height = 8;
+  const t = tile.getContext('2d');
+  t.fillStyle = '#14171c';
+  t.fillRect(0, 0, 8, 8);
+  for (let j = 0; j < 4; j++) {
+    for (let i = 0; i < 4; i++) {
+      // a 2/2 twill: each tow goes over two and under two, stepping one along each row
+      const over = ((i + j) & 3) < 2;
+      t.fillStyle = over ? '#262b33' : '#0d0f13';
+      t.fillRect(i * 2, j * 2, 2, 2);
+    }
+  }
+  const pattern = ctx.createPattern(tile, 'repeat');
+  // one tile is eight pixels of a full-size sheet, whatever the scale of the space it is used in
+  const k = ctx.canvas.width / SHEET.w;
+  const m = ctx.getTransform();
+  pattern.setTransform(new DOMMatrix([k / Math.hypot(m.a, m.b), 0, 0, k / Math.hypot(m.c, m.d), 0, 0]));
+  return pattern;
+}
+
 /**
  * Paint a team's boat.
  * @param {{ hull: string, accent: string }} team
@@ -183,6 +409,9 @@ export function paintLivery(team, number, scale = 1) {
   const { canvas, ctx } = sheet(scale);
   const { hull: H, accent: A, third: T } = teamColors(team);
   const deep = shade(H, 0.72);
+  const design = PATTERNS[team.pattern] || PATTERNS.slash;
+  const mark = team.mark || 'BREAKWATER';
+  const colours = { H, A, T };
 
   // gaps between the charts take the hull colour, so nothing odd bleeds in from a distance
   ctx.fillStyle = H;
@@ -198,32 +427,7 @@ export function paintLivery(team, number, scale = 1) {
     ctx.fillRect(TOP.z0, -TOP.xMax, TOP.z1 - TOP.z0, 2 * TOP.xMax);
 
     for (const side of [1, -1]) {
-      // bow tips, and two chevrons chasing them
-      ctx.fillStyle = T;
-      path(ctx, deckBand(side, TIP, [1, 1]));
-      ctx.fill();
-      ctx.fillStyle = A;
-      path(ctx, deckBand(side, [TIP[0] - 0.05, TIP[1] - 0.05], [TIP[0] - 0.022, TIP[1] - 0.022]));
-      ctx.fill();
-      path(ctx, deckBand(side, [TIP[0] - 0.082, TIP[1] - 0.082], [TIP[0] - 0.068, TIP[1] - 0.068]));
-      ctx.fill();
-
-      // a stripe along the outer edge of the deck, with a hairline inboard of it
-      ctx.fillStyle = A;
-      path(ctx, [...edge(outerAt, side, 0, TIP[0] - 0.09, 0.045), ...edge(outerAt, side, TIP[0] - 0.09, 0, 0.115)]);
-      ctx.fill();
-      ctx.fillStyle = T;
-      path(ctx, [...edge(outerAt, side, 0, TIP[0] - 0.09, 0.135), ...edge(outerAt, side, TIP[0] - 0.09, 0, 0.15)]);
-      ctx.fill();
-
-      // chequers across the tail
-      const sq = 0.062;
-      for (let r = 0; r < 2; r++) {
-        for (let k = 0; k < 10; k++) {
-          ctx.fillStyle = (r + k) % 2 ? INK : WHITE;
-          ctx.fillRect(BOAT.sternZ + r * sq, side * (0.46 + k * sq) - (side < 0 ? sq : 0), sq, sq);
-        }
-      }
+      design.top(ctx, side, colours);
 
       // step pads beside the cockpit
       ctx.fillStyle = 'rgba(28, 31, 37, 0.92)';
@@ -245,7 +449,7 @@ export function paintLivery(team, number, scale = 1) {
       label(ctx, String(number), PLATE.z - 0.012, side * PLATE.x + 0.012, { size: 0.33, dir: [0, -1], color: INK, weight: 900 });
 
       // the name along the foredeck, read from that side of the boat
-      label(ctx, 'BREAKWATER', 0.98, side * 0.735, { size: 0.165, dir: [-side, 0], color: A, squeeze: 0.96 });
+      label(ctx, mark, 0.98, side * 0.735, { size: 0.165, dir: [-side, 0], color: luminance(A) > 0.4 ? A : WHITE, squeeze: 0.96, stroke: { color: 'rgba(8,10,14,0.55)', width: 0.012 } });
       // a filler cap with its label, and a mark by the bow cleat
       ctx.lineWidth = 0.008;
       ctx.strokeStyle = 'rgba(8, 10, 14, 0.55)';
@@ -277,8 +481,8 @@ export function paintLivery(team, number, scale = 1) {
     ctx.fillStyle = T;
     ctx.fillRect(SCOOP.z1 - 0.09, -0.22, 0.035, 0.44);
 
-    // a dull dark panel round the canopy, running forward to the nose, so the glass does not glare
-    ctx.fillStyle = '#14171c';
+    // a dull dark panel of bare carbon round the canopy, running forward to the nose, so the glass does not glare
+    ctx.fillStyle = weave(ctx);
     path(ctx, canopyOutline(0.075));
     ctx.fill();
     path(ctx, [
@@ -317,31 +521,12 @@ export function paintLivery(team, number, scale = 1) {
       ctx.fillStyle = fade;
       ctx.fillRect(TOP.z0, PORT.yBottom, TOP.z1 - TOP.z0, PORT.yTop - PORT.yBottom);
 
-      // a band along the bottom, tall at the stern and running out toward the bow
-      const lower = [];
-      const upper = [];
-      const line = [];
-      for (let i = 0; i <= N; i++) {
-        const t = i / N;
-        lower.push([zAt(t), PORT.yBottom]);
-        upper.push(sidePoint(t, sideBandAt(t)));
-        line.push(sidePoint(t, sideBandAt(t) + 0.055));
-      }
-      ctx.fillStyle = T;
-      path(ctx, [...lower, ...upper.slice().reverse()]);
-      ctx.fill();
-      ctx.fillStyle = A;
-      path(ctx, [...upper, ...line.slice().reverse()]);
-      ctx.fill();
-      // the bow tips match the deck
-      ctx.fillStyle = T;
-      path(ctx, [sidePoint(TIP[0], 0), [BOAT.bowZ + 0.05, PORT.yBottom], [BOAT.bowZ + 0.05, PORT.yTop], sidePoint(TIP[0] + 0.03, 1.3)]);
-      ctx.fill();
+      design.side(ctx, colours);
 
       // the name, large
       const away = port ? -1 : 1; // reading direction along z
-      label(ctx, 'BREAKWATER', -0.2, 0.345, { size: 0.215, dir: [away, 0], color: A, squeeze: 1.0 });
-      label(ctx, 'GRAND PRIX', -0.95, 0.088, { size: 0.072, dir: [away, 0], color: luminance(T) > 0.4 ? INK : WHITE, weight: 700 });
+      label(ctx, mark, -0.2, 0.345, { size: 0.235, dir: [away, 0], color: WHITE, squeeze: 1.0, weight: 900, stroke: { color: INK, width: 0.03 } });
+      label(ctx, 'BREAKWATER GP', -0.95, 0.088, { size: 0.072, dir: [away, 0], color: WHITE, weight: 700, stroke: { color: 'rgba(8,10,14,0.7)', width: 0.012 } });
       // the number in a roundel toward the bow
       const [rz, ry] = [zAt(0.745), 0.34];
       ctx.fillStyle = WHITE;
@@ -354,19 +539,6 @@ export function paintLivery(team, number, scale = 1) {
       ctx.ellipse(rz, ry, 0.125, 0.125, 0, 0, Math.PI * 2);
       ctx.stroke();
       label(ctx, String(number), rz + away * 0.008, ry - 0.008, { size: 0.2, dir: [away, 0], color: INK, weight: 900 });
-      // speed stripes at the stern, leaning back
-      ctx.fillStyle = A;
-      for (let k = 0; k < 4; k++) {
-        const z = -1.62 - k * 0.2;
-        const w = 0.12 - k * 0.02;
-        path(ctx, [
-          [z, 0.52],
-          [z - w, 0.52],
-          [z - w + 0.12, 0.26],
-          [z + 0.12, 0.26],
-        ]);
-        ctx.fill();
-      }
       // a bilge outlet near the tail
       ctx.fillStyle = '#0a0c10';
       ctx.beginPath();
@@ -405,7 +577,7 @@ export function paintLivery(team, number, scale = 1) {
     });
   }
   inTransom(ctx, TRANSOM_MID, (w, h) => {
-    ctx.fillStyle = '#12151a';
+    ctx.fillStyle = weave(ctx);
     ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = A;
     ctx.fillRect(0, 6, w, 5);

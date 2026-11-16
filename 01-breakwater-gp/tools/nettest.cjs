@@ -292,7 +292,10 @@ const fmt = (st, unit = 'm') => `mean ${st.mean.toFixed(2)} ${unit}, 95% under $
     console.log(`\n— B: a slow, uneven, lossy link (${LAG}–${LAG + JITTER} ms each way, ${LOSS} % of updates lost) —`);
     const { context, host, guest } = await connect(`?manual&dpr=1&laps=1&ap&netlag=${LAG}&netjitter=${JITTER}&netloss=${LOSS}`, { manual: true });
     let gap = await clockGap(host, guest, true);
-    check('guest: has the host sea clock despite the delay', Math.abs(gap) < 0.03, `${(gap * 1000).toFixed(0)} ms apart`);
+    // Straight after joining, the guest has only a few round trips to go on. Its error is half the difference between
+    // the two legs of the quickest one (up to JITTER / 2) plus the grain of the stepped stopwatch (one step, 17 ms):
+    // 37 ms at worst here. It closes to a few milliseconds as more round trips come in (checked below).
+    check('guest: has the host sea clock despite the delay', Math.abs(gap) < JITTER / 2000 + 0.02, `${(gap * 1000).toFixed(0)} ms apart`);
     await host.click('#bw-net-start');
     await both(host, guest, 4.6, 1 / 60); // countdown + off the line
     let h = await probe(host);

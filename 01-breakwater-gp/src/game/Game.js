@@ -19,7 +19,7 @@ import { BotDriver, PlayerDriver } from './drivers.js';
 import { Race } from './Race.js';
 import { Hud } from './Hud.js';
 import { Mist, Spray, WakeField } from './effects.js';
-import { LensDrops } from './LensDrops.js';
+import { Lens } from './Lens.js';
 import { HULL, RULES } from './config.js';
 import { ReflectionProbe } from '../engine/ReflectionProbe.js';
 import { WaterMirror } from '../engine/WaterMirror.js';
@@ -38,7 +38,7 @@ const AUTO_LANES = [-3.6, -1.2, 1.2, 3.6];
 export class Game {
   /**
    * @param {HTMLElement} root
-   * @param {{ pixelRatio?: number, manual?: boolean, draw?: boolean, autopilot?: boolean, laps?: number, seaScale?: number, drops?: boolean, reflections?: boolean, shadows?: boolean, online?: boolean, playUrl?: string, net?: { lag: number, jitter: number, loss: number } }} [options]
+   * @param {{ pixelRatio?: number, manual?: boolean, draw?: boolean, autopilot?: boolean, laps?: number, seaScale?: number, drops?: boolean, look?: boolean, reflections?: boolean, shadows?: boolean, online?: boolean, playUrl?: string, net?: { lag: number, jitter: number, loss: number } }} [options]
    */
   constructor(root, options = {}) {
     this.options = options;
@@ -57,7 +57,8 @@ export class Game {
     };
     const coarse = matchMedia('(pointer: coarse)').matches;
 
-    const engine = new Engine(hud.canvasHost, { pixelRatio: options.pixelRatio, manual: options.manual, draw: options.draw });
+    // (on a desktop the picture is drawn finer than the screen and scaled down, while frames keep up)
+    const engine = new Engine(hud.canvasHost, { pixelRatio: options.pixelRatio, supersample: coarse ? 1 : 1.5, manual: options.manual, draw: options.draw });
     this.engine = engine;
     const world = createWorld(engine, { waterSegments: coarse ? 176 : 256, shadows: options.shadows !== false });
     this.world = world;
@@ -90,10 +91,12 @@ export class Game {
       return craft;
     });
 
-    /** One per driver on this machine: { racer, camera, chase, hud, rect, pan, emphasis, human, auto, lens, wet }. */
+    /** One per driver on this machine: { racer, camera, chase, hud, rect, pan, emphasis, human, auto, lens }. */
     this.views = [];
-    /** Water on each view's camera lens (kept from race to race). */
+    /** Each view's camera lens: the rain on it and the finish of the picture (kept from race to race). */
     this.lenses = [];
+    this._lensOptions = { look: !coarse && options.look !== false, low: coarse };
+    this._lensRender = { rain: options.drops !== false, look: options.look !== false };
     this.mode = 'solo';
     this.phase = 'title'; // title | lobby | race | results
     this._countdownAt = null; // online: the sea time at which both machines start counting down
@@ -190,11 +193,10 @@ export class Game {
     this.views = locals.map((racer, n) => {
       const camera = new THREE.PerspectiveCamera(62, 1, 0.3, 9000);
       const chase = new ChaseCamera(camera);
-      if (!this.lenses[n]) this.lenses[n] = new LensDrops(this.engine.renderer);
+      if (!this.lenses[n]) this.lenses[n] = new Lens(this.engine.renderer, this._lensOptions);
       this.lenses[n].clear();
       return {
         lens: this.lenses[n],
-        wet: 0,
         racer,
         camera,
         chase,
@@ -510,11 +512,15 @@ export class Game {
     }
   }
 
-  /** Spray that reaches a camera all the time: the driver's own at speed, and a rooster tail followed too closely. */
+  /**
+   * Spray that reaches a camera all the time: a little of the driver's own at speed, more of it in a slide,
+   * and most of all another boat's plume followed too closely. And the wind that dries it.
+   */
   _wetLenses(dt) {
     for (const v of this.views) {
       const me = v.racer.craft;
-      let rate = me.grip > 0.3 ? 0.9 * clamp01((me.speed - 14) / 12) : 0;
+      const speedK = clamp01((me.speed - 12) / 14);
+      let rate = me.grip > 0.3 ? speedK * (0.05 + 0.035 * clamp01(Math.abs(me.slip) / 0.45)) : 0;
       for (const c of this.crafts) {
         if (c === me || c.grip < 0.3 || c.speed < 8) continue;
         const dx = me.pos.x - c.pos.x;
@@ -523,13 +529,12 @@ export class Game {
         const fz = Math.cos(c.yaw);
         const behind = -(dx * fx + dz * fz);
         const side = Math.abs(dx * fz - dz * fx);
-        if (behind > 2.5 && behind < 16 && side < 3) rate += 13 * (1 - behind / 16) * (1 - side / 3) * c.throttle;
+        if (behind > 2 && behind < 18 && side < 3.4) {
+          rate += 0.34 * (1 - behind / 18) * (1 - side / 3.4) * clamp01(c.speed / 20) * (0.4 + 0.6 * c.throttle);
+        }
       }
-      v.wet += rate * dt;
-      while (v.wet >= 1) {
-        v.wet -= 1;
-        v.lens.splash(1, 0);
-      }
+      if (rate > 0) v.lens.splash(rate * dt, 0);
+      v.lens.update(dt, clamp01(me.speed / 26));
     }
   }
 
@@ -582,7 +587,7 @@ export class Game {
         }
         // plumes: fine spray thrown up and out from the tail of each hull, and a third
         // from the propellers, which hangs in the air behind the boat and drifts apart
-        acc.plume += dt * 62 * speedK * speedK * this._mistRate * (0.4 + 0.6 * c.throttle);
+        acc.plume += dt * (62 + 70 * clamp01(Math.abs(c.slip) / 0.45)) * speedK * speedK * this._mistRate * (0.4 + 0.6 * c.throttle);
         while (acc.plume >= 1) {
           acc.plume -= 1;
           const pick = Math.random();
@@ -622,13 +627,16 @@ export class Game {
             0.22 + Math.random() * 0.3,
           );
         }
-        // sheets of spray peeling off the two hulls, heavier on the outside of a turn
+        // sheets of spray peeling off the two hulls, heavier on the outside of a turn,
+        // and a wall of it off the hull that leads when the boat is sliding
         if (c.speed > 8) {
-          acc.bow += dt * 190 * speedK;
+          const slide = clamp01(Math.abs(c.slip) / 0.45);
+          acc.bow += dt * (190 + 520 * slide) * speedK;
           while (acc.bow >= 1) {
             acc.bow -= 1;
             const turn = Math.max(-1, Math.min(1, c.yawRate));
-            const sideSign = Math.random() < 0.5 - turn * 0.3 ? 1 : -1; // +1 = port
+            const lead = c.slip > 0 ? 1 : -1; // the side the boat is sliding toward
+            const sideSign = Math.random() < slide * 0.8 ? lead : Math.random() < 0.5 - turn * 0.3 ? 1 : -1; // +1 = port
             const out = 2.4 + Math.random() * 3.2;
             const along = -0.6 + Math.random() * 1.6; // where the hulls meet the water at speed
             this.spray.emit(
@@ -693,18 +701,18 @@ export class Game {
             view.chase.kick(0.25 + ev.strength * 0.6);
             this.audio.splash(ev.strength, view.pan);
             // the splash comes up over the camera
-            if (ev.strength > 0.28) view.lens.splash(3 + 30 * ev.strength, ev.strength);
+            if (ev.strength > 0.25) view.lens.splash(0.02 + 0.22 * ev.strength, Math.max(0, ev.strength - 0.35) * 1.3);
           }
           // and somebody else coming down close by wets the lens too
           for (const v of this.views) {
             if (v === view) continue;
             const d = Math.hypot(c.pos.x - v.racer.craft.pos.x, c.pos.z - v.racer.craft.pos.z);
-            if (d < 8) v.lens.splash((2 + 12 * ev.strength) * (1 - d / 8), ev.strength * 0.4);
+            if (d < 8) v.lens.splash((0.05 + 0.3 * ev.strength) * (1 - d / 8), 0);
           }
         } else if (ev.type === 'bump' && view) {
           view.chase.kick(0.2 + ev.strength * 0.6);
           this.audio.splash(0.2 + ev.strength * 0.5, view.pan);
-          view.lens.splash(3 + 10 * ev.strength, ev.strength * 0.5);
+          view.lens.splash(0.06 + 0.2 * ev.strength, 0);
         }
       }
       c.events.length = 0;
@@ -733,7 +741,7 @@ export class Game {
     const racing = this.phase === 'race';
     for (const v of this.views) {
       v.chase.update(frameDt, v.racer.craft, time);
-      v.lens.update(frameDt, clamp01(v.racer.craft.speed / 26));
+      v.lens.tick(frameDt, clamp01(v.racer.craft.speed / 26));
       // each driver's next mark stands out in their own view
       const next = racing ? v.racer.nextGate : -1;
       const k = Math.min(1, frameDt * 6);
@@ -821,11 +829,11 @@ export class Game {
       renderer.setViewport(x, y, w, h);
       renderer.setScissor(x, y, w, h);
       renderer.render(engine.scene, v.camera);
-      // water on the lens goes on last, bending what was just drawn
+      // the camera's lens goes on last: rain on the glass bending what was just drawn, and the finish of the picture
       // (left out on devices that are already struggling to keep up)
-      if (this.options.drops !== false && engine._qualitySteps < 2) {
+      if (engine._qualitySteps < 2) {
         const pr = engine.pixelRatio;
-        v.lens.render(Math.round(x * pr), Math.round(y * pr), Math.round(w * pr), Math.round(h * pr));
+        v.lens.render(Math.round(x * pr), Math.round(y * pr), Math.round(w * pr), Math.round(h * pr), this._lensRender);
       }
     }
   }

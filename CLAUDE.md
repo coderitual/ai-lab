@@ -39,3 +39,11 @@ branch.
   visible; `game/` is the race; `net/` is online play.
 - Dev scripts in `tools/` need Playwright available to Node (not a project
   dependency) and step the game deterministically (`?manual`).
+- Anything that changes the state of the game (how wet a camera's lens is, for
+  example) belongs in the fixed step, not in the per-picture render: tests and
+  pictures fast-forward without drawing, and must find the same game.
+- The land's height function (`heightAt` in `src/assets/island.js`) is what
+  boats run aground on. Up to the back of the beach it is part of the course;
+  above that it is scenery and can be reshaped freely.
+- A team is `{ hull, accent, mark, pattern }` (`src/assets/palette.js`): each
+  boat is painted to its own design. Keep them tellable apart from any side.

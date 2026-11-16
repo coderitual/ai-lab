@@ -7,7 +7,8 @@
 //   ?sea=0.8   scale the wave height
 //   ?manual    do not run the frame loop (step with __bw.advance)
 //   ?nodraw    run the frame loop without rendering
-//   ?drops=0   no water on the camera lens
+//   ?drops=0   no rain on the camera lens
+//   ?look=0    no finishing of the picture (glow, sharpening, grade)
 //   ?reflect=0 no live reflections on the boats
 //   ?shadows=0 no sun shadows on the boats
 //   ?netlag=80&netjitter=30&netloss=5
@@ -33,6 +34,7 @@ try {
     seaScale: num('sea'),
     draw: !q.has('nodraw'),
     drops: q.get('drops') !== '0',
+    look: q.get('look') !== '0',
     reflections: q.get('reflect') !== '0',
     shadows: q.get('shadows') !== '0',
     net: { lag: (num('netlag') || 0) / 1000, jitter: (num('netjitter') || 0) / 1000, loss: (num('netloss') || 0) / 100 },
