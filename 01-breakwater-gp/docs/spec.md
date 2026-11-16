@@ -53,7 +53,8 @@ src/
     buoys.js           marks, course floats, start arch
     island.js          land: height function, mesh, the ground material (sand, grass, rock)
     palm.js            coconut palms: trunks, fronds, their textures, the wind
-    scenery.js         rocks, lighthouse, pier, sailboats
+    rocks.js           rock and thicket cut by one chisel: blocks, crags, fields of them; their tones
+    scenery.js         sea stacks (crags from rocks.js), lighthouse, pier, sailboats
     geo.js             modelling helpers (part, merge, loft, skin, fan, facet)
     registry.js        what the viewer can show
   game/
@@ -251,16 +252,22 @@ Catmull–Rom curve through ten points at angle/radius (degrees, metres)
   (253, −146); six far hills on the horizon. Props: palms, sea stacks, a
   pier, moored boats (which can be hit), sailboats.
 - Rock on the main island (`assets/rocks.js`, placed in `game/World.js`): a
-  massif of three crags on the high ground (54 m, 34 m and 24 m tall, of 6, 4
-  and 3 blocks; the tallest stands on the summit, so its top is some 75 m
-  above the sea), five lesser crags of 9 to 20 m round them, up to 26
-  outcrops on the slopes, and eight clusters of 4 to 7 boulders (0.9 to
-  4.3 m) where the grass meets the sand. Over the hill and along the back of
+  massif of three crags on the high ground (54 m, 34 m and 24 m from foot to
+  top, of 6, 4 and 3 blocks; the tallest stands on the summit with its foot
+  sunk 7 m into it, so its top is about 73 m above the sea), five lesser
+  crags of 9 to 20 m round them, up to 26 outcrops on the slopes, and eight
+  clusters of 4 to 7 boulders (cut from balls of 0.9 to 4.3 m radius) where
+  the grass meets the sand. Everything planted on sloping ground goes on
+  below its foot as a root (about its own radius deep), so no underside
+  shows where the ground falls away. Over the hill and along the back of
   the beach, a thicket: 130 clumps of bush (70 on phones), each of two or
   three masses. The lighthouse islet has two small crags and 16 boulders. All
   of it stands on ground no boat can reach: it is scenery, and nothing in the
   physics knows it is there. The eight sea stacks are crags of two or three
-  blocks; they are hit as circles, as before.
+  blocks, set half a metre into the still sea and going on 5 m below that;
+  each is hit as a circle fitted to its own outline at the height of a hull
+  (the mean of how far the rock reaches in 24 directions), so what bounces a
+  boat is where the rock is.
 
 ## 6. The race
 
@@ -413,9 +420,11 @@ band-pass for the water.
   palms read it.
 - **Palms**: 44 on the main island, 11 on the sand islet. Each has 22–26
   fronds of 7 segments and a 9-ring trunk, about 930 triangles. The three
-  islands themselves are 23 000 triangles; the rock of the main island is
-  12 000 and its thicket 43 000 (14 000 on phones, where the clumps are fewer
-  and cut from a coarser ball). Palms lean
+  islands themselves are 20 000 triangles; the rock of the main island is
+  12 000, the lighthouse islet's 2 700, the sea stacks 3 600, and the
+  thicket 43 000 (14 000 on phones, where the clumps are fewer and cut from a
+  coarser ball; it is left out of the map the paintwork mirrors, and on
+  phones out of the water mirror as well). Palms lean
   0.1 m with the wind and up to 0.3 m in gusts at the crown; fronds bob
   ±0.13 m at the tip.
 
@@ -439,8 +448,9 @@ In order, per frame:
       On phones this happens only while the glass is wet, and without the
       finish.
 
-A solo frame is about 170 draw calls and 770 000 triangles; split screen about
-295 and 1 160 000; a phone, with its coarser sea, about 140 and 570 000. (The
+A solo frame is about 170 draw calls and 760 000 triangles; split screen about
+295 and 1 140 000; a phone, with its coarser sea, about 140 and 580 000
+(medians over the first frames of a race, on the build). (The
 islands with their rock, thicket and 55 palms are about 130 000 of those on a
 desktop and 100 000 on a phone, drawn again in the water mirror.)
 

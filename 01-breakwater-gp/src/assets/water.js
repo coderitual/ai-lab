@@ -133,8 +133,8 @@ void main() {
   // swell-aligned coordinates: x runs with the main swell, y along its crests
   vec2 sp = vec2(dot(vBase, uSwellDir), dot(vBase, vec2(-uSwellDir.y, uSwellDir.x)));
 
-  // ---- ripples: four scrolling layers of the tiling normal map, squeezed along
-  //      the swell so they read as fine wind streaks lying across it
+  // ---- ripples: four scrolling layers of the tiling normal map, squeezed a little along
+  //      the swell: small facets, each catching the sky or the sun on its own
   vec2 n1 = texture2D(uNormalTex, sp * vec2(0.14, 0.095) + t * vec2(0.03, 0.012)).xy - 0.5;
   vec2 n2 = texture2D(uNormalTex, sp.yx * vec2(0.27, 0.38) + t * vec2(-0.03, 0.05)).xy - 0.5;
   vec2 n3 = texture2D(uNormalTex, vBase * 0.023 + t * vec2(0.004, -0.006)).xy - 0.5;
@@ -186,7 +186,7 @@ void main() {
 
   // surf along the shore
   float sd = shore + (fine - 0.5) * 3.5 + sin(t * 0.9 + vBase.x * 0.05) * 0.8;
-  float wash = smoothstep(9.0, 0.5, sd) * mix(0.3, 1.0, 0.5 + 0.5 * sin(sd * 1.15 - t * 1.4));
+  float wash = (1.0 - smoothstep(0.5, 9.0, sd)) * mix(0.3, 1.0, 0.5 + 0.5 * sin(sd * 1.15 - t * 1.4));
 
   float mask = max(crest, wash * 0.85);
   // white threads where the pattern is strong; in between, a thin veil of bubbles

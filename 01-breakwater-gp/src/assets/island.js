@@ -48,14 +48,14 @@ const TERRAIN_COLOR = /* glsl */ `
   float tGrass = 1.0 - tSand - tRock;
 
   // sand: pale gold where it is dry, darker and richer toward the sea
-  float tDamp = smoothstep(1.25, 0.3, tP.y + (tMid - 0.5) * 0.5);
+  float tDamp = (1.0 - smoothstep(0.3, 1.25, tP.y + (tMid - 0.5) * 0.5));
   float tReach = 0.17 + 0.13 * sin(uTerrainTime * 0.7 + tSoft * 12.0 + tP.x * 0.03);      // how far up the last wave came
   float tSoaked = smoothstep(tReach + 0.3, tReach + 0.02, tP.y);
   vec3 tSandCol = mix(vec3(0.66, 0.50, 0.29), vec3(0.76, 0.62, 0.40), tSoft);
   tSandCol *= 0.9 + 0.2 * tFine.b;                                                            // grain
   tSandCol = mix(tSandCol, tSandCol * vec3(0.56, 0.50, 0.42), tDamp * 0.9);
   // the lace of foam the wave leaves as it runs back
-  float tLace = smoothstep(0.07, 0.0, abs(tP.y - tReach - 0.03)) * smoothstep(0.3, 0.7, tFine.g + tFine.r * 0.6);
+  float tLace = (1.0 - smoothstep(0.0, 0.07, abs(tP.y - tReach - 0.03))) * smoothstep(0.3, 0.7, tFine.g + tFine.r * 0.6);
   tSandCol = mix(tSandCol, vec3(0.9, 0.93, 0.95), tLace * 0.75);
 
   // green: a rough sward low down with paler, drier patches; higher up the dark crowns of the forest
@@ -72,11 +72,11 @@ const TERRAIN_COLOR = /* glsl */ `
   // rock: grey strata, darker and wet near the water
   float tStrata = 0.5 + 0.5 * sin(tP.y * 1.7 + tMid * 9.0 + tSoft * 14.0 + tFine.r * 3.0);
   vec3 tRockCol = mix(vec3(0.21, 0.14, 0.09), vec3(0.56, 0.40, 0.24), tStrata * 0.3 + tFine.b * 0.45 + tMid * 0.25);   // (the tones of assets/rocks.js)
-  tRockCol = mix(tRockCol, tRockCol * 0.45, smoothstep(1.4, 0.2, tP.y));
+  tRockCol = mix(tRockCol, tRockCol * 0.45, (1.0 - smoothstep(0.2, 1.4, tP.y)));
   tRockCol = mix(tRockCol, vec3(0.22, 0.30, 0.12), smoothstep(0.5, 0.85, tFine.a) * smoothstep(2.0, 6.0, tP.y) * 0.55);   // moss
 
   diffuseColor.rgb = tSandCol * tSand + tGrassCol * tGrass + tRockCol * tRock;
-  float tGloss = max(tSoaked * tSand, smoothstep(1.2, 0.2, tP.y) * tRock * 0.7);
+  float tGloss = max(tSoaked * tSand, (1.0 - smoothstep(0.2, 1.2, tP.y)) * tRock * 0.7);
 `;
 
 // The small relief: after <normal_fragment_maps>.

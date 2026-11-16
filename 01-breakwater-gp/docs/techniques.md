@@ -111,7 +111,7 @@ depth buffer read.
   put it.
 - **Ripples as facets, not streaks.** Four scrolling lookups of one normal
   map make the fine surface. Squeezed hard along the swell they read as
-  smeared streaks; nearly square, and a third stronger, they read as small
+  smeared streaks; squeezed by 1.4 instead of 2.3, and a quarter stronger, they read as small
   sharp facets, each catching the sky or the sun on its own.
 - **Foam that lingers.** Foam belongs where a crest broke a moment ago, not
   where the crest is now. Rather than simulate it, the shader asks the wave
@@ -659,7 +659,7 @@ driver can choose to slide.
 shadows float on the sand.
 
 **Trick.** Each island is drawn once, from the sun, into a depth texture
-(`engine/BakedShadow.js`): the land, the palms (through their cut-out
+(`engine/BakedShadow.js`): the land, the rock and the thicket, the palms (through their cut-out
 texture, so the shadow has leaflets), the pier, the lighthouse. Any material
 can then be patched (`withBakedShadow`) to ask that picture how much of the
 sun reaches a point, and to scale the sun's part of its light by the answer.
@@ -732,20 +732,29 @@ underneath.
   round it at uneven angles, and a few more that take the corners off. It is
   then drawn out to its height, narrowed toward the top and leaned.
 - A **crag** is blocks piled on one another, each smaller than the one it
-  stands on and sunk well into it (they overlap by more than half), ending
+  stands on, with its foot about halfway up it (they overlap by half), ending
   in a horn. The ledges where one block meets the next are what makes it
   read as rock that has weathered in beds.
-- **Paint is per face, not per triangle.** A flat face is many triangles;
-  give each its own tone and the mesh shows through as a mosaic. The tone is
-  taken from the *direction the face looks* (a noise of the normal), so all
-  the triangles of one stroke agree, and from height: pale flats that take
-  the sun, a warm body that is ochre here and grey there, dark undersides and
-  feet, moss in patches on what faces up.
+- **Paint follows the faces.** A flat face is many triangles; give each a
+  tone of its own and the mesh shows through as a mosaic. So the tone of a
+  wall is taken from the *direction the face looks* (a noise of the normal),
+  on which all the triangles of one stroke agree, and only then shifted by
+  height: paler toward the top, darker toward the foot, pale flats that take
+  the sun, dark undersides, moss in patches on what faces up. (The shift by
+  height is per triangle, so a tall face still grades a little from top to
+  bottom.)
 - **The same chisel cuts the thicket.** A clump of bush is the same function
   with no flat top and no walls (only corner strokes, so it stays round),
   painted in greens that are pale on top and dark underneath, two or three
   grown into one another.
-- Shaded flat, in one draw call per island, casting into and reading the
+- **What is asked for is what is built.** A rock's highest point lands
+  exactly on the height it is given (the ball is measured after the chisel
+  and stretched to fit), a crag's blocks are sized so that the pile ends at
+  the crag's height, and the lowest block stands where the crag is put. Below
+  its foot every rock goes on as a root, as deep as it is told, so that one
+  planted on a slope (or a stack in a deep trough) never shows its underside.
+- Shaded flat, in one draw call for an island's rock and one for its
+  thicket, drawn before the ground they hide, casting into and reading the
   island's baked shadow map (section 20), so the massif throws its afternoon
   shadow across the hill and the beach.
 

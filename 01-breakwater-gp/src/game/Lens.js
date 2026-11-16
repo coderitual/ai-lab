@@ -113,7 +113,7 @@ Wet runners(vec2 p, float t, vec2 cells, float amount, float seed, vec2 drawn) {
   // its path wanders a little
   #define PATH(y) (x0 + 0.08 * sin((y) * 7.0 + h * 6.283) + 0.03 * sin((y) * 19.0 + h * 40.0))
   float radius = (0.062 + 0.1 * r.x * r.x) * (0.6 + 0.4 * on) / cells.x;   // in units of the view's height
-  float life = smoothstep(0.0, 0.04, ph) * smoothstep(1.0, 0.93, ph) * on;
+  float life = smoothstep(0.0, 0.04, ph) * (1.0 - smoothstep(0.93, 1.0, ph)) * on;
 
   // the drop: round in front, drawn out behind, never quite a circle
   vec2 d = (f - vec2(PATH(headY), headY)) / cells;
@@ -125,8 +125,8 @@ Wet runners(vec2 p, float t, vec2 cells, float amount, float seed, vec2 drawn) {
   float above = f.y - headY;
   float width = radius * (0.5 - 0.28 * smoothstep(0.0, 0.6, above));
   float across = (f.x - PATH(f.y)) / cells.x / width;
-  float track = smoothstep(1.0, 0.55, abs(across)) * smoothstep(-0.01, 0.02, above) * exp(-max(above, 0.0) * drawn.y)
-              * smoothstep(0.95, 0.9, f.y);
+  float track = (1.0 - smoothstep(0.55, 1.0, abs(across))) * smoothstep(-0.01, 0.02, above) * exp(-max(above, 0.0) * drawn.y)
+              * (1.0 - smoothstep(0.9, 0.95, f.y));
 
   Wet w = Wet(d / radius, smoothstep(1.0, 1.0 - clamp(1.5 * uTexel.y / radius, 0.08, 0.7), rho) * life, radius,
               vec2(clamp(across, -1.0, 1.0), 0.0), track * life);
@@ -242,7 +242,7 @@ void main() {
     float c = length(glass.bend);
     float lit = dot(glass.bend, vec2(-0.6, 0.8));
     col *= 1.0 - 0.3 * glass.film * smoothstep(0.45, 1.0, c);
-    col += vec3(0.9, 0.95, 1.0) * 0.16 * glass.film * smoothstep(0.15, 0.6, lit) * smoothstep(1.0, 0.7, c);
+    col += vec3(0.9, 0.95, 1.0) * 0.16 * glass.film * smoothstep(0.15, 0.6, lit) * (1.0 - smoothstep(0.7, 1.0, c));
   }
   // a drop is a strong lens: it holds the whole scene, upside down
   if (glass.drop > 0.0) {
@@ -251,8 +251,8 @@ void main() {
     vec2 through = mix(uv, vec2(0.5, 0.54), 0.62) - glass.on * vec2(0.34, 0.4);
     vec3 held = textureLod(uScene, clamp(through, 0.003, 0.997), 4.0 - big).rgb;
     held *= 1.0 - (0.25 + 0.4 * big) * smoothstep(0.4, 1.0, rim);                                  // dark toward its rim
-    held += vec3(1.0, 0.98, 0.94) * smoothstep(0.36, 0.1, length(glass.on - vec2(-0.34, 0.42))) * 0.65;   // the sun on it
-    held += vec3(0.8, 0.9, 1.0) * smoothstep(0.5, 1.0, rim) * smoothstep(-0.2, -0.9, glass.on.y) * 0.22;      // sky along its lower rim
+    held += vec3(1.0, 0.98, 0.94) * (1.0 - smoothstep(0.1, 0.36, length(glass.on - vec2(-0.34, 0.42)))) * 0.65;   // the sun on it
+    held += vec3(0.8, 0.9, 1.0) * smoothstep(0.5, 1.0, rim) * (1.0 - smoothstep(-0.9, -0.2, glass.on.y)) * 0.22;      // sky along its lower rim
     col = mix(col, held, glass.drop);
   }
 

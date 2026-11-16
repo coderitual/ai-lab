@@ -4,10 +4,10 @@
 //
 // A rock starts as a ball and is chiselled: a handful of random planes each
 // slice off whatever stands beyond them (walls mostly, some sloping roofs, a
-// few flat tops). What is left is drawn out to its height, narrowed toward the
-// top, leaned, and (for the tall ones) stepped in and out in bands so that it
-// reads as blocks stacked on blocks. It is shaded flat, one colour per facet,
-// chosen from which way the facet looks and how high up it is.
+// flat top). What is left is drawn out to its height, narrowed toward the top
+// and leaned; tall ones are several such blocks piled on one another. It is
+// shaded flat, a colour to each facet, chosen mostly from which way the facet
+// looks and partly from how high up it is.
 
 import * as THREE from 'three';
 import { clamp01, fbm2, lerp, makeRng, smoothstep } from '../engine/math.js';
@@ -42,27 +42,45 @@ export const FOLIAGE_TONES = {
 
 const _v = new THREE.Vector3();
 
+/** The balls rocks are cut from, by subdivision: built once, copied for each rock. */
+const BALLS = new Map();
+function ball(detail) {
+  let positions = BALLS.get(detail);
+  if (!positions) {
+    const g = new THREE.IcosahedronGeometry(1, detail);
+    positions = g.attributes.position.array.slice();
+    g.dispose();
+    BALLS.set(detail, positions);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3));
+  return g;
+}
+/** The farthest out a corner stroke may lie and still take in at least three points of a ball this coarse. */
+const REACH = { 1: 0.85, 2: 0.92, 3: 0.96 };
+
 /**
- * One rock, sitting on y = 0 (a little of it is below, to be sunk into the ground).
+ * One rock. Its foot is at y = 0 and its highest point at y = `height`; below the foot it goes on down as a root,
+ * to be sunk into the ground (or the sea).
  * @param {number} seed
  * @param {object} [o]
- * @param {number} [o.radius]  half its width at the foot (m)
- * @param {number} [o.height]
+ * @param {number} [o.radius]  half the width of the ball it is cut from (m): the rock is a little narrower
+ * @param {number} [o.height]  from foot to highest point
  * @param {number} [o.cuts]    how many planes chisel it: few = boulder, many = crag
  * @param {number} [o.taper]   width at the top as a fraction of the foot
  * @param {number} [o.detail]  subdivision of the ball it is cut from (1..3)
  * @param {[number, number]} [o.lean] metres sideways (x, z) per metre of height
- * @param {number} [o.steps]   bands it is stepped in and out by (0 = none)
  * @param {number} [o.moss]    0..1: how much of its upward faces is overgrown
  * @param {number} [o.wet]     height of the dark band at its foot (m)
  * @param {number} [o.squash]  depth as a fraction of width (a slab rather than a column)
+ * @param {number} [o.root]    how far it goes on below its foot (m): enough to stay buried on a slope
  * @param {typeof ROCK_TONES} [o.tones] what it is painted in
  * @param {boolean} [o.round]  no flat top and no walls: only strokes that take the corners off (a bush, a pebble)
  * @returns {THREE.BufferGeometry} flat-shaded, with vertex colours
  */
-export function chunkyRock(seed, { radius = 1, height = radius * 1.3, cuts = 12, taper = 0.7, detail = 2, lean = [0, 0], steps = 0, moss = 0, wet = 0, squash = 1, tones = ROCK_TONES, round = false } = {}) {
+export function chunkyRock(seed, { radius = 1, height = radius * 1.3, cuts = 12, taper = 0.7, detail = 2, lean = [0, 0], moss = 0, wet = 0, squash = 1, root = radius * 0.18, tones = ROCK_TONES, round = false } = {}) {
   const rng = makeRng(seed * 977 + 31);
-  const g = new THREE.IcosahedronGeometry(1, detail);
+  const g = ball(detail);
   const pos = g.attributes.position;
 
   // ---- the chisel: a flat top, walls all round, and a few more strokes to break the corners
@@ -75,45 +93,37 @@ export function chunkyRock(seed, { radius = 1, height = radius * 1.3, cuts = 12,
   if (!round) plane(rng() * Math.PI * 2, 0.9 + rng() * 0.1, 0.5 + rng() * 0.22);
   const a0 = rng() * Math.PI * 2;
   for (let i = 0; i < walls; i++) plane(a0 + ((i + (rng() - 0.5) * 0.7) / walls) * Math.PI * 2, -0.12 + rng() * 0.34, 0.52 + rng() * 0.26);
-  for (let i = walls + 1; i < cuts; i++) plane(rng() * Math.PI * 2, round ? -0.2 + rng() * 1.1 : 0.25 + rng() * 0.5, (round ? 0.74 : 0.66) + rng() * 0.24);
-  // ---- the bands: each a little wider or narrower than the one below, and shoved a little to one side
-  const bands = [];
-  for (let b = 0; b <= steps; b++) bands.push({ scale: 1 + (rng() - 0.5) * 0.3, dx: (rng() - 0.5) * 0.16, dz: (rng() - 0.5) * 0.16 });
+  const reach = REACH[detail] || 0.96;
+  for (let i = round ? 0 : walls + 1; i < cuts; i++) plane(rng() * Math.PI * 2, round ? -0.2 + rng() * 1.1 : 0.25 + rng() * 0.5, Math.min(reach, (round ? 0.74 : 0.66) + rng() * 0.24));
   const turn = rng() * Math.PI * 2;
   const ct = Math.cos(turn);
   const st = Math.sin(turn);
 
+  // (what is above the ball's y = FOOT is the rock, what is below is its root)
+  const FOOT = -0.38;
+  let top = FOOT + 0.1;
   for (let i = 0; i < pos.count; i++) {
     _v.fromBufferAttribute(pos, i);
     for (const p of planes) {
       const over = _v.dot(p.n) - p.d;
       if (over > 0) _v.addScaledVector(p.n, -over);
     }
-    // from the ball to the rock: the lowest third of the ball is under the ground
-    const up = clamp01((_v.y + 0.38) / 1.3);
-    let x = _v.x;
-    let z = _v.z * squash;
-    let y = up * height;
-    let wide = radius * lerp(1, taper, Math.pow(up, 1.25));
-    if (steps > 0) {
-      const f = up * steps;
-      const b = Math.min(steps, Math.floor(f));
-      const band = bands[b];
-      wide *= band.scale;
-      x += band.dx;
-      z += band.dz;
-      // the top of each band is a ledge: pull the last of it level
-      const within = f - b;
-      if (within > 0.86 && b < steps) y = ((b + 0.86 + (within - 0.86) * 0.25) / steps) * height;
-    }
-    if (_v.y < -0.38) y = -radius * 0.18 * clamp01((-0.38 - _v.y) / 0.3);
-    const wx = (x * ct - z * st) * wide + lean[0] * y;
-    const wz = (x * st + z * ct) * wide + lean[1] * y;
-    pos.setXYZ(i, wx, y, wz);
+    pos.setXYZ(i, _v.x, _v.y, _v.z);
+    if (_v.y > top) top = _v.y;
+  }
+  for (let i = 0; i < pos.count; i++) {
+    _v.fromBufferAttribute(pos, i);
+    // from the ball to the rock: its highest point lands exactly on `height`
+    const up = clamp01((_v.y - FOOT) / (top - FOOT));
+    const x = _v.x;
+    const z = _v.z * squash;
+    const y = _v.y < FOOT ? -root * clamp01((FOOT - _v.y) / 0.3) : up * height;
+    const wide = radius * lerp(1, taper, Math.pow(up, 1.25));
+    pos.setXYZ(i, (x * ct - z * st) * wide + lean[0] * y, y, (x * st + z * ct) * wide + lean[1] * y);
   }
 
-  // ---- the paint: one colour to a face. (A face is many triangles lying in one plane: the colour is chosen from
-  // the way the plane looks, not from where the triangle is, so that the whole face is one tone.)
+  // ---- the paint: a colour to each facet. The tone of a wall comes from the way it looks (so the many triangles
+  // of one stroke agree, near enough), and is then shifted by how high up the facet is.
   const t = tones;
   const tint = rng();
   return facet(g, (c, normal, out) => {
@@ -134,29 +144,35 @@ export function chunkyRock(seed, { radius = 1, height = radius * 1.3, cuts = 12,
 }
 
 /**
- * A crag: blocks of rock piled on one another, each smaller than the one it stands on, ending in a horn.
+ * A crag: blocks of rock piled on one another, each smaller than the one it stands on, ending in a horn. Its foot
+ * is at y = 0, where it is put (the lowest block is not shifted), and its highest point at y = `height`.
  * @param {number} seed
  * @param {object} [o]
- * @param {number} [o.radius] half the width of the lowest block
- * @param {number} [o.height] of the whole pile
+ * @param {number} [o.radius] half the width of the ball the lowest block is cut from
+ * @param {number} [o.height] of the whole pile, foot to highest point
  * @param {number} [o.blocks] how many
  * @param {[number, number]} [o.lean] metres sideways per metre of height
  * @param {number} [o.moss]
  * @param {number} [o.wet]
+ * @param {number} [o.root]   how far the lowest block goes on below its foot (m)
  * @param {number} [o.detail] how finely the lowest blocks are cut (3), for crags nobody will ever be near (1)
  * @returns {THREE.BufferGeometry}
  */
-export function crag(seed, { radius = 10, height = 40, blocks = 5, lean = [0, 0], moss = 0.5, wet = 0, detail = 3 } = {}) {
+export function crag(seed, { radius = 10, height = 40, blocks = 5, lean = [0, 0], moss = 0.5, wet = 0, root = radius * 0.3, detail = 3 } = {}) {
   const rng = makeRng(seed * 131 + 7);
-  const parts = [];
   // heights of the blocks: the lower ones squat, the last one a horn
   const share = [];
   for (let i = 0; i < blocks; i++) share.push((i === blocks - 1 ? 1.25 : 0.8 + rng() * 0.5) * lerp(1, 0.8, i / blocks));
-  const total = share.reduce((a, b) => a + b, 0);
+  // each block stands with its foot 0.48 of the way up the one below (they overlap by about half): size them so
+  // that the top of the last one is at `height`
+  const RISE = 0.48;
+  let span = 0;
+  for (let i = 0; i < blocks; i++) span += share[i] * (i === blocks - 1 ? 1 : RISE);
+  const parts = [];
   let y = 0;
   for (let i = 0; i < blocks; i++) {
     const u = blocks > 1 ? i / (blocks - 1) : 0;
-    const h = (share[i] / total) * height * 1.75; // (they overlap: each stands well inside the one below)
+    const h = (share[i] / span) * height;
     const r = radius * lerp(1, 0.36, Math.pow(u, 0.9)) * (0.9 + rng() * 0.2);
     const last = i === blocks - 1;
     const g = chunkyRock(seed * 17 + i * 5 + 1, {
@@ -168,12 +184,15 @@ export function crag(seed, { radius = 10, height = 40, blocks = 5, lean = [0, 0]
       squash: 0.8 + rng() * 0.2,
       moss: moss * (0.5 + 0.5 * u),
       wet: i === 0 ? wet : 0,
+      root: i === 0 ? root : r * 0.18,
       lean: [(rng() - 0.5) * 0.12, (rng() - 0.5) * 0.12],
     });
-    const off = last ? 0.2 : 0.34;
-    g.translate(lean[0] * y + (rng() - 0.5) * r * off, y, lean[1] * y + (rng() - 0.5) * r * off);
+    const off = i === 0 ? 0 : last ? 0.2 : 0.34;
+    const ox = (rng() - 0.5) * r * off;
+    const oz = (rng() - 0.5) * r * off;
+    g.translate(lean[0] * y + ox, y, lean[1] * y + oz);
     parts.push(g);
-    y += h * 0.42;
+    y += h * RISE;
   }
   return merge(parts);
 }

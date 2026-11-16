@@ -20,10 +20,16 @@ import { Race } from './Race.js';
 import { Hud } from './Hud.js';
 import { Mist, Spray, WakeField } from './effects.js';
 import { Lens } from './Lens.js';
-import { HULL, RULES } from './config.js';
+import { CRAFT_TUNE, HULL, RULES } from './config.js';
 import { ReflectionProbe } from '../engine/ReflectionProbe.js';
 import { WaterMirror } from '../engine/WaterMirror.js';
 import { OnlinePlay } from '../net/OnlinePlay.js';
+/**
+ * A hull is a row of circles (HULL.circles): nothing nearer than this to its middle can be touching it. (With a
+ * little to spare for the distance it travels in a step.)
+ */
+const HULL_REACH = CRAFT_TUNE.radius + Math.max(...HULL.circles.map(Math.abs)) + 0.5;
+
 
 // Bots: how much power they can build, base pace, and their habits.
 const BOTS = [
@@ -81,6 +87,10 @@ export class Game {
     // and what the water mirrors: one picture per view, see engine/WaterMirror.js
     this._mirrorScale = options.reflections === false ? 0 : coarse ? 0.4 : 0.5;
     this._mirrorHidden = [world.env.water, world.env.sky, this.spray.points, this.mist.points];
+    // (a phone's small mirror shows the thicket as a few green pixels: not worth its triangles there)
+    if (coarse && world.thicket) this._mirrorHidden.push(world.thicket);
+    /** What the paintwork's map leaves out: the boat itself, and the thicket, which is far too fine to show in it. */
+    this._probeExtra = world.thicket ? [world.thicket] : [];
     // (the sea's low-detail stand-in is hidden anyway, except while the paintwork's map is drawn)
     this._mirrors = []; // one per view, kept from race to race
 
@@ -467,7 +477,7 @@ export class Game {
       for (const col of world.colliders) {
         const dx = c.pos.x - col.x;
         const dz = c.pos.z - col.z;
-        const reach = col.r + 1.4;
+        const reach = col.r + HULL_REACH;
         if (dx * dx + dz * dz < reach * reach) c.collideCircle(col.x, col.z, col.r, col.bounce, col.soft);
       }
       c.collideTerrain(world.terrainHeightAt);
@@ -796,7 +806,7 @@ export class Game {
       for (let i = 0; i < world.buoys.length; i++) world.buoys[i].userData.pose(time, v.emphasis[i]);
       this.spray.points.visible = this.mist.points.visible = false;
       world.env.coarseWater(true);
-      this.probe.update(engine.scene, p.x, p.y + 0.9, p.z, [boat]);
+      this.probe.update(engine.scene, p.x, p.y + 0.9, p.z, [boat, ...this._probeExtra]);
       world.env.coarseWater(false);
       this.spray.points.visible = this.mist.points.visible = true;
     }

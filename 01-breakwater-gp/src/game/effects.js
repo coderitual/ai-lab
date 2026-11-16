@@ -46,7 +46,7 @@ void main() {
   // the two edges of the wake: thin lines of foam that outlast the middle
   float ax = abs(x) - 0.85;
   float arms = exp(-ax * ax * 95.0) * life * 0.46;
-  float a = (max(core, band) + arms) * vData.z * smoothstep(1.0, 0.93, abs(x));
+  float a = (max(core, band) + arms) * vData.z * (1.0 - smoothstep(0.93, 1.0, abs(x)));
   gl_FragColor = vec4(a, 0.0, life * step(0.004, a), 1.0);
 }
 `;
@@ -57,8 +57,8 @@ varying vec3 vData;       // x,y: quad coords (-1..1), z: strength (negative = s
 uniform float uRing;      // 0 = soft blob, 1 = ring
 void main() {
   float r = length(vData.xy);
-  float blob = smoothstep(1.0, 0.25, r);
-  float ring = smoothstep(0.45, 0.78, r) * smoothstep(1.0, 0.86, r);
+  float blob = (1.0 - smoothstep(0.25, 1.0, r));
+  float ring = smoothstep(0.45, 0.78, r) * (1.0 - smoothstep(0.86, 1.0, r));
   float a = mix(blob, ring, uRing) * abs(vData.z);
   // white water thrown up by a hull or a landing is as fresh as it gets
   gl_FragColor = vData.z < 0.0 ? vec4(0.0, a, 0.0, 1.0) : vec4(a, 0.0, min(1.0, a * 1.6), 1.0);

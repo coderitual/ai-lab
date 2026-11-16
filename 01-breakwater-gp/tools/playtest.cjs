@@ -312,6 +312,24 @@ const run = (page, seconds) => page.evaluate(`window.__bw.skip(${seconds})`);
     s = await page.evaluate(info);
     check('rules: after 5 s you are put back on course', Math.abs(s.lat) < 20 && s.off === 0 && !s.toastOn, `lateral=${s.lat.toFixed(1)}`);
 
+    // a hull driven straight at a sea stack is stopped at the rock, not inside it
+    const hit = await page.evaluate(`(() => {
+      const g = window.__bw.game; const c = g.race.player.craft;
+      const col = g.world.colliders.find((k) => !k.soft && k.bounce === 0.35);
+      c.place(col.x - col.r - 30, col.z, Math.PI / 2, g.engine.simTime, 22);
+      let deepest = -Infinity; let slowest = Infinity;
+      for (let i = 0; i < 360; i++) {
+        g.engine.advance(1 / 120, 1 / 120, false);
+        for (const along of [-1.6, 0, 1.6]) {
+          const x = c.pos.x + Math.sin(c.yaw) * along; const z = c.pos.z + Math.cos(c.yaw) * along;
+          deepest = Math.max(deepest, col.r + 1.2 - Math.hypot(x - col.x, z - col.z));
+        }
+        slowest = Math.min(slowest, c.speed);
+      }
+      return { deepest, slowest };
+    })()`);
+    check('collisions: a hull driven at a sea stack is stopped at the rock', hit.slowest < 12 && hit.deepest < 0.5, `deepest ${hit.deepest.toFixed(2)} m inside its circle, slowest ${hit.slowest.toFixed(1)} m/s`);
+
     // five misses and you are out
     await page.keyboard.down('ArrowUp');
     for (let i = 0; i < 4; i++) {

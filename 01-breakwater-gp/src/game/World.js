@@ -73,8 +73,10 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
   {
     const rr = makeRng(77);
     const rocks = [];
+    // (a rock is seated a little into the ground under its middle, and goes on down as a root far enough to stay
+    // buried where the ground falls away under one side of it)
     const put = (x, z, o, sink = 0.3) => {
-      rocks.push({ x: main.x + x, z: main.z + z, y: main.heightAt(main.x + x, main.z + z) - o.radius * sink, ...o });
+      rocks.push({ x: main.x + x, z: main.z + z, y: main.heightAt(main.x + x, main.z + z) - o.radius * sink, root: o.radius * 1.1, ...o });
       stones.push({ x: main.x + x, z: main.z + z, r: o.radius });
     };
     // the massif: three crags, the tallest on the summit, and the shoulders they stand on
@@ -97,7 +99,7 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
         const spot = findSpotOnIsland(main, a, rr() < 0.7 ? 2.2 + rr() * 2.2 : 0.5 + rr() * 1.3);
         const radius = 0.9 + rr() * rr() * 3.4;
         const o = { seed: 100 + c * 13 + i, radius, height: radius * (0.75 + rr() * 0.6), cuts: 8 + Math.floor(rr() * 4), detail: radius > 2.2 ? 2 : 1, squash: 0.7 + rr() * 0.3, moss: spot.y > 2.4 ? 0.35 : 0 };
-        rocks.push({ x: spot.x, z: spot.z, y: spot.y - radius * 0.22, ...o });
+        rocks.push({ x: spot.x, z: spot.z, y: spot.y - radius * 0.22, root: radius * 0.5, ...o });
         stones.push({ x: spot.x, z: spot.z, r: radius });
       }
     });
@@ -115,6 +117,7 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
     const solidRock = () => withSkyFog(main.extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true })));
     const mesh = new THREE.Mesh(rockField(rocks), solidRock());
     mesh.name = 'rocks';
+    mesh.renderOrder = -1; // (before the ground, whose costlier shader is then skipped where rock hides it)
     mesh.matrixAutoUpdate = false;
     root.add(mesh);
     main.casters.push(mesh);
@@ -139,13 +142,14 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
         const ox = k ? (rr() - 0.5) * size * 1.5 : 0;
         const oz = k ? (rr() - 0.5) * size * 1.5 : 0;
         const y = main.heightAt(x + ox, z + oz);
-        clumps.push({ x: x + ox, z: z + oz, y: y - radius * 0.32, seed: 500 + i * 3 + k, radius, height: radius * (1.05 + rr() * 0.4), cuts: 10 + Math.floor(rr() * 4), taper: 0.62, detail: !coarse && radius > 2.3 ? 2 : 1, squash: 0.85 + rr() * 0.15, tones: FOLIAGE_TONES, round: true });
+        clumps.push({ x: x + ox, z: z + oz, y: y - radius * 0.32, seed: 500 + i * 3 + k, radius, height: radius * (1.05 + rr() * 0.4), cuts: 10 + Math.floor(rr() * 4), taper: 0.62, detail: !coarse && radius > 2.3 ? 2 : 1, squash: 0.85 + rr() * 0.15, root: radius * 1.2, tones: FOLIAGE_TONES, round: true });
       }
       stones.push({ x, z, r: size * 0.6 });
       grown++;
     }
     const thicket = new THREE.Mesh(rockField(clumps), solidRock());
     thicket.name = 'thicket';
+    thicket.renderOrder = -1;
     thicket.matrixAutoUpdate = false;
     root.add(thicket);
     main.casters.push(thicket);
@@ -177,7 +181,7 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
     const rocks = [];
     const at = (deg, height, o) => {
       const spot = findSpotOnIsland(lightIslet, deg * DEG, height);
-      rocks.push({ x: spot.x, z: spot.z, y: spot.y - o.radius * 0.3, ...o });
+      rocks.push({ x: spot.x, z: spot.z, y: spot.y - o.radius * 0.3, root: o.radius * 1.1, ...o });
     };
     at(140, 5.5, { seed: 61, radius: 5.5, height: 12, blocks: 3, moss: 0.5, detail: 2 });
     at(305, 4.5, { seed: 63, radius: 4.2, height: 7, blocks: 2, moss: 0.5, detail: 2 });
@@ -187,6 +191,7 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
     }
     const mesh = new THREE.Mesh(rockField(rocks), withSkyFog(lightIslet.extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }))));
     mesh.name = 'islet-rocks';
+    mesh.renderOrder = -1;
     mesh.matrixAutoUpdate = false;
     root.add(mesh);
     lightIslet.casters.push(mesh);
@@ -333,5 +338,5 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
     palmUniforms.uPalmTime.value = time;
   }
 
-  return { env, track, root, islands: solid, colliders, buoys, arch, floats, sailboats, terrainHeightAt, update, prepareView };
+  return { env, track, root, islands: solid, colliders, buoys, arch, floats, sailboats, thicket: root.getObjectByName('thicket'), terrainHeightAt, update, prepareView };
 }

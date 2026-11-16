@@ -23,7 +23,7 @@ while a test is running against the preview.
 
 | script | what it does |
 | --- | --- |
-| `tools/playtest.cjs URL` | Solo and split screen through the real input paths: keys, touch on phone-sized viewports in both orientations, rules, panels, a lost WebGL context. 71 checks. |
+| `tools/playtest.cjs URL` | Solo and split screen through the real input paths: keys, touch on phone-sized viewports in both orientations, rules, a hull against a sea stack, panels, a lost WebGL context. 72 checks. |
 | `tools/soundtest.cjs URL [dir]` | Renders the soundtrack offline and looks for every cue: moment, side, level. 16 checks. With `dir`, keeps the WAV files. |
 | `tools/nettest.cjs URL [dir] [--only=a\|b\|c\|d]` | Online play between pages of one browser: A the whole two-player flow, B a slow lossy link, C real time, D four players. 61 checks. |
 | `tools/screenshots.cjs` | Regenerates every picture in the README and these documents. `--list`, `--only a,b`. |
