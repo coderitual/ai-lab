@@ -175,7 +175,7 @@ uniform float paintMetal;
 uniform float paintRough;
 uniform float paintFlop;
 uniform float paintFlake;
-vec3 cBase; float cMetal; float cRough; float cCoat; vec3 cEmit; float cShut; float cPaint;
+vec3 cBase; float cMetal; float cRough; float cCoat; vec3 cEmit; float cShut; float cPaint; vec3 cTilt;
 #define CAR_REGION(w, col, met, rough, coat) { float w_ = (w); cBase = mix(cBase, col, w_); cMetal = mix(cMetal, met, w_); cRough = mix(cRough, rough, w_); cCoat = mix(cCoat, coat, w_); cPaint *= 1.0 - w_; }
 
 /**
@@ -223,56 +223,135 @@ vec3 carForm(vec3 p, vec3 n) {
   return tilt;
 }
 
-/** The lamp units, until they are modelled: what shows through the lens, and what lights up. */
+/** Where the ray from the eye through this pixel of a lens meets a layer `d` behind it (car space, left side). */
+vec3 carDeep(vec3 eye, float cosv, float d) {
+  vec3 q = vCarPos - eye * (d / cosv);
+  return vec3(abs(q.x), q.yz);
+}
+/** A point's place in a plane square to `v` round `c` (two axes, metres). */
+vec2 carPlane(vec3 q, vec3 c, vec3 v) {
+  vec3 e1 = normalize(cross(vec3(0.0, 1.0, 0.0), v));
+  vec3 e2 = cross(v, e1);
+  return vec2(dot(q - c, e1), dot(q - c, e2));
+}
+
+/**
+ * The lamp units, seen through their flush lenses. Nothing here is geometry: each part is a layer at its own
+ * depth behind the lens, found by following the view ray in (parallax), so the blades, the light guides and the
+ * modules shift against each other and against the housing as the camera moves. The lens itself (the glass
+ * mesh) is the only reflection on top; the parts' own shading uses cTilt for their curvature.
+ */
 void carLamp(float lens, float w) {
   if (w <= 0.0) return;
-  vec3 p = vec3(abs(vCarPos.x), vCarPos.yz);
   bool left = vCarPos.x > 0.0;
+  vec3 eye = normalize(transpose(vCarToView) * vViewPosition);
+  vec3 n = normalize(vCarNormal);
+  float cosv = max(dot(eye, n), 0.3);
+  float inside = -lens; // m inside the lens's outline, measured on the skin
+  float indicator = left ? carLampsB.z : carLampsB.w;
+  vec3 col; float met; float rough; vec3 emit = vec3(0.0);
   if (vCarPos.z > 0.0) {
-    // head lamp: gloss black housing; under the straight brow the hook, the two modules and the blue accent
+    // ---- head lamp (5.2): gloss black housing 50 mm deep; the two modules and the blue accent 40 mm in; the
+    // eyebrow light guide just under the lens, with its hook down the inner edge
     vec3 v = normalize(vec3(0.6, 0.2, 0.77));
-    float brow = min(carSegment(p, vec3(0.535, 0.70, 2.045), vec3(0.80, 0.74, 1.735), v),
-                     carSegment(p, vec3(0.535, 0.70, 2.045), vec3(0.515, 0.655, 2.09), v));
+    vec3 qb = carDeep(eye, cosv, 0.05);
+    vec3 qm = carDeep(eye, cosv, 0.04);
+    vec3 qe = carDeep(eye, cosv, 0.007);
+    // housing: black, with satin rings round the module wells and a shadow under the lens's edge
+    col = vec3(0.012); met = 0.0; rough = 0.12;
+    vec2 pb = carPlane(qb, vec3(0.615, 0.663, 1.975), v);
+    vec2 mb = carPlane(qb, vec3(0.715, 0.672, 1.862), v);
+    float well = min(carBox(pb, vec2(0.0), vec2(0.044), 0.012), carBox(mb, vec2(0.0), vec2(0.046, 0.034), 0.012));
+    float ring = carInside(abs(well) - 0.004);
+    col = mix(col, vec3(0.55), ring); met = mix(met, 1.0, ring); rough = mix(rough, 0.3, ring);
+    col *= 0.35 + 0.65 * smoothstep(0.0, 0.02, inside);
+    // the modules
+    vec2 pp = carPlane(qm, vec3(0.615, 0.663, 1.975), v);
+    vec2 pm = carPlane(qm, vec3(0.715, 0.672, 1.862), v);
+    vec2 pa = carPlane(qm, vec3(0.555, 0.668, 2.04), v);
+    vec2 pc = carPlane(qm, vec3(0.78, 0.69, 1.77), v);
+    float rp = length(pp) / 0.0325;
+    float rm = length(pm / vec2(0.035, 0.0225));
+    float bezel = carInside(carBox(pp, vec2(0.0), vec2(0.04), 0.008)) + carInside(carBox(pm, vec2(0.0), vec2(0.042, 0.03), 0.008));
+    col = mix(col, vec3(0.7), bezel); met = mix(met, 1.0, bezel); rough = mix(rough, 0.22, bezel);
+    float lensP = carInside((rp - 1.0) * 0.0325);
+    float lensM = carInside((rm - 1.0) * 0.0225);
+    // projector lenses: dark domes of glass with a chrome reflector glinting through them
+    vec3 glassCol = mix(vec3(0.015), vec3(0.18), carInside(abs(rp - 0.62) * 0.0325 - 0.003));
+    col = mix(col, glassCol, lensP); met = mix(met, 0.0, lensP); rough = mix(rough, 0.04, lensP);
+    vec3 dots = vec3(0.02 + 0.25 * step(0.6, fract(pm.x / 0.007)) * step(0.5, fract(pm.y / 0.008)));
+    col = mix(col, dots, lensM); met = mix(met, 0.6, lensM); rough = mix(rough, 0.1, lensM);
+    float aux = carInside(length(pa / vec2(0.015, 0.02)) * 0.015 - 0.015);
+    col = mix(col, vec3(0.6), aux); met = mix(met, 1.0, aux); rough = mix(rough, 0.15, aux);
+    float accent = carInside(carBox(pc, vec2(0.0), vec2(0.022, 0.015), 0.006));
+    col = mix(col, vec3(0.02, 0.10, 0.55), accent); met = mix(met, 0.0, accent); rough = mix(rough, 0.2, accent);
+    // the domes' curvature, for their highlights
+    vec3 e1 = normalize(cross(vec3(0.0, 1.0, 0.0), v)); vec3 e2 = cross(v, e1);
+    cTilt = (e1 * pp.x + e2 * pp.y) / 0.0325 * 0.7 * lensP + (e1 * pm.x + e2 * pm.y) / 0.035 * 0.5 * lensM;
+    // eyebrow (frosted bar, 12 mm) and hook
+    float brow = min(carSegment(qe, vec3(0.535, 0.70, 2.045), vec3(0.80, 0.74, 1.735), v),
+                     carSegment(qe, vec3(0.535, 0.70, 2.045), vec3(0.515, 0.655, 2.09), v));
     float browW = carInside(brow - 0.006);
-    float proj = length(p - vec3(0.615, 0.663, 1.975) - v * dot(p - vec3(0.615, 0.663, 1.975), v));
-    float matrixM = length(p - vec3(0.715, 0.672, 1.862) - v * dot(p - vec3(0.715, 0.672, 1.862), v));
-    float accent = length(p - vec3(0.78, 0.69, 1.77) - v * dot(p - vec3(0.78, 0.69, 1.77), v));
-    vec3 col = vec3(0.01);
-    float met = 0.0; float rough = 0.08;
-    float bezel = carInside(abs(proj - 0.036) - 0.006) + carInside(abs(matrixM - 0.036) - 0.005);
-    col = mix(col, vec3(0.75), bezel); met = mix(met, 1.0, bezel); rough = mix(rough, 0.25, bezel);
-    col = mix(col, vec3(0.6, 0.62, 0.65), browW); rough = mix(rough, 0.4, browW);
-    col = mix(col, vec3(0.02, 0.10, 0.55), carInside(accent - 0.02));
-    CAR_REGION(w, col, met, rough, 1.0);
-    float indicator = left ? carLampsB.z : carLampsB.w;
-    vec3 drl = mix(vec3(1.0, 0.97, 0.93) * 18.0 * max(carLampsA.x, 0.1 * carLampsA.y), vec3(1.0, 0.45, 0.05) * 30.0, indicator);
-    cEmit += w * browW * drl;
-    float beam = carLampsA.y + carLampsA.z;
-    cEmit += w * vec3(0.95, 0.97, 1.0) * 6.0 * beam * (carInside(proj - 0.03) + carInside(matrixM - 0.03) * (0.4 + carLampsA.z));
+    col = mix(col, vec3(0.62, 0.63, 0.65), browW); met = mix(met, 0.0, browW); rough = mix(rough, 0.45, browW);
+    cTilt *= 1.0 - browW;
+    vec3 drl = mix(vec3(1.0, 0.97, 0.93) * 30.0 * carLampsA.x, vec3(1.0, 0.42, 0.04) * 40.0, indicator);
+    emit += browW * drl + carInside(brow - 0.012) * (1.0 - browW) * drl * 0.08;
+    // dipped beam: the projector glows from within; main beam lights the matrix module's rows too
+    float beam = min(carLampsA.y + carLampsA.z, 1.0);
+    emit += vec3(0.95, 0.97, 1.0) * lensP * beam * (14.0 * (1.0 - 0.6 * rp * rp) + 2.0);
+    emit += vec3(0.95, 0.97, 1.0) * lensM * (carLampsA.z + 0.15 * carLampsA.y) * (4.0 + 18.0 * dots.r);
+    emit += vec3(0.95, 0.97, 1.0) * (1.0 - lensP) * (1.0 - lensM) * beam * 0.06 * (1.0 - browW);
   } else {
-    // tail lamp: smoked red; two rows of slanted fins that open towards the middle, a smooth band between them
-    float x = p.x;
-    float yu = 0.866 + 0.044 * clamp((x - 0.37) / 0.39, 0.0, 1.0);
-    float yl = x < 0.66 ? 0.866 - 0.118 * (x - 0.37) / 0.29 : 0.748 + 0.13 * (x - 0.66) / 0.182;
-    float mid = 0.5 * (yu + yl);
-    float edge = -lens;
-    float rowBand = carInside(abs(edge - 0.015) - 0.007);
-    float upper = rowBand * step(mid, p.y);
-    float lower = rowBand * (1.0 - step(mid, p.y)) * step(0.54, x);
-    float finsU = smoothstep(0.42, 0.5, fract((x + 0.7 * p.y) / 0.037)) * (1.0 - smoothstep(0.58, 0.66, fract((x + 0.7 * p.y) / 0.037)));
-    float finsL = smoothstep(0.42, 0.5, fract((x - 0.7 * p.y) / 0.037)) * (1.0 - smoothstep(0.58, 0.66, fract((x - 0.7 * p.y) / 0.037)));
-    float fins = upper * finsU * (x > 0.6 ? 1.0 : 0.5) + lower * finsL;
-    float band = carInside(0.022 - edge) * carInside(abs(p.y - mid) - 0.012);
-    float reverse = carInside(carBox(p.xy, vec2(0.41, 0.864), vec2(0.022, 0.009), 0.003));
-    vec3 col = mix(vec3(0.1, 0.006, 0.009), vec3(0.3, 0.02, 0.02), fins);
-    col = mix(col, vec3(0.5), reverse * 0.6);
-    CAR_REGION(w, col, 0.0, 0.12, 1.0);
-    float indicator = (left ? carLampsB.z : carLampsB.w) * step(0.6, x);
-    cEmit += w * fins * vec3(1.0, 0.03, 0.01) * 2.5 * carLampsA.w;
-    cEmit += w * band * mix(vec3(1.0, 0.02, 0.01) * 14.0 * carLampsB.x, vec3(1.0, 0.4, 0.03) * 20.0, indicator);
-    cEmit += w * band * vec3(1.0, 0.03, 0.01) * 0.6 * carLampsA.w;
-    cEmit += w * reverse * vec3(1.0, 0.98, 0.95) * 16.0 * carLampsB.y;
+    // ---- tail lamp (6.2): two rows of slanted blades 8 mm in, a smooth light guide between them 14 mm in, the
+    // reversing lamp's window by the inner tip, and a dark red mirror of a housing 25 mm in
+    vec3 qf = carDeep(eye, cosv, 0.008);
+    vec3 qg = carDeep(eye, cosv, 0.014);
+    vec3 qb = carDeep(eye, cosv, 0.025);
+    // edges of the lamp from behind (x, y): upper nearly straight, lower one diagonal to the lowest point
+    #define TAIL_UP(x) (0.866 + 0.044 * clamp(((x) - 0.37) / 0.39, 0.0, 1.0))
+    #define TAIL_LOW(x) ((x) < 0.66 ? 0.852 - 0.1 * ((x) - 0.37) / 0.29 : 0.752 + 0.126 * ((x) - 0.66) / 0.182)
+    // housing: dark red chrome in horizontal steps, shaded by its walls near the edge
+    col = vec3(0.11, 0.008, 0.01) * (0.7 + 0.3 * step(0.5, fract(qb.y / 0.006)));
+    met = 0.85; rough = 0.3;
+    float wall = smoothstep(0.0, 0.006 + 0.025 * sqrt(1.0 - cosv * cosv) / cosv, inside);
+    col *= 0.25 + 0.75 * wall;
+    emit += vec3(1.0, 0.02, 0.01) * (0.35 * carLampsA.w + 1.6 * carLampsB.x) * (0.3 + 0.7 * wall);
+    // the light guide between the rows: wide in the outer piece, a slim strip through the inner one
+    float x = qg.x;
+    float yu = TAIL_UP(x); float yl = TAIL_LOW(x);
+    float outer = smoothstep(0.54, 0.6, x);
+    float c = mix(yu - 0.034, 0.5 * (yu + yl), outer);
+    float hh = mix(0.0035, mix(0.013, 0.005, clamp((x - 0.6) / 0.22, 0.0, 1.0)), outer);
+    float guide = carInside(abs(qg.y - c) - hh) * step(0.39, x) * carInside(x - 0.825);
+    col = mix(col, vec3(0.3, 0.025, 0.03), guide); met = mix(met, 0.0, guide); rough = mix(rough, 0.5, guide);
+    float amber = indicator * step(0.6, x);
+    emit += guide * mix(vec3(1.0, 0.02, 0.01) * (30.0 * carLampsB.x + 0.8 * carLampsA.w), vec3(1.0, 0.4, 0.03) * 34.0, amber);
+    // the reversing lamp's clear window
+    float rev = carInside(carBox(qg.xy, vec2(0.407, 0.858), vec2(0.021, 0.008), 0.003));
+    col = mix(col, vec3(0.55), rev); met = mix(met, 0.7, rev); rough = mix(rough, 0.15, rev);
+    emit = mix(emit, vec3(1.0, 0.98, 0.95) * 40.0 * carLampsB.y, rev);
+    // blades: 22 x 5 mm, leaning 35 degrees, 37 mm apart; the upper row leans out, the lower row in
+    x = qf.x;
+    yu = TAIL_UP(x); yl = TAIL_LOW(x);
+    float upRow = carInside(abs(qf.y - (yu - 0.016)) - 0.008) * step(0.44, x) * carInside(x - 0.82);
+    float lowRow = carInside(abs(qf.y - (yl + 0.014)) - 0.008) * step(0.54, x) * carInside(x - 0.8);
+    float su = fract((x - 0.7 * qf.y) / 0.037) - 0.5;
+    float sl = fract((x + 0.7 * qf.y) / 0.037) - 0.5;
+    float bw = max(fwidth(x) / 0.037, 1e-4);
+    float bladeU = clamp((0.068 - abs(su)) / bw + 0.5, 0.0, 1.0) * upRow;
+    float bladeL = clamp((0.068 - abs(sl)) / bw + 0.5, 0.0, 1.0) * lowRow;
+    float blade = max(bladeU * mix(0.6, 1.0, smoothstep(0.56, 0.6, x)), bladeL);
+    col = mix(col, vec3(0.45, 0.03, 0.03), blade); met = mix(met, 0.3, blade); rough = mix(rough, 0.2, blade);
+    emit = mix(emit, vec3(1.0, 0.03, 0.01) * (7.0 * carLampsA.w + 1.5 * carLampsB.x), blade);
+    // the blades' faces turn a little towards the outer tip: they catch the light one by one
+    cTilt = vec3(0.25 * blade, 0.0, 0.0);
+    // the smoked lens over everything
+    col *= vec3(1.0, 0.75, 0.75);
   }
+  if (!left) cTilt.x = -cTilt.x;
+  cTilt *= w;
+  CAR_REGION(w, col, met, rough, 0.0);
+  cEmit += w * emit;
 }
 `,
     replace: [
@@ -290,7 +369,7 @@ void carLamp(float lens, float w) {
   if (abs(vCarNormal.x) > 0.25 && carArchHole(p)) discard;
   float ndv = abs(dot(normalize(vNormal), normalize(vViewPosition)));
   cBase = paintColor * mix(1.0, paintFlop, pow(1.0 - ndv, 1.5));
-  cMetal = paintMetal; cRough = paintRough; cCoat = 1.0; cEmit = vec3(0.0); cPaint = 1.0;
+  cMetal = paintMetal; cRough = paintRough; cCoat = 1.0; cEmit = vec3(0.0); cPaint = 1.0; cTilt = vec3(0.0);
   // the grille's bright frame
   CAR_REGION(carCover(B.r - 0.008) * step(1.9, p.z) * step(0.4, p.y), vec3(0.83, 0.84, 0.86), 1.0, 0.08, 0.0);
   // gloss black: window surround, belt strip, B-pillar, the frit under the glass's edge, the corner slits
@@ -351,7 +430,7 @@ void carLamp(float lens, float w) {
         /* glsl */ `#include <clearcoat_normal_fragment_maps>
   {
     vec3 tilt = vCarToView * carForm(vec3(abs(vCarPos.x), vCarPos.yz), vCarNormal) * cPaint;
-    normal = normalize(normal + tilt);
+    normal = normalize(normal + tilt + vCarToView * cTilt);
     clearcoatNormal = normalize(clearcoatNormal + tilt);
   }
   {
