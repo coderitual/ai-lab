@@ -16,7 +16,7 @@ let ui = null;
 try {
   const engine = new Engine(root, { manual: params.manual, pixelRatio: params.dpr });
   const world = new World(engine, params);
-  ui = createUi(world.ctx, { enabled: params.ui, instant: params.manual || !params.ui });
+  ui = createUi(world.ctx, { world, enabled: params.ui, instant: params.manual || !params.ui });
 
   engine.onUpdate = (dt) => {
     world.update(dt);

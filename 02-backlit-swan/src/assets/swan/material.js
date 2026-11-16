@@ -245,7 +245,8 @@ void main() {
   // The neck knows its own thickness; the head is one stubby cylinder of the chain (the last), which it keeps.
   vec3 axis = quatRotate(rot, vec3(0.0, 0.0, 1.0));
   float girth = length(position.xy) * k;
-  float ownDepth = (1.0 - aHead.w) * ownNeckDepth(normalize(n - axis * dot(n, axis)), axis, girth, girth * NECK_CORE);
+  // (the head is treated as a tube of its own girth too: a skull lets no more through than a neck)
+  float ownDepth = ownNeckDepth(normalize(n - axis * dot(n, axis) + axis * 1.0e-4), axis, max(girth, 0.004), max(girth, 0.004) * NECK_CORE);
   float ownSegment = mix(aRing * SEG_PER_RING - 0.5, float(N_SEG) - 2.5, aHead.w);
 ${FINISH_VERTEX}
 }
@@ -311,6 +312,8 @@ uniform vec4 uSky;        // share of the sky's light on a surface that faces do
 uniform vec3 uAlbedo;
 uniform vec3 uStain;      // the feathers of the head and upper neck are a little stained
 uniform vec3 uBillColor;
+uniform vec2 uNeckSky;     // x: share of the sky's light the neck and head get (they stand upright under their own arch);
+                           // y: share of the light inside them that leaves through their skin (dense, close feathering: little)
 in vec3 vWorldPos;
 in vec3 vNormal;
 in float vDepth;
@@ -361,13 +364,16 @@ void main() {
 #endif
 
   float reach = sunReach(vWorldPos);
-  vec3 through = exp(-uAbsorb * vDepth);
+  // (never less than nothing: at the edge of a multisampled triangle the value
+  // is extrapolated past its corners, and a negative depth would amplify the
+  // light, blue most of all)
+  vec3 through = exp(-uAbsorb * max(vDepth, 0.0));
   float nl = dot(n, uSunDir);
   float direct = clamp((nl + uFeather.y) / (1.0 + uFeather.y), 0.0, 1.0);
   // Light inside the plumage leaves through any surface, whichever way it
   // faces; a surface turned to the sun is lit by it directly as well, and
   // shows whichever of the two is the brighter.
-  vec3 sunFeather = uSunColor * reach * through * max(uFeather.x, direct);
+  vec3 sunFeather = uSunColor * reach * through * max(mix(uFeather.x, uNeckSky.y, vHead.w), direct);
   // Bare parts let nothing through: plain sunlight, shadowed by the bird.
   vec3 sunBare = uSunColor * reach * through * max(nl, 0.0);
 
@@ -375,7 +381,13 @@ void main() {
   float tilt = n.y;
   float open = tilt < 0.0 ? mix(uSky.y, uSky.x, min(-tilt * 2.0, 1.0)) : mix(uSky.y, uSky.z, smoothstep(0.0, uSky.w, tilt));
   open *= mix(uFeather.z, 1.0, smoothstep(0.0, uFeather.w, vWorldPos.y));
-  vec3 fill = fillLight(n) * open;
+#ifdef FRINGE
+  // down standing off the neck sees no more sky than the neck it stands on
+  float skyShare = uNeckSky.x * 0.6;
+#else
+  float skyShare = mix(1.0, uNeckSky.x, vHead.w);
+#endif
+  vec3 fill = fillLight(n) * open * skyShare;
 
   vec3 col = albedo * (mix(sunFeather, sunBare, bare) + fill);
 
@@ -384,8 +396,8 @@ void main() {
     vec3 hv = normalize(uSunDir + v);
     float ndh = max(dot(n, hv), 0.0);
     float fres = 0.04 + 0.96 * pow(1.0 - max(dot(v, hv), 0.0), 5.0);
-    col += gloss * uSunColor * reach * through * fres * pow(ndh, 90.0) * 6.0;
-    col += gloss * uSkyColor * (0.04 + 0.96 * pow(1.0 - max(dot(n, v), 0.0), 5.0)) * 0.6;
+    col += gloss * uSunColor * reach * through * fres * pow(ndh, 90.0) * 2.5;
+    col += gloss * uSkyColor * (0.04 + 0.96 * pow(1.0 - max(dot(n, v), 0.0), 5.0)) * 0.12;
   }
 
 #ifdef FRINGE

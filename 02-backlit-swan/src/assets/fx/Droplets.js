@@ -1,15 +1,19 @@
 // Water drops in the air: what falls from the bill when the swan lifts its
-// head, what flies when it shakes. PLACEHOLDER: points thrown under gravity
-// that light up against the sun. The real version (streaks, refraction
-// sparkle, strings of drops) replaces the contents of this file and keeps
-// what createDroplets() returns.
+// head, what flies when it shakes.
 //
-// A drop that reaches the water dents the ripple field there and announces
-// itself: ctx.events.emit('drop', { x, z, size }).
+// In the film they are round neutral-white dots about 0.8 % of the swan's
+// length across, on clean parabolas, with no streak (the shutter was fast).
+// So that is all they are here: points thrown under gravity, each a tiny lens
+// that is bright wherever the sun reaches it. A drop that reaches the water
+// dents the ripple field there (the water turns that into rings and glints),
+// throws up two or three specks of splash that hop a few centimetres, and
+// announces itself: ctx.events.emit('drop', { x, z, size }).
 
 import * as THREE from 'three';
 
 const GRAVITY = 9.81;
+const _p = new THREE.Vector3();
+const _v = new THREE.Vector3();
 
 const VERTEX = /* glsl */ `
 uniform vec2 uResolution;
@@ -35,11 +39,14 @@ void main() {
   vec2 q = gl_PointCoord * 2.0 - 1.0;
   float d = dot(q, q);
   if (d > 1.0) discard;
-  // a drop is a tiny lens: it flares when the sun is behind it
+  // A drop is a tiny lens: it gathers the sun from behind it and shows it as
+  // a point of plain white, brighter the more nearly the eye looks into the
+  // light. Out of the sun it has only the sky to show, which is very little.
   vec3 v = normalize(cameraPosition - vWorldPos);
   float back = towardSun(v);
-  vec3 col = uSunColor * (0.04 + 1.6 * pow(back, 6.0)) + uSkyColor * 0.6;
-  outColor = toTarget(vec4(col * (1.0 - d) * vOn, 1.0));
+  vec3 col = uSunColor * sunReach(vWorldPos) * (0.16 + 0.3 * back * back) + uSkyColor * 0.05;
+  // (a soft-edged disc, so that a drop two pixels wide does not crawl)
+  outColor = toTarget(vec4(col * (1.0 - d * d) * vOn, 1.0));
 }
 `;
 
@@ -60,8 +67,10 @@ export function createDroplets(ctx) {
   const positions = new Float32Array(max * 3);
   const sizes = new Float32Array(max);
   const velocities = new Float32Array(max * 3);
+  const splash = new Uint8Array(max); // 1: a speck thrown up by a landing; it lands without a splash of its own
   let next = 0;
   let alive = 0;
+  const landed = []; // x, z, size of the drops that reached the water this step
 
   const geometry = new THREE.BufferGeometry();
   const positionAttribute = new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage);
@@ -93,7 +102,7 @@ export function createDroplets(ctx) {
 
   return {
     object,
-    spawn({ position, velocity, spread = 0.3, count = 1, size = 0.008 }) {
+    spawn({ position, velocity, spread = 0.3, count = 1, size = 0.008, isSplash = false }) {
       for (let n = 0; n < count; n++) {
         // the pool is a ring: when it is full the oldest drop is reused
         const i = next;
@@ -104,7 +113,8 @@ export function createDroplets(ctx) {
           [(velocity ? velocity.x : 0) + rng.gauss() * spread, (velocity ? velocity.y : 0) + rng.gauss() * spread, (velocity ? velocity.z : 0) + rng.gauss() * spread],
           i * 3,
         );
-        sizes[i] = size * rng.range(0.6, 1.4);
+        sizes[i] = size * rng.range(0.75, 1.25);
+        splash[i] = isSplash ? 1 : 0;
       }
       positionAttribute.needsUpdate = true;
       sizeAttribute.needsUpdate = true;
@@ -130,11 +140,33 @@ export function createDroplets(ctx) {
           alive--;
           // only on the pond; a drop that somehow reaches the bank just disappears
           if (ctx.pond.shoreDistance(x, z) < 0) {
-            ctx.ripple.disturb(x, z, size * 4, size * 0.5);
-            ctx.events.emit('drop', { x, z, size });
+            if (splash[i]) {
+              ctx.ripple.disturb(x, z, size * 3, size * 0.2);
+            } else {
+              ctx.ripple.disturb(x, z, size * 4, size * 0.5);
+              ctx.events.emit('drop', { x, z, size });
+              // the rebound: a couple of specks hop up and out and are gone in a tenth of a second
+              landed.push(x, z, size);
+            }
           }
         }
       }
+      // (thrown after the loop: spawning reuses slots of the very pool being walked)
+      for (let n = 0; n < landed.length; n += 3) {
+        const hops = 2 + (rng.float() < 0.4 ? 1 : 0);
+        for (let h = 0; h < hops; h++) {
+          const a = rng.range(0, Math.PI * 2);
+          const out = rng.range(0.08, 0.3);
+          this.spawn({
+            position: _p.set(landed[n], 0.004, landed[n + 1]),
+            velocity: _v.set(Math.cos(a) * out, rng.range(0.45, 0.85), Math.sin(a) * out),
+            spread: 0,
+            size: landed[n + 2] * 0.5,
+            isSplash: true,
+          });
+        }
+      }
+      landed.length = 0;
       positionAttribute.needsUpdate = true;
       sizeAttribute.needsUpdate = true;
     },

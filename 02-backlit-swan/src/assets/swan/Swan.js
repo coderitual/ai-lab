@@ -97,6 +97,7 @@ export function createSwan(ctx) {
     uAbsorb: { value: new THREE.Vector3(20, 30, 48) },
     uFeather: { value: new THREE.Vector4(0.45, 0.35, 0.22, 0.2) },
     uSky: { value: new THREE.Vector4(0.1, 0.45, 1, 0) },
+    uNeckSky: { value: new THREE.Vector2(0.3, 0.05) },
     uAlbedo: { value: new THREE.Vector3(0.93, 0.92, 0.9) },
     uStain: { value: new THREE.Vector3(0.92, 0.86, 0.72) },
     uBillColor: { value: new THREE.Vector3(0.8, 0.24, 0.035) },
@@ -213,6 +214,7 @@ export function createSwan(ctx) {
     uniforms.uStain.value.fromArray(look.swanStain);
     uniforms.uBillColor.value.fromArray(look.swanBill);
     uniforms.uSegDensity.value = look.swanNeckDensity;
+    uniforms.uNeckSky.value.set(look.swanNeckSky, look.swanNeckThrough);
     uniforms.uFringe.value.set(look.swanFringe, look.swanFringeBend, 0, 0);
   }
 

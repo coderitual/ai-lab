@@ -11,7 +11,7 @@ export const LOOK = {
   // camera looks north, so a sun a little east of north is behind the swan
   // and slightly to the right of the picture.
   sunAzimuth: 14,
-  sunElevation: 20,
+  sunElevation: 32, // high enough that calm water never throws the sun at a low camera, and up-facing edges carry the widest rim
   // Nearly neutral on purpose: the warmth and the teal of the picture come
   // from the print curve (LOOK.print), which was measured from the film.
   sunColor: [4.2, 4.0, 3.6], // a white surface facing the sun; far over the exposure
@@ -27,12 +27,12 @@ export const LOOK = {
   shadeWanderLength: 2.9,
 
   // Lens
-  aperture: 0.55, // 0..1: how far out of focus the background is
+  aperture: 0.42, // 0..1: how far out of focus the background is
   bokehMax: 0.034, // blur disc radius at aperture 1, as a fraction of the picture height
-  farClear: [0.002, 0.0036, 0.004], // what shows between the trees
+  farClear: [0.0004, 0.0005, 0.0011], // what shows between the trees: nothing
 
   // Bloom
-  bloomStrength: 0.1,
+  bloomStrength: 0.22,
   bloomThreshold: 0.0, // only light brighter than this blooms (0: everything, as a lens does)...
   bloomKnee: 0.05, // ...fading in over this range below it
   bloomFirefly: 0.12, // 0: plain average; higher: single very bright pixels count less
@@ -63,7 +63,7 @@ export const LOOK = {
 
   // Water (assets/pond/Water.js)
   waterColor: [0.005, 0.0055, 0.009], // what is seen looking down into it where the sun does not reach
-  waterSunColor: [0.01, 0.01, 0.012], // added to that where it does
+  waterSunColor: [0.006, 0.0065, 0.008], // added to that where it does
   waterLowAngle: 0.4, // exponent by which that colour fades as the view flattens, on top of what the mirror takes (measured)
   ambientRipple: 0.0075, // slope (root mean square) of the fine ripples on calm water
   agitatedRipple: 0.07, // slope they gain per unit of agitation (RippleField.js)
@@ -71,13 +71,13 @@ export const LOOK = {
   mirrorBase: 0.02, // share of light mirrored looking straight down
   mirrorRise: 2.6, // exponent of its rise toward grazing; 5 is the textbook, 2.6 gives the film's 0.57 at 10 to 13 degrees
   mirrorFarDistance: 14, // metres along a reflected ray to the surroundings
-  glintStrength: 14.0, // the sun in the water, as a multiple of what sunColor alone would give
+  glintStrength: 4.5, // the sun in the water, as a multiple of what sunColor alone would give
   glintCalm: 0.008, // roughness (spread of slopes) of calm water, the sun's own size included
   glintSteep: 2.5, // roughness added per unit of simulated slope
   glintSun: 0.2, // how far leaves and haze spread the sun (as a roughness): bounds how bright its own image in calm water is
   glintMax: 40, // brightest a glint may be
   // What floats on it (assets/pond/Specks.js)
-  speckBrightness: 0.52, // the middle speck, in the sun
+  speckBrightness: 0.4, // the middle speck, in the sun
   speckShade: 0.04, // share of that left where the sun does not reach
   speckColor: [0.7, 0.76, 1.0], // cool white: the print warms it to the film's neutral
   leafColor: [0.26, 0.19, 0.11], // share of the sun a floating leaf lets through
@@ -90,9 +90,11 @@ export const LOOK = {
   swanThrough: 0.38, // share of the light inside the plumage that leaves through a surface facing away from the sun
   swanWrap: 0.12, // how far direct sun creeps past the terminator on something this soft
   swanNeckDensity: 3.0, // the neck and head, relative to plain feather
+  swanNeckThrough: 0.08, // the same share as swanThrough, for the neck and head: their feathering is close and dense
+  swanNeckSky: 0.3, // share of the sky's light the neck and head get (the film's neck is olive inside, not teal)
   swanSkyAtWater: 0.5, // share of the sky's light that reaches the skin at the waterline...
   swanSkyHeight: 0.2, // ...rising to all of it this many metres up
-  swanSkyTilt: [0.05, 0.4, 1.0, 0.35], // share of it on surfaces facing down, facing the horizon, tilted up; the tilt (normal's y) that gets it all
+  swanSkyTilt: [0.05, 0.27, 1.0, 0.45], // share of it on surfaces facing down, facing the horizon, tilted up; the tilt (normal's y) that gets it all
   swanFringe: 0.0036, // metres the down stands off the neck on a straight run (0.006 L)
   swanFringeBend: 2.2, // how much taller it stands on the outside of a tight bend
   swanBill: [0.8, 0.24, 0.035], // orange; black parts are fixed
@@ -112,8 +114,8 @@ export const CAMERA = {
   // Where the swan sits in the picture (in half-pictures from the centre, y
   // up). Below the middle in both layouts: the wood needs the room above, and
   // the far bank should not sit on the picture's upper edge.
-  offsetPortrait: [0, -0.24],
-  offsetLandscape: [0, -0.2],
+  offsetPortrait: [0.1, -0.24],
+  offsetLandscape: [0.04, -0.44],
   near: 0.5,
   far: 400,
   limits: { minEl: 2, maxEl: 35, minDist: 2.2, maxDist: 9, minFov: 9, maxFov: 46, minHeight: 0.12 },
@@ -147,7 +149,7 @@ export const TIERS = {
     fxaaSteps: 5,
     rippleSize: 256,
     waterDetail: 0, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 7000, leaves: 2500, trunks: 80, droplets: 192, featherDetail: 0 },
+    counts: { specks: 7000, leaves: 4000, trunks: 80, droplets: 192, featherDetail: 0 },
   },
   medium: {
     pixelRatio: 2,
@@ -162,7 +164,7 @@ export const TIERS = {
     fxaaSteps: 7,
     rippleSize: 384,
     waterDetail: 1, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 13000, leaves: 5000, trunks: 140, droplets: 384, featherDetail: 1 },
+    counts: { specks: 13000, leaves: 8000, trunks: 140, droplets: 384, featherDetail: 1 },
   },
   high: {
     pixelRatio: 2,
@@ -177,6 +179,6 @@ export const TIERS = {
     fxaaSteps: 10,
     rippleSize: 512,
     waterDetail: 2, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 16000, leaves: 9000, trunks: 220, droplets: 768, featherDetail: 2 },
+    counts: { specks: 16000, leaves: 13000, trunks: 220, droplets: 768, featherDetail: 2 },
   },
 };

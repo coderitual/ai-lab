@@ -1,20 +1,123 @@
-// What a person can do to the scene. STUB. Later: tap or click the water to
-// call the swan there (ctx.events 'tap', SwanMind.callTo), drag to orbit, pinch
-// or wheel to zoom, and the keys that go with the on-screen controls.
+// What a person can do to the scene, apart from moving the camera (which is
+// the rig's own business, engine/OrbitRig.js).
+//
+//   touch the water   a drop falls there: rings, a glint, and the swan comes
+//                     over and feeds
+//   touch the swan    it shakes its head
+//   double tap        back to the film's view
+//   keys              the same things as the on-screen buttons (see KEYS)
+
+import * as THREE from 'three';
+
+const _ray = new THREE.Raycaster();
+const _ndc = new THREE.Vector2();
+const _hit = new THREE.Vector3();
+const _from = new THREE.Vector3();
+const _velocity = new THREE.Vector3();
+const WATER = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+/** What each key does; shown in the help panel. */
+export const KEYS = [
+  ['S', 'shake'],
+  ['D', 'dunk'],
+  ['R', 'reach'],
+  ['F', 'play the film again'],
+  ['1 – 5', 'views'],
+  ['Arrows', 'move the camera'],
+  ['+ −', 'closer, further'],
+  ['T', 'slow motion'],
+  ['M', 'sound'],
+  ['H', 'hide the controls'],
+];
 
 /**
  * @param {object} ctx the shared context (see World.js)
- * @param {{ domElement: HTMLElement, camera: import('three').Camera, rig: import('../engine/OrbitRig.js').OrbitRig, mind: import('./SwanMind.js').SwanMind|null }} parts
- * @returns {{ update: (dt: number, time: number) => void, dispose: () => void }}
+ * @param {{ domElement: HTMLElement, camera: THREE.Camera, rig: import('../engine/OrbitRig.js').OrbitRig,
+ *   mind: import('./SwanMind.js').SwanMind|null, droplets?: object|null, director?: object|null }} parts
+ * @returns {{ touchWater: (x: number, z: number) => boolean, update: (dt: number, time: number) => void, dispose: () => void }}
  */
-export function createInteraction(ctx, { domElement, camera, rig, mind }) {
-  void ctx;
-  void domElement;
-  void camera;
-  void rig;
-  void mind;
+export function createInteraction(ctx, { domElement, camera, rig, mind, droplets = null, director = null }) {
+  /**
+   * A drop let fall on the water at a point, and the swan called to it.
+   * @returns {boolean} whether the point was on the pond
+   */
+  function touchWater(x, z) {
+    if (ctx.pond.shoreDistance(x, z) > -1.2) return false;
+    if (droplets) {
+      // from just above, so that it is seen to fall and lands a moment later
+      droplets.spawn({ position: _from.set(x, 0.55, z), velocity: _velocity.set(0, -0.6, 0), spread: 0.02, count: 1, size: 0.011 });
+    } else {
+      ctx.ripple.disturb(x, z, 0.06, 0.006);
+    }
+    ctx.events.emit('tap', { x, z });
+    if (mind) mind.callTo(x, z);
+    return true;
+  }
+
+  rig.onTap = (px, py) => {
+    const w = domElement.clientWidth || 1;
+    const h = domElement.clientHeight || 1;
+    _ndc.set((px / w) * 2 - 1, 1 - (py / h) * 2);
+    _ray.setFromCamera(_ndc, camera);
+    // the swan itself? (a ball round its body and one round its head are near enough)
+    if (mind) {
+      const s = mind.swan;
+      _hit.copy(mind.position).setY(0.14);
+      const body = _ray.ray.distanceSqToPoint(_hit) < 0.3 * 0.3;
+      const head = _ray.ray.distanceSqToPoint(s.headPosition) < 0.12 * 0.12;
+      if (body || head) {
+        mind.act('shake');
+        ctx.events.emit('tap', { x: mind.position.x, z: mind.position.z, swan: true });
+        return;
+      }
+    }
+    if (_ray.ray.direction.y >= -0.01) return; // above the horizon: sky, trees
+    if (!_ray.ray.intersectPlane(WATER, _hit)) return;
+    touchWater(_hit.x, _hit.z);
+  };
+  rig.onDoubleTap = () => {
+    if (director) director.view('film');
+  };
+
+  const actions = {
+    s: () => mind && mind.act('shake'),
+    d: () => mind && mind.act('dunk'),
+    r: () => mind && mind.act('reach'),
+    f: () => director && director.replay(),
+    1: () => director && director.view('film'),
+    2: () => director && director.view('low'),
+    3: () => director && director.view('close'),
+    4: () => director && director.view('high'),
+    5: () => director && director.view('meadow'),
+    arrowleft: () => rig.nudge(-4, 0),
+    arrowright: () => rig.nudge(4, 0),
+    arrowup: () => rig.nudge(0, 2),
+    arrowdown: () => rig.nudge(0, -2),
+    '+': () => rig.nudge(0, 0, 0.9),
+    '=': () => rig.nudge(0, 0, 0.9),
+    '-': () => rig.nudge(0, 0, 1.1),
+    t: () => ctx.events.emit('key', { name: 'slow' }),
+    m: () => ctx.events.emit('key', { name: 'sound' }),
+    h: () => ctx.events.emit('key', { name: 'hide' }),
+  };
+  const onKey = (e) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    const action = actions[e.key.toLowerCase()];
+    if (!action) return;
+    e.preventDefault();
+    action();
+  };
+  window.addEventListener('keydown', onKey);
+
   return {
+    touchWater,
     update() {},
-    dispose() {},
+    dispose() {
+      window.removeEventListener('keydown', onKey);
+      rig.onTap = null;
+      rig.onDoubleTap = null;
+    },
   };
 }

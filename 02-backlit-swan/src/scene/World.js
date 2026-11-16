@@ -155,8 +155,8 @@ export class World {
       this.rig.drift.el = 0;
       this.rig.set(params.view);
     }
-    this.director = createDirector(ctx, { rig: this.rig, mind: this.mind });
-    this.interaction = createInteraction(ctx, { domElement: renderer.domElement, camera: this.camera, rig: this.rig, mind: this.mind });
+    this.director = createDirector(ctx, { rig: this.rig, mind: this.mind, staged: this.staged });
+    this.interaction = createInteraction(ctx, { domElement: renderer.domElement, camera: this.camera, rig: this.rig, mind: this.mind, droplets: this.droplets, director: this.director });
     this.ambience = createAmbience(ctx);
 
     // Debug view of the ripple field: height in green, the two slopes in red and blue.

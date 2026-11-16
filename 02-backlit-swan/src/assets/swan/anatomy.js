@@ -383,12 +383,17 @@ export function proxyShapes(lift) {
   const beam = mix(0.305, 0.33, lift);
   const top = peak + 0.01;
   const wall = 0.07;
-  const edge = { u0: 0.223, m: 0.94, width: 0.18 };
+  const edge = { u0: 0.223, m: 0.94, width: 0.3 };
+  // Arched wings are puffed up and loose, and let light through their upper
+  // parts; relaxed wings lie flat and close and let almost none through (by
+  // the end of the film the whole body is a dark shape with a lit outline).
+  const loose = mix(0.95, 0.42, lift);
+  const wing = mix(3.2, 1.6, lift);
   return [
-    { centre: [0.633, 0.25, 0], radii: [0.6, top - 0.25, beam], tilt: 0, density: 0.42, plane: null },
-    { centre: [0.606, 0.23, 0], radii: [0.6 - 1.2 * wall, top - 0.25 - wall, beam - wall], tilt: 0, density: -0.42, plane: null },
-    { centre: [0.66, 0.1, 0.15], radii: [0.42, peak - 0.11, beam - 0.16], tilt: 0, density: 0.51, plane: edge },
-    { centre: [0.66, 0.1, -0.15], radii: [0.42, peak - 0.11, beam - 0.16], tilt: 0, density: 0.51, plane: edge },
+    { centre: [0.633, 0.25, 0], radii: [0.6, top - 0.25, beam], tilt: 0, density: loose, plane: null },
+    { centre: [0.606, 0.23, 0], radii: [0.6 - 1.2 * wall, top - 0.25 - wall, beam - wall], tilt: 0, density: -loose, plane: null },
+    { centre: [0.66, 0.1, 0.15], radii: [0.42, peak - 0.11, beam - 0.16], tilt: 0, density: wing, plane: edge },
+    { centre: [0.66, 0.1, -0.15], radii: [0.42, peak - 0.11, beam - 0.16], tilt: 0, density: wing, plane: edge },
     { centre: [0.632, -0.014, 0], radii: [0.227, 0.232, 0.177], tilt: 0, density: 3, plane: null },
     { centre: [1.035, 0.28, 0], radii: [0.1, 0.045, 0.07], tilt: 0.75, density: 0.5, plane: null },
   ];
