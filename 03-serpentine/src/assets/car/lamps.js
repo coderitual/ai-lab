@@ -72,13 +72,15 @@ export function createLampLights(object, keep, tier = 'high') {
     // about 5700 K
     const light = new THREE.SpotLight(0xfff0e4, 0, 0, BEAM_ANGLE, 0.25, 2);
     light.map = dipped;
-    light.position.set(side * LAMPS.head.x, LAMPS.head.y, LAMPS.head.z);
+    // 0.15 m ahead of the lamp's centre, just clear of its own lens: from inside, a light this close whitened the
+    // lens and the paint round it, and lit the grille's louvre from behind
+    light.position.set(side * LAMPS.head.x, LAMPS.head.y, LAMPS.head.z + 0.15);
     light.target.position.set(side * LAMPS.head.x, LAMPS.head.y, LAMPS.head.z + 10);
     if (tier === 'high') {
       light.castShadow = true;
       light.shadow.mapSize.set(512, 512);
-      // the near plane clears the car's own nose, which stands a few tenths ahead of the lamp's centre
-      light.shadow.camera.near = 0.45;
+      // the near plane clears the car's own bumper corner just ahead and below
+      light.shadow.camera.near = 0.3;
       light.shadow.camera.far = 160;
       light.shadow.bias = -0.0005;
       light.shadow.normalBias = 0.02;
