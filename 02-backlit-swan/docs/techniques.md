@@ -43,7 +43,7 @@ so that is what is computed:
 - The light that arrives is `exp(-absorb * depth)` per channel, with blue
   absorbed 2.3 times and green 1.45 times as fast as red: a little depth
   gives cream, more gives amber, more gives nothing.
-- A surface facing away from the sun shows a share of that light (0.38 on the
+- A surface facing away from the sun shows a share of that light (0.32 on the
   body, 0.08 on the close-feathered neck and head); a surface facing the sun
   shows the larger of that and plain wrapped sunlight.
 - Everything else is the sky: a blue fill, strongest on surfaces tilted up,

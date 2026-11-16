@@ -107,7 +107,7 @@ the finish pass, and the sRGB curve is applied by the grade pass.
 | FXAA search steps | 5 | 7 | 10 |
 | ripple texture | 256² | 384² | 512² |
 | `waterDetail` (ripple trains summed; mirror read twice at 2) | 0 | 1 | 2 |
-| specks / leaves / trunks / droplets | 7000 / 4000 / 80 / 192 | 13000 / 8000 / 140 / 384 | 16000 / 13000 / 220 / 768 |
+| specks / leaves / trunks / droplets | 7000 / 3200 / 80 / 192 | 13000 / 6000 / 140 / 384 | 16000 / 9000 / 220 / 768 |
 | `featherDetail` (the swan's mesh and fringe) | 0 | 1 | 2 |
 
 The tier is `?q=` if given, else the probe's guess (`caps.tier`): software

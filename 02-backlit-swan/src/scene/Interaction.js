@@ -42,7 +42,7 @@ export function createInteraction(ctx, { domElement, camera, rig, mind, droplets
    * @returns {boolean} whether the point was on the pond
    */
   function touchWater(x, z) {
-    if (ctx.pond.shoreDistance(x, z) > -1.2) return false;
+    if (ctx.pond.shoreDistance(x, z) > -1.5) return false; // the same margin SwanMind.callTo keeps from the bank
     if (droplets) {
       // from just above, so that it is seen to fall and lands a moment later
       droplets.spawn({ position: _from.set(x, 0.55, z), velocity: _velocity.set(0, -0.6, 0), spread: 0.02, count: 1, size: 0.011 });

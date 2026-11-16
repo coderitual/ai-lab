@@ -85,7 +85,7 @@ export const LOOK = {
   // The swan (assets/swan/). How its feathers take the light; shapes and sizes are in assets/swan/anatomy.js.
   swanAlbedo: [0.93, 0.92, 0.9], // white feather
   swanStain: [0.92, 0.86, 0.72], // head and upper neck, as stained as a mute swan's usually are
-  swanFreePath: 0.034, // metres of plain feather that take red light down to 1/e (0.08 L)
+  swanFreePath: 0.034, // metres of plain feather that take red light down to 1/e (0.057 L)
   swanAbsorb: [1.0, 1.45, 2.3], // green and blue are taken faster than red by these factors: thin is cream, thicker amber
   swanThrough: 0.32, // share of the light inside the plumage that leaves through a surface facing away from the sun
   swanWrap: 0.12, // how far direct sun creeps past the terminator on something this soft

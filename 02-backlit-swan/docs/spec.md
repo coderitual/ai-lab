@@ -60,8 +60,8 @@ of 20 keys naming shapes.
   pond's centre (`HOME`): the sunlit water in front of the wood's shadow.
 - Its neck settles into a shape that wanders between the film's A, C and G.
 - Every 5 to 11 s it does something: with a wet bill, 60 % of the time it
-  shakes; otherwise it dunks (40 %), reaches (22 %) or looks round (the
-  rest).
+  shakes; with a dry one it dunks (40 %), reaches (22 %) or looks round
+  (the rest).
   - **Dunk**: down in 0.3 s, under for 0.7 to 1.5 s, hovers, half the time
     touches a second time, rises in 0.6 s.
   - **Reach**: 1.5 s down, 1.2 to 2.6 s feeding with the body all but
@@ -97,7 +97,7 @@ of 20 keys naming shapes.
 ## Touch
 
 - A tap on the water lets a drop of 11 mm fall there from 0.55 m and calls
-  the swan. Taps on the bank, the sky or within 1.2 m of the shore do
+  the swan. Taps on the bank, the sky or within 1.5 m of the shore do
   nothing.
 - A tap on the swan (within 0.3 m of its body or 0.12 m of its head) makes it
   shake.
@@ -117,7 +117,7 @@ move the camera, `+` and `-` closer and further, `T` slow motion, `M` sound,
 | Sun | 14 degrees east of north, 32 degrees up; linear colour 4.2, 4.0, 3.6 |
 | Sky fill | 0.1, 0.2, 0.33 |
 | The wood's shadow | begins 1.6 m from the pond's centre toward the sun, soft over 0.9 m, wandering by 0.5 m |
-| Aperture | 0.42 of a blur disc of 3.4 % of the picture height |
+| Aperture | 0.3 of a blur disc of 3.4 % of the picture height |
 | Glow | strength 0.22, no threshold |
 | Tone | exposure 1, toe 0.008, shoulder 3 |
 | Print | 1 (the measured curve, `printCurve` in `engine/PostChain.js`) |
@@ -140,7 +140,7 @@ Chosen by a probe of the device (`engine/caps.js`) or by `?q=`.
 | ripple texture | 256² | 384² | 512² |
 | water detail | 0 | 1 | 2 |
 | specks | 7000 | 13000 | 16000 |
-| leaves, trunks | 4000, 80 | 8000, 140 | 13000, 220 |
+| leaves, trunks | 3200, 80 | 6000, 140 | 9000, 220 |
 | drops in the air at once | 192 | 384 | 768 |
 | swan detail | 0 | 1 | 2 |
 
