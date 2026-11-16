@@ -272,7 +272,7 @@ totalEmissiveRadiance += diffuseColor.rgb * RECIPROCAL_PI * boreLampLight(vLocal
 }
 
 /** Board-marked concrete for the portals: soft stains in a small texture-free shader edit. */
-function concreteDetail(material) {
+export function concreteDetail(material) {
   return extend(material, 'portal-concrete', (shader) => {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vPortalWorld;')
