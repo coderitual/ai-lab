@@ -30,7 +30,7 @@ export const PALETTE = {
 
   // sea
   waterDeep: c('#052c52'), // troughs, looking down into deep water
-  waterMid: c('#0a76a2'), // the lit body of a wave
+  waterMid: c('#0a7aa8'), // the lit body of a wave
   waterShallow: c('#3ad6c6'), // over sand near the islands
   waterScatter: c('#33e2cd'), // light coming through the wave tops
   foam: c('#f6fcff'),

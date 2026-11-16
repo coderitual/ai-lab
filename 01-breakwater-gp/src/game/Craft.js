@@ -194,7 +194,7 @@ export class Craft {
     if (wet > 0) {
       if (wasAir && this.airTime > 0.16 && impact > 1.4) {
         this.events.push({ type: 'land', strength: clamp01((impact - 0.6) / 10), airTime: this.airTime });
-        const loss = clamp(impact * 0.014, 0, 0.14);
+        const loss = clamp(impact * 0.011, 0, 0.11);
         v.x *= 1 - loss;
         v.z *= 1 - loss;
       }

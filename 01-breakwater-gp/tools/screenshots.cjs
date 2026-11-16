@@ -207,7 +207,10 @@ async function downscale(page, pngBuffer, scale, quality = 0.88) {
           const g = window.__bw.game;
           const c = g.views[0].racer.craft;
           for (let i = 0; i < 1800; i++) {
-            g.engine.advance(1 / 60, 1 / 60, i % 5 === 0);
+            // (drawing is what takes the time: draw seldom until the moment is near, then often, so that what the
+            // paintwork mirrors is fresh when the picture is taken)
+            const near = c.airborne || c.pos.y - c.waterY > 0.3;
+            g.engine.advance(1 / 60, 1 / 60, i % (near ? 5 : 60) === 0);
             if (c.airborne && c.pos.y - c.waterY > 0.75 && c.vel.y > -0.5) break;
           }
           g.engine.advance(1 / 60);
@@ -220,7 +223,8 @@ async function downscale(page, pngBuffer, scale, quality = 0.88) {
           const g = window.__bw.game;
           const c = g.views[0].racer.craft;
           for (let i = 0; i < 3600; i++) {
-            g.engine.advance(1 / 60, 1 / 60, i % 5 === 0);
+            const near = Math.abs(c.slip) > 0.15;
+            g.engine.advance(1 / 60, 1 / 60, i % (near ? 5 : 60) === 0);
             if (!c.airborne && c.speed > 20 && Math.abs(c.slip) > 0.3) break;
           }
           g.engine.advance(1 / 60);

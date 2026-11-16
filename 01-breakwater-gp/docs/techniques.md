@@ -111,7 +111,9 @@ depth buffer read.
 - **Glitter at constant size.** Sun sparkle comes from a normal-map lookup
   whose scale is chosen per pixel from `log2(distance)`, blended between the
   two nearest octaves, so facets stay a few pixels across from the bow to the
-  horizon instead of turning to noise far away.
+  horizon instead of turning to noise far away. Under the sun there is a soft
+  glare as well, in two lobes: a tight one and a broad faint one, which is what
+  makes the sea toward the sun look wet rather than merely bright.
 - **Sky reflection without a texture.** The sky is a formula
   (`skyGradient`), so the water evaluates it in the reflected direction.
 

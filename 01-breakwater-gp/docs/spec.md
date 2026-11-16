@@ -165,7 +165,7 @@ Nothing else tells the hull what attitude to take.
   thrust and the helm. All fade as the boat leaves the water.
 - No point in the water for more than 0.05 s counts as airborne. Coming down
   after more than 0.16 s with an impact over 1.4 m/s is a *landing*: strength
-  `(impact − 0.6) / 10`, and up to 14 % of horizontal speed is lost.
+  `(impact − 0.6) / 10`, and up to 11 % of horizontal speed is lost.
 - In the air the hull levels out and settles 0.07 rad bow-up, so it comes
   down tails first.
 
@@ -178,7 +178,7 @@ the current power:
 | top speed, m/s | 22.6 | 23.8 | 24.9 | 26.0 | 27.1 | 28.4 |
 | km/h | 81 | 86 | 90 | 94 | 98 | 102 |
 
-Braking adds `8.5·brake·√grip` of drag. Wave faces push the hull downhill with
+Braking adds `9.2·brake·√grip` of drag. Wave faces push the hull downhill with
 `0.55·gravity·slope`.
 
 **Going sideways.** The water resists sideways speed `u` with
@@ -202,14 +202,14 @@ What that gives, measured on a calm sea from about 100 km/h by
 | helm | result |
 | --- | --- |
 | half lock, 3 s | a clean carve: 6° of slip, 69 m radius, no speed lost |
-| full lock, 3 s | a drift: 20° of slip after 1 s, 33° after 3 s, 101 → 78 km/h, radius closing from 40 m to 31 m |
-| then let go | slip back to 14° in half a second and to nothing within a second and a half |
-| full lock and brake, 0.9 s | a tight powerslide: 34° of slip, 105 → 60 km/h, 17 m radius |
+| full lock, 3 s | a drift: 20° of slip after 1 s, 34° after 3 s, 102 → 80 km/h, radius closing from 42 m to 33 m |
+| then let go | slip back to 15° in half a second and to nothing within a second and a half |
+| full lock and brake, 0.9 s | a tight powerslide: 34° of slip, 105 → 61 km/h, 18 m radius |
 | flick one way, then the other | 15° of slip one way, 18° the other, speed kept |
 
 **Trim.** On the water the bows are asked up `0.055 rad × throttle` while
 accelerating and 0.04 rad at speed, down 0.04 rad under braking, and the hull
-is asked to lean into a turn by `0.2 rad per rad/s` of yaw rate, through the
+is asked to lean into a turn by `0.23 rad per rad/s` of yaw rate, through the
 same springs the four points make.
 
 **Inputs are smoothed**: keys ramp the helm at 3.6 /s toward a side and 6 /s

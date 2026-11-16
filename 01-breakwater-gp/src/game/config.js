@@ -34,10 +34,10 @@ export const CRAFT_TUNE = {
   sideBite: 5.0, // how sharply the hulls resist going sideways at first (1/s)
   sideHold: 17, // the most sideways push the water gives before the boat drifts (m/s²)
   slideScrub: 0.055, // forward speed lost per m/s of sideways slide (1/s)
-  brakeDrag: 8.5,
+  brakeDrag: 9.2,
   yawRate: 1.3, // rad/s at the sweet spot
   yawAlign: 1.15, // how strongly a sliding hull swings to point the way it is going (1/s)
-  bank: 0.2, // how far the hull leans into a turn (rad per rad/s of turning, at speed)
+  bank: 0.23, // how far the hull leans into a turn (rad per rad/s of turning, at speed)
   planing: 0.09, // how far the hull climbs out of the water at speed (m)
   slopePush: 0.55, // how strongly wave faces push the boat downhill
 };

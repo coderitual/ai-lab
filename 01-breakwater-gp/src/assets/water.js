@@ -202,7 +202,7 @@ void main() {
   float bubbles = cells * 0.42 + cells2 * 0.38 + grit * 0.5;
   float wfoam = smoothstep(0.93 - wake.r * 0.95, 1.1 - wake.r * 0.9, bubbles + wake.b * 0.22);
   // light and shade inside the foam, so thick white water has some body
-  float foamBody = 0.8 + 0.32 * grit - 0.1 * cells2;
+  float foamBody = 0.74 + 0.42 * grit - 0.16 * cells2;
   foam = max(foam, wfoam);
 
   mask = max(mask, wake.r);
@@ -232,7 +232,7 @@ void main() {
   vec2 nh = N.xz / max(length(N.xz), 1.0e-4);
   vec2 vh = V.xz / max(length(V.xz), 1.0e-4);
   float faceOn = max(dot(nh, vh), 0.0) * clamp((1.0 - N.y) * 5.0, 0.0, 1.0) * smoothstep(0.25, 0.85, hn);
-  float scatter = thin * (0.27 + 0.85 * sunward) + faceOn * (0.16 + 0.45 * sunward);
+  float scatter = thin * (0.3 + 0.92 * sunward) + faceOn * (0.18 + 0.5 * sunward);
   // caustics drifting inside the wave give that glow its texture
   float cIn = caustic((vBase - into * 1.8) * 0.05 + N.xz * 0.45, t * 0.6);
   scatter *= 0.68 + 1.3 * cIn;
@@ -288,7 +288,8 @@ void main() {
   vec3 Ng = normalize(Nr + vec3(g.x, 0.0, g.y));
   float glint = pow(max(dot(Ng, H), 0.0), uGlint.z) * uGlint.w;
   // and a broad soft glare under the sun
-  float sheen = pow(max(dot(Nr, H), 0.0), 48.0) * 0.3;
+  float NdH = max(dot(Nr, H), 0.0);
+  float sheen = pow(NdH, 48.0) * 0.3 + pow(NdH, 12.0) * 0.06;
 
   // (a painted hull a few metres away shows in the water more than bare physics allows: it is the point of having it)
   vec3 col = mix(body, refl, min(1.0, fresnel + mirrored * 0.38));
