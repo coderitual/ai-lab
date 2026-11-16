@@ -163,6 +163,16 @@ const road = {
 };
 const assetName = ASSETS[given.asset] ? given.asset : 'car';
 const asset = ASSETS[assetName]();
+// a parked car's head lamps, for whatever in the world answers them (the paint's glass beads)
+const beams = [];
+if (asset.car) {
+  stand.updateMatrixWorld(true);
+  const lamps = lampPreset(given.lights);
+  const pos = new THREE.Vector3();
+  for (const light of asset.car.headlights) pos.add(light.getWorldPosition(new THREE.Vector3()).multiplyScalar(0.5));
+  const dir = new THREE.Vector3(0, 0, 1).transformDirection(stand.matrixWorld);
+  beams.push({ pos, dir, low: lamps.low ?? 0, high: lamps.high ?? 0 });
+}
 
 // ---- the camera
 const view = {
@@ -303,7 +313,7 @@ engine.onRender = placeCamera;
 engine.onDraw = () => {
   if (Number.isFinite(view.focus)) track.pointAt(view.focus, view.lat, focus);
   else stand.getWorldPosition(focus);
-  world.prepareView(camera, focus);
+  world.prepareView(camera, focus, beams);
   pipeline.render(world.scene, camera, rect, frame);
 };
 

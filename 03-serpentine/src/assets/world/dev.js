@@ -56,7 +56,7 @@ export function placeOnRoad(track, s, lat, object) {
 export function roadCamera(track, view, camera, aspect) {
   if (view.top) {
     placeOnRoad(track, view.s, view.lat, camera);
-    camera.position.y += 400;
+    camera.position.y = 1400;
     camera.up.set(0, 0, 1);
     camera.lookAt(camera.position.x, camera.position.y - 1, camera.position.z);
     camera.left = -view.top / 2;
@@ -64,7 +64,7 @@ export function roadCamera(track, view, camera, aspect) {
     camera.top = view.top / 2 / aspect;
     camera.bottom = -view.top / 2 / aspect;
     camera.near = 1;
-    camera.far = 1200;
+    camera.far = 2400;
   } else {
     const s = view.s - view.back;
     placeOnRoad(track, s, view.lat, camera);

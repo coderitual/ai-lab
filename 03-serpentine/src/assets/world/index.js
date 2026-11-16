@@ -8,7 +8,12 @@
 //   sky.js          the dome, the clouds, the stars
 //   environment.js  the sky as an environment map, one per time of day
 //   sun.js          the sun or moon, its shadow, the fill light
-//   placeholderGround.js   the road and its verges until the real ones exist
+//   terrain.js, groundMaterial.js   the mountain (height field, band, grid, far land, baked light)
+//   road.js         the pavement and its asphalt
+//   rock.js         the cut rock faces at the rock edges
+//   lake.js         the water beside the straight
+//   placeholderGround.js   cones, posts and poles until the forest and the roadside exist
+//   placeholderBore.js     a plain tube and portal faces until the tunnel exists
 //
 // Three rules the parts keep between them:
 //  - The scene always holds the same lights. setTime changes what they are,
@@ -24,9 +29,16 @@ import * as THREE from 'three';
 import { createAtmosphere } from './atmosphere.js';
 import { createEnvironment } from './environment.js';
 import { TIMES } from './lighting.js';
+import { createGroundMaterial } from './groundMaterial.js';
+import { createLake } from './lake.js';
+import { createPlaceholderBore } from './placeholderBore.js';
 import { createPlaceholderGround } from './placeholderGround.js';
+import { selectBake } from './shading.js';
 import { createSky } from './sky.js';
 import { createSun } from './sun.js';
+import { createRoad } from './road.js';
+import { createRockFaces } from './rock.js';
+import { ROW_STEP, createTerrain } from './terrain.js';
 
 /**
  * @typedef {object} Beam one car's head lamps, for whatever answers them (reflectors)
@@ -69,9 +81,21 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   const sky = createSky({ tier, rng: rng.fork('sky'), atmosphere });
   const environment = createEnvironment({ renderer, caps, sky, atmosphere });
   const sun = createSun({ renderer, tier, shadows: params.shadows });
-  const ground = createPlaceholderGround({ caps, tier, track, rng: rng.fork('ground'), atmosphere });
+  const groundMaterial = createGroundMaterial({ caps, tier, atmosphere });
+  const terrain = createTerrain({
+    track,
+    tier,
+    rng: rng.fork('terrain'),
+    material: groundMaterial.material,
+    lights: { day: TIMES.day.sun.dir, night: TIMES.night.sun.dir },
+  });
+  const road = createRoad({ track, caps, tier, atmosphere, terrain, rowStep: ROW_STEP[tier] ?? 1 });
+  const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock') });
+  const bore = createPlaceholderBore({ track, atmosphere });
+  const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
+  const ground = createPlaceholderGround({ caps, tier, track, rng: rng.fork('ground'), atmosphere, heightAt: terrain.heightAt });
 
-  scene.add(ground.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(terrain.group, road.group, rock.group, bore.group, lake.mesh, ground.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -96,12 +120,14 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     time: null,
     probeHidden: [sky.stars],
     atmosphere,
+    terrain,
 
     setTime(name) {
       const time = TIMES[name];
       world.time = time;
       atmosphere.setTime(time);
       sky.setTime(time);
+      selectBake(name);
 
       const { ambient, sky: dome } = time;
       const above = ambient.sky.map((v) => v * ambient.intensity);
@@ -123,10 +149,12 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
 
     update(dt, simTime) {
       sky.update(dt, simTime);
+      lake.update(simTime);
     },
 
-    prepareView(camera, focus) {
+    prepareView(camera, focus, beams) {
       sun.prepareView(camera, focus);
+      road.setBeams(beams);
       atmosphere.prepareView(camera);
       // The environment map and the fill are the open sky's light. It does not follow the car into the tunnel
       // (the sun is kept out by its shadow map; these two have none).
@@ -148,10 +176,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       return wetness;
     },
     set wetness(value) {
-      // all a placeholder can show of rain: darker, smoother asphalt
       wetness = Math.min(1, Math.max(0, value));
-      ground.road.roughness = 0.88 - 0.6 * wetness;
-      ground.road.color.setScalar(1 - 0.45 * wetness);
+      road.setWetness(wetness);
     },
 
     refresh() {
@@ -171,6 +197,12 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       sun.dispose();
       sky.dispose();
       ground.dispose();
+      terrain.dispose();
+      road.dispose();
+      lake.dispose();
+      rock.dispose();
+      bore.dispose();
+      groundMaterial.dispose();
     },
   };
 

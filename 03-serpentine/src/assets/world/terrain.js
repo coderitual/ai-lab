@@ -1,0 +1,704 @@
+// The mountain: one height function, built from the Track outwards, and the
+// meshes that draw it.
+//
+// The height function H(x, z) has three layers.
+//  1. Near the road it IS the road's corridor: out to the solid edge the
+//     Track's own cross-section (what the wheels stand on), and beyond the
+//     edge the hillside the Track asks for (its far slope), with a cliff where
+//     the edge is rock: the rock face (rock.js) stands in front of it.
+//  2. Further out it blends, over 10 to 100 m, into the shape of the land: a
+//     field made on a 16 m grid from the road itself (the road's height, rising
+//     inside the loop towards a massif and falling outside it towards the
+//     valleys, a lake beside the straight, a ridge over the tunnel and a
+//     ravine under the viaduct), smoothed so that the line where two stretches
+//     of road are equally near leaves no crease, with ridged noise on top.
+//  3. Far away, beyond the course, mountains rise round the valley.
+//
+// It is drawn in three pieces that meet without cracks:
+//  - the BAND: a strip that follows the road on each side, row by row with the
+//    Track's samples, from the pavement's edge out to about 30 m beyond the
+//    solid edge. Its columns sit on the corridor's own kinks (pavement, solid
+//    edge, the foot and top of the cliff), so it is exact where the eye is
+//    closest. Where another stretch of road is nearer it stops.
+//  - the GRID: square cells (5 m on the high tier) over the whole course, cut
+//    into chunks the renderer can cull. Cells the band covers are dropped;
+//    the band's neighbours are pulled a little under it.
+//  - the FAR land: 100 m cells out to the mountains on the horizon.
+//
+// Under the tunnel's portals the grid is cut open (the bore and its face come
+// with the tunnel); over the bore the ground stands above its crown; under the
+// viaduct it falls into the ravine.
+
+import * as THREE from 'three';
+import { planeNoise, smoothstep, withBake } from './shading.js';
+
+// The Track's EDGE and SURFACE values (the world never imports from game/).
+const EDGE_ROCK = 1;
+const EDGE_TREES = 4;
+const SURFACE_GRAVEL = 3;
+/** The tunnel's ceiling above the road (TUNNEL.height in game/trackLayout.js): the ground stays above it. */
+const BORE_HEIGHT = 5.6;
+
+/** Grid cell (m) per tier. */
+const CELL = { low: 8, medium: 6, high: 5 };
+/** Band rows: one every this many Track samples, per tier. */
+export const ROW_STEP = { low: 2, medium: 1, high: 1 };
+/** The land-shape field's cell (m). */
+const MACRO = 16;
+/** How far the grid reaches beyond the course's bounds (m). */
+const MARGIN = 260;
+/** Beyond this distance from the solid edge the road no longer shapes the ground (m). */
+const NEAR_REACH = 170;
+/** Columns of the band beyond the cliff's top, metres from it. */
+const BAND_OUT = [2, 5, 9, 14, 20, 27];
+/** The far land: its cell and how far it reaches from the middle of the course (m). */
+const FAR_CELL = 100;
+const FAR_REACH = 4800;
+
+/**
+ * @typedef {object} Terrain
+ * @property {THREE.Group} group
+ * @property {(x: number, z: number) => number} heightAt the ground's height (on the corridor: the road's surface)
+ * @property {(x: number, z: number, out?: THREE.Vector3) => THREE.Vector3} normalAt the ground's unit normal
+ * @property {(x: number, z: number) => number} forestAt 0..1 where the forest stands (the forest stage plants it)
+ * @property {(x: number, z: number, out: number[], offset: number) => void} bakeAt the baked light at a point
+ *   (aBake: sun by day, moon by night, sky), for anything that stands on the ground and wants to match it
+ * @property {(s: number, side: number) => { top: number, height: number, rock: number }} cliffAt the cliff behind a
+ *   rock edge: how far beyond the solid edge its top is (m), how high it rises, and how much of a rock edge it is
+ * @property {(s: number, lat: number) => number} heightOnTrack the same height at track coordinates
+ * @property {THREE.MeshStandardMaterial} material the ground's material (the band, the grid, the far land)
+ * @property {{ level: number, extent: { x0: number, x1: number, z0: number, z1: number } }} lake where the water lies
+ * @property {object} stats vertices, triangles, milliseconds
+ * @property {() => void} dispose
+ */
+
+/**
+ * @param {object} options
+ * @param {object} options.track the Track
+ * @param {import('../../engine/caps.js').Tier} options.tier
+ * @param {import('../../engine/rng.js').Rng} options.rng
+ * @param {THREE.MeshStandardMaterial} options.material the ground material (groundMaterial.js), already patched
+ * @param {{ day: number[], night: number[] }} options.lights directions towards the sun and the moon
+ * @returns {Terrain}
+ */
+export function createTerrain({ track, tier, rng, material, lights }) {
+  const started = performance.now();
+  const n = track.count;
+  const ds = track.ds;
+  const pave = track.halfWidth + track.shoulder;
+  const noise = planeNoise(rng.int(1 << 30));
+  const lakeLevel = track.layout?.lakeLevel ?? -1.8;
+
+  // ---- per sample: what the road asks of the land on each side
+  const wrap = (s) => track.wrap(s);
+  const read = (arr, s) => {
+    const f = wrap(s) / ds;
+    const i = Math.floor(f) % n;
+    const b = i + 1 === n ? 0 : i + 1;
+    return arr[i] + (arr[b] - arr[i]) * (f - Math.floor(f));
+  };
+  /** 0..1 how much of a rock edge each sample is, eased over a few metres so the cliffs rise and fall. */
+  const rockiness = (kinds) => {
+    const raw = new Float32Array(n);
+    for (let i = 0; i < n; i++) raw[i] = kinds[i] === EDGE_ROCK ? 1 : 0;
+    const out = new Float32Array(n);
+    const half = Math.round(6 / ds);
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (let k = -half; k <= half; k++) sum += raw[(i + k + n) % n];
+      out[i] = sum / (2 * half + 1);
+    }
+    return out;
+  };
+  const rockL = rockiness(track.kindL);
+  const rockR = rockiness(track.kindR);
+  /** Height of the cliff behind a rock edge: a few metres where the hill beyond is gentle, up to 9 where it is steep. */
+  const cliffOf = (rock, far) => {
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) out[i] = rock[i] * Math.min(9, Math.max(1.4, 2 + 5 * far[i]));
+    return out;
+  };
+  const cliffL = cliffOf(rockL, track.farSlopeL);
+  const cliffR = cliffOf(rockR, track.farSlopeR);
+  /** The cliff's foot starts this far beyond the edge, and climbs this far out per metre up. */
+  const FOOT = 0.8;
+  const LEAN = 0.3;
+
+  // tunnels and bridges, per sample: how much ground stands over the bore, how deep the ravine is
+  const cover = new Float32Array(n).fill(-1);
+  const ravine = new Float32Array(n).fill(-1);
+  for (const t of track.tunnels) {
+    for (let i = Math.ceil(t.s0 / ds); i <= Math.floor(t.s1 / ds); i++) {
+      const s = i * ds;
+      cover[i % n] = 2.5 + Math.min(40, 0.35 * Math.min(s - t.s0, t.s1 - s));
+    }
+  }
+  for (const b of track.bridges) {
+    const drop = b.drop ?? 30;
+    for (let i = Math.ceil(b.s0 / ds); i <= Math.floor(b.s1 / ds); i++) {
+      const u = (i * ds - b.s0) / (b.s1 - b.s0);
+      ravine[i % n] = Math.max(1.5, drop * Math.pow(Math.sin(Math.PI * u), 0.6));
+    }
+  }
+  const zoneOf = (s) => {
+    const i = Math.round(wrap(s) / ds) % n;
+    return cover[i] >= 0 ? 1 : ravine[i] >= 0 ? 2 : 0;
+  };
+  /** The height the land is shaped from: the road, or the ground over the bore, or the ravine's floor. */
+  const ref = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    ref[i] = track.py[i] + (cover[i] >= 0 ? BORE_HEIGHT + cover[i] : 0) - (ravine[i] >= 0 ? ravine[i] : 0);
+  }
+
+  // ---- layer 3: the valley, the lake and the mountains round them
+  const mid = { x: (track.bounds.minX + track.bounds.maxX) / 2, z: (track.bounds.minZ + track.bounds.maxZ) / 2 };
+  // the lake lies along the straight's shore (the straight runs along z = 0, the water on its -z side)
+  const LAKE = { x: 60, z: -330, rx: 650, rz: 300 };
+  const lakeE = (x, z) => ((x - LAKE.x) / LAKE.rx) ** 2 + ((z - LAKE.z) / LAKE.rz) ** 2;
+  function valley(x, z) {
+    const e = lakeE(x, z);
+    const inLake = smoothstep(1.06, 0.82, e);
+    const floor = 3 + 20 * noise.fbm(x / 420, z / 420, 3) + 30 * smoothstep(1.2, 3, e) * noise.fbm(x / 300 + 7, z / 300, 3);
+    const bottom = lakeLevel - 10 * smoothstep(0.95, 0.35, e);
+    const r = Math.hypot(x - mid.x, (z - mid.z) * 0.9);
+    const ring = smoothstep(750, 1900, r) * (220 + 380 * noise.ridged(x / 1100 + 3, z / 1100, 5));
+    return floor + (bottom - floor) * inLake + ring * (1 - inLake);
+  }
+  /** Small hills and gullies on top of the land's shape, zero on average. */
+  const detail = (x, z) => 18 * (noise.ridged(x / 280, z / 280, 4) - 0.35) + 5 * (noise.fbm(x / 70, z / 70, 3) - 0.5);
+
+  // ---- layer 2: the shape of the land, on a coarse grid
+  const minX = track.bounds.minX - MARGIN;
+  const minZ = track.bounds.minZ - MARGIN;
+  const maxX = track.bounds.maxX + MARGIN;
+  const maxZ = track.bounds.maxZ + MARGIN;
+  const mx = Math.ceil((maxX - minX) / MACRO) + 1;
+  const mz = Math.ceil((maxZ - minZ) / MACRO) + 1;
+  const macro = new Float32Array(mx * mz);
+  const macroD = new Float32Array(mx * mz);
+  const spot = { index: -1, s: 0, lat: 0 };
+  // the loop as a polygon on the map, to tell inside (the massif) from outside (the valleys)
+  const ring = [];
+  for (let i = 0; i < n; i += 4) ring.push(track.px[i], track.pz[i]);
+  const inside = (x, z) => {
+    let c = false;
+    for (let i = 0, j = ring.length - 2; i < ring.length; j = i, i += 2) {
+      const zi = ring[i + 1];
+      const zj = ring[j + 1];
+      if (zi > z !== zj > z && x < ((ring[j] - ring[i]) * (z - zi)) / (zj - zi) + ring[i]) c = !c;
+    }
+    return c;
+  };
+  {
+    let hint = -1;
+    for (let j = 0; j < mz; j++) {
+      for (let i = 0; i < mx; i++) {
+        const x = minX + i * MACRO;
+        const z = minZ + j * MACRO;
+        track.locate(x, z, hint, spot);
+        hint = spot.index;
+        const side = spot.lat >= 0 ? 1 : -1;
+        const d = Math.max(0, Math.abs(spot.lat) - track.edgeAt(spot.s, side));
+        const base = read(ref, spot.s);
+        const g = valley(x, z);
+        let v;
+        if (inside(x, z)) {
+          // the massif: gently up from the road at first (meadows, the wood), then steeply
+          const cap = 165 + 45 * noise.fbm(x / 300, z / 300, 3);
+          v = Math.max(Math.min(base + 0.22 * d + 0.42 * Math.max(0, d - 50), cap), Math.min(base, cap));
+        } else {
+          v = Math.max(base - 0.25 * d, g);
+        }
+        macro[j * mx + i] = v;
+        macroD[j * mx + i] = d;
+      }
+    }
+    // smoothed, so the line where two stretches are equally near leaves no crease
+    const tmp = new Float32Array(macro.length);
+    for (let pass = 0; pass < 3; pass++) {
+      for (let j = 0; j < mz; j++) {
+        for (let i = 0; i < mx; i++) {
+          let sum = 0;
+          let w = 0;
+          for (let b = -1; b <= 1; b++) {
+            const jj = Math.min(mz - 1, Math.max(0, j + b));
+            for (let a = -1; a <= 1; a++) {
+              const ii = Math.min(mx - 1, Math.max(0, i + a));
+              sum += macro[jj * mx + ii];
+              w++;
+            }
+          }
+          tmp[j * mx + i] = sum / w;
+        }
+      }
+      macro.set(tmp);
+    }
+  }
+  const bilinear = (arr, w, h, x0, z0, cell, x, z) => {
+    const fx = Math.min(w - 1.001, Math.max(0, (x - x0) / cell));
+    const fz = Math.min(h - 1.001, Math.max(0, (z - z0) / cell));
+    const i = Math.floor(fx);
+    const j = Math.floor(fz);
+    const u = fx - i;
+    const v = fz - j;
+    const k = j * w + i;
+    return (arr[k] * (1 - u) + arr[k + 1] * u) * (1 - v) + (arr[k + w] * (1 - u) + arr[k + w + 1] * u) * v;
+  };
+  const inMacro = (x, z) => x >= minX && x <= maxX && z >= minZ && z <= maxZ;
+  /** The land's shape with its hills: what the ground is far from any road. */
+  const land = (x, z) => (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detail(x, z);
+
+  const phases = { macro: Math.round(performance.now() - started) };
+  // the far land's heights, on its own coarse grid (the bake marches over them too)
+  const farN = Math.round((FAR_REACH * 2) / FAR_CELL) + 1;
+  const farX0 = mid.x - FAR_REACH;
+  const farZ0 = mid.z - FAR_REACH;
+  const farHeight = new Float32Array(farN * farN);
+  for (let j = 0; j < farN; j++) {
+    for (let i = 0; i < farN; i++) farHeight[j * farN + i] = land(farX0 + i * FAR_CELL, farZ0 + j * FAR_CELL);
+  }
+  // ---- layer 1: the corridor and the hillside just beyond it
+  const prof = { y: 0, surface: 0 };
+  /** The cliff behind the edge on one side at s. */
+  const cliff = { top: 0, height: 0, rock: 0 };
+  function cliffAt(s, side) {
+    cliff.rock = read(side > 0 ? rockL : rockR, s);
+    cliff.height = read(side > 0 ? cliffL : cliffR, s);
+    cliff.top = cliff.height > 0.01 ? FOOT * cliff.rock + LEAN * cliff.height : 0;
+    return cliff;
+  }
+  /** Height of the corridor and its hillside at track coordinates, before the land takes over. */
+  function nearAt(s, lat, edge, d) {
+    const zone = zoneOf(s);
+    if (zone === 1) return read(track.py, s) + BORE_HEIGHT + read(cover, s);
+    if (zone === 2) return Math.min(read(track.py, s) - 1.5, read(track.py, s) - read(ravine, s) - 0.15 * lat);
+    if (d <= 0) return track.profile(s, lat, prof).y;
+    const side = lat > 0 ? 1 : -1;
+    const yE = track.profile(s, side * edge, prof).y;
+    const c = cliffAt(s, side);
+    let y = yE;
+    let beyond = d;
+    if (c.height > 0.01) {
+      const foot = FOOT * c.rock;
+      y += c.height * smoothstep(0, 1, (d - foot) / (LEAN * c.height));
+      beyond = Math.max(0, d - c.top);
+    }
+    const far = read(side > 0 ? track.farSlopeL : track.farSlopeR, s);
+    return y + far * 40 * (1 - Math.exp(-beyond / 40));
+  }
+  /** H at a point whose track coordinates are known. */
+  function heightOf(x, z, s, lat) {
+    const side = lat >= 0 ? 1 : -1;
+    const edge = track.edgeAt(s, side);
+    const d = Math.max(0, Math.abs(lat) - edge);
+    const zone = zoneOf(s);
+    const w = zone ? smoothstep(3, 60, d) : smoothstep(10, 100, d);
+    const near = nearAt(s, lat, edge, d);
+    if (w <= 0) return near;
+    const far = (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detail(x, z) * smoothstep(15, 150, d);
+    return near + (far - near) * w;
+  }
+  const near = (x, z) => (inMacro(x, z) ? bilinear(macroD, mx, mz, minX, minZ, MACRO, x, z) : 1e9) < NEAR_REACH;
+  function heightAt(x, z) {
+    if (!near(x, z)) return land(x, z);
+    track.locate(x, z, -1, spot);
+    return heightOf(x, z, spot.s, spot.lat);
+  }
+  const pointScratch = new THREE.Vector3();
+  function heightOnTrack(s, lat) {
+    track.pointAt(s, lat, pointScratch);
+    return heightOf(pointScratch.x, pointScratch.z, s, lat);
+  }
+
+  // ---- the forest: where the Track says trees stand, and in patches on the massif and the far slopes
+  function forestOf(x, z, y, slope, s, lat, d) {
+    if (y < lakeLevel + 0.6) return 0;
+    let f = 0;
+    if (s !== null) {
+      const kinds = lat > 0 ? track.kindL : track.kindR;
+      if (kinds[Math.round(wrap(s) / ds) % n] === EDGE_TREES) f = smoothstep(0.5, 3, d) * (1 - smoothstep(90, 150, d));
+    }
+    const patch = smoothstep(0.42, 0.6, noise.fbm(x / 230 + 11, z / 230, 4));
+    f = Math.max(f, patch * (1 - smoothstep(170, 230, y)) * (s === null || d > 12 ? 1 : 0));
+    return f * (1 - smoothstep(0.55, 0.8, slope));
+  }
+
+  // ---- the band
+  const bandStep = ROW_STEP[tier] ?? 1;
+  const cols = 3 + 4 + BAND_OUT.length; // pavement edge, solid edge, the foot, four up the cliff, the rest
+  const ext = [new Float32Array(n), new Float32Array(n)]; // per sample and side: how far out the band reaches (|lat|)
+  const pt = new THREE.Vector3();
+  /** The band's geometries, in chunks of about 160 m (after the bake: its vertices carry it). */
+  function buildBands() {
+    const out = [];
+    const rows = [];
+    for (let i = 0; i < n; i += bandStep) rows.push(i);
+    // runs of rows outside the tunnels and bridges (a run may wrap through s = 0)
+    const open = (i) => cover[i] < 0 && ravine[i] < 0;
+    const runs = [];
+    let run = null;
+    for (const i of rows) {
+      if (open(i)) {
+        if (!run) runs.push((run = []));
+        run.push(i);
+      } else {
+        if (run) run.push(i); // the band reaches the portal or the abutment
+        run = null;
+      }
+    }
+    if (runs.length > 1 && runs[0][0] === 0 && open(rows[rows.length - 1])) {
+      const first = runs.shift();
+      runs[runs.length - 1].push(...first);
+    } else if (runs.length === 1 && runs[0].length === rows.length) runs[0].push(0);
+    // each run in chunks of about 160 m, so that the renderer can cull them
+    const CHUNK = Math.round(160 / (ds * bandStep));
+    for (const r of runs) {
+      for (let a = 0; a < r.length - 1; a += CHUNK) out.push(buildBand(r.slice(a, Math.min(r.length, a + CHUNK + 1))));
+    }
+    return out;
+  }
+
+  function buildBand(rowList) {
+    const count = rowList.length * 2 * cols;
+    const pos = new Float32Array(count * 3);
+    const bake = new Float32Array(count * 3);
+    const mask = new Float32Array(count * 2);
+    const offs = new Float32Array(cols);
+    for (let r = 0; r < rowList.length; r++) {
+      const i = rowList[r];
+      const s = i * ds;
+      for (let half = 0; half < 2; half++) {
+        const side = half === 0 ? 1 : -1;
+        const edge = side > 0 ? track.edgeL[i] : track.edgeR[i];
+        const c = cliffAt(s, side);
+        const top = c.top;
+        offs[0] = pave - edge; // (relative to the edge)
+        offs[1] = 0;
+        offs[2] = FOOT * c.rock * (c.height > 0.01 ? 1 : 0);
+        for (let k = 1; k <= 4; k++) offs[2 + k] = offs[2] + (top - offs[2]) * (k / 4);
+        for (let k = 0; k < BAND_OUT.length; k++) offs[7 + k] = top + BAND_OUT[k];
+        const gravel = (side > 0 ? track.vergeL : track.vergeR)[i] === SURFACE_GRAVEL;
+        let lastOwn = 0;
+        for (let k = 0; k < cols; k++) {
+          let lat = side * (edge + offs[k]);
+          if (k >= 9) {
+            // stop where another stretch of the road is nearer than this one
+            track.pointAt(s, lat, pt);
+            track.locate(pt.x, pt.z, -1, spot);
+            if (Math.abs(track.delta(s, spot.s)) > 6) lat = side * (edge + offs[lastOwn]);
+            else lastOwn = k;
+          } else lastOwn = k;
+          if (k > lastOwn) lat = side * (edge + offs[lastOwn]);
+          track.pointAt(s, lat, pt);
+          const d = Math.max(0, Math.abs(lat) - edge);
+          const y = heightOf(pt.x, pt.z, s, lat);
+          const v = (r * 2 + half) * cols + k;
+          pos[v * 3] = pt.x;
+          pos[v * 3 + 1] = y;
+          pos[v * 3 + 2] = pt.z;
+          bakeAt(pt.x, pt.z, bake, v * 3);
+          const slope = k >= 2 && k <= 6 && c.height > 0.01 ? 0.9 : 0;
+          mask[v * 2] = k <= 1 ? 0 : forestOf(pt.x, pt.z, y, slope, s, lat, d);
+          // the verge and the cliff's foot are loose stone where the verge is gravel
+          mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
+        }
+        ext[half][i] = edge + offs[lastOwn];
+        if (bandStep > 1) for (let b = 1; b < bandStep && i + b < n; b++) ext[half][i + b] = ext[half][i];
+      }
+    }
+    const index = [];
+    for (let r = 0; r < rowList.length - 1; r++) {
+      for (let half = 0; half < 2; half++) {
+        for (let k = 0; k < cols - 1; k++) {
+          const a = (r * 2 + half) * cols + k;
+          const b = a + 2 * cols;
+          if (half === 0) index.push(a, b, a + 1, a + 1, b, b + 1);
+          else index.push(a, a + 1, b, a + 1, b + 1, b);
+        }
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+    geometry.setAttribute('aMask', new THREE.BufferAttribute(mask, 2));
+    geometry.setIndex(index);
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    return geometry;
+  }
+
+  // ---- the grid: heights first (the bake marches over them), then the meshes
+  const cell = CELL[tier] ?? 6;
+  const gw = Math.floor((maxX - minX) / cell) + 1;
+  const gh = Math.floor((maxZ - minZ) / cell) + 1;
+  const gHeight = new Float32Array(gw * gh);
+  const gS = new Float32Array(gw * gh).fill(-1);
+  const gLat = new Float32Array(gw * gh);
+  {
+    let hint = -1;
+    for (let j = 0; j < gh; j++) {
+      for (let i = 0; i < gw; i++) {
+        const x = minX + i * cell;
+        const z = minZ + j * cell;
+        const k = j * gw + i;
+        if (near(x, z)) {
+          track.locate(x, z, hint, spot);
+          hint = spot.index;
+          gS[k] = spot.s;
+          gLat[k] = spot.lat;
+          gHeight[k] = heightOf(x, z, spot.s, spot.lat);
+        } else gHeight[k] = land(x, z);
+      }
+    }
+  }
+  phases.grid = Math.round(performance.now() - started);
+  const inGrid = (x, z) => x >= minX && x <= minX + (gw - 1) * cell && z >= minZ && z <= minZ + (gh - 1) * cell;
+  /** The ground's height for the bake's march: the grid where there is one, the land beyond. */
+  const coarseHeight = (x, z) =>
+    inGrid(x, z) ? bilinear(gHeight, gw, gh, minX, minZ, cell, x, z) : bilinear(farHeight, farN, farN, farX0, farZ0, FAR_CELL, x, z);
+
+  // ---- the bake, on every other grid point
+  const bw = Math.ceil(gw / 2);
+  const bh = Math.ceil(gh / 2);
+  const bcell = cell * 2;
+  const bakeGrid = new Float32Array(bw * bh * 3);
+  const dirs = [lights.day, lights.night].map((d) => {
+    const h = Math.hypot(d[0], d[2]);
+    return { x: d[0] / h, z: d[2] / h, elevation: Math.atan2(d[1], h) };
+  });
+  const SKY_DIRS = 8;
+  function marchSun(x, z, h0, dir, far) {
+    let best = -1;
+    for (let t = 4; t < far; t *= 1.13) {
+      const slope = (coarseHeight(x + dir.x * t, z + dir.z * t) - h0) / t;
+      if (slope > best) best = slope;
+    }
+    // a soft edge a few degrees wide: the grid is coarse, and the sun is not a point
+    return smoothstep(-0.05, 0.05, dir.elevation - Math.atan(best));
+  }
+  function marchSky(x, z, h0) {
+    let sum = 0;
+    for (let a = 0; a < SKY_DIRS; a++) {
+      const dx = Math.cos((a / SKY_DIRS) * Math.PI * 2);
+      const dz = Math.sin((a / SKY_DIRS) * Math.PI * 2);
+      let best = 0;
+      for (let t = 3; t < 160; t *= 1.3) best = Math.max(best, (coarseHeight(x + dx * t, z + dz * t) - h0) / t);
+      sum += 1 / (1 + best * best);
+    }
+    return 1 - 0.85 * (1 - sum / SKY_DIRS);
+  }
+  for (let j = 0; j < bh; j++) {
+    for (let i = 0; i < bw; i++) {
+      const x = minX + i * bcell;
+      const z = minZ + j * bcell;
+      const h0 = coarseHeight(x, z) + 1.2;
+      const k = (j * bw + i) * 3;
+      bakeGrid[k] = marchSun(x, z, h0, dirs[0], 2600);
+      bakeGrid[k + 1] = marchSun(x, z, h0, dirs[1], 2600);
+      bakeGrid[k + 2] = marchSky(x, z, h0);
+    }
+  }
+  function bakeAt(x, z, out, o) {
+    if (!(x >= minX && z >= minZ && x <= minX + (bw - 1) * bcell && z <= minZ + (bh - 1) * bcell)) {
+      out[o] = out[o + 1] = out[o + 2] = 1;
+      return;
+    }
+    const fx = Math.min(bw - 1.001, (x - minX) / bcell);
+    const fz = Math.min(bh - 1.001, (z - minZ) / bcell);
+    const i = Math.floor(fx);
+    const j = Math.floor(fz);
+    const u = fx - i;
+    const v = fz - j;
+    for (let c = 0; c < 3; c++) {
+      const k = (j * bw + i) * 3 + c;
+      const w = bw * 3;
+      out[o + c] = (bakeGrid[k] * (1 - u) + bakeGrid[k + 3] * u) * (1 - v) + (bakeGrid[k + w] * (1 - u) + bakeGrid[k + w + 3] * u) * v;
+    }
+  }
+
+  phases.bake = Math.round(performance.now() - started);
+  const bandGeometries = buildBands();
+  phases.band = Math.round(performance.now() - started);
+
+  // ---- the grid's meshes
+  const covered = new Uint8Array(gw * gh); // 1: under the band, 2: in a portal's opening
+  for (let k = 0; k < gw * gh; k++) {
+    if (gS[k] < 0) continue;
+    const s = gS[k];
+    const lat = gLat[k];
+    const i = Math.round(wrap(s) / ds) % n;
+    const half = lat >= 0 ? 0 : 1;
+    if (cover[i] < 0 && ravine[i] < 0 && Math.abs(lat) < ext[half][i] - 0.5) covered[k] = 1;
+  }
+  for (const t of track.tunnels) {
+    for (const portal of [t.s0, t.s1]) {
+      for (let k = 0; k < gw * gh; k++) {
+        if (gS[k] < 0) continue;
+        const along = track.delta(portal, gS[k]);
+        const edge = track.edgeAt(gS[k], gLat[k] >= 0 ? 1 : -1);
+        if (Math.abs(along) < cell * 0.75 && Math.abs(gLat[k]) < edge + 6) covered[k] = 2;
+      }
+    }
+  }
+  const gridGeometries = [];
+  const CH = 48; // cells per chunk side
+  let gridTriangles = 0;
+  for (let cj = 0; cj < gh - 1; cj += CH) {
+    for (let ci = 0; ci < gw - 1; ci += CH) {
+      const w = Math.min(CH, gw - 1 - ci) + 1;
+      const h = Math.min(CH, gh - 1 - cj) + 1;
+      const pos = new Float32Array(w * h * 3);
+      const nor = new Float32Array(w * h * 3);
+      const bake = new Float32Array(w * h * 3);
+      const mask = new Float32Array(w * h * 2);
+      for (let b = 0; b < h; b++) {
+        for (let a = 0; a < w; a++) {
+          const i = ci + a;
+          const j = cj + b;
+          const k = j * gw + i;
+          const v = b * w + a;
+          const x = minX + i * cell;
+          const z = minZ + j * cell;
+          const y = gHeight[k];
+          // pulled under the band where the band lies over it
+          pos[v * 3] = x;
+          pos[v * 3 + 1] = covered[k] === 1 ? y - 0.4 : y;
+          pos[v * 3 + 2] = z;
+          const hx = (gHeight[j * gw + Math.min(gw - 1, i + 1)] - gHeight[j * gw + Math.max(0, i - 1)]) / (2 * cell);
+          const hz = (gHeight[Math.min(gh - 1, j + 1) * gw + i] - gHeight[Math.max(0, j - 1) * gw + i]) / (2 * cell);
+          const inv = 1 / Math.hypot(hx, 1, hz);
+          nor[v * 3] = -hx * inv;
+          nor[v * 3 + 1] = inv;
+          nor[v * 3 + 2] = -hz * inv;
+          bakeAt(x, z, bake, v * 3);
+          const s = gS[k] >= 0 ? gS[k] : null;
+          const d = s === null ? 1e9 : Math.max(0, Math.abs(gLat[k]) - track.edgeAt(s, gLat[k] >= 0 ? 1 : -1));
+          mask[v * 2] = forestOf(x, z, y, 1 - inv, s, gLat[k], d);
+          mask[v * 2 + 1] = smoothstep(0.6, 0.9, 1 - inv) * 0.5;
+        }
+      }
+      const index = [];
+      for (let b = 0; b < h - 1; b++) {
+        for (let a = 0; a < w - 1; a++) {
+          const k00 = (cj + b) * gw + ci + a;
+          const c00 = covered[k00];
+          const c10 = covered[k00 + 1];
+          const c01 = covered[k00 + gw];
+          const c11 = covered[k00 + gw + 1];
+          const v = b * w + a;
+          const drop = (p, q, r) => (p && q && r) || p === 2 || q === 2 || r === 2;
+          if (!drop(c00, c01, c10)) index.push(v, v + w, v + 1);
+          if (!drop(c10, c01, c11)) index.push(v + 1, v + w, v + w + 1);
+        }
+      }
+      if (!index.length) continue;
+      gridTriangles += index.length / 3;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geometry.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+      geometry.setAttribute('aMask', new THREE.BufferAttribute(mask, 2));
+      geometry.setIndex(index);
+      geometry.computeBoundingSphere();
+      gridGeometries.push(geometry);
+    }
+  }
+
+  phases.meshes = Math.round(performance.now() - started);
+  // ---- the far land
+  let farGeometry;
+  {
+    const m = farN;
+    const x0 = farX0;
+    const z0 = farZ0;
+    const heights = farHeight;
+    const pos = new Float32Array(m * m * 3);
+    const bake = new Float32Array(m * m * 3);
+    const mask = new Float32Array(m * m * 2);
+    for (let j = 0; j < m; j++) {
+      for (let i = 0; i < m; i++) {
+        const v = j * m + i;
+        const x = x0 + i * FAR_CELL;
+        const z = z0 + j * FAR_CELL;
+        // inside the grid it lies well under it, out of sight, so the two never fight
+        const under = x > minX + FAR_CELL && x < maxX - FAR_CELL && z > minZ + FAR_CELL && z < maxZ - FAR_CELL;
+        pos[v * 3] = x;
+        pos[v * 3 + 1] = under ? heights[v] - 40 : heights[v];
+        pos[v * 3 + 2] = z;
+        const h0 = heights[v] + 2;
+        bake[v * 3] = marchSun(x, z, h0, dirs[0], 4000);
+        bake[v * 3 + 1] = marchSun(x, z, h0, dirs[1], 4000);
+        bake[v * 3 + 2] = marchSky(x, z, h0);
+        const hx = (heights[j * m + Math.min(m - 1, i + 1)] - heights[j * m + Math.max(0, i - 1)]) / (2 * FAR_CELL);
+        const hz = (heights[Math.min(m - 1, j + 1) * m + i] - heights[Math.max(0, j - 1) * m + i]) / (2 * FAR_CELL);
+        mask[v * 2] = forestOf(x, z, heights[v], 1 - 1 / Math.hypot(hx, 1, hz), null, 0, 0);
+      }
+    }
+    const index = [];
+    for (let j = 0; j < m - 1; j++) {
+      for (let i = 0; i < m - 1; i++) {
+        const v = j * m + i;
+        index.push(v, v + m, v + 1, v + 1, v + m, v + m + 1);
+      }
+    }
+    farGeometry = new THREE.BufferGeometry();
+    farGeometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    farGeometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+    farGeometry.setAttribute('aMask', new THREE.BufferAttribute(mask, 2));
+    farGeometry.setIndex(index);
+    farGeometry.computeVertexNormals();
+  }
+
+  // ---- assembled
+  const group = new THREE.Group();
+  group.name = 'terrain';
+  for (const geometry of [...bandGeometries, ...gridGeometries]) {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    mesh.matrixAutoUpdate = false;
+    group.add(mesh);
+  }
+  const far = new THREE.Mesh(farGeometry, material);
+  far.receiveShadow = true;
+  far.matrixAutoUpdate = false;
+  group.add(far);
+
+  const normal = new THREE.Vector3();
+  let vertices = 0;
+  let triangles = 0;
+  group.traverse((o) => {
+    if (!o.isMesh) return;
+    vertices += o.geometry.attributes.position.count;
+    triangles += o.geometry.index.count / 3;
+  });
+
+  return {
+    group,
+    material,
+    lake: { level: lakeLevel, extent: { x0: LAKE.x - LAKE.rx * 1.1, x1: LAKE.x + LAKE.rx * 1.1, z0: LAKE.z - LAKE.rz * 1.1, z1: LAKE.z + LAKE.rz * 1.1 } },
+    heightAt,
+    heightOnTrack,
+    normalAt(x, z, out = normal) {
+      const e = 1;
+      const hx = (heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e);
+      const hz = (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e);
+      return out.set(-hx, 1, -hz).normalize();
+    },
+    forestAt(x, z) {
+      if (!near(x, z)) return forestOf(x, z, land(x, z), 0, null, 0, 0);
+      track.locate(x, z, -1, spot);
+      const side = spot.lat >= 0 ? 1 : -1;
+      const d = Math.max(0, Math.abs(spot.lat) - track.edgeAt(spot.s, side));
+      return forestOf(x, z, heightOf(x, z, spot.s, spot.lat), 0, spot.s, spot.lat, d);
+    },
+    bakeAt,
+    cliffAt: (s, side) => ({ ...cliffAt(s, side) }),
+    stats: { vertices, triangles, gridTriangles, ms: Math.round(performance.now() - started), phases },
+    dispose() {
+      group.traverse((o) => o.isMesh && o.geometry.dispose());
+    },
+  };
+}
+
+export { withBake };
