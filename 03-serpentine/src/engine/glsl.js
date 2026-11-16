@@ -122,24 +122,48 @@ vec3 srgbToLinear(vec3 c) {
 `;
 
 /**
- * The tone curve: scene light (any brightness) to display light (0..1), per
- * channel, so that very bright colours wash toward white as on film.
- * `curve` is (toe, shoulder, contrast):
- *   toe       x^2 / (x + toe) pulls the darkest values toward black and leaves
- *             everything well above "toe" alone
- *   contrast  a power around middle grey (0.18 stays where it is)
- *   shoulder  x / (1 + x^s)^(1/s) approaches 1 without ever clipping; s = 1 is
- *             the gentlest roll-off, larger s holds brightness longer and then
- *             bends harder
+ * The numbers of the tone curve (see GLSL_TONE). `gain` is what makes 0.18 come out as 0.18 at contrast 1; it
+ * follows from the other two and has to be worked out again if they change (tools/frametest.cjs checks it).
+ */
+export const TONE = { gain: 1.1053101, toe: 0.012, shoulder: 1.6, inset: 0.04 };
+
+/**
+ * The tone curve: scene light (any brightness, already multiplied by the exposure) to display light (0..1).
+ *
+ * One channel, x >= 0:
+ *   toe       x' = (g x)^2 / (g x + toe)      pulls what is far below `toe` toward black, leaves the rest alone
+ *   contrast  x'' = 0.18 (x' / 0.18)^k        a power about middle grey (k is Look.contrast; 1 changes nothing)
+ *   shoulder  y = x'' / (1 + x''^s)^(1/s)     approaches 1 and never reaches it: no brightness clips
+ * With contrast 1, y(0.18) = 0.18, y(1) = 0.677 and y(16) = 0.994.
+ *
+ * Applied to red, green and blue on their own, a curve like this bends colours as they get bright: the largest
+ * channel stops growing first, so a red lamp turns orange, then yellow. Applied to brightness alone, colours
+ * never wash out and a lamp is a flat red disc. So, as AgX does it: before the curve the colour is pulled a
+ * little toward its own grey (`inset`), which lifts the small channels of a pure colour together, and after it
+ * the same amount is taken out again. In the straight part of the curve the two cancel exactly; in the shoulder
+ * they cannot, and what is left is a colour that keeps its hue and goes to white as it burns out. Greys are
+ * not touched by either step.
  */
 export const GLSL_TONE = /* glsl */ `
-vec3 toneCurve(vec3 x, vec3 curve) {
-  x = max(x, 0.0);
-  x = x * x / (x + curve.x + 1.0e-6);
-  x = 0.18 * pow(x / 0.18, vec3(curve.z));
-  return x / pow(1.0 + pow(x, vec3(curve.y)), vec3(1.0 / curve.y));
+vec3 toneCurve(vec3 c, float contrast) {
+  c = max(c, 0.0);
+  c = mix(c, vec3((c.r + c.g + c.b) / 3.0), ${TONE.inset});
+  vec3 x = c * ${TONE.gain};
+  x = x * x / (x + ${TONE.toe});
+  x = 0.18 * pow(x / 0.18, vec3(contrast));
+  x = x / pow(1.0 + pow(x, vec3(${TONE.shoulder.toFixed(4)})), vec3(${(1 / TONE.shoulder).toFixed(6)}));
+  float grey = (x.r + x.g + x.b) / 3.0;
+  return clamp(grey + (x - grey) / ${(1 - TONE.inset).toFixed(4)}, 0.0, 1.0);
 }
 `;
+
+/** JS twin of toneCurve() for one grey value (the documented response; also used to pick display greys). */
+export function toneResponse(x, contrast = 1) {
+  const gx = Math.max(0, x) * TONE.gain;
+  const toed = (gx * gx) / (gx + TONE.toe);
+  const k = 0.18 * Math.pow(toed / 0.18, contrast);
+  return k / Math.pow(1 + Math.pow(k, TONE.shoulder), 1 / TONE.shoulder);
+}
 
 /**
  * How colours are stored in the off-screen targets.
@@ -186,6 +210,44 @@ vec4 fromTarget(vec4 e) { return e; }
 #endif
 `;
 
+/**
+ * How to read a reflection probe (ReflectionProbe.js) in any material: paste this chunk and call
+ *
+ *     vec3 light = probeSample(uProbe, directionInWorldSpace, roughness);
+ *
+ * The convention, exactly:
+ *  - The probe is a cube map drawn by this renderer, so it is in OpenGL's own cube orientation and is looked up
+ *    with the plain world-space direction from the probe's centre toward what is seen. No component is flipped.
+ *    (three.js negates x for cube maps that were loaded from pictures; for a cube render target it does not,
+ *    and neither must you.)
+ *  - Roughness picks a mip level. The mips are plain 2x2 averages, so level n is the surroundings blurred over
+ *    about 2^n texels of level 0, and a GGX highlight of roughness r is about 2.6 r^2 radians across:
+ *        level = log2(1.65 * r^2 * size)        clamped to 0 .. log2(size)
+ *    where `size` is the cube's edge in texels. Roughness 0 is the sharp picture.
+ *  - What comes back is linear light in scene units, as everything that is drawn. The material must carry the
+ *    defines of targetDefines(caps), or the 8-bit fallback's encoding is not undone.
+ *
+ * Needs nothing else from this file; the names do not collide with three.js's.
+ */
+export const GLSL_PROBE = /* glsl */ `
+float probeLevel(float roughness, float size) {
+  return clamp(log2(max(1.65 * roughness * roughness * size, 1.0)), 0.0, log2(size));
+}
+vec3 probeSample(samplerCube probe, vec3 direction, float roughness) {
+  vec3 e = textureLod(probe, direction, probeLevel(roughness, float(textureSize(probe, 0).x))).rgb;
+#ifdef LDR_TARGETS
+  e = min(e * e, 0.984);
+  e = e / (1.0 - e);
+#endif
+  return e;
+}
+`;
+
+/** JS twin of probeLevel(): the mip level a roughness reads, for a cube of `size` texels. */
+export function probeLevel(roughness, size) {
+  return Math.min(Math.log2(size), Math.max(0, Math.log2(Math.max(1.65 * roughness * roughness * size, 1))));
+}
+
 export const GLSL_COMMON = `${GLSL_HASH}${GLSL_NOISE}${GLSL_COLOR}${GLSL_TONE}${GLSL_TARGET}`;
 
 /** The define a shader of ours needs so that GLSL_TARGET picks the right half. */
@@ -199,6 +261,9 @@ export function encodeForTarget(value, ldr) {
 }
 
 let ldrInstalled = false;
+
+/** Whether installLdrEncoding() has run: everything drawn from now on is in the 8-bit encoding. */
+export const ldrEncodingInstalled = () => ldrInstalled;
 
 /**
  * Makes every material of three.js write the 8-bit encoding (see GLSL_TARGET).

@@ -24,6 +24,7 @@ import { createWorld } from '../assets/world/index.js';
 import { TIME_NAMES } from '../assets/world/lighting.js';
 import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
+import { ReflectionProbe } from '../engine/ReflectionProbe.js';
 import { TIERS, probeCaps } from '../engine/caps.js';
 import { damp, lerp } from '../engine/math.js';
 import { createRng } from '../engine/rng.js';
@@ -55,6 +56,12 @@ import { ChaseRig, PlaceholderDriver, PlaceholderInput, PlaceholderVehicle, crea
  * @property {number} exposure eased in the fixed step
  * @property {object|null} probe the car's reflection probe (none yet)
  */
+
+/** How much of the car's bounding box, from the ground up, is left out of the motion blur's sharp box (m). */
+const SHARP_LIFT = 0.1;
+
+const probeAt = new THREE.Vector3();
+const probeHidden = [];
 
 export class Game {
   /**
@@ -89,8 +96,11 @@ export class Game {
     this.setup(params.mode);
 
     engine.onResize(() => this.layout());
-    // pictures that only lived on the GPU (the environment map) are drawn again
-    engine.onContextRestored(() => this.world.restore());
+    // pictures that only lived on the GPU (the environment map, the reflection probes) are drawn again
+    engine.onContextRestored(() => {
+      this.world.restore();
+      for (const racer of this.racers) if (racer.probe) racer.probe.reset();
+    });
 
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
@@ -113,10 +123,11 @@ export class Game {
    * @param {'solo'|'split'} mode
    */
   setup(mode) {
-    const { world, track, params } = this;
+    const { world, track, params, engine } = this;
     for (const racer of this.racers) {
       world.scene.remove(racer.car.object);
       racer.car.dispose();
+      if (racer.probe) racer.probe.dispose();
     }
     this.mode = mode;
     const split = mode === 'split';
@@ -142,7 +153,16 @@ export class Game {
         driver,
         controls: { steer: 0, throttle: 0, brake: 0, handbrake: false, analog: false },
         prevWheels: vehicle.wheels.map(() => ({ steer: 0, travel: 0 })),
-        sharp: { matrix: new THREE.Matrix4(), prevMatrix: new THREE.Matrix4(), center: car.box.center, half: car.box.half },
+        // (ENGINE lane) The blur's box is the car without its lowest 10 cm: the road it stands on must not count
+        // as part of it, and the tyres' contact patches do move with the road.
+        sharp: {
+          matrix: new THREE.Matrix4(),
+          prevMatrix: new THREE.Matrix4(),
+          center: car.box.center.clone().setY(car.box.center.y + SHARP_LIFT / 2),
+          half: car.box.half.clone().setY(car.box.half.y - SHARP_LIFT / 2),
+        },
+        // (ENGINE lane) what the car's paint mirrors: a cube picture of its surroundings, a face or two a frame
+        probe: params.probe ? new ReflectionProbe(engine.renderer, TIERS[this.tier].probeSize) : null,
       };
     });
     const sharp = this.racers.map((racer) => racer.sharp);
@@ -154,9 +174,9 @@ export class Game {
       hud: null,
       rect: { x: 0, y: 0, w: 1, h: 1 },
       zone: { left: 0, top: 0, width: 1, height: 1 },
-      frame: { exposure: 1, look: world.time.look, motionBlur: VIEW.motionBlur, cut: true, sharp },
+      frame: { exposure: 1, look: world.time.look, motionBlur: VIEW.motionBlur, cut: true, sharp, probe: racer.probe?.texture },
       exposure: this._exposureFor(racer.vehicle),
-      probe: null,
+      probe: racer.probe,
     }));
     this.layout();
     for (const view of this.views) view.rig.snap(view.racer.vehicle);
@@ -184,7 +204,6 @@ export class Game {
       view.camera.updateProjectionMatrix();
       view.rig.setAspect(w / h);
     });
-    this.pipeline.scale = engine.renderScale;
   }
 
   /**
@@ -254,7 +273,7 @@ export class Game {
       // automatic lamps: what the time of day asks for under the open sky, dipped beam in a tunnel
       const lamps = LAMPS[vehicle.sky < 0.5 ? 'low' : time.carLights];
       car.setLights({ ...lamps, high: this.highBeam && lamps.low ? 1 : 0, brake: vehicle.brake > 0.02 ? 1 : 0 });
-      car.setReflections({ cube: null, sky: vehicle.sky });
+      car.setReflections({ cube: racer.probe ? racer.probe.texture : null, sky: vehicle.sky });
 
       car.object.updateMatrixWorld();
       sharp.prevMatrix.copy(sharp.matrix);
@@ -272,8 +291,18 @@ export class Game {
 
   /** Draw every view into its rectangle. */
   draw() {
+    const { probeFaces, probeEvery } = TIERS[this.tier];
     for (const view of this.views) {
-      this.world.prepareView(view.camera, view.racer.car.object.position);
+      const car = view.racer.car;
+      this.world.prepareView(view.camera, car.object.position);
+      // (ENGINE lane) the car's probe, from the middle of the car, without the car itself; after prepareView, so
+      // that the shadows it shows are this view's
+      if (view.probe && this.engine.frame % probeEvery === 0) {
+        probeAt.copy(car.box.center).applyMatrix4(car.object.matrixWorld);
+        probeHidden.length = 0;
+        probeHidden.push(car.object, ...this.world.probeHidden);
+        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces);
+      }
       this.pipeline.render(this.world.scene, view.camera, view.rect, view.frame);
       view.rig.cut = false;
     }
@@ -295,6 +324,7 @@ export class Game {
       pixelRatio: engine.pixelRatio,
       renderScale: engine.renderScale,
       qualityStep: engine.qualityStep,
+      pipeline: this.pipeline.stats(),
       tier: this.tier,
       hdr: this.caps.hdr,
       gpu: this.caps.gpu,

@@ -11,8 +11,13 @@
 //  - the head lamps are spot lights with a picture of the beam in front of
 //    them (SpotLight.map): the cut-off of a low beam is in that picture, and
 //    main beam is the same picture tilted up and turned up.
+//
+// The paint and the glass carry a clear coat that mirrors the car's reflection
+// probe (addCoat below): it is there so that the probe can be judged, and it
+// shows how any material reads one (GLSL_PROBE in engine/glsl.js).
 
 import * as THREE from 'three';
+import { GLSL_PROBE, targetDefines } from '../../engine/glsl.js';
 import { DIMS, LAMPS, STATIONS, WHEELS } from './spec.js';
 
 /**
@@ -90,6 +95,34 @@ function createBeamTexture() {
 }
 
 /**
+ * A clear coat over a built-in material: a perfectly smooth layer that mirrors the reflection probe, as much as
+ * a varnish does (4 % seen square on, everything at a glancing angle) and takes that much away from what lies under it.
+ * @param {THREE.MeshStandardMaterial} material
+ * @param {{ uProbe: { value: THREE.CubeTexture|null }, uCoat: { value: number } }} coat shared by every coated material of a car
+ * @param {import('../../engine/caps.js').Caps} [caps]
+ */
+function addCoat(material, coat, caps) {
+  if (caps) Object.assign(material.defines, targetDefines(caps));
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, coat);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nuniform samplerCube uProbe;\nuniform float uCoat;\n${GLSL_PROBE}`)
+      .replace(
+        '#include <opaque_fragment>',
+        /* glsl */ `
+        if (uCoat > 0.0) {
+          vec3 coatView = normalize(vViewPosition);
+          float coatFresnel = 0.04 + 0.96 * pow(1.0 - clamp(dot(normal, coatView), 0.0, 1.0), 5.0);
+          // the probe is looked up with a world-space direction
+          vec3 coatDir = inverseTransformDirection(reflect(-coatView, normal), viewMatrix);
+          outgoingLight = mix(outgoingLight, probeSample(uProbe, coatDir, 0.0), coatFresnel * uCoat);
+        }
+        #include <opaque_fragment>`,
+      );
+  };
+}
+
+/**
  * @param {object} [options]
  * @param {string} [options.paint] one of `paints`
  * @param {string} [options.plate] what the number plate says, default 'AI LAB03' (the placeholder has no plate)
@@ -97,7 +130,7 @@ function createBeamTexture() {
  * @param {import('../../engine/caps.js').Caps} [options.caps]
  * @returns {CarModel}
  */
-export function createCar({ paint = 'silver' } = {}) {
+export function createCar({ paint = 'silver', caps } = {}) {
   const object = new THREE.Group();
   const disposables = [];
   const keep = (thing) => {
@@ -116,6 +149,9 @@ export function createCar({ paint = 'silver' } = {}) {
   const paintMaterial = keep(new THREE.MeshStandardMaterial(PAINTS[paint] || PAINTS.silver));
   const glassMaterial = keep(new THREE.MeshStandardMaterial({ color: 0x06080a, metalness: 0, roughness: 0.06 }));
   const darkMaterial = keep(new THREE.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.8 }));
+  const coat = { uProbe: { value: null }, uCoat: { value: 0 } };
+  addCoat(paintMaterial, coat, caps);
+  addCoat(glassMaterial, coat, caps);
   const beltline = 0.93;
   const middle = (STATIONS.nose + STATIONS.tail) / 2;
   addMesh(object, keep(new THREE.BoxGeometry(DIMS.width, beltline - 0.24, DIMS.length)), paintMaterial, 0, (beltline + 0.24) / 2, middle);
@@ -223,11 +259,12 @@ export function createCar({ paint = 'silver' } = {}) {
     },
 
     setReflections({ cube, sky }) {
-      for (const material of [paintMaterial, glassMaterial, rimMaterial]) {
-        material.envMap = cube;
-        // with no probe of its own the car mirrors the open sky: fade that where there is none overhead
-        material.envMapIntensity = cube ? 1 : 0.1 + 0.9 * sky;
-      }
+      coat.uProbe.value = cube;
+      coat.uCoat.value = cube ? 1 : 0;
+      // What lies under the coat mirrors the scene's sky map, blurred by its roughness: fade that where there is
+      // no sky overhead. The glass is all coat, so with a probe it needs nothing else.
+      paintMaterial.envMapIntensity = rimMaterial.envMapIntensity = 0.1 + 0.9 * sky;
+      glassMaterial.envMapIntensity = cube ? 0 : 0.1 + 0.9 * sky;
     },
 
     dispose() {
