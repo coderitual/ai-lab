@@ -136,10 +136,18 @@ export const SIM = {
  * What each quality tier costs. `counts` are read by the assets.
  * Scales are relative to the scene target (which is the canvas times the
  * adaptive render scale).
+ *
+ * `pixelRatio` caps the canvas's device pixels per CSS pixel and `maxPixels`
+ * its device pixels in all (Engine.js lowers the ratio to fit). The budgets
+ * leave phones alone (430 x 932 at ratio 2 is 1.6 million) and a 2560 x 1440
+ * desktop window at ratio 1 (3.7 million); they are there for tablets and
+ * high-density desktop screens, where the ratio cap alone would allocate
+ * half a gigabyte or more of multisampled half-float targets.
  */
 export const TIERS = {
   low: {
     pixelRatio: 1.5,
+    maxPixels: 1.2e6,
     msaa: 0,
     mirrorMsaa: 0,
     farScale: 0.4,
@@ -155,6 +163,7 @@ export const TIERS = {
   },
   medium: {
     pixelRatio: 2,
+    maxPixels: 2.2e6,
     msaa: 4,
     mirrorMsaa: 4,
     farScale: 0.5,
@@ -170,6 +179,7 @@ export const TIERS = {
   },
   high: {
     pixelRatio: 2,
+    maxPixels: 4e6,
     msaa: 4,
     mirrorMsaa: 4,
     farScale: 0.5,

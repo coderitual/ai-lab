@@ -27,7 +27,8 @@ built:
 (`proxyShapes`).*
 
 The film's glow is not a rim light. Thin parts of the bird (tail, wing tips,
-the taper of the bow) are bright cream, slightly thicker parts amber, and the
+the taper of the bow) are bright cream, slightly thicker parts a dimmer
+cream that the print curve turns pale olive rather than amber, and the
 thick middle gets no sun at all. That is absorption along the light's path,
 so that is what is computed:
 
@@ -41,13 +42,20 @@ so that is what is computed:
   and ray against cylinder have closed forms, and so does a density that
   fades linearly behind a plane.
 - The light that arrives is `exp(-absorb * depth)` per channel, with blue
-  absorbed 2.3 times and green 1.45 times as fast as red: a little depth
-  gives cream, more gives amber, more gives nothing.
+  absorbed 1.4 times and green 1.12 times as fast as red (`swanAbsorb`): a
+  little depth gives cream, more gives a dimmer, slightly warmer cream, more
+  gives nothing. (Read back through the film's curves, its edge from cream to
+  teal is neutral dimming, not amber, so the factors are small.)
 - A surface facing away from the sun shows a share of that light (0.32 on the
-  body, 0.08 on the close-feathered neck and head); a surface facing the sun
-  shows the larger of that and plain wrapped sunlight.
+  body); a surface facing the sun
+  shows the larger of that and plain wrapped sunlight. On the neck and head
+  the share is 0.16 (`swanNeckThrough`: close, dense feathering) and a small
+  floor of the sun's own colour, 0.0065 of it (`swanNeckAround`), is kept
+  under the transmitted light: the film's neck is dim neutral olive inside,
+  and depth-based transmission alone cannot reach its thick lower part.
 - Everything else is the sky: a blue fill, strongest on surfaces tilted up,
-  weak on vertical ones and near the water, a third as strong on the neck.
+  weak on vertical ones and near the water, a tenth as strong on the neck and
+  head (`swanNeckSky`: the film's neck is olive inside, not teal).
   The print curve turns it teal.
 
 Because it is one sum over shapes that move with the pose (the neck's
@@ -124,7 +132,9 @@ That one construction gives everything the film's reflection does: sharp, the
 right height, fraying at its lower edge, breaking into horizontal slivers and
 closed loops under the reflected head. Nothing is blurred or stretched on
 purpose. The surroundings are looked up the same way, further along the ray,
-in a defocused mirror picture of the far layer, and the swan is laid over
+in a defocused mirror picture of the far layer (blurred by at least
+`LOOK.mirrorSoftness` of the full bokeh, since ripples too fine to draw spread
+a reflection from that far away), and the swan is laid over
 them by its alpha.
 
 ![](images/buffer-mirror.jpg)
@@ -201,7 +211,7 @@ nearest the water in view, fading toward the edge of its square and toward
 its range, so the hand-over to the next copy is never seen. The sheet drifts
 as one. A speck is lit by the sun or it is almost nothing: none in the
 wood's shadow (`sunReach`), few in the swan's. It is a point on the surface:
-it rides the ripples, is never smaller than about 1.3 pixels, has no mirror
+it rides the ripples, is never smaller than about 1.5 pixels, has no mirror
 image, and the swan hides it. A fifth are flat and show as short level
 dashes; a few are golden leaves.
 

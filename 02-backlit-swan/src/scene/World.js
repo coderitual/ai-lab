@@ -75,14 +75,17 @@ export class World {
 
     const caps = probeCaps(renderer, { ldr: params.ldr });
     this.tier = params.quality || caps.tier;
-    const quality = TIERS[this.tier];
-    engine.setMaxPixelRatio(quality.pixelRatio);
+    // ?msaa= overrides the tier's multisampling, to compare its cost on the device in hand
+    const quality = params.msaa === null ? TIERS[this.tier] : { ...TIERS[this.tier], msaa: params.msaa, mirrorMsaa: params.msaa };
+    engine.setMaxPixelRatio(quality.pixelRatio, quality.maxPixels);
     if (params.timeScale !== null) SIM.timeScale = params.timeScale;
 
     /** Seconds of slowed-down time (what the swan and the water live in). */
     this.time = 0;
     /** Seconds of real time (camera moves, film grain). */
     this.realTime = 0;
+    /** The WebGL error code left by building everything and drawing the first frame (0: none). Set by main.js. */
+    this.startError = 0;
 
     this.scene = new THREE.Scene();
     this.farScene = new THREE.Scene();

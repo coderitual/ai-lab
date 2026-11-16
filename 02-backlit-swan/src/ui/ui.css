@@ -45,7 +45,8 @@
   color: var(--ink);
   font: inherit;
   cursor: pointer;
-  touch-action: manipulation;
+  /* not `manipulation`, which still lets two fingers on a button zoom the page; the page never scrolls, so nothing is lost */
+  touch-action: none;
   -webkit-tap-highlight-color: transparent;
   transition:
     background 0.2s ease,
@@ -188,6 +189,14 @@
   user-select: none;
 }
 
+/* The sheet scrolls up and down and its sliders slide; a pinch on it must not
+   zoom the page (the canvas would not give a pinch back: it moves the camera). */
+.ui-panel,
+.ui-panel *,
+.ui .ui-panel button {
+  touch-action: pan-y;
+}
+
 .ui-panel[hidden] {
   display: none;
 }
@@ -316,6 +325,12 @@
   color: var(--dim);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
+}
+
+.ui-info {
+  margin: 10px 0 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .ui-keys {

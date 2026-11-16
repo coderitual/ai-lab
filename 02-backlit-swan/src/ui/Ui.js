@@ -54,7 +54,7 @@ const SLIDERS = [
  *   `enabled: false` (?ui=0): no controls. `instant`: the veil goes at once
  *   instead of fading (used when frames are stepped by hand, so that a
  *   screenshot taken right after never catches it half gone).
- * @returns {{ ready: () => void, fail: (message: string) => void, update: (dt: number, time: number) => void, dispose: () => void }}
+ * @returns {{ ready: () => void, fail: (message: string, detail?: string, onTap?: (() => void)|null) => void, update: (dt: number, time: number) => void, dispose: () => void }}
  */
 export function createUi(ctx, { world = null, enabled = true, instant = false } = {}) {
   const veil = document.getElementById('loading');
@@ -63,6 +63,7 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
   let hintTimer = 0;
   let hintGone = false;
   let panelOpen = false;
+  let failed = false;
   let refresh = () => {};
 
   if (ctx && world && enabled) {
@@ -191,6 +192,9 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
     const stat = el('span', 'ui-stat', '');
     foot.append(stat);
     panel.append(foot);
+    // Which paths this device took: on a phone there is nowhere else to read them.
+    const info = el('p', 'ui-stat ui-info', '');
+    panel.append(info);
 
     if (!coarse) {
       const keys = el('p', 'ui-keys', KEYS.map(([k, what]) => `<kbd>${k}</kbd> ${what}`).join(' &nbsp; '));
@@ -253,9 +257,29 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
           sinceStat = 0;
           const fps = engine.frameMs ? Math.round(1000 / engine.frameMs) : 0;
           stat.textContent = `${world.tier} · ${Math.round(engine.targetWidth)}×${Math.round(engine.targetHeight)} · ${fps} fps`;
+          const { caps } = ctx;
+          const samples = world.post.sceneTarget.samples;
+          info.textContent = [
+            caps.gpu || 'GPU not named',
+            caps.hdr ? 'half-float' : '8-bit',
+            samples > 0 ? `${samples}× multisampled` : caps.hdr && !caps.msaaHdr ? 'multisampling refused' : 'not multisampled',
+            `ripples ${world.ripple.precision}`,
+            `pixel ratio ${Math.round(engine.pixelRatio * 100) / 100}`,
+            `render scale ${engine.renderScale}`,
+            world.startError ? `WebGL error 0x${world.startError.toString(16)} at start` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ');
         }
       }
     };
+    // iOS Safari zooms the whole page when two fingers spread on anything that
+    // does not forbid it (it ignores user-scalable=no), and with the canvas
+    // taking every pinch for the camera there would be no easy way back.
+    // gesturestart is Safari's own event; other browsers obey touch-action (ui.css).
+    const noZoom = (e) => e.preventDefault();
+    document.addEventListener('gesturestart', noZoom, { passive: false });
+    offs.push(() => document.removeEventListener('gesturestart', noZoom));
     document.body.append(root);
   }
 
@@ -263,17 +287,34 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
     /** The first frame is on the screen. */
     ready() {
       if (root) root.classList.add('ready');
-      if (!veil) return;
+      // a failure reported while the first frame was drawn stays on the page
+      if (!veil || failed) return;
       if (instant || !enabled) {
         veil.remove();
         return;
       }
       veil.classList.add('done');
-      veil.addEventListener('transitionend', () => veil.remove(), { once: true });
+      veil.addEventListener('transitionend', () => !failed && veil.remove(), { once: true });
     },
-    /** The scene could not start: say why, in place of the loading mark. */
-    fail(message) {
-      if (veil) veil.textContent = message;
+    /**
+     * Something is wrong: say what over the picture, where the loading mark
+     * was (it is put back if it has already gone, and stays).
+     * @param {string} message
+     * @param {string} [detail] small print, such as a graphics driver's own words
+     * @param {(() => void)|null} [onTap] makes the whole notice a button
+     */
+    fail(message, detail = '', onTap = null) {
+      failed = true;
+      if (!veil) return;
+      veil.classList.remove('done');
+      veil.textContent = message;
+      if (detail) {
+        const small = document.createElement('small');
+        small.textContent = detail;
+        veil.append(small);
+      }
+      if (onTap) veil.addEventListener('click', onTap, { once: true });
+      if (!veil.isConnected) document.body.append(veil);
     },
     update(dt) {
       if (root && root._tick) root._tick(dt);

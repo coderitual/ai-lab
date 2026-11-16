@@ -71,8 +71,10 @@ of 20 keys naming shapes.
 - **Called** (a touch on the water): it swims there at up to 0.5 m/s, turning
   faster than usual, stops with its bill over the place, and reaches.
 - A request made while it is busy waits; only the latest is kept.
-- What it does to the water: a dent under the breast and a smaller one off
-  the stern every 4.5 cm travelled; a dent where the bill enters and leaves;
+- What it does to the water: a small dent at the breast every 4.5 cm
+  travelled (strength 0.0005 plus 0.004 times the speed in m/s; the churned
+  water behind the tail comes from `assets/pond/surface.js`, from the body's
+  movement alone); a dent where the bill enters and leaves;
   small ones every 0.11 s while the bill is under; a slow breath of a ripple
   under the body every 1.4 s.
 
@@ -117,7 +119,7 @@ move the camera, `+` and `-` closer and further, `T` slow motion, `M` sound,
 | Sun | 14 degrees east of north, 32 degrees up; linear colour 4.2, 4.0, 3.6 |
 | Sky fill | 0.1, 0.2, 0.33 |
 | The wood's shadow | begins 1.6 m from the pond's centre toward the sun, soft over 0.9 m, wandering by 0.5 m |
-| Aperture | 0.3 of a blur disc of 3.4 % of the picture height |
+| Aperture | 0.08 of a blur disc of 3.4 % of the picture height; the mirrored far layer is blurred by at least `mirrorSoftness` 0.3 of it |
 | Glow | strength 0.22, no threshold |
 | Tone | exposure 1, toe 0.008, shoulder 3 |
 | Print | 1 (the measured curve, `printCurve` in `engine/PostChain.js`) |
@@ -126,6 +128,11 @@ move the camera, `+` and `-` closer and further, `T` slow motion, `M` sound,
 The look panel's sliders write `sunAzimuth` (-60 to 90), `sunElevation` (16
 to 62), `aperture` (0 to 1), `bloomStrength` (0 to 0.6), `exposure` (0.4 to
 2.2) and `print` (0 to 1); Reset puts back the values above.
+Under the sliders: the views, the quality chips, Reset, one line of small
+print (tier, size of the scene target, frames a second) and a second naming
+the paths this device took (GPU string, half-float or 8-bit, multisampling,
+ripple precision, pixel ratio, render scale, and any WebGL error from
+start). On a screen with a mouse it also lists the keys.
 
 ## Quality tiers (`TIERS` in `scene/config.js`)
 
@@ -134,18 +141,20 @@ Chosen by a probe of the device (`engine/caps.js`) or by `?q=`.
 | | low | medium | high |
 | --- | --- | --- | --- |
 | pixel ratio cap | 1.5 | 2 | 2 |
+| canvas pixel budget (the ratio is lowered to fit; a forced `?dpr=` is exempt) | 1.2 million | 2.2 million | 4 million |
 | multisampling | none | 4x | 4x |
 | far layer, far mirror, swan mirror (share of the picture's size) | 0.4, 0.25, 0.5 | 0.5, 0.3, 0.75 | 0.5, 0.4, 1 |
 | bloom levels | 5 | 6 | 7 |
 | ripple texture | 256² | 384² | 512² |
 | water detail | 0 | 1 | 2 |
 | specks | 7000 | 13000 | 16000 |
-| leaves, trunks | 3200, 80 | 6000, 140 | 9000, 220 |
+| leaves, trunks | 4800, 80 | 9000, 140 | 13500, 220 |
 | drops in the air at once | 192 | 384 | 768 |
 | swan detail | 0 | 1 | 2 |
 
 If frames run long for a while the off-screen targets shrink in steps (1,
-0.85, 0.72, 0.6, 0.5) and grow back when there is room; see
+0.85, 0.72, 0.6, 0.5) and grow back when there is room (a browser-held rate such
+as 30 fps in Low Power Mode is recognised and not chased); see
 [engine.md](engine.md).
 
 ## Sound (`audio/Ambience.js`)
@@ -160,6 +169,10 @@ burst when the bill enters or leaves the water.
 - While loading: "Loading…".
 - If WebGL 2 cannot start: "This device could not start WebGL 2. Try a recent
   version of Safari or Chrome."
+- If a shader does not compile: "This device’s graphics driver refused a part
+  of the picture." with the driver's own log in small print.
+- If the WebGL context is lost and not restored within 3 s (page visible):
+  "The picture was lost. Tap to load it again." A tap reloads the page.
 - Hint under the title until the picture is first touched, or for 14 s: "Drag
   to look round · pinch to come closer · touch the water" (with a mouse:
   "scroll" and "click").

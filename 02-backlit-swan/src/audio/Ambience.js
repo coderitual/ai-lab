@@ -118,6 +118,32 @@ export function createAmbience(ctx) {
     src.onended = () => g.disconnect();
   }
 
+  /**
+   * Have the context running exactly when there is something to hear and
+   * the page is showing. Anything but 'running' is resumed, not only
+   * 'suspended': Safari has a third state, 'interrupted' (a call, Siri, the
+   * lock screen, another app), which nothing but resume() ends. A resume the
+   * browser refuses (iOS may want a touch first) is tried again on the next
+   * press, below.
+   */
+  function wake() {
+    if (!audio || audio.state === 'closed') return;
+    let settle = null;
+    if (enabled && !document.hidden) {
+      if (audio.state !== 'running') settle = audio.resume();
+    } else if (document.hidden && audio.state === 'running') {
+      // (switched off with the page showing, it is suspended after its fade-out: setEnabled)
+      settle = audio.suspend();
+    }
+    if (settle && settle.catch) settle.catch(() => {});
+  }
+  // a hidden page should be silent at once, and not go on computing noise
+  document.addEventListener('visibilitychange', wake);
+  offs.push(() => document.removeEventListener('visibilitychange', wake));
+  // (capture: the controls stop their presses from reaching anything behind them)
+  window.addEventListener('pointerdown', wake, { capture: true, passive: true });
+  offs.push(() => window.removeEventListener('pointerdown', wake, { capture: true }));
+
   offs.push(ctx.events.on('drop', (e) => plink(e.size)));
   offs.push(ctx.events.on('billEnter', () => bloop(0.5)));
   offs.push(ctx.events.on('billExit', () => bloop(0.3)));
@@ -131,7 +157,7 @@ export function createAmbience(ctx) {
       if (on && !audio && !build()) return;
       enabled = !!on && !!audio;
       if (!audio) return;
-      if (enabled && audio.state === 'suspended') audio.resume();
+      wake();
       const now = audio.currentTime;
       master.gain.cancelScheduledValues(now);
       master.gain.setTargetAtTime(enabled ? 0.55 : 0, now, enabled ? 0.6 : 0.12);

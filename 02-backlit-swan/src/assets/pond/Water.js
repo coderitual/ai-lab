@@ -305,7 +305,8 @@ void main() {
   col += min(glint, vec3(uGlint.w)) * (sun * open);
 
   // fade out over the last two metres before the shore, where the bank takes over
-  float alpha = smoothstep(0.0, -2.0, shoreDistance(xz));
+  // (a falling ramp is written as one minus a rising one: smoothstep with its edges the wrong way round is undefined in GLSL ES)
+  float alpha = 1.0 - smoothstep(-2.0, 0.0, shoreDistance(xz));
   outColor = toTarget(vec4(col, alpha));
 }
 `;

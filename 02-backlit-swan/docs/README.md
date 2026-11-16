@@ -43,10 +43,11 @@ All in [`images/`](images/), all made by `tools/screenshots.cjs`.
 | ![](images/desktop.jpg) On a desktop, with the look panel open | ![](images/close.jpg) Close: the fringe of down along the neck, light through the tail |
 | ![](images/phone.jpg) On a phone held upright | ![](images/phone-side.jpg) On a phone held sideways |
 | ![](images/reach.jpg) The reach, bill in the water | ![](images/water.jpg) The spray landing: glints only where the water is disturbed |
-| ![](images/above.jpg) From above, drops landing under the bill | ![](images/meadow.jpg) Toward the meadow and the fence |
+| ![](images/above.jpg) From above, as the swan comes up from the dunk | ![](images/meadow.jpg) Toward the meadow and the fence |
 | ![](images/sunny-side.jpg) From the sunny side, where the film never went | ![](images/no-print.jpg) A frame before the print curve |
 | ![](images/transmission.jpg) The sun alone: light that has crossed the bird | ![](images/sky-only.jpg) Without transmission: the sky and the rim |
 | ![](images/buffer-far.jpg) The far layer: drawn small, defocused as one | ![](images/buffer-mirror.jpg) The mirror picture of the swan |
+| ![](images/buffer-ripple.jpg) The ripple field, a moment after four drops have landed round the swan | |
 
 ![](images/film.jpg)
 The film: drips, the shake, the turn, the dunk, up again, the reach.

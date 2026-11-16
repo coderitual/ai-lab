@@ -63,7 +63,8 @@ const state = (page) =>
       el: w.rig.el,
       dist: w.rig.dist,
       mode: w.director.mode,
-      gl: w.engine.renderer.getContext().getError(),
+      // main.js reads (and so clears) the error flag once after the first frame: count what it found
+      gl: w.engine.renderer.getContext().getError() || w.startError,
       timeScale: w.time,
     };
   });
@@ -354,6 +355,36 @@ const GROUPS = {
       check(s.gl === 0 && problems.length === 0, `${name}: no errors along the way`, problems.slice(0, 3).join(' | '));
       await context.close();
     }
+  },
+
+  /** Two fingers as the very first gesture, while someone else has the camera: the film's operator, then a move to a view. */
+  async pinch(browser) {
+    const { page, context, problems } = await open(browser, 'manual&q=low&ui=0', { size: PHONE, mobile: true, dpr: 2 });
+    const cdp = await context.newCDPSession(page);
+    const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+    const cx = PHONE.width / 2;
+    const cy = PHONE.height * 0.45;
+    const spread = async () => {
+      await touch('touchStart', [[cx - 40, cy], [cx + 40, cy]]);
+      for (let i = 1; i <= 6; i++) await touch('touchMove', [[cx - 40 - i * 12, cy], [cx + 40 + i * 12, cy]]);
+      await touch('touchEnd', []);
+    };
+    await advance(page, 0.5);
+    const before = await state(page);
+    await spread();
+    await advance(page, 0.5);
+    let s = await state(page);
+    check(before.mode === 'film' && s.mode === 'free' && s.mind === 'film', 'a pinch during the film takes the camera and leaves the swan performing', JSON.stringify({ before: before.mode, mode: s.mode, mind: s.mind }));
+    check(s.dist < before.dist * 0.75, 'and the camera stays as close as the fingers brought it', `${before.dist.toFixed(2)} -> ${s.dist.toFixed(2)}`);
+    // on the way to the view from above (6.5 m away, 30 degrees up), pinch again
+    await page.evaluate(() => window.__swan.world.director.view('high'));
+    await advance(page, 0.2);
+    await spread();
+    await advance(page, 2);
+    s = await state(page);
+    check(s.dist < 3 && s.el < 20, 'a pinch stops a move to a view that was under way', `dist ${s.dist.toFixed(2)}, el ${s.el.toFixed(1)}`);
+    check(s.gl === 0 && problems.length === 0, 'no errors along the way', problems.slice(0, 3).join(' | '));
+    await context.close();
   },
 
   /** Turning the phone, losing the graphics context, the fallbacks and the tiers. */

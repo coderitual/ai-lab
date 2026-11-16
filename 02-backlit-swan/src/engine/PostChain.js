@@ -182,6 +182,7 @@ uniform sampler2D uTex;  // the graded picture (sRGB values), brightness in alph
 uniform vec2 uTexel;     // one texel of uTex
 uniform vec2 uFxaa;      // how much single odd pixels are softened, contrast below which nothing is done
 uniform vec3 uGrain;     // amount, cell size in canvas pixels, frame number
+uniform float uStretched; // 1 when the canvas is not the size of uTex
 
 #if FXAA_STEPS > 0
 // FXAA (Timothy Lottes' method): find pixels on a contrast edge, work out
@@ -259,10 +260,23 @@ void main() {
   vec3 s = texture(uTex, vUv).rgb;
 #endif
   // Film grain: changes 24 times a second, strongest in the mid-darks, absent in pure black.
-  vec2 cell = floor(gl_FragCoord.xy / uGrain.y);
-  float n = hash13(vec3(cell, uGrain.z)) + hash13(vec3(cell + 71.0, uGrain.z)) - 1.0;
-  float ls = luma(s);
-  s += n * uGrain.x * smoothstep(0.0, 0.12, ls) * (1.0 - 0.55 * ls);
+  // (Skipped when there is none, which is the default look: six hashes a pixel for a term times zero.)
+  if (uGrain.x > 0.0) {
+    vec2 cell = floor(gl_FragCoord.xy / uGrain.y);
+    float n = hash13(vec3(cell, uGrain.z)) + hash13(vec3(cell + 71.0, uGrain.z)) - 1.0;
+    float ls = luma(s);
+    s += n * uGrain.x * smoothstep(0.0, 0.12, ls) * (1.0 - 0.55 * ls);
+  }
+  // The graded picture was dithered at its own size. Stretched onto a larger
+  // canvas (the adaptive render scale), every canvas pixel is a blend of four
+  // of its pixels: the blend averages most of that dither away and is then
+  // rounded to 8 bits again, which would bring the bands back in the long
+  // dark gradients. So it gets a dither of its own here. Not when the sizes
+  // match: there the picture passes through as it is.
+  if (uStretched > 0.0) {
+    vec3 t = hash33(vec3(gl_FragCoord.xy, 13.0)) + hash33(vec3(gl_FragCoord.xy, 631.0)) - 1.0;
+    s += t / 255.0;
+  }
   outColor = vec4(s, 1.0);
 }
 `;
@@ -385,6 +399,7 @@ export class PostChain {
           uTexel: { value: new THREE.Vector2() },
           uFxaa: { value: new THREE.Vector2(0.35, 0.12) },
           uGrain: { value: new THREE.Vector3(0.03, 1.5, 0) },
+          uStretched: { value: 0 },
         },
       }),
     );
@@ -398,6 +413,8 @@ export class PostChain {
     /** Blur radius of the upsampling steps, in texels (1 is the plain tent). */
     this.bloomRadius = 1;
     this._weights = levelWeights(bloomLevels, 0.5, 0.5, [1, 1, 1]);
+    this._weightsFor = '';
+    this._canvasSize = new THREE.Vector2();
   }
 
   /**
@@ -425,7 +442,12 @@ export class PostChain {
     f.uBloomStrength.value = look.bloomStrength;
     this.prefilterPass.material.uniforms.uThreshold.value.set(look.bloomThreshold, Math.max(1e-3, look.bloomKnee), look.bloomFirefly);
     this.bloomRadius = look.bloomRadius;
-    this._weights = levelWeights(this.levels, look.bloomTight, look.bloomWide, look.bloomTint);
+    // (setLook runs every frame: the weights are rebuilt only when their numbers change)
+    const weightsFor = `${look.bloomTight} ${look.bloomWide} ${look.bloomTint}`;
+    if (weightsFor !== this._weightsFor) {
+      this._weightsFor = weightsFor;
+      this._weights = levelWeights(this.levels, look.bloomTight, look.bloomWide, look.bloomTint);
+    }
     this.presentPass.material.uniforms.uExposure.value = look.exposure;
   }
 
@@ -481,6 +503,8 @@ export class PostChain {
     this.gradePass.render(this.renderer, this.gradeTarget);
     // film runs at 24 frames a second, and so does its grain
     this.finishPass.material.uniforms.uGrain.value.z = Math.floor(seconds * 24);
+    const canvas = this.renderer.getDrawingBufferSize(this._canvasSize);
+    this.finishPass.material.uniforms.uStretched.value = canvas.x !== this.gradeTarget.width || canvas.y !== this.gradeTarget.height ? 1 : 0;
     this.finishPass.render(this.renderer, null);
   }
 

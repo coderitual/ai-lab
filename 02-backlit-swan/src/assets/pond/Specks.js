@@ -169,7 +169,8 @@ void main() {
   float inside = clamp(0.5 - edge / pixel, 0.0, 1.0);
   if (inside <= 0.0) discard;
   // a dry leaf lying on the water with the sun behind it: lit through, and the midrib a shade darker
-  float rib = 1.0 - 0.25 * smoothstep(0.12, 0.0, abs(vLeafUv.y));
+  // (edges in rising order: smoothstep is undefined in GLSL ES with them the other way round)
+  float rib = 1.0 - 0.25 * (1.0 - smoothstep(0.0, 0.12, abs(vLeafUv.y)));
   vec3 col = uSunColor * uLeafColor * rib * vLit + uSkyColor * 0.02;
   outColor = toTarget(vec4(col * inside, inside));
 }

@@ -51,15 +51,15 @@ const SHOTS = [
   { name: 'head-on', size: TALL, query: 't=3.75', caption: 'Head-on at 3.75 s: the two wing lobes either side of the neck' },
   { name: 'reach', size: WIDE, query: 'still&heading=172&pose=F&az=16&el=11&dist=3.4', caption: 'The reach, bill in the water' },
   { name: 'sunny-side', size: WIDE, query: 'still&heading=200&pose=A&az=178&el=14&dist=4.2', caption: 'From the sunny side, where the film never went: a white swan with an orange bill' },
-  { name: 'above', size: WIDE, query: 't=6.9&az=-25&el=30&dist=6.5', caption: 'From above, drops landing under the bill' },
+  { name: 'above', size: WIDE, query: 't=6.9&az=-25&el=30&dist=4.2', caption: 'From above, as the swan comes up from the dunk' },
   { name: 'meadow', size: WIDE, query: 'still&heading=160&pose=G&az=46&el=8&dist=5.5', caption: 'Toward the meadow and the fence' },
   { name: 'water', size: WIDE, query: 't=1.75&el=16&dist=4.2', caption: 'The spray landing: glints only where the water is disturbed' },
   { name: 'transmission', size: WIDE, query: 'still&heading=10&pose=A&dist=3.6&el=9', eval: "__swan.set('look.skyColor', [0, 0, 0])", caption: 'The sun alone: light that has crossed the bird' },
   { name: 'sky-only', size: WIDE, query: 'still&heading=10&pose=A&dist=3.6&el=9', eval: "__swan.set('look.swanThrough', 0); __swan.set('look.swanNeckThrough', 0)", caption: 'Without transmission: the sky and the rim' },
   { name: 'no-print', size: WIDE, query: 't=7.4', eval: "__swan.set('look.print', 0)", caption: 'The same frame before the print curve' },
   { name: 'buffer-far', size: WIDE, query: 't=7.4&debug=far', caption: 'The far layer: drawn small, defocused as one' },
-  { name: 'buffer-mirror', size: WIDE, query: 't=7.4&debug=mirror', caption: 'The mirror picture of the swan' },
-  { name: 'buffer-ripple', size: { w: 720, h: 720 }, query: 't=1.9&debug=ripple', caption: 'The ripple field after the spray has landed' },
+  { name: 'buffer-mirror', size: WIDE, query: 't=7.4&debug=mirror', eval: "__swan.set('camera.offsetLandscape', [0.04, 0.3])", caption: 'The mirror picture of the swan' },
+  { name: 'buffer-ripple', size: { w: 720, h: 720 }, query: 't=5.3&debug=ripple', eval: "const r = __swan.ctx.ripple; for (const [x, z, k] of [[-0.9, 0.5, 0.012], [0.6, -0.4, 0.009], [0.1, 0.9, 0.015], [-0.4, -0.6, 0.007]]) r.disturb(x, z, 0.06, k); __swan.advance(0.7)", caption: 'The ripple field, a moment after four drops have landed round the swan' },
   { name: 'og', size: CARD, query: 't=7.45', out: 'public/og.jpg', caption: 'Link preview' },
 ];
 

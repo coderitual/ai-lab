@@ -345,7 +345,8 @@ void main() {
     float edge = h.z - (${f(BILL_START - 0.012)} + 0.012 * clamp(h.y / 0.045, -1.0, 1.0));
     bare = smoothstep(-0.0015, 0.0015, edge);
     // black: the knob and the base of the bill, the nail at its tip, the lower mandible, the edge of the gape
-    float knob = smoothstep(${f(KNOB.at + 0.03)}, ${f(KNOB.at + 0.018)}, h.z) * smoothstep(0.004, 0.012, h.y);
+    // (edges in rising order: smoothstep is undefined in GLSL ES with them the other way round)
+    float knob = (1.0 - smoothstep(${f(KNOB.at + 0.018)}, ${f(KNOB.at + 0.03)}, h.z)) * smoothstep(0.004, 0.012, h.y);
     float base = 1.0 - smoothstep(0.004, 0.009, edge);
     float nail = smoothstep(0.268, 0.274, h.z) * smoothstep(-0.012, -0.004, h.y);
     float under = 1.0 - smoothstep(-0.016, -0.011, h.y);
