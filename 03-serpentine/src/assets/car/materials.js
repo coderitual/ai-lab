@@ -356,9 +356,9 @@ void carLamp(float lens, float w) {
     emit += browW * drl + carInside(brow - 0.012) * (1.0 - browW) * drl * 0.08;
     // dipped beam: the projector glows from within; main beam lights the matrix module's rows too
     float beam = min(carLampsA.y + carLampsA.z, 1.0);
-    emit += vec3(0.95, 0.97, 1.0) * lensP * beam * (14.0 * (1.0 - 0.6 * rp * rp) + 2.0);
-    emit += vec3(0.95, 0.97, 1.0) * lensM * (carLampsA.z + 0.15 * carLampsA.y) * (4.0 + 18.0 * dots.r);
-    emit += vec3(0.95, 0.97, 1.0) * (1.0 - lensP) * (1.0 - lensM) * beam * 0.06 * (1.0 - browW);
+    emit += vec3(0.95, 0.97, 1.0) * lensP * beam * (1.2 * (1.0 - 0.6 * rp * rp) + 0.3);
+    emit += vec3(0.95, 0.97, 1.0) * lensM * (carLampsA.z + 0.15 * carLampsA.y) * (0.8 + 4.0 * dots.r);
+    emit += vec3(0.95, 0.97, 1.0) * (1.0 - lensP) * (1.0 - lensM) * beam * 0.02 * (1.0 - browW);
   } else {
     // ---- tail lamp (6.2): two rows of slanted blades 8 mm in, a smooth light guide between them 14 mm in, the
     // reversing lamp's window by the inner tip, and a dark red mirror of a housing 25 mm in
@@ -657,7 +657,7 @@ export function createEmitterMaterial(shared, caps) {
     int f = int(vLampFn + 0.5);
     vec3 e = vec3(0.0);
     if (f == ${LAMP_FN.thirdBrake}) e = vec3(1.0, 0.02, 0.01) * 50.0 * carLampsB.x;
-    else if (f == ${LAMP_FN.plate}) e = vec3(1.0, 0.97, 0.92) * 5.0 * carLampsA.w;
+    else if (f == ${LAMP_FN.plate}) e = vec3(1.0, 0.97, 0.92) * 2.0 * carLampsA.w;
     else if (f == ${LAMP_FN.screen}) e = vec3(0.55, 0.7, 1.0) * 1.2 * carLampsC.x;
     totalEmissiveRadiance += e;
   }`,
