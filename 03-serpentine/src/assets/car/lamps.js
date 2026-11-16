@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { LAMPS, STATIONS } from './spec.js';
 
 /** What the lamps throw: head lamps in candela-like units at the low beam's hot spot, the tail glow likewise. */
-const THROW = { head: 3200, tail: 0.05, brake: 0.25 };
+const THROW = { head: 3200, tail: 0.06, brake: 0.3 };
 /** Half the angle the beam picture covers. */
 const BEAM_ANGLE = 0.5;
 /** Main beam's hot spot against dipped beam's (110 000 cd against 30 000 cd a lamp, modelling sheet 9). */
@@ -91,9 +91,11 @@ export function createLampLights(object, keep, tier = 'high') {
   // It sits under the boot floor, just inside the bumper's face, and is a spot pointed back and down: from there
   // it reddens the road behind and can shine neither on the car's own tail (a light this close to a panel would
   // whiten it) nor forward onto the rear tyres (a point light did: nothing in the scene stops it).
-  const taillight = new THREE.SpotLight(0xff1408, 0, 6, 1.2, 1, 2);
-  taillight.position.set(0, 0.3, STATIONS.tail + 0.12);
-  taillight.target.position.set(0, -0.6, STATIONS.tail - 3);
+  // At the lamps' own height and aimed 5 m back, so the red lies long and soft on the road behind instead of
+  // as a bright bar under the bumper.
+  const taillight = new THREE.SpotLight(0xff1408, 0, 8, 1.1, 1, 2);
+  taillight.position.set(0, 0.62, STATIONS.tail + 0.12);
+  taillight.target.position.set(0, 0, STATIONS.tail - 5);
   object.add(taillight, taillight.target);
   return {
     headlights,
