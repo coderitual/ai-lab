@@ -213,7 +213,11 @@ let ldrInstalled = false;
 export function installLdrEncoding() {
   if (ldrInstalled) return;
   ldrInstalled = true;
-  const encode = 'gl_FragColor.rgb = sqrt( max( gl_FragColor.rgb, 0.0 ) / ( 1.0 + max( gl_FragColor.rgb, 0.0 ) ) );';
+  // (with half a step of noise: at night everything lives in the lowest few of the 256 levels, and what would
+  // be bands across the sky after the exposure has multiplied them becomes grain instead)
+  const encode =
+    'gl_FragColor.rgb = sqrt( max( gl_FragColor.rgb, 0.0 ) / ( 1.0 + max( gl_FragColor.rgb, 0.0 ) ) )' +
+    ' + ( fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) - 0.5 ) / 255.0;';
   const decode = 'gl_FragColor.rgb = min( gl_FragColor.rgb * gl_FragColor.rgb, 0.984 ); gl_FragColor.rgb /= 1.0 - gl_FragColor.rgb;';
   ShaderChunk.colorspace_fragment = `${ShaderChunk.colorspace_fragment}\n${encode}\n`;
   ShaderChunk.fog_fragment = `#ifdef USE_FOG\n${decode}\n#endif\n${ShaderChunk.fog_fragment}\n#ifdef USE_FOG\n${encode}\n#endif\n`;

@@ -14,18 +14,24 @@
 //
 // Metres, kilograms, radians.
 
-/** Outer dimensions and hard points of the body (W206 saloon, AMG Line). */
+/**
+ * Outer dimensions and hard points of the body (W206 saloon, AMG Line).
+ *
+ * The AMG Line bumpers make the car 42 mm longer than the 4.751 m usually quoted (835 + 2865 + 1093), and
+ * its staggered 18-inch wheels (7.5J ET40 front, 8.5J ET52 rear) give tracks of 1.590 / 1.579 m, not the
+ * 1.582 / 1.594 m of the base wheels. Photographs of the car agree: nose at +2.27, tail at -2.53.
+ */
 export const DIMS = {
-  length: 4.751,
+  length: 4.793,
   width: 1.82, // body, without mirrors
   widthWithMirrors: 2.033,
   height: 1.438,
   wheelbase: 2.865,
-  trackFront: 1.582,
-  trackRear: 1.594,
-  frontOverhang: 0.812, // front axle to the nose
-  rearOverhang: 1.074, // rear axle to the tail
-  groundClearance: 0.13,
+  trackFront: 1.59,
+  trackRear: 1.579,
+  frontOverhang: 0.835, // front axle to the nose (the upper edge of the grille)
+  rearOverhang: 1.093, // rear axle to the tail (the bumper, 0.47 m up)
+  groundClearance: 0.13, // unladen, under the floor (the maker quotes 94 mm fully laden); the sills are at 0.19
 };
 
 /** Z of the axles and of the body's ends in car space. */
@@ -67,15 +73,15 @@ export const MASS = {
 
 /** Where the lamps are (centres of the light sources, car space; x for the left lamp, mirror for the right). */
 export const LAMPS = {
-  head: { x: 0.71, y: 0.685, z: STATIONS.nose - 0.14 },
-  tail: { x: 0.66, y: 0.9, z: STATIONS.tail + 0.06 },
-  thirdBrake: { x: 0, y: 1.3, z: -1.62 },
-  plateRear: { x: 0, y: 0.72, z: STATIONS.tail + 0.01 },
+  head: { x: 0.67, y: 0.67, z: STATIONS.nose - 0.31 }, // between the two projectors; the lamps sit well back on the swept nose
+  tail: { x: 0.62, y: 0.84, z: STATIONS.tail + 0.235 }, // middle of the lamp, where the boot lid's cut crosses it
+  thirdBrake: { x: 0, y: 1.305, z: -1.56 }, // inside the rear screen, 30 mm under its upper edge
+  plateRear: { x: 0, y: 0.842, z: STATIONS.tail + 0.095 }, // the lamps above the plate; the plate's centre is at y 0.771, tail + 0.108
 };
 
 /** The driver's eye, the bonnet camera and the bumper camera (car space). */
 export const VIEWPOINTS = {
   eye: { x: 0.37, y: 1.14, z: 0.05 },
-  bonnet: { x: 0, y: 1.08, z: 0.55 },
-  bumper: { x: 0, y: 0.55, z: STATIONS.nose - 0.05 },
+  bonnet: { x: 0, y: 1.12, z: 0.95 }, // 0.11 above the bonnet, just ahead of the windscreen's foot (z 0.84): outside the glass
+  bumper: { x: 0, y: 0.5, z: STATIONS.nose + 0.03 }, // ahead of the grille (its star is at y 0.573), above the plate
 };

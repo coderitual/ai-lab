@@ -1,0 +1,1039 @@
+// One car as a machine: a rigid body on four sprung wheels, driven through the tyres.
+//
+// Each fixed step runs in the order a contact solver would: springs, gravity and air first, giving the velocity
+// the body would have if the tyres did nothing; then the tyres, as friction against that velocity (so a stopped
+// car on a slope is held with no creep and a slow one cannot be reversed by its own brakes); then the pose;
+// then whatever is solid (the track's edges, the ground under a car on its roof), as impulses and a push back out.
+// The road is only ever asked one question, track.surfaceAt: height, normal and grip under a point.
+//
+// Frames: world +Y up; car space +Z forward, +Y up, +X the car's LEFT. Positive yaw and positive steering angle turn
+// LEFT; the control input `steer` is +1 = RIGHT. Wheels: 0 FL, 1 FR, 2 RL, 3 RR.
+//
+// Nothing here allocates while driving (it runs 120 times a second per car on a phone), which is why the vector
+// algebra is written out in components.
+
+import { Matrix4, Quaternion, Vector3 } from 'three';
+import { Drivetrain } from './drivetrain.js';
+import { CAR } from './params.js';
+import { Contact } from './tyre.js';
+
+/** The longest step taken in one go (s); a longer dt is cut into equal parts no longer than this. */
+const MAX_STEP = 1 / 110;
+const TAU = Math.PI * 2;
+const MAX_IMPACTS = 8;
+
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const finite = (v) => (Number.isFinite(v) ? v : 0);
+
+const makeSample = () => ({ y: 0, nx: 0, ny: 1, nz: 0, surface: 0, grip: 1, s: 0, lat: 0, index: 0, edgeL: Infinity, edgeR: Infinity, sky: 1 });
+const makeImpact = () => ({ strength: 0, x: 0, y: 0, z: 0, nx: 0, ny: 0, nz: 0, kind: 'edge', edgeKind: 0 });
+
+const REST = { steer: 0, throttle: 0, brake: 0, handbrake: 1 };
+const _m = new Matrix4();
+const _a = new Vector3();
+const _b = new Vector3();
+const _c = new Vector3();
+
+export class Vehicle {
+  /**
+   * @param {object} track anything with surfaceAt(x, z, hint, out) and the per-sample arrays of game/track.js
+   * @param {typeof CAR} [params]
+   */
+  constructor(track, params = CAR) {
+    this.track = track;
+    this.params = params;
+
+    // pose of the model's root (car space origin: on the ground between the axles when the car stands level)
+    this.position = new Vector3();
+    this.quaternion = new Quaternion();
+    this.prevPosition = new Vector3();
+    this.prevQuaternion = new Quaternion();
+    this.velocity = new Vector3(); // of the centre of mass, world
+    this.angularVelocity = new Vector3(); // world
+    this.yaw = 0;
+    this.speed = 0; // forward, m/s (negative in reverse)
+    this.rpm = params.engine.idle;
+    this.gear = 1; // -1 R, 1..9
+    this.throttle = 0; // as applied, after the assists
+    this.brake = 0; // the foot brake as applied (what the brake lamps show)
+    this.steerAngle = 0; // rad at the road wheels, about +Y (a right turn is negative)
+
+    this.wheels = params.wheels.map((spec) => ({
+      steer: 0,
+      spin: 0, // rad, accumulates
+      omega: 0, // rad/s
+      travel: 0, // m, + = compressed from rest
+      grounded: true,
+      surface: 0,
+      load: spec.staticLoad, // N
+      slipRatio: 0,
+      slipAngle: 0,
+      skid: 0, // 0..1, for smoke, marks and squeal
+      contact: new Vector3(), // where the tyre touches, world
+      _spec: spec,
+      _hint: -1,
+      _sample: makeSample(),
+      _travel: 0, // unclamped
+      _facing: 1, // the body's up along the ground's normal
+      _rx: 0, // from the centre of mass to the patch, world
+      _ry: 0,
+      _rz: 0,
+      _vlong: 0, // speed of the patch along the wheel at the last step
+      _slip: 0, // slip velocity along the wheel at the last step
+      _brake: 0, // brake torque asked for this step (N·m)
+      _drive: 0, // drive torque this step (N·m)
+      _cut: 0, // 0..1 of the brake torque the ABS has learnt to hold back
+    }));
+
+    /** How hard each assist is working right now, 0..1. */
+    this.assists = { abs: 0, tc: 0, esc: 0 };
+    /** Switches (the handling tests turn them off; the game leaves them on). */
+    this.assistsOn = { abs: true, tc: true, esc: true };
+
+    this.trackIndex = 0;
+    this.s = 0;
+    this.lat = 0;
+    this.sky = 1;
+    /** @type {Array<{strength:number,x:number,y:number,z:number,nx:number,ny:number,nz:number,kind:'edge'|'car',edgeKind:number}>} */
+    this.impacts = [];
+    this.scrape = 0; // 0..1 sliding along something solid right now
+    this.upsideDown = false;
+    this.stuckTime = 0; // s the pedals have asked for motion and got none
+    this.wrongWayTime = 0; // s spent pointing back down the road
+
+    const p = params;
+    this._drivetrain = new Drivetrain(p, p.wheels[2].radius);
+    this._contact = new Contact(p.tyre);
+    this._com = new Vector3(); // centre of mass, world: the body's real state (position is derived from it)
+    this._invMass = 1 / p.mass;
+    this._invIx = 1 / p.inertia.x;
+    this._invIy = 1 / p.inertia.y;
+    this._invIz = 1 / p.inertia.z;
+    // What one tyre has to move when it acts with the other three: the body gives way in roll to a sideways push at
+    // the ground and in pitch to one along it, so it is less than a quarter of the car.
+    this._massLat = 0.25 / (this._invMass + p.com.y * p.com.y * this._invIz);
+    this._massLong = 0.25 / (this._invMass + p.com.y * p.com.y * this._invIx);
+    this._dragK = 0.5 * p.aero.airDensity * p.aero.dragArea;
+    // body axes in world space, refreshed from the quaternion
+    this._lx = 1; this._ly = 0; this._lz = 0;
+    this._ux = 0; this._uy = 1; this._uz = 0;
+    this._fx = 0; this._fy = 0; this._fz = 1;
+    // scratch results of _invInertia and of _pointResponse
+    this._ox = 0; this._oy = 0; this._oz = 0;
+
+    const box = p.box;
+    const mid = (box.front + box.rear) / 2;
+    /** The body's outline in car space (x, z): four corners, then the middles of the four sides. */
+    this._outline = [box.halfWidth, box.front, -box.halfWidth, box.front, box.halfWidth, box.rear, -box.halfWidth, box.rear,
+      0, box.front, 0, box.rear, box.halfWidth, mid, -box.halfWidth, mid];
+    /** Further than this from an edge (m, root to edge), no part of the body can be touching it. */
+    this._reach = Math.hypot(box.halfWidth, Math.max(box.front, -box.rear)) + 0.45;
+    this._outlineSamples = [];
+    this._outlineHints = new Int32Array(8).fill(-1);
+    for (let i = 0; i < 8; i++) this._outlineSamples.push(makeSample());
+    this._centre = makeSample();
+    this._centreHint = -1;
+    this._impactPool = [];
+    for (let i = 0; i < MAX_IMPACTS; i++) this._impactPool.push(makeImpact());
+
+    this._reverse = false;
+    this._selectTimer = 0;
+    this._hold = 0; // 0..1 the brakes holding a standing car
+    this._tcCut = 0;
+    this._escPause = 0; // s the stability control stays out of the way after the handbrake
+    this._beta = 0; // body slip angle at the last step
+    this._betaRate = 0;
+    this._restTime = 0;
+    this._asleep = false;
+    this._grip = 1; // mean grip of the surfaces under the wheels
+    this._touching = false;
+    this._asking = false; // a pedal is asking the car to move
+
+    this.reset({ x: 0, y: 0, z: 0, yaw: 0 });
+  }
+
+  /**
+   * Put the car down at rest on its springs, facing `yaw`. `y` is not needed: the road is asked.
+   * @param {{x:number, y?:number, z:number, yaw:number}} at
+   */
+  reset({ x, z, yaw }) {
+    const p = this.params;
+    const sample = this._centre;
+    this._centreHint = -1;
+    this._outlineHints.fill(-1);
+    for (const w of this.wheels) w._hint = -1;
+    this.track.surfaceAt(x, z, -1, sample);
+    this._centreHint = sample.index;
+    // stand on the surface: up is its normal, forward is the heading laid onto it
+    _b.set(sample.nx, sample.ny, sample.nz);
+    _c.set(Math.sin(yaw), 0, Math.cos(yaw));
+    _c.addScaledVector(_b, -_c.dot(_b)).normalize();
+    _a.crossVectors(_b, _c);
+    _m.makeBasis(_a, _b, _c);
+    this.quaternion.setFromRotationMatrix(_m);
+    this._axes();
+    this._com.set(
+      x + this._lx * p.com.x + this._ux * p.com.y + this._fx * p.com.z,
+      sample.y + this._ly * p.com.x + this._uy * p.com.y + this._fy * p.com.z,
+      z + this._lz * p.com.x + this._uz * p.com.y + this._fz * p.com.z,
+    );
+    this._still();
+    this._drivetrain.reset();
+    this._reverse = false;
+    this._selectTimer = 0;
+    this._hold = 1;
+    this._tcCut = 0;
+    this._escPause = 0;
+    this._beta = 0;
+    this._betaRate = 0;
+    this.steerAngle = 0;
+    for (const w of this.wheels) {
+      w.spin = 0;
+      w.steer = 0;
+      w._cut = 0;
+      w._slip = 0;
+      w._vlong = 0;
+    }
+    // let the springs find their own level (it differs from the drawing by millimetres on a slope)
+    this._asleep = false;
+    for (let i = 0; i < 180; i++) this._substep(1 / 120, REST);
+    this._still();
+    this._escPause = 0;
+    this._sync();
+    this._locate(0);
+    this.impacts.length = 0;
+    this.scrape = 0;
+    this.stuckTime = 0;
+    this.wrongWayTime = 0;
+    this._restTime = 0;
+    this._asleep = false;
+    this.assists.abs = this.assists.tc = this.assists.esc = 0;
+    this.throttle = 0;
+    this.brake = 0;
+    this.prevPosition.copy(this.position);
+    this.prevQuaternion.copy(this.quaternion);
+  }
+
+  /**
+   * One fixed step.
+   * @param {number} dt
+   * @param {{steer:number, throttle:number, brake:number, handbrake?:number|boolean}} controls
+   */
+  step(dt, controls) {
+    this.prevPosition.copy(this.position);
+    this.prevQuaternion.copy(this.quaternion);
+    const n = Math.max(1, Math.ceil(dt / MAX_STEP - 1e-6));
+    const h = dt / n;
+    for (let i = 0; i < n; i++) this._substep(h, controls);
+    this._locate(dt);
+  }
+
+  /** Move the impacts recorded since the last call into `out` (as copies) and forget them. */
+  drainImpacts(out) {
+    for (let i = 0; i < this.impacts.length; i++) out.push({ ...this.impacts[i] });
+    this.impacts.length = 0;
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------------------------------------
+
+  _substep(dt, c) {
+    const p = this.params;
+    const wheels = this.wheels;
+    const v = this.velocity;
+    const o = this.angularVelocity;
+    this._axes();
+    const lx = this._lx, ly = this._ly, lz = this._lz;
+    const ux = this._ux, uy = this._uy, uz = this._uz;
+    const fx = this._fx, fy = this._fy, fz = this._fz;
+    const vLong = v.x * fx + v.y * fy + v.z * fz;
+    const vLat = v.x * lx + v.y * ly + v.z * lz;
+    const yawRate = o.x * ux + o.y * uy + o.z * uz;
+
+    // ---- the driver --------------------------------------------------------------------------------------
+    const steerIn = clamp(finite(c.steer), -1, 1);
+    const throttleIn = clamp01(finite(c.throttle));
+    const brakeIn = clamp01(finite(c.brake));
+    const handbrake = clamp01(finite(+c.handbrake || 0));
+    // Braking at a standstill selects reverse and the brake pedal becomes its throttle; the throttle is then the
+    // brake until the car has stopped rolling back, and selects drive again.
+    if (!this._reverse) {
+      if (brakeIn > 0.3 && throttleIn < 0.1 && Math.abs(vLong) < 0.4) {
+        this._selectTimer += dt;
+        if (this._selectTimer > 0.3) {
+          this._reverse = true;
+          this._selectTimer = 0;
+        }
+      } else this._selectTimer = 0;
+    } else if (throttleIn > 0.1 && brakeIn < 0.3 && vLong > -0.4) this._reverse = false;
+    const reverse = this._reverse;
+    let throttle = reverse ? brakeIn : throttleIn;
+    const pedal = reverse ? throttleIn : brakeIn;
+
+    // a standing car with the throttle closed is held on its brakes, and after a moment simply left alone
+    const holding = throttle < 0.02 && Math.abs(vLong) < 0.6;
+    this._hold = clamp01(this._hold + (holding ? dt * 5 : -dt * 12));
+    if (this._asleep) {
+      if (holding && v.lengthSq() + o.lengthSq() === 0) {
+        this._idle(dt, pedal);
+        return;
+      }
+      this._asleep = false;
+      this._restTime = 0;
+    }
+
+    const lock = p.steering.lock;
+    const wanted = -steerIn * lock;
+    this.steerAngle += clamp(wanted - this.steerAngle, -p.steering.rate * dt, p.steering.rate * dt);
+    const steer = this.steerAngle;
+    wheels[0].steer = wheels[1].steer = steer;
+
+    // ---- the assists (they read what the last step left) -----------------------------------------------------
+    const a = p.assists;
+    if (handbrake > 0.1) this._escPause = 0.7;
+    else this._escPause = Math.max(0, this._escPause - dt);
+
+    // stability control: the yaw moment (about +Y) that would put the car back where the steering points it
+    let moment = 0;
+    let trim = 0;
+    const beta = Math.abs(vLong) > 2 ? Math.atan2(vLat, Math.abs(vLong)) : 0;
+    this._betaRate += ((beta - this._beta) / dt - this._betaRate) * Math.min(1, dt * 30);
+    this._beta = beta;
+    if (this.assistsOn.esc && vLong > a.esc.minSpeed && this._escPause === 0) {
+      const e = a.esc;
+      const ratio = vLong / e.characteristicSpeed;
+      const holds = (0.95 * p.gravity * this._grip) / vLong; // no more yaw than the road can hold
+      const wantedYaw = clamp((vLong * steer) / (p.wheelbase * (1 + ratio * ratio)), -holds, holds);
+      const error = yawRate - wantedYaw;
+      const beyond = Math.abs(error) - e.deadband - 0.12 * Math.abs(wantedYaw);
+      if (beyond > 0) moment -= Math.sign(error) * e.yawGain * beyond;
+      const slip = beta - clamp(beta, -e.slipAllowed, e.slipAllowed);
+      if (slip !== 0) {
+        moment += e.slipGain * slip;
+        if (slip * this._betaRate > 0) moment += e.slipRateGain * this._betaRate;
+      }
+      // turning less than asked with the front already sliding: brakes cannot find grip that is not there, so ease the power
+      if (beyond > 0 && error * wantedYaw < 0 && Math.abs(wantedYaw) > Math.abs(yawRate)) trim = clamp01(e.understeerGain * beyond);
+      // turning more than asked, or sideways: take the power off the rear wheels
+      if (moment * yawRate < 0) trim = Math.max(trim, clamp01(Math.abs(moment) / 5000));
+    }
+
+    // traction control: trim the engine while a driven wheel spins faster than the road
+    const tcOn = this.assistsOn.tc && this._escPause === 0;
+    let spin = 0;
+    for (let i = 2; i < 4; i++) {
+      const w = wheels[i];
+      if (!w.grounded) continue;
+      const ref = Math.max(Math.abs(w._vlong), 3);
+      spin = Math.max(spin, (reverse ? -w._slip : w._slip) / ref);
+    }
+    let cut = 0;
+    if (tcOn && throttle > 0.02) {
+      // in a bend it lets the wheels spin a little more: the tail may move, and the stability control minds the yaw
+      const over = spin / (a.tc.slip + a.tc.bendSlip * clamp01(Math.abs(yawRate * vLong) / 6)) - 1;
+      // what it has learnt the road will take, plus an answer to the slip of this instant
+      this._tcCut = clamp(this._tcCut + dt * (over > 0 ? a.tc.learn * Math.min(over, 3) : a.tc.forget * Math.max(over, -1)), 0, 0.95);
+      cut = clamp(this._tcCut + a.tc.react * Math.max(0, over), 0, 0.97);
+    } else this._tcCut = Math.max(0, this._tcCut - dt * 4);
+
+    const limiter = reverse ? clamp01((p.gearbox.reverseSpeed + vLong) / 2) : clamp01((p.topSpeed + 0.6 - vLong) / 1.2);
+    this._asking = throttle > 0.3;
+    throttle *= limiter;
+    if (handbrake > 0.1) throttle = 0; // the handbrake lifts the drive, as pulling it does in a car set up for it
+    const keep = (1 - cut) * (1 - trim);
+    this.throttle = throttle * keep;
+    this.brake = pedal;
+
+    // ---- engine and gearbox ---------------------------------------------------------------------------------
+    const dt_ = this._drivetrain;
+    const rearOmega = (wheels[2].omega + wheels[3].omega) / 2;
+    dt_.update(dt, throttle, keep, pedal, rearOmega, vLong, Math.abs(yawRate * vLong) / p.gravity, reverse);
+    this.rpm = dt_.rpm;
+    this.gear = dt_.gear;
+    const axle = dt_.axleTorque;
+    const d = p.differential;
+    const locking = d.preload + d.bias * Math.abs(axle);
+    const across = clamp(d.viscous * (wheels[2].omega - wheels[3].omega), -locking, locking);
+    wheels[0]._drive = wheels[1]._drive = 0;
+    wheels[2]._drive = axle / 2 - across;
+    wheels[3]._drive = axle / 2 + across;
+
+    // ---- brakes: the pedal, what the stability control adds to one wheel, less what the ABS holds back ------
+    const rolling = 1 + (vLong / p.rollingSpeed) * (vLong / p.rollingSpeed);
+    const escTorque = Math.min((Math.abs(moment) / (p.wheels[0].x + 0.001)) * p.wheels[0].radius, p.brakes.front * 0.8);
+    // a moment to the left (+) is made by braking a left wheel: the front one when it works against the car's
+    // rotation (catching a slide), the rear one when it helps the car turn (understeer)
+    const escWheel = moment === 0 ? -1 : (moment > 0 ? 0 : 1) + (moment * yawRate < 0 ? 0 : 2);
+    let absWork = 0;
+    for (let i = 0; i < 4; i++) {
+      const w = wheels[i];
+      const spec = w._spec;
+      let torque = pedal * (spec.front ? p.brakes.front : p.brakes.rear);
+      if (i === escWheel) torque += spec.front ? escTorque : escTorque * 0.5;
+      const speed = Math.abs(w._vlong);
+      let release = 0;
+      if (this.assistsOn.abs && torque > 0 && speed > a.abs.minSpeed && w.grounded) {
+        const slip = (w._vlong > 0 ? -w._slip : w._slip) / Math.max(speed, 2.5); // + = the wheel is turning slower than the road
+        const over = slip / a.abs.slip - 1;
+        // as the traction control: what it has learnt this wheel's road will take, plus an answer to this instant
+        w._cut = clamp(w._cut + dt * (over > 0 ? a.abs.learn * Math.min(over, 3) : a.abs.forget * Math.max(over, -1)), 0, 0.95);
+        release = clamp(w._cut + a.abs.react * Math.max(0, over), 0, 0.97);
+      } else w._cut = Math.max(0, w._cut - dt * 8);
+      if (release > absWork && pedal > 0.05) absWork = release;
+      torque *= 1 - release;
+      if (!spec.front) torque += handbrake * p.brakes.handbrake;
+      torque += this._hold * p.brakes.hold;
+      const surface = p.surfaces[w.surface] || p.surfaces[0];
+      w._brake = torque + surface.rolling * rolling * w.load * spec.radius;
+    }
+    this.assists.abs += (absWork - this.assists.abs) * Math.min(1, dt * 20);
+    this.assists.tc += (cut - this.assists.tc) * Math.min(1, dt * 20);
+    this.assists.esc += (Math.max(clamp01(escTorque / 900), trim) - this.assists.esc) * Math.min(1, dt * 20);
+
+    // ---- springs: where each wheel meets the road, and how hard --------------------------------------------
+    const com = this._com;
+    const sus = p.suspension;
+    const track = this.track;
+    let grip = 0;
+    let grounded = 0;
+    for (let i = 0; i < 4; i++) {
+      const w = wheels[i];
+      const spec = w._spec;
+      // the foot of the strut when the car stands level, from the centre of mass
+      const ax = spec.x - p.com.x, ay = -p.com.y, az = spec.z - p.com.z;
+      const px = com.x + lx * ax + ux * ay + fx * az;
+      const py = com.y + ly * ax + uy * ay + fy * az;
+      const pz = com.z + lz * ax + uz * ay + fz * az;
+      const s = w._sample;
+      track.surfaceAt(px, pz, w._hint, s);
+      w._hint = s.index;
+      w.surface = s.surface;
+      const surface = p.surfaces[s.surface] || p.surfaces[0];
+      let ground = s.y;
+      if (surface.rough > 0) {
+        const k = TAU / surface.wavelength;
+        ground += surface.rough * Math.sin(px * k) * Math.sin(pz * k * 1.31 + 1.7);
+      }
+      const facing = ux * s.nx + uy * s.ny + uz * s.nz;
+      let travel = -sus.droop;
+      if (facing > 0.3) travel = Math.max(travel, ((ground - py) * s.ny) / facing);
+      w.grounded = travel > -sus.droop;
+      w._travel = travel;
+      w._facing = facing;
+      w.travel = Math.min(travel, sus.bump);
+      w._rx = px + ux * travel - com.x;
+      w._ry = py + uy * travel - com.y;
+      w._rz = pz + uz * travel - com.z;
+      w.contact.set(com.x + w._rx, com.y + w._ry, com.z + w._rz);
+      if (w.grounded) {
+        grip += s.grip;
+        grounded++;
+      }
+    }
+    this._grip = grounded ? grip / grounded : 1;
+
+    let Fx = 0, Fy = -p.mass * p.gravity, Fz = 0;
+    let Tx = 0, Ty = 0, Tz = 0;
+    for (let i = 0; i < 4; i++) {
+      const w = wheels[i];
+      if (!w.grounded) {
+        w.load = 0;
+        continue;
+      }
+      const spec = w._spec;
+      const s = w._sample;
+      const rx = w._rx, ry = w._ry, rz = w._rz;
+      const t = w.travel;
+      // how fast the body is closing on the road here
+      const cx = v.x + o.y * rz - o.z * ry;
+      const cy = v.y + o.z * rx - o.x * rz;
+      const cz = v.z + o.x * ry - o.y * rx;
+      const rate = clamp(-(cx * s.nx + cy * s.ny + cz * s.nz) / w._facing, -sus.damperSpeed, sus.damperSpeed);
+      let force = spec.spring * (t + spec.preload) + (rate > 0 ? spec.damperBump : spec.damperRebound) * rate;
+      force += spec.antiRoll * (t - wheels[i ^ 1].travel);
+      if (t > sus.bumpStop) force += sus.bumpStopRate * (t - sus.bumpStop);
+      force = clamp(force, 0, sus.maxLoad * spec.staticLoad);
+      w.load = force;
+      const nx = s.nx * force, ny = s.ny * force, nz = s.nz * force;
+      Fx += nx; Fy += ny; Fz += nz;
+      Tx += ry * nz - rz * ny;
+      Ty += rz * nx - rx * nz;
+      Tz += rx * ny - ry * nx;
+    }
+
+    // air
+    const airspeed = v.length();
+    Fx -= this._dragK * airspeed * v.x;
+    Fy -= this._dragK * airspeed * v.y;
+    Fz -= this._dragK * airspeed * v.z;
+
+    v.x += Fx * this._invMass * dt;
+    v.y += Fy * this._invMass * dt;
+    v.z += Fz * this._invMass * dt;
+    this._invInertia(Tx, Ty, Tz);
+    o.x += this._ox * dt;
+    o.y += this._oy * dt;
+    o.z += this._oz * dt;
+
+    // a suspension that has run out of travel is the body sitting on the road: stop it going further, lift it out
+    let lift = 0, liftX = 0, liftY = 0, liftZ = 0;
+    for (let i = 0; i < 4; i++) {
+      const w = wheels[i];
+      if (w._travel <= sus.bump) continue;
+      const s = w._sample;
+      this._stop(w._rx, w._ry, w._rz, s.nx, s.ny, s.nz, 0, 0);
+      const over = Math.min(w._travel - sus.bump, 0.04);
+      if (over > lift) {
+        lift = over;
+        liftX = s.nx; liftY = s.ny; liftZ = s.nz;
+      }
+    }
+
+    // ---- tyres: friction against the velocity the car now has ----------------------------------------------
+    const contact = this._contact;
+    const cosS = Math.cos(steer), sinS = Math.sin(steer);
+    let Px = 0, Py = 0, Pz = 0;
+    let Qx = 0, Qy = 0, Qz = 0;
+    for (let i = 0; i < 4; i++) {
+      const w = wheels[i];
+      const spec = w._spec;
+      const inertia = spec.inertia + (spec.driven ? dt_.wheelInertia : 0);
+      if (!w.grounded || w.load <= 0) {
+        // in the air: only the brake and the engine act on it
+        let omega = w.omega + (dt * w._drive) / inertia;
+        const stop = (dt * w._brake) / inertia;
+        omega = Math.abs(omega) <= stop ? 0 : omega - Math.sign(omega) * stop;
+        w.omega = omega;
+        w.spin += omega * dt;
+        w._slip = 0;
+        w._vlong = omega * spec.radius;
+        w.slipRatio = w.slipAngle = w.skid = 0;
+        continue;
+      }
+      const s = w._sample;
+      const nx = s.nx, ny = s.ny, nz = s.nz;
+      const rx = w._rx, ry = w._ry, rz = w._rz;
+      // the wheel's heading, laid onto the road, and the direction to its left
+      let hx = spec.front ? fx * cosS + lx * sinS : fx;
+      let hy = spec.front ? fy * cosS + ly * sinS : fy;
+      let hz = spec.front ? fz * cosS + lz * sinS : fz;
+      const along = hx * nx + hy * ny + hz * nz;
+      hx -= nx * along; hy -= ny * along; hz -= nz * along;
+      const length = Math.sqrt(hx * hx + hy * hy + hz * hz);
+      hx /= length; hy /= length; hz /= length;
+      const sx = ny * hz - nz * hy;
+      const sy = nz * hx - nx * hz;
+      const sz = nx * hy - ny * hx;
+      const cx = v.x + o.y * rz - o.z * ry;
+      const cy = v.y + o.z * rx - o.x * rz;
+      const cz = v.z + o.x * ry - o.y * rx;
+      const vlong = cx * hx + cy * hy + cz * hz;
+      const vside = cx * sx + cy * sy + cz * sz;
+      contact.setup(w.load, s.grip * spec.grip, s.grip, vlong, vside, spec.give);
+
+      // along the wheel: the wheel and the car find the slip they share at the end of the step
+      const radius = spec.radius;
+      const body = dt / this._massLong;
+      const both = body + (dt * radius * radius) / inertia;
+      const drive = w._drive;
+      const brake = w._brake;
+      let omega = w.omega;
+      let slip = 0;
+      let force = 0;
+      let locked = omega === 0;
+      if (!locked) {
+        const way = omega > 0 ? 1 : -1;
+        slip = contact.solve((omega + (dt * (drive - way * brake)) / inertia) * radius - vlong, both);
+        force = contact.forceX(slip);
+        const next = omega + (dt * (drive - way * brake - radius * force)) / inertia;
+        if (next * way <= 0) locked = true; // the brake has stopped it within the step
+        else omega = next;
+      }
+      if (locked) {
+        slip = contact.solve(-vlong, body);
+        force = contact.forceX(slip);
+        const need = drive - radius * force; // what the brake must hold for the wheel to stay still
+        omega = 0;
+        if (Math.abs(need) > brake) {
+          const way = need > 0 ? 1 : -1;
+          slip = contact.solve(((dt * (drive - way * brake)) / inertia) * radius - vlong, both);
+          force = contact.forceX(slip);
+          omega = (dt * (drive - way * brake - radius * force)) / inertia;
+          if (omega * way < 0) omega = 0;
+        }
+      }
+      // across it: the curve's force, but never more than stops the patch's sideways motion in this step; and a
+      // tyre leant far over on its shoulder lets go, so a car up on two wheels slides rather than trips
+      let side = contact.forceY(slip) * clamp01((w._facing - sus.tripEnd) / (sus.tripStart - sus.tripEnd));
+      const stops = (this._massLat * Math.abs(vside)) / dt;
+      if (side > stops) side = stops;
+      else if (side < -stops) side = -stops;
+
+      w.omega = omega;
+      w.spin += omega * dt;
+      w._slip = slip;
+      w._vlong = vlong;
+      const ref = Math.max(Math.abs(vlong), 1);
+      w.slipRatio = slip / ref;
+      w.slipAngle = Math.atan2(-vside, ref);
+      const sliding = Math.sqrt(slip * slip + vside * vside);
+      w.skid = clamp01((contact.rho - 0.75) / 1.25) * clamp01((sliding - 0.5) / 2.5);
+
+      const gx = hx * force + sx * side;
+      const gy = hy * force + sy * side;
+      const gz = hz * force + sz * side;
+      Px += gx; Py += gy; Pz += gz;
+      Qx += ry * gz - rz * gy;
+      Qy += rz * gx - rx * gz;
+      Qz += rx * gy - ry * gx;
+    }
+    v.x += Px * this._invMass * dt;
+    v.y += Py * this._invMass * dt;
+    v.z += Pz * this._invMass * dt;
+    this._invInertia(Qx, Qy, Qz);
+    o.x += this._ox * dt;
+    o.y += this._oy * dt;
+    o.z += this._oz * dt;
+
+    // A verge taken sideways at speed is a ramp, and so is a crest. This is a road car on a road: it may go light,
+    // but the ground under it never falls away faster than a firm rebound of the springs, and it is not flicked
+    // onto its side: roll and pitch can only be so quick, and die away once the body leans well beyond its springs.
+    const under = this._centre;
+    const away = v.x * under.nx + v.y * under.ny + v.z * under.nz - sus.release;
+    if (away > 0) {
+      v.x -= under.nx * away;
+      v.y -= under.ny * away;
+      v.z -= under.nz * away;
+    }
+    const pitchRate = o.x * lx + o.y * ly + o.z * lz;
+    const rollRate = o.x * fx + o.y * fy + o.z * fz;
+    const leaning = clamp01((sus.tripStart - (ux * under.nx + uy * under.ny + uz * under.nz)) / (sus.tripStart - sus.tripEnd));
+    const fade = Math.exp(-dt * sus.leanDamping * leaning);
+    const dp = clamp(pitchRate * fade, -sus.tumble, sus.tumble) - pitchRate;
+    const dr = clamp(rollRate * fade, -sus.tumble, sus.tumble) - rollRate;
+    o.x += lx * dp + fx * dr;
+    o.y += ly * dp + fy * dr;
+    o.z += lz * dp + fz * dr;
+
+    // ---- the pose ---------------------------------------------------------------------------------------------
+    com.x += v.x * dt + liftX * lift;
+    com.y += v.y * dt + liftY * lift;
+    com.z += v.z * dt + liftZ * lift;
+    const q = this.quaternion;
+    const hx_ = 0.5 * dt * o.x, hy_ = 0.5 * dt * o.y, hz_ = 0.5 * dt * o.z;
+    const qx = q.x, qy = q.y, qz = q.z, qw = q.w;
+    q.x = qx + hx_ * qw + hy_ * qz - hz_ * qy;
+    q.y = qy - hx_ * qz + hy_ * qw + hz_ * qx;
+    q.z = qz + hx_ * qy - hy_ * qx + hz_ * qw;
+    q.w = qw - hx_ * qx - hy_ * qy - hz_ * qz;
+    q.normalize();
+    this._axes();
+
+    // ---- what is solid ----------------------------------------------------------------------------------------
+    this._edges(dt);
+    this.upsideDown = this._uy < 0.15;
+    if (this._uy < 0.8) this._shell();
+    this._sync();
+
+    // ---- has it come to rest? --------------------------------------------------------------------------------
+    if (holding && grounded === 4 && v.lengthSq() < 0.0016 && o.lengthSq() < 0.0016 && !this._touching) {
+      this._restTime += dt;
+      if (this._restTime > 0.5) {
+        this._asleep = true;
+        this._still();
+      }
+    } else this._restTime = 0;
+  }
+
+  /** A step of a car left standing: nothing moves; the engine idles and the lamps of the assists go out. */
+  _idle(dt, pedal) {
+    const d = this._drivetrain;
+    d.update(dt, 0, 1, pedal, 0, 0, 0, this._reverse);
+    this.rpm = d.rpm;
+    this.gear = d.gear;
+    this.throttle = 0;
+    this.brake = pedal;
+    const fade = Math.min(1, dt * 20);
+    this.assists.abs -= this.assists.abs * fade;
+    this.assists.tc -= this.assists.tc * fade;
+    this.assists.esc -= this.assists.esc * fade;
+    this.scrape -= this.scrape * fade;
+    for (const w of this.wheels) w.skid = w.slipRatio = w.slipAngle = 0;
+  }
+
+  /**
+   * The solid edges of the road. The body's outline may not be further from the centre line than the track says;
+   * a point that is gets an impulse in the ground plane (it bounces a little, rubs, and turns the car by its lever
+   * arm) and the car is moved back by as much as the deepest point is through.
+   */
+  _edges(dt) {
+    const p = this.params;
+    const track = this.track;
+    const com = this._com;
+    const v = this.velocity;
+    const o = this.angularVelocity;
+    const lx = this._lx, lz = this._lz, fx = this._fx, fz = this._fz;
+    // the root of the model, on the ground plane
+    const ox = com.x - (lx * p.com.x + this._ux * p.com.y + fx * p.com.z);
+    const oz = com.z - (lz * p.com.x + this._uz * p.com.y + fz * p.com.z);
+    // Where the car is on the track (what s, lat and sky report), and whether any of it can be near an edge at all:
+    // most of the time it cannot, and the eight questions below need not be asked.
+    const centre = this._centre;
+    track.surfaceAt(ox, oz, this._centreHint, centre);
+    this._centreHint = centre.index;
+    if (centre.edgeL - centre.lat > this._reach && centre.edgeR + centre.lat > this._reach) {
+      this._touching = false;
+      this.scrape -= this.scrape * Math.min(1, dt * 18);
+      return;
+    }
+    const yawMobility = this._ly * this._ly * this._invIx + this._uy * this._uy * this._invIy + this._fy * this._fy * this._invIz;
+    const outline = this._outline;
+    let deepL = 0, deepLx = 0, deepLz = 0;
+    let deepR = 0, deepRx = 0, deepRz = 0;
+    let rub = 0;
+    let touching = false;
+    for (let i = 0; i < 8; i++) {
+      const ax = outline[i * 2], az = outline[i * 2 + 1];
+      const wx = ox + lx * ax + fx * az;
+      const wz = oz + lz * ax + fz * az;
+      const s = this._outlineSamples[i];
+      track.surfaceAt(wx, wz, this._outlineHints[i], s);
+      this._outlineHints[i] = s.index;
+      const overL = s.lat - s.edgeL;
+      const overR = -s.lat - s.edgeR;
+      if (!(overL > 0) && !(overR > 0)) continue;
+      touching = true;
+      const left = overL > 0;
+      const over = left ? overL : overR;
+      // the way back onto the road: across the track, level
+      let nx = track.lx ? track.lx[s.index] : 1;
+      let nz = track.lz ? track.lz[s.index] : 0;
+      const length = Math.sqrt(nx * nx + nz * nz) || 1;
+      nx /= left ? -length : length;
+      nz /= left ? -length : length;
+      if (left) {
+        if (over > deepL) { deepL = over; deepLx = nx; deepLz = nz; }
+      } else if (over > deepR) { deepR = over; deepRx = nx; deepRz = nz; }
+
+      const rx = wx - com.x, rz = wz - com.z;
+      const px = v.x + o.y * rz;
+      const pz = v.z - o.y * rx;
+      const closing = px * nx + pz * nz;
+      if (closing >= 0) continue;
+      const kinds = track.kindL && track.kindR ? (left ? track.kindL : track.kindR) : null;
+      const kind = kinds ? kinds[s.index] : 0;
+      const material = p.edges.kinds[kind] || p.edges.kinds[0];
+      const armN = rz * nx - rx * nz;
+      const bounce = material.restitution * clamp01((-closing - 0.5) / 2);
+      const jn = (-(1 + bounce) * closing) / (this._invMass + armN * armN * yawMobility);
+      const tx = nz, tz = -nx;
+      const along = px * tx + pz * tz;
+      const armT = rz * tx - rx * tz;
+      const jt = clamp(-along / (this._invMass + armT * armT * yawMobility), -material.friction * jn, material.friction * jn);
+      const jx = nx * jn + tx * jt;
+      const jz = nz * jn + tz * jt;
+      v.x += jx * this._invMass;
+      v.z += jz * this._invMass;
+      o.y += (rz * jx - rx * jz) * yawMobility;
+      // What it is pressed against also holds it by friction against riding up or down (measured square to the
+      // road, which the edge follows up hill and down): a nose that has climbed the verge is stopped there, not
+      // left to rear up the rock.
+      const ux = centre.nx, uy = centre.ny, uz = centre.nz;
+      const rising = (v.x + o.y * rz) * ux + (v.y + o.z * rx - o.x * rz) * uy + (v.z - o.y * rx) * uz;
+      const jv = clamp(-rising / this._mobility(rx, 0, rz, ux, uy, uz), -material.friction * jn, material.friction * jn);
+      this._push(rx, 0, rz, ux * jv, uy * jv, uz * jv);
+      rub = Math.max(rub, Math.abs(along));
+      if (-closing > p.edges.impactSpeed) this._impact(-closing, wx, com.y, wz, nx, 0, nz, 'edge', kind);
+    }
+    com.x += deepLx * deepL + deepRx * deepR;
+    com.z += deepLz * deepL + deepRz * deepR;
+    this._touching = touching;
+    this.scrape += ((touching ? clamp01(rub / 8) : 0) - this.scrape) * Math.min(1, dt * 18);
+  }
+
+  /** A car on its side or its roof: the corners of the body against the ground, without bounce. */
+  _shell() {
+    const p = this.params;
+    const com = this._com;
+    const box = p.box;
+    let lift = 0;
+    for (let i = 0; i < 8; i++) {
+      const ax = (i & 1 ? -box.halfWidth : box.halfWidth) - p.com.x;
+      const ay = (i & 2 ? box.top : box.bottom) - p.com.y;
+      const az = (i & 4 ? box.rear : box.front) - p.com.z;
+      const rx = this._lx * ax + this._ux * ay + this._fx * az;
+      const ry = this._ly * ax + this._uy * ay + this._fy * az;
+      const rz = this._lz * ax + this._uz * ay + this._fz * az;
+      const s = this._outlineSamples[i];
+      this.track.surfaceAt(com.x + rx, com.z + rz, this._outlineHints[i], s);
+      this._outlineHints[i] = s.index;
+      const depth = (s.y - (com.y + ry)) * s.ny;
+      if (depth <= 0) continue;
+      this._stop(rx, ry, rz, s.nx, s.ny, s.nz, 0.7, 0);
+      lift = Math.max(lift, Math.min(depth, 0.05));
+    }
+    com.y += lift;
+  }
+
+  /**
+   * A point of the body (at r from the centre of mass) has met something with normal n: take away the velocity it
+   * has into it (times 1 + bounce) and rub off its sliding with the given friction.
+   */
+  _stop(rx, ry, rz, nx, ny, nz, friction, bounce) {
+    const v = this.velocity;
+    const o = this.angularVelocity;
+    let cx = v.x + o.y * rz - o.z * ry;
+    let cy = v.y + o.z * rx - o.x * rz;
+    let cz = v.z + o.x * ry - o.y * rx;
+    const closing = cx * nx + cy * ny + cz * nz;
+    if (closing >= 0) return 0;
+    const jn = (-(1 + bounce) * closing) / this._mobility(rx, ry, rz, nx, ny, nz);
+    this._push(rx, ry, rz, nx * jn, ny * jn, nz * jn);
+    if (friction > 0) {
+      cx = v.x + o.y * rz - o.z * ry;
+      cy = v.y + o.z * rx - o.x * rz;
+      cz = v.z + o.x * ry - o.y * rx;
+      const into = cx * nx + cy * ny + cz * nz;
+      cx -= nx * into; cy -= ny * into; cz -= nz * into;
+      const sliding = Math.sqrt(cx * cx + cy * cy + cz * cz);
+      if (sliding > 1e-4) {
+        cx /= sliding; cy /= sliding; cz /= sliding;
+        const jt = Math.min(sliding / this._mobility(rx, ry, rz, cx, cy, cz), friction * jn);
+        this._push(rx, ry, rz, -cx * jt, -cy * jt, -cz * jt);
+      }
+    }
+    return -closing;
+  }
+
+  /** How much velocity along n a unit impulse along n gives the point at r (1 / the mass felt there). */
+  _mobility(rx, ry, rz, nx, ny, nz) {
+    this._invInertia(ry * nz - rz * ny, rz * nx - rx * nz, rx * ny - ry * nx);
+    const ax = this._oy * rz - this._oz * ry;
+    const ay = this._oz * rx - this._ox * rz;
+    const az = this._ox * ry - this._oy * rx;
+    return this._invMass + ax * nx + ay * ny + az * nz;
+  }
+
+  /** An impulse j at r from the centre of mass. */
+  _push(rx, ry, rz, jx, jy, jz) {
+    const v = this.velocity;
+    const o = this.angularVelocity;
+    v.x += jx * this._invMass;
+    v.y += jy * this._invMass;
+    v.z += jz * this._invMass;
+    this._invInertia(ry * jz - rz * jy, rz * jx - rx * jz, rx * jy - ry * jx);
+    o.x += this._ox;
+    o.y += this._oy;
+    o.z += this._oz;
+  }
+
+  /** World inverse inertia times a vector, into _ox, _oy, _oz. */
+  _invInertia(x, y, z) {
+    const a = (x * this._lx + y * this._ly + z * this._lz) * this._invIx;
+    const b = (x * this._ux + y * this._uy + z * this._uz) * this._invIy;
+    const c = (x * this._fx + y * this._fy + z * this._fz) * this._invIz;
+    this._ox = this._lx * a + this._ux * b + this._fx * c;
+    this._oy = this._ly * a + this._uy * b + this._fy * c;
+    this._oz = this._lz * a + this._uz * b + this._fz * c;
+  }
+
+  /** The body's axes in world space, from the quaternion. */
+  _axes() {
+    const q = this.quaternion;
+    const x = q.x, y = q.y, z = q.z, w = q.w;
+    this._lx = 1 - 2 * (y * y + z * z); this._ly = 2 * (x * y + z * w); this._lz = 2 * (x * z - y * w);
+    this._ux = 2 * (x * y - z * w); this._uy = 1 - 2 * (x * x + z * z); this._uz = 2 * (y * z + x * w);
+    this._fx = 2 * (x * z + y * w); this._fy = 2 * (y * z - x * w); this._fz = 1 - 2 * (x * x + y * y);
+  }
+
+  /** What the outside reads, from the body's state. */
+  _sync() {
+    const p = this.params;
+    const com = this._com;
+    this.position.set(
+      com.x - (this._lx * p.com.x + this._ux * p.com.y + this._fx * p.com.z),
+      com.y - (this._ly * p.com.x + this._uy * p.com.y + this._fy * p.com.z),
+      com.z - (this._lz * p.com.x + this._uz * p.com.y + this._fz * p.com.z),
+    );
+    this.yaw = Math.atan2(this._fx, this._fz);
+    const v = this.velocity;
+    this.speed = v.x * this._fx + v.y * this._fy + v.z * this._fz;
+  }
+
+  _still() {
+    this.velocity.set(0, 0, 0);
+    this.angularVelocity.set(0, 0, 0);
+    for (const w of this.wheels) w.omega = 0;
+    this._sync();
+  }
+
+  /** Where on the track the car is, and the two clocks the reset rule goes by. */
+  _locate(dt) {
+    const track = this.track;
+    const s = this._centre;
+    if (this._touching || dt === 0) {
+      // the edge has just moved the car, or it has just been put down: ask again
+      track.surfaceAt(this.position.x, this.position.z, this._centreHint, s);
+      this._centreHint = s.index;
+    }
+    this.trackIndex = s.index;
+    this.s = s.s;
+    this.lat = s.lat;
+    this.sky = s.sky;
+    const moving = Math.abs(this.speed) > 0.7;
+    const asking = this._asking;
+    if (this.upsideDown || (asking && !moving)) this.stuckTime += dt;
+    else if (Math.abs(this.speed) > 2 || !asking) this.stuckTime = 0;
+    if (track.tx && track.tz) {
+      const facing = this._fx * track.tx[s.index] + this._fz * track.tz[s.index];
+      if (facing < -0.3) this.wrongWayTime += dt;
+      else if (facing > 0) this.wrongWayTime = 0;
+    }
+  }
+
+  _impact(strength, x, y, z, nx, ny, nz, kind, edgeKind) {
+    const list = this.impacts;
+    let slot;
+    if (list.length < MAX_IMPACTS) {
+      slot = this._impactPool[list.length];
+      list.push(slot);
+    } else {
+      slot = list[0];
+      for (let i = 1; i < list.length; i++) if (list[i].strength < slot.strength) slot = list[i];
+      if (slot.strength >= strength) return;
+    }
+    slot.strength = strength;
+    slot.x = x; slot.y = y; slot.z = z;
+    slot.nx = nx; slot.ny = ny; slot.nz = nz;
+    slot.kind = kind;
+    slot.edgeKind = edgeKind;
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+
+const boxA = { cx: 0, cz: 0, fx: 0, fz: 1, lx: 1, lz: 0, half: 0, halfWidth: 0 };
+const boxB = { cx: 0, cz: 0, fx: 0, fz: 1, lx: 1, lz: 0, half: 0, halfWidth: 0 };
+
+/** The car's box on the ground plane: centre, forward and left axes, half length and half width. */
+function footprint(vehicle, out) {
+  const box = vehicle.params.box;
+  let fx = vehicle._fx, fz = vehicle._fz;
+  const length = Math.sqrt(fx * fx + fz * fz) || 1;
+  fx /= length;
+  fz /= length;
+  const mid = (box.front + box.rear) / 2;
+  out.fx = fx;
+  out.fz = fz;
+  out.lx = fz;
+  out.lz = -fx;
+  out.cx = vehicle.position.x + fx * mid;
+  out.cz = vehicle.position.z + fz * mid;
+  out.half = (box.front - box.rear) / 2;
+  out.halfWidth = box.halfWidth;
+  return out;
+}
+
+/** How far box b reaches along a unit direction (its support radius). */
+const reach = (box, x, z) => Math.abs(box.fx * x + box.fz * z) * box.half + Math.abs(box.lx * x + box.lz * z) * box.halfWidth;
+
+/**
+ * Two cars against each other: their boxes on the ground plane. Where they overlap they are pushed apart along the
+ * axis of least overlap (half each) and exchange an impulse there, with a little bounce and some rubbing, each
+ * turned by its own lever arm. Call once per fixed step after both have stepped; the overlap a step can create at a
+ * closing speed of 100 m/s is less than half a car's width, so the axis found is always the side they came from.
+ * @param {Vehicle} a
+ * @param {Vehicle} b
+ * @returns {boolean} whether they touched
+ */
+export function collideVehicles(a, b) {
+  const dy = a._com.y - b._com.y;
+  if (dy > a.params.box.top || -dy > b.params.box.top) return false; // one is passing over the other
+  const A = footprint(a, boxA);
+  const B = footprint(b, boxB);
+  const dx = A.cx - B.cx, dz = A.cz - B.cz;
+  if (dx * dx + dz * dz > (A.half + A.halfWidth + B.half + B.halfWidth) ** 2) return false;
+  // separating axes: the four face normals
+  let least = Infinity, nx = 0, nz = 0;
+  for (let i = 0; i < 4; i++) {
+    const box = i < 2 ? A : B;
+    const ax = i & 1 ? box.lx : box.fx;
+    const az = i & 1 ? box.lz : box.fz;
+    const gap = Math.abs(dx * ax + dz * az);
+    const overlap = reach(A, ax, az) + reach(B, ax, az) - gap;
+    if (overlap <= 0) return false;
+    if (overlap < least) {
+      least = overlap;
+      const way = dx * ax + dz * az < 0 ? -1 : 1; // from b towards a
+      nx = ax * way;
+      nz = az * way;
+    }
+  }
+  // where: the middle of the corners of each that are inside the other, or failing that between the centres
+  let px = 0, pz = 0, count = 0;
+  for (let k = 0; k < 2; k++) {
+    const box = k ? B : A;
+    const other = k ? A : B;
+    for (let i = 0; i < 4; i++) {
+      const x = box.cx + box.fx * (i & 1 ? -box.half : box.half) + box.lx * (i & 2 ? -box.halfWidth : box.halfWidth);
+      const z = box.cz + box.fz * (i & 1 ? -box.half : box.half) + box.lz * (i & 2 ? -box.halfWidth : box.halfWidth);
+      const ex = x - other.cx, ez = z - other.cz;
+      if (Math.abs(ex * other.fx + ez * other.fz) <= other.half + 1e-6 && Math.abs(ex * other.lx + ez * other.lz) <= other.halfWidth + 1e-6) {
+        px += x;
+        pz += z;
+        count++;
+      }
+    }
+  }
+  if (count) {
+    px /= count;
+    pz /= count;
+  } else {
+    px = (A.cx + B.cx) / 2;
+    pz = (A.cz + B.cz) / 2;
+  }
+
+  const ca = a._com, cb = b._com;
+  const va = a.velocity, vb = b.velocity;
+  const oa = a.angularVelocity, ob = b.angularVelocity;
+  const rax = px - ca.x, raz = pz - ca.z;
+  const rbx = px - cb.x, rbz = pz - cb.z;
+  const ka = a._invIy, kb = b._invIy;
+  // velocity of a's point relative to b's, in the ground plane
+  const rvx = va.x + oa.y * raz - (vb.x + ob.y * rbz);
+  const rvz = va.z - oa.y * rax - (vb.z - ob.y * rbx);
+  const closing = rvx * nx + rvz * nz;
+  if (closing < 0) {
+    const material = a.params.contact;
+    const armA = raz * nx - rax * nz, armB = rbz * nx - rbx * nz;
+    const bounce = material.restitution * clamp01((-closing - 0.5) / 2);
+    const jn = (-(1 + bounce) * closing) / (a._invMass + b._invMass + armA * armA * ka + armB * armB * kb);
+    const tx = nz, tz = -nx;
+    const along = rvx * tx + rvz * tz;
+    const tA = raz * tx - rax * tz, tB = rbz * tx - rbx * tz;
+    const limit = material.friction * jn;
+    const jt = clamp(-along / (a._invMass + b._invMass + tA * tA * ka + tB * tB * kb), -limit, limit);
+    const jx = nx * jn + tx * jt;
+    const jz = nz * jn + tz * jt;
+    va.x += jx * a._invMass;
+    va.z += jz * a._invMass;
+    oa.y += (raz * jx - rax * jz) * ka;
+    vb.x -= jx * b._invMass;
+    vb.z -= jz * b._invMass;
+    ob.y -= (rbz * jx - rbx * jz) * kb;
+    if (-closing > a.params.edges.impactSpeed) {
+      a._impact(-closing, px, ca.y, pz, nx, 0, nz, 'car', 0);
+      b._impact(-closing, px, cb.y, pz, -nx, 0, -nz, 'car', 0);
+    }
+  }
+  const share = a._invMass / (a._invMass + b._invMass);
+  ca.x += nx * least * share;
+  ca.z += nz * least * share;
+  cb.x -= nx * least * (1 - share);
+  cb.z -= nz * least * (1 - share);
+  a._asleep = b._asleep = false;
+  a._sync();
+  b._sync();
+  return true;
+}
