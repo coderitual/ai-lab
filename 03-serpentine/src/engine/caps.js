@@ -26,17 +26,20 @@ import * as THREE from 'three';
  * The engine's own numbers for each tier. Whoever builds something heavy
  * (the world, the car) is handed the tier's name and keeps its own table.
  *   pixelRatio   cap on the device pixel ratio
- *   msaa         samples of the scene target (0: none)
- *   blurTaps     motion blur samples per pixel
+ *   msaa         samples of the scene target (0: none, and the finished picture gets FXAA instead)
+ *   blurTaps     motion blur samples per pixel, at most (0: no motion blur)
+ *   blurInline   the motion blur is done by the last pass as it reads the scene, not by a pass of its own:
+ *                one full-size target and one pass less, and the glow is made from the unblurred scene
  *   bloomLevels  levels of the bloom pyramid
+ *   lens         chromatic aberration and lens ghosts are available (the Look says how much)
  *   probeSize    edge of a reflection probe's cube faces
  *   probeFaces   faces redrawn on a frame that redraws any
  *   probeEvery   redrawn every n-th frame
  */
 export const TIERS = {
-  low: { pixelRatio: 1.5, msaa: 0, blurTaps: 6, bloomLevels: 4, probeSize: 64, probeFaces: 1, probeEvery: 2 },
-  medium: { pixelRatio: 2, msaa: 4, blurTaps: 8, bloomLevels: 5, probeSize: 128, probeFaces: 1, probeEvery: 1 },
-  high: { pixelRatio: 2, msaa: 4, blurTaps: 14, bloomLevels: 6, probeSize: 256, probeFaces: 2, probeEvery: 1 },
+  low: { pixelRatio: 1.5, msaa: 0, blurTaps: 6, blurInline: true, bloomLevels: 4, lens: false, probeSize: 64, probeFaces: 1, probeEvery: 2 },
+  medium: { pixelRatio: 2, msaa: 4, blurTaps: 8, blurInline: false, bloomLevels: 5, lens: true, probeSize: 128, probeFaces: 1, probeEvery: 1 },
+  high: { pixelRatio: 2, msaa: 4, blurTaps: 14, blurInline: false, bloomLevels: 6, lens: true, probeSize: 256, probeFaces: 2, probeEvery: 1 },
 };
 
 /**

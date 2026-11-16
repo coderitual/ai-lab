@@ -296,7 +296,6 @@ const focus = new THREE.Vector3();
 engine.onResize(() => {
   rect.w = engine.bufferWidth;
   rect.h = engine.bufferHeight;
-  pipeline.scale = engine.renderScale;
 });
 engine.onContextRestored(() => world.restore());
 engine.onUpdate = (dt, simTime) => world.update(dt, simTime);
