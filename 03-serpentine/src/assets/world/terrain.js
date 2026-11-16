@@ -209,8 +209,10 @@ export function createTerrain({ track, tier, rng, material, lights }) {
           // does so for a while before the massif rises, so no hill stands over an open crest
           const fall = read(side > 0 ? track.farSlopeL : track.farSlopeR, spot.s);
           const open = smoothstep(0, -0.2, fall);
-          const rise = 0.22 * d + 0.42 * Math.max(0, d - 50);
-          const away = fall * Math.min(d, 45) + 0.4 * Math.max(0, d - 130);
+          // the foot of the steep part wanders, so it never draws the road's outline a constant way off
+          const foot = 30 + 60 * noise.fbm(x / 260 + 5, z / 260, 2);
+          const rise = 0.22 * d + 0.42 * Math.max(0, d - foot);
+          const away = fall * Math.min(d, 45) + 0.4 * Math.max(0, d - 80 - foot);
           v = Math.max(Math.min(base + rise + (away - rise) * open, cap), Math.min(base + fall * 45 * open, cap));
         } else {
           v = Math.max(base - 0.25 * d, g);
@@ -298,13 +300,89 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     else if (zone === 2) y = Math.min(y, read(track.py, s) - read(ravine, s) - 0.1 * Math.abs(lat));
     return y;
   }
+  // Where another stretch of road lies beside this one (the hairpins' legs), the ground between them is shared:
+  // per sample and side, how far out (|lat|, m) the other stretch's ground takes over (GAP_FREE: nowhere within
+  // reach), and where on the other stretch that line lies. Between two legs the height is a blend of what each
+  // asks for, weighted by how far the point is from each one's solid edge, so the two meet on one surface along
+  // the line between them instead of in a step.
+  const GAP_FREE = 400;
+  const GAP_EVERY = 4;
+  const gap = [new Float32Array(n).fill(GAP_FREE), new Float32Array(n).fill(GAP_FREE)];
+  const gapS = [new Float32Array(n), new Float32Array(n)];
+  const gapLat = [new Float32Array(n), new Float32Array(n)];
+  {
+    const p = new THREE.Vector3();
+    for (let i = 0; i < n; i += GAP_EVERY) {
+      for (let half = 0; half < 2; half++) {
+        const side = half === 0 ? 1 : -1;
+        const edge = side > 0 ? track.edgeL[i] : track.edgeR[i];
+        for (let d = edge + 6; d < 220; d += 4) {
+          track.pointAt(i * ds, side * d, p);
+          track.locate(p.x, p.z, -1, spot);
+          if (Math.abs(track.delta(i * ds, spot.s)) > 6) {
+            // not where the other stretch passes over or under this one (a crossing): there each keeps its own
+            if (Math.abs(read(track.py, spot.s) - track.py[i]) < 30 && d > edge + 8) {
+              gap[half][i] = d;
+              gapS[half][i] = spot.s;
+              gapLat[half][i] = spot.lat;
+            }
+            break;
+          }
+        }
+      }
+    }
+    for (let half = 0; half < 2; half++) {
+      for (let i = 0; i < n; i++) {
+        if (i % GAP_EVERY === 0) continue;
+        const a = i - (i % GAP_EVERY);
+        const b = (a + GAP_EVERY) % n;
+        const t = (i % GAP_EVERY) / GAP_EVERY;
+        if (gap[half][a] < GAP_FREE && gap[half][b] < GAP_FREE && Math.abs(track.delta(gapS[half][a], gapS[half][b])) < 3 * GAP_EVERY * ds) {
+          // between two samples that see the same stretch: in between, smoothly
+          gap[half][i] = gap[half][a] + (gap[half][b] - gap[half][a]) * t;
+          gapS[half][i] = wrap(gapS[half][a] + track.delta(gapS[half][a], gapS[half][b]) * t);
+          gapLat[half][i] = gapLat[half][a] + (gapLat[half][b] - gapLat[half][a]) * t;
+        } else {
+          const k = gap[half][a] <= gap[half][b] ? a : b; // the nearer of the two: never later than either
+          gap[half][i] = gap[half][k];
+          gapS[half][i] = gapS[half][k];
+          gapLat[half][i] = gapLat[half][k];
+        }
+      }
+    }
+  }
+  phases.gap = Math.round(performance.now() - started);
+
   /** H at a point whose track coordinates are known. */
   function heightOf(x, z, s, lat) {
     const side = lat >= 0 ? 1 : -1;
     const edge = track.edgeAt(s, side);
     const d = Math.max(0, Math.abs(lat) - edge);
-    const w = smoothstep(10, 100, d);
-    const near = nearAt(s, lat, edge, d);
+    let near = nearAt(s, lat, edge, d);
+    let reach = 1;
+    if (d > 0) {
+      const half = side > 0 ? 0 : 1;
+      const f = wrap(s) / ds;
+      const i = Math.floor(f) % n;
+      const j = i + 1 === n ? 0 : i + 1;
+      const t = f - Math.floor(f);
+      const smooth = gap[half][i] < GAP_FREE && gap[half][j] < GAP_FREE && Math.abs(track.delta(gapS[half][i], gapS[half][j])) < 3 * ds;
+      const g = smooth ? gap[half][i] + (gap[half][j] - gap[half][i]) * t : gap[half][t < 0.5 ? i : j];
+      if (g < GAP_FREE) {
+        const k = t < 0.5 ? i : j;
+        const gl = smooth ? gapLat[half][i] + (gapLat[half][j] - gapLat[half][i]) * t : gapLat[half][k];
+        // the other stretch: how far this point is from its centre line, on the side where the switch was found
+        const latB = gl + Math.sign(gl) * Math.max(0, g - Math.abs(lat));
+        const sB = smooth ? gapS[half][i] + track.delta(gapS[half][i], gapS[half][j]) * t : gapS[half][k];
+        const sideB = latB >= 0 ? 1 : -1;
+        const edgeB = track.edgeAt(sB, sideB);
+        const dB = Math.max(0, Math.abs(latB) - edgeB);
+        const hB = nearAt(sB, latB, edgeB, dB);
+        near += (hB - near) * smoothstep(0, 1, d / (d + dB + 1e-3));
+        reach = smoothstep(80, 200, g);
+      }
+    }
+    const w = smoothstep(10, 100, d) * reach;
     if (w <= 0) return near;
     const far = (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detail(x, z) * smoothstep(15, 150, d);
     return near + (far - near) * w;
@@ -369,6 +447,15 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     return out;
   }
 
+  // on the inside of a tight bend the band's rows would cross over one another beyond the bend's centre: there
+  // they stop short of it (and the grid fills in), per sample the reach allowed on the inside (|lat|, m)
+  const innerReach = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let k = 0;
+    for (let b = -8; b <= 8; b++) k = Math.max(k, Math.abs(track.curvature[(i + b + n) % n]));
+    innerReach[i] = k > 1e-4 ? 0.8 / k : 1e9;
+  }
+
   function buildBand(rowList) {
     const count = rowList.length * 2 * cols;
     const pos = new Float32Array(count * 3);
@@ -392,7 +479,9 @@ export function createTerrain({ track, tier, rng, material, lights }) {
         let lastOwn = 0;
         for (let k = 0; k < cols; k++) {
           let lat = side * (edge + offs[k]);
-          if (k >= 9) {
+          const inner = side * track.curvature[i] > 0 && edge + offs[k] > innerReach[i];
+          if (k >= 2 && inner) lat = side * (edge + offs[lastOwn]);
+          else if (k >= 9) {
             // stop where another stretch of the road is nearer than this one
             track.pointAt(s, lat, pt);
             track.locate(pt.x, pt.z, -1, spot);
@@ -445,6 +534,8 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   const gHeight = new Float32Array(gw * gh);
   const gS = new Float32Array(gw * gh).fill(-1);
   const gLat = new Float32Array(gw * gh);
+  const gridX1 = minX + (gw - 1) * cell;
+  const gridZ1 = minZ + (gh - 1) * cell;
   {
     let hint = -1;
     for (let j = 0; j < gh; j++) {
@@ -459,6 +550,12 @@ export function createTerrain({ track, tier, rng, material, lights }) {
           gLat[k] = spot.lat;
           gHeight[k] = heightOf(x, z, spot.s, spot.lat);
         } else gHeight[k] = land(x, z);
+        // towards its border the grid eases onto the far land, so the two meet without a step
+        const e = Math.min(x - minX, gridX1 - x, z - minZ, gridZ1 - z);
+        if (e < 220) {
+          const far = bilinear(farHeight, farN, farN, farX0, farZ0, FAR_CELL, x, z);
+          gHeight[k] += (far - gHeight[k]) * smoothstep(220, 30, e);
+        }
       }
     }
   }
@@ -485,7 +582,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
       if (slope > best) best = slope;
     }
     // a soft edge a few degrees wide: the grid is coarse, and the sun is not a point
-    return smoothstep(-0.05, 0.05, dir.elevation - Math.atan(best));
+    return smoothstep(-0.09, 0.09, dir.elevation - Math.atan(best));
   }
   function marchSky(x, z, h0) {
     let sum = 0;
@@ -507,6 +604,19 @@ export function createTerrain({ track, tier, rng, material, lights }) {
       bakeGrid[k] = marchSun(x, z, h0, dirs[0], 2600);
       bakeGrid[k + 1] = marchSun(x, z, h0, dirs[1], 2600);
       bakeGrid[k + 2] = marchSky(x, z, h0);
+    }
+  }
+  // blurred once, so the edge of a valley's shadow is soft rather than stepped by the triangles that carry it
+  {
+    const tmp = new Float32Array(bakeGrid);
+    for (let j = 1; j < bh - 1; j++) {
+      for (let i = 1; i < bw - 1; i++) {
+        for (let c = 0; c < 2; c++) {
+          let sum = 0;
+          for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) sum += tmp[((j + b) * bw + i + a) * 3 + c] * (a || b ? 1 : 2);
+          bakeGrid[(j * bw + i) * 3 + c] = sum / 10;
+        }
+      }
     }
   }
   function bakeAt(x, z, out, o) {
@@ -632,9 +742,12 @@ export function createTerrain({ track, tier, rng, material, lights }) {
         const x = x0 + i * FAR_CELL;
         const z = z0 + j * FAR_CELL;
         // inside the grid it lies well under it, out of sight, so the two never fight
-        const under = x > minX + FAR_CELL && x < maxX - FAR_CELL && z > minZ + FAR_CELL && z < maxZ - FAR_CELL;
+        // (the far vertices next to the grid's border stay at their height, a little under the grid's edge, which
+        // eases onto them, so the far land's triangles that reach under the grid never open a trench at its border)
+        const under = x > minX + 2 * FAR_CELL && x < maxX - 2 * FAR_CELL && z > minZ + 2 * FAR_CELL && z < maxZ - 2 * FAR_CELL;
+        const overlap = x > minX && x < maxX && z > minZ && z < maxZ;
         pos[v * 3] = x;
-        pos[v * 3 + 1] = under ? heights[v] - 40 : heights[v];
+        pos[v * 3 + 1] = under ? heights[v] - 40 : overlap ? heights[v] - 1.5 : heights[v];
         pos[v * 3 + 2] = z;
         const h0 = heights[v] + 2;
         bake[v * 3] = marchSun(x, z, h0, dirs[0], 4000);
@@ -665,12 +778,14 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   group.name = 'terrain';
   for (const geometry of [...bandGeometries, ...gridGeometries]) {
     const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = bandGeometries.includes(geometry) ? 'terrain-band' : 'terrain-grid';
     mesh.receiveShadow = true;
     mesh.castShadow = true;
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
   }
   const far = new THREE.Mesh(farGeometry, material);
+  far.name = 'terrain-far';
   far.receiveShadow = true;
   far.matrixAutoUpdate = false;
   group.add(far);
