@@ -46,7 +46,8 @@ function createBeamTexture(high) {
       const spread = Math.exp(-((right / 17) ** 2)) * 0.75 + Math.exp(-((right / 6) ** 2)) * 0.25;
       // a trace above the cut-off, so that signs and reflector posts answer
       let value = (edge + 0.008 * (1 - edge)) * depth * spread;
-      if (high) value += HIGH_GAIN * Math.exp(-Math.LN2 * ((right / 10) ** 2 + ((up - 0.5) / 3.5) ** 2));
+      // (main beam's spot falls off towards the car like dipped beam does, or it whitens the road by the bumper)
+      if (high) value += HIGH_GAIN * depth * Math.exp(-Math.LN2 * ((right / 10) ** 2 + ((up - 0.5) / 3.5) ** 2));
       const o = (y * width + x) * 4;
       data[o] = data[o + 1] = data[o + 2] = THREE.DataUtils.toHalfFloat(value);
       data[o + 3] = one;

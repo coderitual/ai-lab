@@ -609,7 +609,7 @@ export function createPlateMaterial(shared, caps, { map, normalMap }) {
   patch(material, shared, caps, {
     replace: [
       ['#include <lights_fragment_maps>', REFLECTIONS(false)],
-      ['#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * step(vCarPos.z, 0.0) * carLampsA.w * 0.5;'],
+      ['#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * step(vCarPos.z, 0.0) * carLampsA.w * 0.06;'],
     ],
   });
   return material;

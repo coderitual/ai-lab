@@ -10,7 +10,8 @@
 //   asset=world    the world alone, looking at the same spot
 //   asset=wheel    a front and a rear wheel alone (side=left|right, only=front|rear, steer, spin, travel, omega)
 //   time=day|night   q=low|medium|high   paint=NAME   plate=TEXT   manual   post=0   dpr=N   (as in the game)
-//   lights=off|drl|low|high|brake|all    the car's lamps (default: what the time of day asks for)
+//   lights=off|drl|low|high|brake|all    the car's lamps (default: what the time of day asks for); or a list of
+//                  setLights names, each at full strength: lights=tail,reverse,indicatorL
 //   s=120          track distance to stand at (default: the first grid slot)
 //
 // The camera. All positions are in the frame of the thing looked at, which
@@ -126,8 +127,9 @@ function lampPreset(name) {
   if (name === 'high') return { ...off, ...LAMPS.low, high: 1 };
   if (name === 'brake') return { ...off, ...auto, brake: 1 };
   if (name === 'all') return { drl: 1, low: 1, high: 1, tail: 1, brake: 1, reverse: 1, indicatorL: 1, indicatorR: 1, interior: 1 };
-  // a list of single functions at full strength, e.g. lights=tail,reverse,indicatorL
-  if (name && name.split(',').every((k) => k in off)) return { ...off, ...Object.fromEntries(name.split(',').map((k) => [k, 1])) };
+  // a list of single functions at full strength, e.g. lights=tail,reverse,indicatorL (params.js keeps only presets)
+  const list = (new URLSearchParams(location.search).get('lights') || '').split(',');
+  if (list.length > 1 || list[0] in off) return { ...off, ...Object.fromEntries(list.filter((k) => k in off).map((k) => [k, 1])) };
   return { ...off, ...auto };
 }
 
