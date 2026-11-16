@@ -137,7 +137,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     const drop = b.drop ?? 30;
     for (let i = Math.ceil(b.s0 / ds); i <= Math.floor(b.s1 / ds); i++) {
       const u = (i * ds - b.s0) / (b.s1 - b.s0);
-      ravine[i % n] = Math.max(1.5, drop * Math.pow(Math.sin(Math.PI * u), 0.6));
+      ravine[i % n] = Math.max(1.5, drop * Math.pow(Math.max(0, Math.sin(Math.PI * u)), 0.6));
     }
   }
   const zoneOf = (s) => {
@@ -269,30 +269,35 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   }
   /** Height of the corridor and its hillside at track coordinates, before the land takes over. */
   function nearAt(s, lat, edge, d) {
-    const zone = zoneOf(s);
-    if (zone === 1) return read(track.py, s) + BORE_HEIGHT + read(cover, s);
-    if (zone === 2) return Math.min(read(track.py, s) - 1.5, read(track.py, s) - read(ravine, s) - 0.15 * lat);
-    if (d <= 0) return track.profile(s, lat, prof).y;
-    const side = lat > 0 ? 1 : -1;
-    const yE = track.profile(s, side * edge, prof).y;
-    const c = cliffAt(s, side);
-    let y = yE;
-    let beyond = d;
-    if (c.height > 0.01) {
-      const foot = FOOT * c.rock;
-      y += c.height * smoothstep(0, 1, (d - foot) / (LEAN * c.height));
-      beyond = Math.max(0, d - c.top);
+    let y;
+    if (d <= 0) y = track.profile(s, lat, prof).y;
+    else {
+      const side = lat > 0 ? 1 : -1;
+      y = track.profile(s, side * edge, prof).y;
+      const c = cliffAt(s, side);
+      let beyond = d;
+      if (c.height > 0.01) {
+        const foot = FOOT * c.rock;
+        y += c.height * smoothstep(0, 1, (d - foot) / (LEAN * c.height));
+        beyond = Math.max(0, d - c.top);
+      }
+      const far = read(side > 0 ? track.farSlopeL : track.farSlopeR, s);
+      y += far * 40 * (1 - Math.exp(-beyond / 40));
     }
-    const far = read(side > 0 ? track.farSlopeL : track.farSlopeR, s);
-    return y + far * 40 * (1 - Math.exp(-beyond / 40));
+    // over a bore the ground stays above its crown, falling away to the sides; under a deck it keeps clear of it.
+    // Both ease to nothing at their ends, so the ground is continuous along the road (except in the portals,
+    // which are cut open)
+    const zone = zoneOf(s);
+    if (zone === 1) y = Math.max(y, read(track.py, s) + BORE_HEIGHT + read(cover, s) - 0.35 * Math.max(0, d - 4));
+    else if (zone === 2) y = Math.min(y, read(track.py, s) - read(ravine, s) - 0.1 * Math.abs(lat));
+    return y;
   }
   /** H at a point whose track coordinates are known. */
   function heightOf(x, z, s, lat) {
     const side = lat >= 0 ? 1 : -1;
     const edge = track.edgeAt(s, side);
     const d = Math.max(0, Math.abs(lat) - edge);
-    const zone = zoneOf(s);
-    const w = zone ? smoothstep(3, 60, d) : smoothstep(10, 100, d);
+    const w = smoothstep(10, 100, d);
     const near = nearAt(s, lat, edge, d);
     if (w <= 0) return near;
     const far = (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detail(x, z) * smoothstep(15, 150, d);

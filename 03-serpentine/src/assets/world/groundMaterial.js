@@ -45,19 +45,21 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
   const g = new Float32Array(size * size);
   const b = new Float32Array(size * size);
   const height = new Float32Array(size * size);
+  const rockHeight = new Float32Array(size * size);
   for (let i = 0; i < r.length; i++) {
     r[i] = 0.65 * clumps[i] + 0.35 * (1 - blades[i]);
     // strata: bands across the texture's v, wavering with the gradient noise, cut by cracks
     const y = Math.floor(i / size) / size;
-    const band = 0.5 + 0.5 * Math.sin((y * 9 + strata[i] * 2.2) * Math.PI * 2);
-    g[i] = Math.min(1, 0.45 * band + 0.45 * strata[i] + 0.25) * (0.55 + 0.45 * Math.min(1, cracks[i] * 4));
+    const band = Math.pow(0.5 + 0.5 * Math.sin((y * 11 + strata[i] * 1.6) * Math.PI * 2), 0.6);
+    g[i] = Math.min(1, 0.5 * band + 0.4 * strata[i] + 0.12) * (0.72 + 0.28 * Math.min(1, cracks[i] * 14));
+    rockHeight[i] = 0.55 * band + 0.45 * strata[i];
     b[i] = 1 - pebbles[i];
     height[i] = 0.45 * r[i] + 0.35 * b[i] + 0.2 * g[i];
   }
   const detail = fieldTexture(size, [r, g, b, litter], { anisotropy });
   const detailNormal = normalTexture(size, height, { relief: 0.03, anisotropy });
-  // rock has its own relief: the strata and the cracks, none of the turf's clumps and pebbles
-  const rockNormal = normalTexture(size, g, { relief: 0.045, anisotropy });
+  // rock has its own relief: the strata, none of the turf's clumps and pebbles
+  const rockNormal = normalTexture(size, rockHeight, { relief: 0.045, anisotropy });
   // large: r lush or dry, g where rock breaks through, b another tone, a snow's ragged edge
   const ls = 256;
   const large = fieldTexture(
