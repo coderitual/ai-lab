@@ -17,6 +17,12 @@
 // The engine does not know what is drawn. Each frame it calls onUpdate once
 // per fixed step, then onRender (pose things between the steps), then onDraw
 // (draw every view).
+//
+// A picture taken after fast-forwarding (?t=, skip()) is drawn twice: once as
+// things were before the last step and once as they are after it. Whatever
+// compares a frame with the one before (the motion blur) then has a real pair
+// to compare, one step apart, and a still shows the same streaks as a frame
+// of the running game.
 
 import * as THREE from 'three';
 
@@ -31,8 +37,25 @@ const MAX_STEPS = 16;
 const SCALE_STEPS = [1, 0.85, 0.72, 0.6, 0.5];
 /** Below about 48 frames a second for a while: give up some resolution. */
 const SLOW_FRAME = 1 / 48;
+/**
+ * More of the run than this between two drawn frames: the next one has no usable predecessor (see the header).
+ * More than MAX_STEPS steps, so that a slow frame of the running game is never drawn twice.
+ */
+const COLD_GAP = 0.15;
+
+/** Which engine made which renderer, so that the frame pipeline can ask for the frame's time (Engine.of). */
+const engines = new WeakMap();
 
 export class Engine {
+  /**
+   * The engine that owns `renderer`, or null.
+   * @param {THREE.WebGLRenderer} renderer
+   * @returns {Engine|null}
+   */
+  static of(renderer) {
+    return engines.get(renderer) ?? null;
+  }
+
   /**
    * @param {HTMLElement} container element the canvas fills
    * @param {{ manual?: boolean, pixelRatio?: number|null, maxPixelRatio?: number, draw?: boolean }} [options]
@@ -66,6 +89,7 @@ export class Engine {
     // counted over all the passes of a frame: reset here, once, before each frame is drawn
     renderer.info.autoReset = false;
     this.renderer = renderer;
+    engines.set(renderer, this);
 
     const canvas = renderer.domElement;
     canvas.style.cssText = 'display:block;width:100%;height:100%;touch-action:none;';
@@ -88,6 +112,11 @@ export class Engine {
     /** Seconds of the run so far: `step` fixed steps. */
     this.simTime = 0;
     this.step = 0;
+    /**
+     * The moment of the run the frame being drawn shows, in seconds: between the last two steps, where `alpha`
+     * puts it. Two frames with the same renderTime show the same moment.
+     */
+    this.renderTime = 0;
     /** Frames drawn. */
     this.frame = 0;
     /** Smoothed real time between frames, in milliseconds (0 until the loop has run). */
@@ -106,6 +135,8 @@ export class Engine {
 
     this._accumulator = 0;
     this._last = 0;
+    this._drawnStep = 0; // the step count when a frame was last drawn
+    this._lead = 0; // 1 after a cold frame, which showed the present and not the usual one step back, until time moves
     this._sizeDirty = true;
     this._resizeListeners = [];
     this._restoreListeners = [];
@@ -257,12 +288,22 @@ export class Engine {
       steps++;
     }
     if (steps === MAX_STEPS) this._accumulator = 0;
+    if (steps > 0) this._lead = 0;
     if (!draw || !this.draws || this.contextLost) return;
-    const alpha = Math.min(1, Math.max(0, this._accumulator / FIXED_DT));
-    const renderTime = this.simTime + alpha * FIXED_DT;
+    if ((this.step - this._drawnStep) * FIXED_DT > COLD_GAP) {
+      // nothing was drawn for a while: first the frame one step back, for the next one to be compared with
+      this._drawFrame(0, 0);
+      this._lead = 1;
+    }
+    this._drawnStep = this.step;
+    this._drawFrame(frameDt, Math.min(1, Math.max(0, this._accumulator / FIXED_DT + this._lead)));
+  }
+
+  _drawFrame(frameDt, alpha) {
+    this.renderTime = this.simTime + alpha * FIXED_DT;
     this.renderer.info.reset();
-    if (this.onRender) this.onRender(frameDt, alpha, renderTime);
-    if (this.onDraw) this.onDraw(renderTime);
+    if (this.onRender) this.onRender(frameDt, alpha, this.renderTime);
+    if (this.onDraw) this.onDraw(this.renderTime);
     this.frame++;
   }
 

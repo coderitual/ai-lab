@@ -100,7 +100,7 @@
  * @property {number} exposure under the open sky
  * @property {number} tunnelExposure inside the tunnel; the game eases between the two with track.sky
  *
- * @property {import('../../engine/FramePipeline.js').Look & { ghosts?: number }} look the grade of the finished picture
+ * @property {import('../../engine/FramePipeline.js').Look} look the grade of the finished picture
  *
  * @property {{ street: number, tunnel: number, windows: number }} lamps how far each kind of lamp is turned up, 0..1
  * @property {'drl'|'low'} carLights what a car's automatic lamps do under the open sky (in the tunnel: always low)
@@ -170,7 +170,7 @@ export const TIMES = {
     exposure: 1,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
-    look: { toe: 0.012, shoulder: 1.6, contrast: 1.08, saturation: 1.06, tint: [1.0, 0.99, 0.965], vignette: 0.22, grain: 0.6, bloom: 0.1 },
+    look: { contrast: 1.08, saturation: 1.06, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.22, chroma: 0.0012, grain: 0.6, bloom: 0.1, ghosts: 0.03 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     carLights: 'drl',
   },
@@ -202,7 +202,7 @@ export const TIMES = {
     exposure: 32,
     // the lit tunnel is two stops brighter than the moonlit road outside
     tunnelExposure: 8,
-    look: { toe: 0.02, shoulder: 1.5, contrast: 1.1, saturation: 0.94, tint: [0.95, 0.985, 1.05], vignette: 0.32, grain: 1.2, bloom: 0.15 },
+    look: { contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], lift: [0.0006, 0.0009, 0.0018], vignette: 0.32, chroma: 0.0012, grain: 1.2, bloom: 0.15, ghosts: 0.03 },
     lamps: { street: 1, tunnel: 1, windows: 1 },
     carLights: 'low',
   },

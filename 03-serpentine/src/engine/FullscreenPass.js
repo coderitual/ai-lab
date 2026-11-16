@@ -34,6 +34,7 @@ const PASS_HEADER = /* glsl */ `
 precision highp float;
 precision highp int;
 precision highp sampler2D;
+precision highp samplerCube;
 layout(location = 0) out highp vec4 outColor;
 in vec2 vUv;
 `;
