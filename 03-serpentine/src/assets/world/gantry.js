@@ -195,7 +195,7 @@ function buildLayBy(lay, spot, terrain, standard) {
   const pad = new THREE.PlaneGeometry(16, 12, 8, 6).rotateX(-Math.PI / 2);
   const pp = pad.attributes.position;
   for (let i = 0; i < pp.count; i++) {
-    const p = at(pp.getX(i), pp.getZ(i) + 2);
+    const p = at(pp.getX(i), pp.getZ(i) - 1);
     pp.setXYZ(i, p.x, terrain.heightAt(p.x, p.z) + 0.04, p.z);
   }
   pad.computeVertexNormals();
@@ -208,8 +208,8 @@ function buildLayBy(lay, spot, terrain, standard) {
   const fence = [];
   for (let k = 0; k <= 8; k++) {
     const x = -8 + k * 2;
-    fence.push(place(x, 7.6, ground(x, 7.6) - 0.3, 0.12, 1.35, 0.12));
-    if (k < 8) for (const h of [0.45, 0.9]) fence.push(place(x + 1, 7.6, ground(x + 1, 7.6) + h, 2.0, 0.09, 0.05));
+    fence.push(place(x, 4.6, ground(x, 4.6) - 0.3, 0.12, 1.35, 0.12));
+    if (k < 8) for (const h of [0.45, 0.9]) fence.push(place(x + 1, 4.6, ground(x + 1, 4.6) + h, 2.0, 0.09, 0.05));
   }
   lay.group.add(row(box, wood, fence, { name: 'lay-by-fence' }));
   const bench = mergeGeometries([
@@ -218,5 +218,5 @@ function buildLayBy(lay, spot, terrain, standard) {
     new THREE.BoxGeometry(0.08, 0.45, 0.36).translate(-0.7, 0.22, 0),
     new THREE.BoxGeometry(0.08, 0.45, 0.36).translate(0.7, 0.22, 0),
   ]);
-  lay.group.add(row(bench, wood, [place(-4.8, 4.8, ground(-4.8, 4.8)), place(4.8, 4.8, ground(4.8, 4.8))], { name: 'lay-by-benches' }));
+  lay.group.add(row(bench, wood, [place(-4.8, 3.4, ground(-4.8, 3.4)), place(4.8, 3.4, ground(4.8, 3.4))], { name: 'lay-by-benches' }));
 }
