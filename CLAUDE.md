@@ -1,8 +1,7 @@
 # ai-lab
 
 Small browser experiments, one per numbered folder (`NN-name/`), each published
-to GitHub Pages by `.github/workflows/pages.yml` on every push to the default
-branch.
+to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
 
 ## Standing rules
 
