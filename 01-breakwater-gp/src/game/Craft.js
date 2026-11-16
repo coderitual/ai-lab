@@ -11,13 +11,21 @@ import { makeSurfaceSample, sampleSurface } from '../engine/waves.js';
 import { CRAFT_TUNE as T, HULL } from './config.js';
 
 const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
-const sBow = makeSurfaceSample();
-const sStern = makeSurfaceSample();
-const sPort = makeSurfaceSample();
-const sStbd = makeSurfaceSample();
 const sMid = makeSurfaceSample();
+/** Where the hull meets the water: under each end of each hull ([to port, forward], m). */
+const FLOATS = [
+  [HULL.beam, HULL.bow],
+  [-HULL.beam, HULL.bow],
+  [HULL.beam, -HULL.stern],
+  [-HULL.beam, -HULL.stern],
+];
+const floats = FLOATS.map(() => makeSurfaceSample());
 
 const FLOAT_DEPTH = T.gravity / T.buoyancy; // how far below the float line gravity is balanced
+// How stiffly the four points hold the hull level (1/s²): a push of this times an
+// angle is what it takes to hold the hull at that angle (used for trim and bank).
+const PITCH_SPRING = (T.buoyancy * (HULL.bow * HULL.bow + HULL.stern * HULL.stern)) / 2 / T.pitchInertia;
+const ROLL_SPRING = (T.buoyancy * HULL.beam * HULL.beam) / T.rollInertia;
 
 export class Craft {
   constructor({ team, number }) {
@@ -54,7 +62,7 @@ export class Craft {
     this.waterY = 0;
     this.undisplacedX = 0; // sea-space coordinates under the stern (for wakes)
     this.undisplacedZ = 0;
-    this.heave = 0; // smoothed vertical kick
+    this.slip = 0; // angle between where the bows point and where the boat is going (> 0: sliding to port)
 
     /** One-shot events for effects / audio: 'land' (strength), 'bump' (strength). */
     this.events = [];
@@ -81,7 +89,6 @@ export class Craft {
     this.grip = 1;
     this.speed = Math.abs(speed);
     this.forwardSpeed = speed;
-    this.heave = 0;
     this._syncQuat();
     this.prevPos.copy(this.pos);
     this.prevQuat.copy(this.quat);
@@ -114,49 +121,82 @@ export class Craft {
     const p = this.pos;
     const v = this.vel;
 
-    // ---- the sea under the hull
-    sampleSurface(p.x, p.z, time, sMid);
-    sampleSurface(p.x + fx * HULL.bow, p.z + fz * HULL.bow, time, sBow);
-    sampleSurface(p.x - fx * HULL.stern, p.z - fz * HULL.stern, time, sStern);
-    sampleSurface(p.x + lx * HULL.beam, p.z + lz * HULL.beam, time, sPort);
-    sampleSurface(p.x - lx * HULL.beam, p.z - lz * HULL.beam, time, sStbd);
-    const waterY = sMid.y * 0.4 + (sBow.y + sStern.y) * 0.2 + (sPort.y + sStbd.y) * 0.1;
-    this.waterY = waterY;
-    this.undisplacedX = sStern.px;
-    this.undisplacedZ = sStern.pz;
-
-    // ---- heave: a one-sided spring (water pushes up, only gravity pulls down)
+    // ---- the sea under the hull: four points, one under each end of each hull.
+    // Each is pushed up by the water it is in (and by nothing when it is out of
+    // it: water pushes, only gravity pulls). Their sum lifts the boat; their
+    // differences pitch and roll it. Nothing tells the hull what attitude to
+    // take: it lies on the water because that is where the forces balance, and
+    // it comes down tails first, or one hull first, because that is what happened.
     const forward = v.x * fx + v.z * fz;
     const lateral = v.x * lx + v.z * lz;
-    const planing = T.planing * clamp01(Math.abs(forward) / 18);
-    const depth = waterY + planing + FLOAT_DEPTH - p.y;
-    const wasAir = this.airborne;
-    let grip = 0;
-    let ay = -T.gravity;
-    if (depth > 0) {
-      grip = clamp01(depth / (FLOAT_DEPTH * 0.9));
+    const fwdAbs = Math.abs(forward);
+    const planing = T.planing * clamp01(fwdAbs / 18);
+    const sinPitch = Math.sin(this.pitch);
+    const sinRoll = Math.sin(this.roll);
+    let lift = 0; // m/s² upward, all four together
+    let pitchPush = 0; // their turning effect, bow up
+    let rollPush = 0; // and port side up
+    let wet = 0; // how many of the four are in the water, by depth
+    let wetAft = 0; // and of the two under the tails
+    let level = 0;
+    let impact = 0;
+    let nx = 0;
+    let nz = 0;
+    let ny = 0;
+    let sternX = 0;
+    let sternZ = 0;
+    for (let i = 0; i < 4; i++) {
+      const ox = FLOATS[i][0];
+      const oz = FLOATS[i][1];
+      const w = floats[i];
+      sampleSurface(p.x + lx * ox + fx * oz, p.z + lz * ox + fz * oz, time, w);
+      level += w.y;
+      if (oz < 0) {
+        // (the two under the tails also say where the wake starts, in the water's own frame)
+        sternX += w.px - lx * ox;
+        sternZ += w.pz - lz * ox;
+      }
+      // where this bit of the keel is, and how fast it is moving up or down
+      const keel = p.y + oz * sinPitch + ox * sinRoll - HULL.draft;
+      const depth = w.y + planing - keel;
+      if (depth <= 0) continue;
+      const rise = v.y + oz * this.pitchRate + ox * this.rollRate - w.vy;
+      const hold = clamp01(depth / (FLOAT_DEPTH * 0.9));
       // linear near the float line, stiffer once the deck starts going under
       const deep = Math.max(0, depth - FLOAT_DEPTH - 0.04);
-      const vRel = v.y - sMid.vy;
-      ay += T.buoyancy * Math.min(depth, 1.2) + T.deepBuoyancy * deep * deep - T.heaveDamping * vRel * grip;
-      // slamming into the water sheds speed fast (drag ~ v²), so a hard landing
-      // stops the hull near the surface instead of bouncing it back out
-      if (vRel < 0 && depth > FLOAT_DEPTH) ay += T.slamDrag * vRel * vRel * clamp01((depth - FLOAT_DEPTH) / 0.12);
+      let f = T.buoyancy * Math.min(depth, 1.2) + T.deepBuoyancy * deep * deep - T.heaveDamping * rise * hold;
+      // driving down into the water sheds speed fast (drag ~ v²), so a hard landing
+      // is stopped near the surface instead of being bounced back out
+      if (rise < 0 && depth > FLOAT_DEPTH) f += T.slamDrag * rise * rise * clamp01((depth - FLOAT_DEPTH) / 0.12);
+      lift += f;
+      pitchPush += f * oz;
+      rollPush += f * ox;
+      wet += hold;
+      if (oz < 0) wetAft += hold;
+      if (-rise > impact) impact = -rise;
+      nx += w.nx * hold;
+      ny += w.ny * hold;
+      nz += w.nz * hold;
     }
+    lift *= 0.25;
+    pitchPush *= 0.25;
+    rollPush *= 0.25;
+    this.waterY = level * 0.25;
+    this.undisplacedX = sternX * 0.5;
+    this.undisplacedZ = sternZ * 0.5;
+    // 0 in the air .. 1 sitting in the water; the tails matter for drive and helm
+    const grip = clamp01(wet * 0.25);
+    const gripAft = clamp01(wetAft * 0.5);
     this.grip = grip;
-    const vyBefore = v.y;
-    v.y += ay * dt;
-    this.heave = damp(this.heave, clamp(ay / T.gravity, -1.5, 3), 6, dt);
 
-    if (depth > 0) {
-      if (wasAir) {
-        const impact = Math.max(0, sMid.vy - vyBefore);
-        if (this.airTime > 0.16 && impact > 1.2) {
-          this.events.push({ type: 'land', strength: clamp01(impact / 9), airTime: this.airTime });
-          const loss = clamp(impact * 0.016, 0, 0.16);
-          v.x *= 1 - loss;
-          v.z *= 1 - loss;
-        }
+    const wasAir = this.airborne;
+    v.y += (lift - T.gravity) * dt;
+    if (wet > 0) {
+      if (wasAir && this.airTime > 0.16 && impact > 1.4) {
+        this.events.push({ type: 'land', strength: clamp01((impact - 0.6) / 10), airTime: this.airTime });
+        const loss = clamp(impact * 0.014, 0, 0.14);
+        v.x *= 1 - loss;
+        v.z *= 1 - loss;
       }
       this.airborne = false;
       this.airTime = 0;
@@ -165,45 +205,50 @@ export class Craft {
       if (this.airTime > 0.05) this.airborne = true;
     }
 
-    // ---- drive, drag and grip
+    // ---- drive and drag
     const vmax = this.maxSpeed;
     const c1 = T.linearDrag;
     const c2 = (T.thrust - c1 * vmax) / (vmax * vmax);
-    const thrust = T.thrust * this.throttle * Math.sqrt(grip);
-    const dragF = (c1 * forward + c2 * forward * Math.abs(forward)) * (0.12 + 0.88 * grip);
-    const brakeF = this.brake * T.brakeDrag * clamp(forward / 3, -1, 1) * grip;
-    // sliding sideways scrubs a little forward speed too
-    const scrub = 0.1 * Math.abs(lateral) * clamp(forward / 4, -1, 1) * grip;
+    const thrust = T.thrust * this.throttle * Math.sqrt(gripAft);
+    const dragF = (c1 * forward + c2 * forward * fwdAbs) * (0.12 + 0.88 * grip);
+    const brakeF = this.brake * T.brakeDrag * clamp(forward / 3, -1, 1) * Math.sqrt(grip);
+    // ---- going sideways. The hulls bite hard at first and then let go: past a
+    // point the water gives no more, the stern steps out, and the boat drifts.
+    // (Braking digs the hulls in: more bite, and more to give.)
+    const most = T.sideHold * (1 + 0.35 * this.brake) * grip;
+    const aL = most > 0 ? -most * Math.tanh((T.sideBite * lateral) / most) : 0;
+    // sliding scrubs off a little speed too
+    const scrub = T.slideScrub * Math.abs(lateral) * clamp(forward / 4, -1, 1) * grip;
     const aF = thrust - dragF - brakeF - scrub;
-    const aL = -T.lateralGrip * (1 + 0.6 * this.brake) * lateral * grip;
-    // wave faces push the craft downhill
-    const slope = T.slopePush * T.gravity * grip;
-    const ax = fx * aF + lx * aL + (sMid.nx / sMid.ny) * slope;
-    const az = fz * aF + lz * aL + (sMid.nz / sMid.ny) * slope;
-    v.x += ax * dt;
-    v.z += az * dt;
+    // wave faces push the boat downhill
+    const slope = ny > 0.01 ? (T.slopePush * T.gravity * grip) / ny : 0;
+    v.x += (fx * aF + lx * aL + nx * slope) * dt;
+    v.z += (fz * aF + lz * aL + nz * slope) * dt;
 
-    // ---- steering
-    const fwdAbs = Math.abs(forward);
-    const authority = (0.3 + 0.7 * clamp01(fwdAbs / 6)) * lerp(1, 0.76, smoothstep(12, 28, fwdAbs)) * (1 + 0.28 * this.brake);
-    const wantYawRate = -this.steer * T.yawRate * authority * (forward < -0.5 ? -1 : 1) * (0.22 + 0.78 * grip);
-    this.yawRate = damp(this.yawRate, wantYawRate, grip > 0 ? 9 : 2, dt);
+    // ---- steering. The helm asks for a rate of turn; a hull going sideways
+    // wants to point the way it is going, which is what stops a drift becoming
+    // a spin and straightens the boat when the helm is let go.
+    const slip = fwdAbs > 2 || Math.abs(lateral) > 2 ? Math.atan2(lateral, Math.max(fwdAbs, 3)) : 0; // > 0: sliding to port
+    this.slip = slip;
+    const authority = (0.3 + 0.7 * clamp01(fwdAbs / 6)) * lerp(1, 0.8, smoothstep(12, 28, fwdAbs)) * (1 + 0.3 * this.brake);
+    const helm = -this.steer * T.yawRate * authority * (forward < -0.5 ? -1 : 1) * (0.22 + 0.78 * gripAft);
+    const weathercock = T.yawAlign * slip * clamp01(this.speed / 10) * grip * (1 - 0.45 * this.brake);
+    this.yawRate = damp(this.yawRate, helm + weathercock, grip > 0 ? 8 : 2, dt);
     this.yaw += this.yawRate * dt;
 
-    // ---- attitude: follow the water, lean a little into turns, lift the bows under power
-    if (grip > 0) {
-      const slopePitch = Math.atan2(sBow.y - sStern.y, HULL.bow + HULL.stern);
-      const slopeRoll = Math.atan2(sPort.y - sStbd.y, 2 * HULL.beam);
-      const speedK = clamp01(this.speed / 20);
-      const wantRoll = slopeRoll * 0.8 - this.yawRate * T.bank * speedK;
-      const wantPitch = slopePitch * 0.92 + 0.06 * this.throttle * (1 - clamp01(fwdAbs / vmax)) + 0.045 * clamp01(fwdAbs / 12) - 0.04 * this.brake * speedK;
-      this.rollRate += (T.rollStiffness * (wantRoll - this.roll) - T.rollDamping * this.rollRate) * dt * grip;
-      this.pitchRate += (T.pitchStiffness * (wantPitch - this.pitch) - T.pitchDamping * this.pitchRate) * dt * grip;
-    }
-    if (grip < 1) {
+    // ---- attitude. On the water: the push of the four points, plus what
+    // driving does (bows lift under power and at speed, dip under braking;
+    // the hull leans a little into a turn).
+    const speedK = clamp01(this.speed / 20);
+    const inWater = clamp01(wet * 0.5);
+    const trim = 0.055 * this.throttle * (1 - clamp01(fwdAbs / vmax)) + 0.04 * clamp01(fwdAbs / 12) - 0.04 * this.brake * speedK;
+    const bank = -this.yawRate * T.bank * speedK;
+    this.pitchRate += (pitchPush / T.pitchInertia + PITCH_SPRING * trim * inWater) * dt;
+    this.rollRate += (rollPush / T.rollInertia + ROLL_SPRING * bank * inWater) * dt;
+    if (inWater < 1) {
       // in the air the hull levels out and flies a little bow-up, on the air packed
       // under the tunnel: it comes down on its tails first
-      const air = 1 - grip;
+      const air = 1 - inWater;
       this.pitchRate += (2.6 * (0.07 - this.pitch) - 1.8 * this.pitchRate) * dt * air;
       this.rollRate += (-3.0 * this.roll - 1.6 * this.rollRate) * dt * air;
     }

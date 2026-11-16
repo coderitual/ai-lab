@@ -885,6 +885,10 @@ export class OnlinePlay {
       c.yawRate = silent ? 0 : N.d[18];
       c.airborne = (N.d[11] & 1) !== 0;
       c.grip = c.airborne ? 0 : 1;
+      // how far its bows point away from where it is going (for the spray a slide throws up)
+      const ahead = c.vel.x * Math.sin(yaw) + c.vel.z * Math.cos(yaw);
+      const aside = c.vel.x * Math.cos(yaw) - c.vel.z * Math.sin(yaw);
+      c.slip = c.speed > 3 ? Math.atan2(aside, Math.max(Math.abs(ahead), 3)) : 0;
       c.power = N.d[12];
       c._syncQuat();
 

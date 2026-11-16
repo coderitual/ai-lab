@@ -7,7 +7,7 @@ work. Written for whoever changes it next.
 | --- | --- |
 | [design.md](design.md) | What is this game, and why is it shaped the way it is? Rules, feel, look, and what was left out on purpose. |
 | [spec.md](spec.md) | What does the build do, exactly? Every rule, number and message, read back out of the code. |
-| [techniques.md](techniques.md) | How do the tricky parts work: the sea, the foam, the reflections, the lens drops, the netcode, the test rigs. Each with its limits and where to take it next. |
+| [techniques.md](techniques.md) | How do the tricky parts work: the sea, the foam, the reflections, the handling, the rain on the lens, the island, the netcode, the test rigs. Each with its limits and where to take it next. |
 | [boat.md](boat.md) | The boat: its lines, its texture sheet, its materials, and how to change them. |
 | [tools.md](tools.md) | The dev scripts: tests, captures, screenshots, and what has and has not been verified. |
 | [ideas.md](ideas.md) | What to do next, roughly in order of value. |
@@ -41,6 +41,9 @@ All in [`images/`](images/), all made by `tools/screenshots.cjs`.
 | ![](images/hero.jpg) The pack a few seconds after the start | ![](images/pursuit.jpg) In the leader's wake |
 | ![](images/race.jpg) Racing: the view from the chase camera | ![](images/race-open-sea.jpg) On the open-ocean side |
 | ![](images/plumes.jpg) Spray plumes at full power | ![](images/jump.jpg) Off the top of a swell |
+| ![](images/drift.jpg) Sliding through a turn | ![](images/rain.jpg) In the pack: other boats' spray as rain on the lens |
+| ![](images/island.jpg) The island from beyond the pier | ![](images/beach.jpg) Palms, their shadows, and ripples in the sand |
+| ![](images/shore.jpg) The sunny side: surf running up the sand | |
 | ![](images/wakes.jpg) Wakes from above | ![](images/reflections.jpg) Calm water: rocks, marks and boats mirrored in it |
 | ![](images/split-screen.jpg) Two players on one keyboard | ![](images/title.jpg) Title screen |
 | ![](images/phone.jpg) Phone, held sideways, one thumb on the glass | ![](images/phone-portrait.jpg) Phone, held upright |

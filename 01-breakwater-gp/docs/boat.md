@@ -1,6 +1,6 @@
 # The boat
 
-One boat, four liveries. Everything about it is generated: the hull from a few
+One boat, four liveries, each to its own design. Everything about it is generated: the hull from a few
 functions, the paint on a canvas, the glass and the gloss by shaders. This is
 the reference for changing any of that. The ideas behind it are in
 [techniques.md](techniques.md) (sections 6, 7 and 8).
@@ -108,15 +108,28 @@ deck between two slanting cuts, `label(ctx, text, a, b, { size, dir })`
 lettering of a given height in metres that reads the right way round on
 whichever chart it is on.
 
-A team is `{ hull, accent }` in `assets/palette.js`. A third colour is derived
-(`teamColors`): deep navy if the accent is light, off-white if it is dark.
+A team is `{ hull, accent, mark, pattern }` in `assets/palette.js`: two
+colours, the name painted on its flanks, and which design it is painted to. A
+third colour is derived (`teamColors`): deep navy if the accent is light,
+off-white if it is dark.
 
-What the current design paints: hull colour deepening toward the bows; bow
-tips and two chevrons; a stripe and a hairline along each deck edge; chequers
-across the tails; step pads; number plates on the stern decks (read from
-astern); the name along each foredeck and each side; a roundel on the nose and
-on each side; an engine hatch panel with louvres; an anti-glare panel round
-the canopy; a lower band on the sides; numbered panels on the transoms.
+**The four designs** (`PATTERNS` in `livery.js`). Each paints the decks
+(`top`, once per side, in the plan view) and the flanks (`side`):
+
+| design | team | what it is |
+| --- | --- | --- |
+| `slash` | EMBER (orange, cream) | broad bands slashed across the decks and carried down the flanks, raked back; a dark stern quarter; chequers on the tail |
+| `wave` | RIPTIDE (blue, navy) | one long sweep of dark water curling along each hull and a smaller curl over the bows, edged in white; on the flanks a wave that is tall at the stern and runs out at the bow |
+| `shard` | ORCHID (magenta, black) | black shards with white edges, as if the paint had been cut with a knife |
+| `stripe` | FIREFLY (lime, charcoal) | twin racing stripes from stern to stem with a pinstripe between; a dark nose; the stripes break up into squares at the stern |
+
+**What every boat has**, painted over the design: hull colour deepening
+toward the bows; step pads; number plates on the stern decks (read from
+astern); the team's name along each foredeck and, large, on each flank, with
+the series name under it; a roundel on the nose and on each flank; an engine
+hatch panel with louvres; a panel of bare carbon weave round the canopy so
+the glass does not glare (a 2/2 twill drawn as an 8 px tile); numbered panels
+on the transoms.
 
 ## Materials
 
@@ -155,8 +168,13 @@ the occlusion/roughness sheet, the engine label (512 × 256).
 ## How to…
 
 **Add or change a team.** Edit `TEAMS` in `assets/palette.js`: `hull`,
-`accent`, and `css` for the HUD. The livery, the fins, the engine stripe and
+`accent`, `mark` (the name on the flanks), `pattern` (one of the four
+designs) and `css` for the HUD. The livery, the fins, the engine stripe and
 the driver's helmet follow.
+
+**Add a design.** Add an entry to `PATTERNS` in `livery.js` with a
+`top(ctx, side, colours)` and a `side(ctx, colours)`. Use `deckBand`, `edge`
+and `sidePoint` so that its shapes follow the hull's lines.
 
 **Change the livery.** Edit `paintLivery` in `livery.js`. Draw in metres
 inside `inTop` / `inSide` / `inTransom`. If you move something that also has

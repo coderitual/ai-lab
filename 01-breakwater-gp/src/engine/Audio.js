@@ -82,7 +82,9 @@ class Voice {
     this.engineFilter.frequency.setTargetAtTime(260 + 1900 * revs * revs, t, 0.06);
     this.engineGain.gain.setTargetAtTime((active ? 0.035 + 0.075 * revs : 0.02) * level, t, 0.08);
     this.waterFilter.frequency.setTargetAtTime(420 + 1500 * speedK, t, 0.1);
-    this.waterGain.gain.setTargetAtTime((active ? (0.03 + 0.26 * speedK * speedK) * (0.25 + 0.75 * craft.grip) : 0.02) * level, t, 0.1);
+    // water rushing past, and louder when the hull is going through it sideways
+    const slide = Math.min(1, Math.abs(craft.slip || 0) / 0.45);
+    this.waterGain.gain.setTargetAtTime((active ? (0.03 + 0.26 * speedK * speedK) * (0.25 + 0.75 * craft.grip) * (1 + 0.6 * slide) : 0.02) * level, t, 0.1);
     if (this.panner) this.panner.pan.setTargetAtTime(pan, t, 0.1);
   }
 

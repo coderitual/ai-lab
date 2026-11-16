@@ -35,16 +35,16 @@ Nothing here has been seen on a phone or in Safari (see
 
 ## The boat and the driving
 
-- **Two floats instead of one.** Give each sponson its own buoyancy sample
-  and force (`game/Craft.js` treats the hull as one point with an attitude).
-  Real roll, hooking a sponson in a turn, landing on one side.
+- **Bite at each end.** The hulls' sideways grip is one curve for the whole
+  boat (`game/Craft.js`). Split it between bow and stern and a boat that
+  lifts its tails spins, and one that digs its bows trips.
 - **Air under the tunnel.** At speed the tunnel packs air and lifts the bows;
   too much trim into a headwind and the boat blows over. A trim control
   (two keys, or the vertical axis of the touch stick while not braking) would
   give the driver something to manage on the straights.
-- **Liveries chosen by the player.** `paintLivery` takes any two colours and a
-  number; add a colour picker to the title screen and the lobby, and send the
-  choice in the `hello` message.
+- **Liveries chosen by the player.** `paintLivery` takes any two colours, one
+  of four designs and a number; add a picker to the title screen and the
+  lobby, and send the choice in the `hello` message.
 - **Wear the race.** Salt streaks and spray marks accumulating on the paint
   (another layer in the roughness sheet, built up per boat).
 - **Propeller blur.** Swap the blades for a translucent disc above a certain
@@ -66,7 +66,12 @@ Nothing here has been seen on a phone or in Safari (see
 - **Step back up.** Quality only ever steps down. Step up again after a
   minute of fast frames.
 - **Motion blur at the edges of the frame** at full power, cheaply, by
-  stretching the lens-drop copy of the frame radially.
+  stretching the lens pass's copy of the frame radially.
+- **A float target for the lens pass**, so the glow knows how bright the sun
+  on the water really was before tone mapping (`game/Lens.js`).
+- **The island's shadow on the lagoon**: let the water shader read the main
+  island's baked shadow map (`engine/BakedShadow.js`).
+- **Palms that bend**, and a cheaper far model for the ones on the horizon.
 
 ## Multiplayer
 

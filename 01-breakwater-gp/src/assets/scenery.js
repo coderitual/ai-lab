@@ -1,5 +1,5 @@
-// Set dressing built from primitives: palms, sea stacks, a lighthouse, a pier
-// with huts and bunting, and anchored sailboats.
+// Set dressing built from primitives: sea stacks, a lighthouse, a pier with
+// huts and bunting, and anchored sailboats. (The palms are in palm.js.)
 
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -9,90 +9,6 @@ import { withSkyFog } from './sky.js';
 import { PALETTE, TEAMS } from './palette.js';
 
 const lit = (opts = {}) => withSkyFog(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, ...opts }));
-
-// ------------------------------------------------------------------ palms
-
-function palmGeometry(rng, height) {
-  const parts = [];
-  const leanDir = rng() * TAU;
-  const lean = 0.8 + rng() * 1.8;
-  const segs = 7;
-  // trunk: stacked tapered segments following a gentle curve
-  const pts = [];
-  for (let i = 0; i <= segs; i++) {
-    const t = i / segs;
-    const bend = t * t * lean;
-    pts.push(new THREE.Vector3(Math.cos(leanDir) * bend, t * height, Math.sin(leanDir) * bend));
-  }
-  const up = new THREE.Vector3(0, 1, 0);
-  const q = new THREE.Quaternion();
-  const e = new THREE.Euler();
-  for (let i = 0; i < segs; i++) {
-    const a = pts[i];
-    const b = pts[i + 1];
-    const dir = b.clone().sub(a);
-    const len = dir.length();
-    q.setFromUnitVectors(up, dir.normalize());
-    e.setFromQuaternion(q);
-    const r0 = lerp(0.3, 0.16, i / segs);
-    const r1 = lerp(0.3, 0.16, (i + 1) / segs) * 0.94;
-    const mid = a.clone().add(b).multiplyScalar(0.5);
-    const shade = PALETTE.trunk.clone().multiplyScalar(i % 2 ? 0.86 : 1);
-    parts.push(part(new THREE.CylinderGeometry(r1, r0, len * 1.04, 6), shade, { pos: mid.toArray(), rot: [e.x, e.y, e.z] }));
-  }
-  // crown: drooping fronds
-  const top = pts[segs];
-  const fronds = 8;
-  for (let f = 0; f < fronds; f++) {
-    const ang = (f / fronds) * TAU + rng() * 0.5;
-    const L = 3.0 + rng() * 1.2;
-    const rise = 0.5 + rng() * 0.6;
-    const droop = 0.42 + rng() * 0.3;
-    const dx = Math.cos(ang);
-    const dz = Math.sin(ang);
-    const rows = [];
-    const N = 6;
-    for (let i = 0; i <= N; i++) {
-      const v = i / N;
-      const cx = top.x + dx * L * v;
-      const cz = top.z + dz * L * v;
-      const cy = top.y + rise * Math.sin(v * Math.PI * 0.8) * 1.2 - droop * L * v * v;
-      const w = 0.72 * Math.sin(Math.min(1, v * 1.25 + 0.08) * Math.PI) * (1 - v * 0.35);
-      const sag = 0.3 * w;
-      rows.push([
-        new THREE.Vector3(cx - dz * w, cy - sag, cz + dx * w),
-        new THREE.Vector3(cx, cy, cz),
-        new THREE.Vector3(cx + dz * w, cy - sag, cz - dx * w),
-      ]);
-    }
-    const col = f % 2 ? PALETTE.palmLeaf : PALETTE.palmLeafLight;
-    parts.push(loft(rows, (i) => col.clone().multiplyScalar(lerp(0.8, 1.08, i / N))));
-  }
-  for (let c = 0; c < 3; c++) {
-    const a = rng() * TAU;
-    parts.push(part(new THREE.SphereGeometry(0.2, 6, 5), '#5b4530', { pos: [top.x + Math.cos(a) * 0.3, top.y - 0.25, top.z + Math.sin(a) * 0.3] }));
-  }
-  return merge(parts);
-}
-
-/** One merged mesh for a whole grove. `spots` = [{x, y, z}] in world space. */
-export function createPalms(spots, seed = 5) {
-  const rng = makeRng(seed);
-  const variants = [palmGeometry(rng, 6.2), palmGeometry(rng, 7.6), palmGeometry(rng, 9.0)];
-  const parts = spots.map((s, i) => {
-    const g = variants[i % variants.length].clone();
-    const sc = 0.85 + rng() * 0.4;
-    g.rotateY(rng() * TAU);
-    g.scale(sc, sc, sc);
-    g.translate(s.x, s.y - 0.3, s.z);
-    return g;
-  });
-  variants.forEach((v) => v.dispose());
-  const mesh = new THREE.Mesh(merge(parts), lit({ side: THREE.DoubleSide, roughness: 0.8 }));
-  mesh.name = 'palms';
-  mesh.matrixAutoUpdate = false;
-  return mesh;
-}
 
 // ------------------------------------------------------------------ rocks
 

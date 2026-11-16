@@ -3,8 +3,11 @@
 
 import * as THREE from 'three';
 import { createEnvironment } from '../assets/environment.js';
-import { createIsland, findSpotOnIsland } from '../assets/island.js';
-import { createLighthouse, createPalms, createPier, createSailboat, createSeaStacks } from '../assets/scenery.js';
+import { createIsland, createTerrainMaterial, findSpotOnIsland, terrainUniforms } from '../assets/island.js';
+import { createPalms, palmUniforms } from '../assets/palm.js';
+import { createLighthouse, createPier, createSailboat, createSeaStacks } from '../assets/scenery.js';
+import { SUN_DIR } from '../assets/palette.js';
+import { BakedShadow, withBakedShadow } from '../engine/BakedShadow.js';
 import { createCourseFloatAssets, createSlalomBuoy, createStartArch } from '../assets/buoys.js';
 import { makeRng, TAU, DEG } from '../engine/math.js';
 import { makeSurfaceSample, sampleSurface, setSeaIslands } from '../engine/waves.js';
@@ -23,9 +26,25 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
   scene.add(root);
 
   // ---------------------------------------------------------------- land
-  const main = createIsland({ x: 0, z: 0, radius: 78, height: 30, seed: 3, style: 'tropical' });
-  const lightIslet = createIsland({ x: -92, z: 250, radius: 24, height: 7, seed: 8, style: 'rock', beach: 0.1 });
-  const sandIslet = createIsland({ x: 253, z: -146, radius: 30, height: 5, seed: 12, style: 'tropical', beach: 0.3 });
+  // Each island has its own picture of where the sun does not reach (engine/BakedShadow.js), drawn once below,
+  // when everything that stands on it has been built.
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  terrainUniforms.uTerrainNoise.value = env.noiseTex;
+  const shade = (def, size) => {
+    const reach = def.radius * 1.3 + def.height * 0.5;
+    const baked = new BakedShadow(engine.renderer, {
+      size: coarse ? size / 2 : size,
+      center: new THREE.Vector3(def.x, def.height * 0.4, def.z),
+      radius: reach,
+      toSun: SUN_DIR,
+    });
+    const extend = (material) => withBakedShadow(material, baked);
+    const island = createIsland({ ...def, material: createTerrainMaterial(extend) });
+    return Object.assign(island, { baked, extend, casters: [island.mesh] });
+  };
+  const main = shade({ x: 0, z: 0, radius: 78, height: 30, seed: 3, style: 'tropical' }, 2048);
+  const lightIslet = shade({ x: -92, z: 250, radius: 24, height: 7, seed: 8, style: 'rock', beach: 0.1 }, 1024);
+  const sandIslet = shade({ x: 253, z: -146, radius: 30, height: 5, seed: 12, style: 'tropical', beach: 0.3 }, 1024);
   const solid = [main, lightIslet, sandIslet];
   solid.forEach((i) => root.add(i.mesh));
 
@@ -44,28 +63,44 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
 
   setSeaIslands(solid.map((i) => ({ x: i.x, z: i.z, r: i.radius })));
 
-  // palms
-  const palmSpots = [];
-  for (let i = 0; i < 30; i++) {
-    const spot = findSpotOnIsland(main, rng() * TAU, 2.4 + rng() * 6.5);
-    if (spot.y > 1.8) palmSpots.push(spot);
-  }
-  for (let i = 0; i < 7; i++) {
-    const spot = findSpotOnIsland(sandIslet, rng() * TAU, 1.8 + rng() * 2.4);
-    if (spot.y > 1.3) palmSpots.push(spot);
-  }
-  root.add(createPalms(palmSpots, 5));
+  // palms: groves along the back of the beach, loners out on the sand, a few up the hill
+  const grove = (island, count, low, high, seed) => {
+    const spots = [];
+    const centres = Array.from({ length: Math.ceil(count / 6) }, () => rng() * TAU);
+    for (let i = 0; i < count * 3 && spots.length < count; i++) {
+      const loner = rng() < 0.3;
+      const angle = loner ? rng() * TAU : centres[i % centres.length] + (rng() - 0.5) * 0.5;
+      const spot = findSpotOnIsland(island, angle, low + (loner ? rng() : rng() * rng()) * (high - low));
+      if (spot.y < low * 0.8) continue;
+      if (spots.some((s) => Math.hypot(s.x - spot.x, s.z - spot.z) < 2.6)) continue;
+      spots.push(spot);
+    }
+    const palms = createPalms(spots, { seed, scale: coarse ? 0.5 : 1, anisotropy: Math.min(4, engine.renderer.capabilities.getMaxAnisotropy()), extend: island.extend });
+    root.add(palms);
+    island.casters.push(palms);
+  };
+  grove(main, 44, 1.7, 9.5, 5);
+  grove(sandIslet, 11, 1.3, 4.2, 6);
 
   // lighthouse on the rocky islet
   const lighthouse = createLighthouse();
   lighthouse.position.set(lightIslet.x, lightIslet.heightAt(lightIslet.x, lightIslet.z) - 0.8, lightIslet.z);
   root.add(lighthouse);
+  lightIslet.casters.push(lighthouse);
 
   // pier pointing at the start line
   const pierBase = findSpotOnIsland(main, 0.05, 1.3);
   const pier = createPier({ length: 34, deckY: 2.2 });
   pier.position.set(pierBase.x - 2, 0, pierBase.z);
   root.add(pier);
+  main.casters.push(pier);
+
+  /** Draw each island's shadows (once, and again if the graphics context has been lost and restored). */
+  const bakeShadows = () => {
+    for (const island of solid) island.baked.bake(island.casters);
+  };
+  bakeShadows();
+  engine.onContextRestored(bakeShadows);
 
   // sea stacks
   const stacks = createSeaStacks([
@@ -184,6 +219,8 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
     }
 
     lighthouse.userData.animate(time);
+    terrainUniforms.uTerrainTime.value = time;
+    palmUniforms.uPalmTime.value = time;
   }
 
   return { env, track, root, islands: solid, colliders, buoys, arch, floats, sailboats, terrainHeightAt, update, prepareView };

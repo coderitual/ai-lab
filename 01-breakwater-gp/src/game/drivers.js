@@ -20,8 +20,9 @@ export class PlayerDriver {
 
 /**
  * A simple bot: aim at a point a little way ahead on the ideal line through
- * the slalom marks, ease off when badly misaligned, shuffle sideways to avoid
- * riding up another craft's stern.
+ * the slalom marks, turn further in when the boat is sliding, ease off when
+ * badly misaligned or running wide, shuffle sideways to avoid riding up
+ * another craft's stern.
  */
 export class BotDriver {
   /**
@@ -35,6 +36,7 @@ export class BotDriver {
     this.wobble = skill.wobble ?? 1.0;
     this.phase = skill.phase ?? 0;
     this._avoid = 0;
+    this._lateral = null;
     this._pt = {};
   }
 
@@ -60,7 +62,7 @@ export class BotDriver {
     this._avoid += (avoid - this._avoid) * Math.min(1, dt * 3);
 
     const wobble = Math.sin(time * 0.37 + this.phase) * this.wobble;
-    let lateral = clamp(track.lineOffset(s) + this.bias + wobble + this._avoid, -track.halfWidth + 3, track.halfWidth - 3);
+    let lateral = clamp(track.lineOffset(s) + this.bias + wobble + this._avoid, -track.halfWidth + 4.5, track.halfWidth - 4.5);
     // whatever else is going on, never aim at the wrong side of the next mark
     const gate = track.gates[racer.nextGate];
     let toGate = gate.s - racer.s;
@@ -71,7 +73,9 @@ export class BotDriver {
     }
     const pt = track.pointAt(s, lateral, this._pt);
     const want = Math.atan2(pt.x - craft.pos.x, pt.z - craft.pos.z);
-    const err = angleDiff(craft.yaw, want); // > 0: target is to port
+    // > 0: the target is to port. A boat that is sliding is not going where it points, so it is pointed further
+    // into the turn by most of the angle it is sliding at.
+    const err = angleDiff(craft.yaw, want) - craft.slip * 0.75;
     const steer = clamp(-err * this.sharpness + craft.yawRate * 0.18, -1, 1); // P on heading, D on yaw rate
 
     const input = craft.input;
@@ -80,5 +84,14 @@ export class BotDriver {
     const off = Math.abs(err);
     input.throttle = off > 1.1 ? 0.35 : 1;
     input.brake = off > 0.8 && craft.speed > 12 ? 1 : 0;
+
+    // running wide: back off before the floats, and brake (which makes the hull bite) if they are close
+    const outward = this._lateral === null || dt <= 0 ? 0 : ((racer.lateral - this._lateral) / dt) * Math.sign(racer.lateral);
+    this._lateral = racer.lateral;
+    const room = track.halfWidth - Math.abs(racer.lateral);
+    if (outward > 0.5 && room < 2.5 + outward * 1.6) {
+      input.throttle = Math.min(input.throttle, 0.45);
+      if (room < 1.5 + outward * 0.8 && craft.speed > 12) input.brake = 1;
+    }
   }
 }

@@ -62,10 +62,13 @@ export const PALETTE = {
   lampGreen: c('#3dff7a'),
 };
 
-/** Racing teams: the two colours of each boat's livery, and the HUD colour. Index 0 is the player. */
+/**
+ * Racing teams: the two colours of each boat's livery, the design it is painted to, the name on its flanks, and the
+ * HUD colour. Index 0 is the player.
+ */
 export const TEAMS = [
-  { name: 'YOU', hull: '#ff6a1a', accent: '#fff3e2', css: '#ff7a2e' },
-  { name: 'KAI', hull: '#12a8d8', accent: '#0d2c52', css: '#27b6e6' },
-  { name: 'MIRA', hull: '#d5308c', accent: '#1b1b24', css: '#ee4aa6' },
-  { name: 'JUNO', hull: '#8fd128', accent: '#2d3138', css: '#a6e03a' },
+  { name: 'YOU', hull: '#ff5a14', accent: '#fff3e2', css: '#ff7a2e', mark: 'EMBER', pattern: 'slash' },
+  { name: 'KAI', hull: '#10a6e0', accent: '#0b2550', css: '#27b6e6', mark: 'RIPTIDE', pattern: 'wave' },
+  { name: 'MIRA', hull: '#e6278f', accent: '#17171f', css: '#ee4aa6', mark: 'ORCHID', pattern: 'shard' },
+  { name: 'JUNO', hull: '#9bd81d', accent: '#262a31', css: '#a6e03a', mark: 'FIREFLY', pattern: 'stripe' },
 ];
