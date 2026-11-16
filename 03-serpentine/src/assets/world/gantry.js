@@ -14,7 +14,7 @@ import { footBox, levelFrame, row, upright } from './furniture.js';
 
 /** A lit start lamp's radiance (linear, scene units): far beyond white by day too. */
 const START_LAMP = [45, 2, 0.8];
-const START_DARK = [0.04, 0.004, 0.003];
+const START_DARK = [0.002, 0.0003, 0.0002];
 /** The chalet's windows at full (lighting.js lamps.windows = 1). */
 const WINDOW = [1.6, 1.0, 0.55];
 /** The gantry's chords: heights of the bottom and top one above the road. */
