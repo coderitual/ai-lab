@@ -22,9 +22,15 @@ is done.
   for seams or holes, the mirrored far layer, the low and high tiers, and
   whether the shafts read well when the sun is turned far from where the
   film has it.
-- **A second pass on the swan against the new lighting** (its form at the
-  six moments, the wide soft edge of the warm region, the amber patch, the
-  thin rim along the neck) was planned and has not run.
+- **A fuller pass on the swan against the new lighting.** A short one was
+  done: the fringe of down along the neck stands a third further off and
+  throws 1.8 times the light (the film's thin rim was the weakest match),
+  the billows on the shadow side are deeper, and the plumage closes earlier
+  as the wings relax, which brings the body at 7.5 s to the film's level
+  (115, 141, 122 against 116, 132, 106 mid-body). Not done: the form checked
+  at all six moments, the wide soft edge of the warm region, the amber patch
+  under the wing tip, the neck at 7.5 s (still lighter and greener than the
+  film's 45, 48, 37), and the glow's skirt.
 
 3. **A side-by-side tool**: the film's frame beside the build's at the same
    moment, with the measured sRGB targets of [design.md](design.md) sampled

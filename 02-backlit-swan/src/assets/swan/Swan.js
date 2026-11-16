@@ -93,7 +93,7 @@ export function createSwan(ctx) {
     uRingBend: { value: solution.bends },
     uBody: { value: new THREE.Vector4(1, 0, 1, 0) },
     uTailSwing: { value: new THREE.Vector3(TAIL_PIVOT[1] * L, (U_ORIGIN - TAIL_PIVOT[0]) * L, 0) },
-    uFringe: { value: new THREE.Vector4(0.0036, 2.2, 0, 0) },
+    uFringe: { value: new THREE.Vector4(0.0048, 2.2, 1.8, 0) },
     uAbsorb: { value: new THREE.Vector3(20, 30, 48) },
     uFeather: { value: new THREE.Vector4(0.45, 0.35, 0.22, 0.2) },
     uSky: { value: new THREE.Vector4(0.1, 0.45, 1, 0) },
@@ -215,7 +215,7 @@ export function createSwan(ctx) {
     uniforms.uBillColor.value.fromArray(look.swanBill);
     uniforms.uSegDensity.value = look.swanNeckDensity;
     uniforms.uNeckSky.value.set(look.swanNeckSky, look.swanNeckThrough, look.swanNeckAround);
-    uniforms.uFringe.value.set(look.swanFringe, look.swanFringeBend, 0, 0);
+    uniforms.uFringe.value.set(look.swanFringe, look.swanFringeBend, look.swanFringeGlow, 0);
   }
 
   const swan = {

@@ -392,7 +392,9 @@ export function proxyShapes(lift) {
   // the end of the film the whole body is a dark shape with a lit outline).
   // The plumage is still loose with the wings half down (7.5 s: the front
   // third still glows) and closes over the last of the way.
-  const loose = mix(0.95, 0.33, smooth(0, 0.6, lift));
+  // (the plumage closes early as the wings come down: half-relaxed, as at
+  // 7.5 s of the film, the body is already much darker than with them arched)
+  const loose = mix(0.95, 0.33, smooth(0.25, 0.95, lift));
   const wing = mix(3.2, 1.6, lift);
   return [
     { centre: [0.633, 0.25, 0], radii: [0.6, top - 0.25, beam], tilt: 0, density: loose, plane: null },

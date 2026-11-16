@@ -259,7 +259,7 @@ ${RINGS}
 in float aRing;
 in vec4 aFin;      // xy: the way the strip stands, in the ring's axes; z: 0 foot .. 1 top; w: random per strip
 in float aAlong;   // distance along the neck, in L
-uniform vec4 uFringe;  // height of the down on a straight run (m), how much taller on the outside of a bend; unused
+uniform vec4 uFringe;  // height of the down on a straight run (m), how much taller on the outside of a bend, how much brighter than skin (fragment stage); unused
 ${VARYINGS_OUT}
 out vec4 vFin;     // along (L), 0 foot .. 1 top, random, how far this side is stretched by the bend
 out vec3 vRadial;
@@ -321,6 +321,7 @@ in float vDepth;
 in vec4 vHead;
 in float vAlong;
 #ifdef FRINGE
+uniform vec4 uFringe;
 in vec4 vFin;
 in vec3 vRadial;
 #endif
@@ -425,8 +426,10 @@ void main() {
   profile = max(max(profile, barb), 0.16);
   float soft = max(fwidth(h) * 1.2, 0.02);
   alpha = side * (1.0 - smoothstep(profile - soft, profile + soft, h));
-  // the down thins toward its tips
-  col *= mix(1.0, 0.65, h);
+  // The down thins toward its tips. Loose down throws far more of the light
+  // on toward the eye than the close feathers under it do (uFringe.z): it is
+  // the bright line round the film's neck.
+  col *= mix(1.0, 0.65, h) * uFringe.z;
   if (alpha < 0.02) discard;
 #endif
 

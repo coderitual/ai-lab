@@ -107,8 +107,9 @@ export const LOOK = {
   swanSkyAtWater: 0.5, // share of the sky's light that reaches the skin at the waterline...
   swanSkyHeight: 0.2, // ...rising to all of it this many metres up
   swanSkyTilt: [0.05, 0.27, 1.0, 0.45], // share of it on surfaces facing down, facing the horizon, tilted up; the tilt (normal's y) that gets it all
-  swanFringe: 0.0036, // metres the down stands off the neck on a straight run (0.006 L)
+  swanFringe: 0.0048, // metres the down stands off the neck on a straight run (0.008 L)
   swanFringeBend: 2.2, // how much taller it stands on the outside of a tight bend
+  swanFringeGlow: 1.8, // how much more of the light loose down throws toward the eye than the feathers under it
   swanBill: [0.8, 0.24, 0.035], // orange; black parts are fixed
 };
 

@@ -91,7 +91,8 @@ pose would put the bill tip and the head without posing the swan.
   long by tier, with both wing positions stored in every vertex so the vertex
   shader can slide between them. The soft billows of the folded wings are in
   the mesh: the skin is pushed in and out by a few millimetres of smooth
-  noise, and the normals are taken from a version pushed twice as far, so
+  noise, and the normals are taken from a version pushed three and a half
+  times as far, so
   that the sky's light picks out the upper edge of each billow without the
   outline going lumpy. The feather shapes are part of this mesh.
 - **Feathers** (`feathers.js`): small flat blades and two rounded lumps, in
@@ -140,5 +141,7 @@ facing the camera, 180 facing right. Add `&az= &el= &dist=` for the camera
   `proxyShapes`. Turn the sky off (`look.skyColor` to zero) to see the sun's
   part alone, or the transmission off (`look.swanThrough` and
   `look.swanNeckThrough` to zero) to see the rest.
-- **The fringe**: `look.swanFringe` (how far the down stands off, metres) and
-  `look.swanFringeBend`.
+- **The fringe**: `look.swanFringe` (how far the down stands off, metres),
+  `look.swanFringeBend` (how much taller on the outside of a bend) and
+  `look.swanFringeGlow` (how much more light it throws toward the eye than
+  the feathers under it).

@@ -4,7 +4,7 @@
 //
 // The soft billows of the folded wings are part of the mesh: the skin is
 // pushed in and out by a few millimetres of smooth noise, and its normals are
-// taken from a version pushed twice as far, so that the sky's light picks the
+// taken from a version pushed three and a half times as far, so that the sky's light picks the
 // upper edge of each billow out without the outline going lumpy.
 
 import * as THREE from 'three';
@@ -126,7 +126,7 @@ export function buildBody({ stations, detail, seed, rng, featherDetail }) {
         const amount = along * smooth(0.02, 0.12, y) * 0.0065 * L;
         for (let c = 0; c < 3; c++) {
           out[o + c] = smoothP[o + c] + normals[o + c] * b * amount;
-          bumped[o + c] = smoothP[o + c] + normals[o + c] * b * amount * 2.2;
+          bumped[o + c] = smoothP[o + c] + normals[o + c] * b * amount * 3.6;
         }
       }
     }
