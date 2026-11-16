@@ -10,9 +10,6 @@
 
 import * as THREE from 'three';
 
-/** What a lit street lamp's head sends out (scene units): a pale shape by day, far beyond white at night. */
-const LAMP_RADIANCE = 40;
-const LAMP_COLOR = [1.0, 0.74, 0.46];
 /** Metres of hillside drawn beyond the solid edge. */
 const BEYOND = 14;
 /** The Track's EDGE.TREES (the world never imports from game/). */
@@ -96,28 +93,13 @@ export function createPlaceholderGround({ caps, tier, track, rng, atmosphere, he
   });
   posts.castShadow = posts.receiveShadow = true;
 
-  const lampList = track.lamps.filter((lamp) => (lamp.kind ? lamp.kind === 'street' : lamp.height > 5));
-  const poles = new THREE.InstancedMesh(box, material({ color: 0x30343a, roughness: 0.5, metalness: 0.6 }), lampList.length);
-  const headMaterial = material({ color: 0x0a0a0a, emissive: new THREE.Color().setRGB(...LAMP_COLOR), emissiveIntensity: 0 });
-  const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.1, 0.9), headMaterial, lampList.length);
-  lampList.forEach((lamp, i) => {
-    const lat = lamp.lat ?? lamp.side * (track.halfWidth + 1.4);
-    track.frameAt(lamp.s, frame);
-    quat.setFromAxisAngle(up, Math.atan2(frame.left.x, frame.left.z));
-    poles.setMatrixAt(i, matrix.compose(at(lamp.s, lat), quat, scale.set(0.16, lamp.height, 0.16)));
-    // the head reaches out over the nearer lane
-    at(lamp.s, lat - lamp.side * 1.2).y += lamp.height;
-    heads.setMatrixAt(i, matrix.compose(point, quat, scale.set(1, 1, 1)));
-  });
-  poles.castShadow = true;
 
-  group.add(forest, posts, poles, heads);
+  group.add(forest, posts);
 
   return {
     group,
-    setLamps(street) {
-      headMaterial.emissiveIntensity = LAMP_RADIANCE * street;
-    },
+    // the street lamps are structures.js's now
+    setLamps() {},
     dispose() {
       group.traverse((object) => {
         if (!object.isMesh) return;
