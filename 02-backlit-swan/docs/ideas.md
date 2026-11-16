@@ -8,26 +8,54 @@ is done.
 1. **Run it on phones.** Nothing here has been seen on a device (see
    [tools.md](tools.md#what-has-not)). Frame rate per tier, whether the tier
    probe picks well, multisampled half-float targets on mobile GPUs, the
-   gestures under a real thumb, how dark the picture reads in daylight.
+   gestures under a real thumb, how dark the picture reads in daylight, the
+   adaptive render scale and the pixel budgets against a real GPU and a
+   browser that caps its frame rate, Safari's page zoom and audio
+   interruptions.
 2. **Listen to the sound**, then decide whether it stays generated noise or
    wants more: a wing shuffle, a far-off bird, the bill's dabbling.
 
 ## Closer to the film
 
+- **Finish checking the new wood**: it was built in two sittings that were
+  both cut short. Not yet looked at systematically: every compass direction
+  for seams or holes, the mirrored far layer, the low and high tiers, and
+  whether the shafts read well when the sun is turned far from where the
+  film has it.
+- **A fuller pass on the swan against the new lighting.** A short one was
+  done: the fringe of down along the neck stands a third further off and
+  throws 1.8 times the light (the film's thin rim was the weakest match),
+  the billows on the shadow side are deeper, and the plumage closes earlier
+  as the wings relax, which brings the body at 7.5 s to the film's level
+  (115, 141, 122 against 116, 132, 106 mid-body). Not done: the form checked
+  at all six moments, the wide soft edge of the warm region, the amber patch
+  under the wing tip, the neck at 7.5 s (still lighter and greener than the
+  film's 45, 48, 37), and the glow's skirt.
+
 3. **A side-by-side tool**: the film's frame beside the build's at the same
    moment, with the measured sRGB targets of [design.md](design.md) sampled
    from both and printed. The measurements exist; the comparison is still
    done by eye.
-4. **The body's cream and teal.** The film's rear two thirds are teal with a
-   soft diagonal edge and a wide cream cap along the top; the build's warm
-   region is a little larger and more sharply bounded. The stand-in's wing
-   edge (`proxyShapes`) and a second, diffuse share of transmitted light are
-   the places to work.
-5. **The neck's inside is olive in the film**, lighter toward the top; here
-   it is darker and bluer.
+4. **The body at the end, and the amber patch.** The body's edge hue, its
+   warm region and its cap are now close to the film at 0.3 s and 7.5 s
+   (measured per pixel: warm median 221, 209, 166 against 220, 203, 163). Not
+   done: at 10.5 s the build's flank is still too bright and blue (teal median
+   70, 108, 97 against the film's 52, 64, 54), the film's soft edge is wider
+   than the build's (0.22 to 0.24 against 0.12 to 0.13 of the body), and the
+   saturated amber patch under the wing tip is not reproduced. The stand-in's
+   wing edge (`proxyShapes`) and the closing of the plumage over the last
+   third are the places to work.
+5. **The neck's inside**: now dim neutral olive as in the film at 0.3 s (rows
+   within about 5 codes). At 3.8 s the middle of the neck is still darker
+   than the film's (55, 68, 48 against 69, 81, 62).
 6. **The glow's skirt**, fitted in the film as four Gaussians (sigma 0.21 to
    1.7 % of the picture height): the pyramid's per-level weights have not
-   been calibrated against those numbers by measurement.
+   been calibrated against those numbers by measurement. Measured at three
+   to 96 pixels from the body's top the build is within about 4 codes of the
+   film, so it was left alone; the thin rim on the neck is weaker (+9 against
+   +16 at 3 px, peak 117 against 200).
+   **Glints** are mixed after the last tuning: ring glints are fewer, the
+   wake's more, the cluster round the bill slightly worse.
 7. **The film's last second**: the bill stays where it is in the water while
    the body glides up to it. Here the neck shape is played back and the bill
    moves with the body by a few centimetres.
@@ -37,6 +65,8 @@ is done.
    seconds.
 
 ## More swan
+
+- **A gamepad** for steering, beside the stick and the keys.
 
 10. **Preening**: the neck laid back along a wing, the bill working in the
     feathers.
@@ -56,7 +86,11 @@ is done.
 
 ## Housekeeping
 
-18. **Split the bundle**: three.js and the scene in one 690 kB file (190 kB
+18. **Split the bundle**: three.js and the scene in one 698 kB file (192 kB
     gzipped). The scene could load after the first paint.
 19. **Fold the look into the URL**, so that a view with its sun and aperture
     can be shared as a link.
+20. **Per-frame allocations in the swan**: `Swan.update` runs twice a step
+    (once from `SwanMind._write`) and `writeProxies` and `proxyShapes` build
+    array literals each time: about 6,600 small objects a second, harmless on
+    a desktop, a little garbage on a phone.

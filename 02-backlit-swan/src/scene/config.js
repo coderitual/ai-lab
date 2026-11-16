@@ -25,9 +25,19 @@ export const LOOK = {
   shadeSoftness: 0.9,
   shadeWander: 0.5,
   shadeWanderLength: 2.9,
+  // That edge is the shadow of leaves: this share of its width is broken into
+  // flecks of sun and shade this many metres across (0: one smooth gradient).
+  shadeDapple: 0.7,
+  shadeDappleSize: 0.2,
+  // The wood (assets/forest/). All of it is lit by the sun and the sky above;
+  // these only say how much of each there is.
+  canopyOpen: 0.42, // share of the canopy the sun comes through: how much of the foliage is lit (0 hardly any .. 1 nearly all)
+  haze: 1.0, // how much the air in the wood glows: aerial perspective, and what shows behind the last trunk
+  shafts: 1.0, // strength of the shafts of light in the haze
+  leafLight: 1.0, // brightness of leaves the sun comes through
 
   // Lens
-  aperture: 0.3, // 0..1: how far out of focus the background is
+  aperture: 0.045, // 0..1: how far out of focus the background is (the film's is only a little: its lit leaves are dapples 4 to 10 of its 2370 pixels across; this makes a point a disc of 7)
   bokehMax: 0.034, // blur disc radius at aperture 1, as a fraction of the picture height
   farClear: [0.0004, 0.0005, 0.0011], // what shows between the trees: nothing
 
@@ -71,9 +81,10 @@ export const LOOK = {
   mirrorBase: 0.02, // share of light mirrored looking straight down
   mirrorRise: 2.6, // exponent of its rise toward grazing; 5 is the textbook, 2.6 gives the film's 0.57 at 10 to 13 degrees
   mirrorFarDistance: 14, // metres along a reflected ray to the surroundings
+  mirrorSoftness: 0.3, // the mirror image of the surroundings is at least as soft as this aperture would make them
   glintStrength: 4.5, // the sun in the water, as a multiple of what sunColor alone would give
   glintCalm: 0.008, // roughness (spread of slopes) of calm water, the sun's own size included
-  glintSteep: 2.5, // roughness added per unit of simulated slope
+  glintSteep: 1.2, // roughness added per unit of simulated slope
   glintSun: 0.2, // how far leaves and haze spread the sun (as a roughness): bounds how bright its own image in calm water is
   glintMax: 40, // brightest a glint may be
   // What floats on it (assets/pond/Specks.js)
@@ -86,17 +97,19 @@ export const LOOK = {
   swanAlbedo: [0.93, 0.92, 0.9], // white feather
   swanStain: [0.92, 0.86, 0.72], // head and upper neck, as stained as a mute swan's usually are
   swanFreePath: 0.034, // metres of plain feather that take red light down to 1/e (0.057 L)
-  swanAbsorb: [1.0, 1.45, 2.3], // green and blue are taken faster than red by these factors: thin is cream, thicker amber
+  swanAbsorb: [1.0, 1.12, 1.4], // green and blue are taken faster than red by these factors: thin is cream, thicker a dimmer, slightly warmer cream (in the film the edge from cream to teal is pale olive, not amber)
   swanThrough: 0.32, // share of the light inside the plumage that leaves through a surface facing away from the sun
   swanWrap: 0.12, // how far direct sun creeps past the terminator on something this soft
   swanNeckDensity: 3.0, // the neck and head, relative to plain feather
-  swanNeckThrough: 0.08, // the same share as swanThrough, for the neck and head: their feathering is close and dense
-  swanNeckSky: 0.3, // share of the sky's light the neck and head get (the film's neck is olive inside, not teal)
+  swanNeckThrough: 0.16, // the same share as swanThrough, for the neck and head: their feathering is close and dense
+  swanNeckSky: 0.1, // share of the sky's light the neck and head get (the film's neck is olive inside, not teal)
+  swanNeckAround: 0.0065, // share of the sun that gets round the neck and head in their down and out on the shadow side, however thick they are
   swanSkyAtWater: 0.5, // share of the sky's light that reaches the skin at the waterline...
   swanSkyHeight: 0.2, // ...rising to all of it this many metres up
   swanSkyTilt: [0.05, 0.27, 1.0, 0.45], // share of it on surfaces facing down, facing the horizon, tilted up; the tilt (normal's y) that gets it all
-  swanFringe: 0.0036, // metres the down stands off the neck on a straight run (0.006 L)
+  swanFringe: 0.0048, // metres the down stands off the neck on a straight run (0.008 L)
   swanFringeBend: 2.2, // how much taller it stands on the outside of a tight bend
+  swanFringeGlow: 1.8, // how much more of the light loose down throws toward the eye than the feathers under it
   swanBill: [0.8, 0.24, 0.035], // orange; black parts are fixed
 };
 
@@ -134,10 +147,18 @@ export const SIM = {
  * What each quality tier costs. `counts` are read by the assets.
  * Scales are relative to the scene target (which is the canvas times the
  * adaptive render scale).
+ *
+ * `pixelRatio` caps the canvas's device pixels per CSS pixel and `maxPixels`
+ * its device pixels in all (Engine.js lowers the ratio to fit). The budgets
+ * leave phones alone (430 x 932 at ratio 2 is 1.6 million) and a 2560 x 1440
+ * desktop window at ratio 1 (3.7 million); they are there for tablets and
+ * high-density desktop screens, where the ratio cap alone would allocate
+ * half a gigabyte or more of multisampled half-float targets.
  */
 export const TIERS = {
   low: {
     pixelRatio: 1.5,
+    maxPixels: 1.2e6,
     msaa: 0,
     mirrorMsaa: 0,
     farScale: 0.4,
@@ -149,10 +170,11 @@ export const TIERS = {
     fxaaSteps: 5,
     rippleSize: 256,
     waterDetail: 0, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 7000, leaves: 3200, trunks: 80, droplets: 192, featherDetail: 0 },
+    counts: { specks: 7000, leaves: 4800, sprays: 1200, trunks: 80, droplets: 192, featherDetail: 0 },
   },
   medium: {
     pixelRatio: 2,
+    maxPixels: 2.2e6,
     msaa: 4,
     mirrorMsaa: 4,
     farScale: 0.5,
@@ -164,10 +186,11 @@ export const TIERS = {
     fxaaSteps: 7,
     rippleSize: 384,
     waterDetail: 1, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 13000, leaves: 6000, trunks: 140, droplets: 384, featherDetail: 1 },
+    counts: { specks: 13000, leaves: 9000, sprays: 2100, trunks: 140, droplets: 384, featherDetail: 1 },
   },
   high: {
     pixelRatio: 2,
+    maxPixels: 4e6,
     msaa: 4,
     mirrorMsaa: 4,
     farScale: 0.5,
@@ -179,6 +202,6 @@ export const TIERS = {
     fxaaSteps: 10,
     rippleSize: 512,
     waterDetail: 2, // 0..2: how many ripple trains the water sums, and whether its mirror is read twice
-    counts: { specks: 16000, leaves: 9000, trunks: 220, droplets: 768, featherDetail: 2 },
+    counts: { specks: 16000, leaves: 13500, sprays: 3300, trunks: 220, droplets: 768, featherDetail: 2 },
   },
 };

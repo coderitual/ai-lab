@@ -1,13 +1,16 @@
 // The overlay: the few controls laid over the picture.
 //
-// Bottom middle, under a thumb: what the swan can be asked to do (shake,
-// dunk, reach) and the film again. Top right: slow motion, sound, the look
-// panel, and hiding all of this. The look panel has the sliders for the
-// light, the lens and the print, the views, and the quality setting.
+// Bottom left, under the left thumb: the stick that swims the swan. Bottom
+// right, under the other (bottom middle on a wide screen): what the swan can
+// be asked to do (shake, dunk, reach) and the film again. Top right: slow
+// motion, sound, the look panel, and hiding all of this. The look panel has
+// the sliders for the light, the lens and the print, the views, and the
+// quality setting.
 //
 // Everything is plain DOM built here, with the icons drawn as small inline
-// SVGs: no images, no fonts to fetch. Buttons are at least 44 px across and
-// keep clear of the notch and the home bar (safe-area insets in ui.css).
+// SVGs: no images, no fonts to fetch. Buttons are at least 44 px across, the
+// stick at least 104, and all of it keeps clear of the notch and the home bar
+// (safe-area insets in ui.css).
 
 import './ui.css';
 import { LOOK, SIM } from '../scene/config.js';
@@ -29,6 +32,9 @@ const ICONS = {
   hide: SVG('<path d="M2.500 12s3.500-6 9.500-6 9.500 6 9.500 6-3.500 6-9.500 6-9.500-6-9.500-6z"/><circle cx="12" cy="12" r="2.600"/>'),
   close: SVG('<path d="m6 6 12 12M18 6 6 18"/>'),
 };
+
+/** The stick's face: four small arrowheads at the rim, the one for "away" a little stronger. */
+const STICK_FACE = `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m45 13.500 5-5 5 5" opacity="0.9"/><path d="m86.500 45 5 5-5 5M55 86.500l-5 5-5-5M13.500 55l-5-5 5-5" opacity="0.5"/></svg>`;
 
 const el = (tag, className, html) => {
   const node = document.createElement(tag);
@@ -54,7 +60,7 @@ const SLIDERS = [
  *   `enabled: false` (?ui=0): no controls. `instant`: the veil goes at once
  *   instead of fading (used when frames are stepped by hand, so that a
  *   screenshot taken right after never catches it half gone).
- * @returns {{ ready: () => void, fail: (message: string) => void, update: (dt: number, time: number) => void, dispose: () => void }}
+ * @returns {{ ready: () => void, fail: (message: string, detail?: string, onTap?: (() => void)|null) => void, update: (dt: number, time: number) => void, dispose: () => void }}
  */
 export function createUi(ctx, { world = null, enabled = true, instant = false } = {}) {
   const veil = document.getElementById('loading');
@@ -63,6 +69,7 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
   let hintTimer = 0;
   let hintGone = false;
   let panelOpen = false;
+  let failed = false;
   let refresh = () => {};
 
   if (ctx && world && enabled) {
@@ -75,7 +82,7 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
     const head = el('div', 'ui-head');
     head.append(el('h1', 'ui-title', 'Backlit Swan'));
     const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    const hint = el('p', 'ui-hint', coarse ? 'Drag to look round · pinch to come closer · touch the water' : 'Drag to look round · scroll to come closer · click the water');
+    const hint = el('p', 'ui-hint', coarse ? 'The stick swims the swan · drag to look round · pinch to come closer · touch the water' : 'W A S D or the stick to swim · drag to look round · scroll to come closer · click the water');
     head.append(hint);
     root.append(head);
 
@@ -84,19 +91,95 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
       b.type = 'button';
       b.title = title;
       b.setAttribute('aria-label', title);
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
+      const press = () => {
         onPress(b);
         b.blur();
+      };
+      // A browser only turns a touch into a click when it is the one finger
+      // on the glass, and here a thumb may be holding the stick. So a finger
+      // that lifts off the button it came down on presses it there and then,
+      // and the click that follows (if one does) is let pass.
+      let pressedAt = -1e9;
+      b.addEventListener('pointerup', (e) => {
+        if (e.pointerType !== 'touch') return;
+        const r = b.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+        pressedAt = e.timeStamp;
+        press();
+      });
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (e.timeStamp - pressedAt < 700) return;
+        press();
       });
       return b;
     };
 
+    // ---- the stick: swims the swan
+    const stick = el('div', 'ui-stick', `${STICK_FACE}<div class="ui-stick-knob"></div>`);
+    stick.title = 'Swim (W A S D)';
+    stick.setAttribute('role', 'img');
+    stick.setAttribute('aria-label', 'Stick: drag it to swim the swan that way (or hold W A S D)');
+    const interaction = world.interaction;
+    let stickPointer = null; // the finger (or mouse) that has it
+    let shownX = 0;
+    let shownY = 0;
+    /** Put the knob at x (right), y (up), each -1..1 of its travel, and tell the scene. */
+    const pushStick = (x, y, tell = true) => {
+      shownX = x;
+      shownY = y;
+      // ui.css turns these into the knob's place
+      stick.style.setProperty('--sx', x.toFixed(3));
+      stick.style.setProperty('--sy', (-y).toFixed(3));
+      if (tell && interaction) interaction.setStick(x, y);
+    };
+    const dragStick = (e) => {
+      const r = stick.getBoundingClientRect();
+      // the knob is 40 % of the base and stays inside it: 30 % of the base is its travel (ui.css)
+      const travel = r.width * 0.3;
+      let x = (e.clientX - (r.left + r.width / 2)) / travel;
+      let y = -(e.clientY - (r.top + r.height / 2)) / travel;
+      const far = Math.hypot(x, y);
+      if (far > 1) {
+        x /= far;
+        y /= far;
+      }
+      pushStick(x, y);
+    };
+    /** The stick springs back. With an event: only if it is from the finger that has it. */
+    const dropStick = (e) => {
+      if (e && e.pointerId !== stickPointer) return;
+      stickPointer = null;
+      stick.classList.remove('held', 'on');
+      pushStick(0, 0);
+    };
+    stick.addEventListener('pointerdown', (e) => {
+      if (stickPointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      stickPointer = e.pointerId;
+      // its own finger, wherever that goes: the rest of the glass stays free
+      // for the other hand (the camera, the buttons)
+      try {
+        stick.setPointerCapture(e.pointerId);
+      } catch {
+        // a pointer that is already gone cannot be captured: nothing to do
+      }
+      stick.classList.add('held', 'on');
+      dragStick(e);
+      dropHint();
+      e.preventDefault();
+    });
+    stick.addEventListener('pointermove', (e) => {
+      if (e.pointerId === stickPointer) dragStick(e);
+    });
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) stick.addEventListener(type, dropStick);
+    stick.addEventListener('contextmenu', (e) => e.preventDefault());
+    root.append(stick);
+
     // ---- what the swan does
     const actions = el('div', 'ui-actions');
     actions.append(
-      button('ui-act', 'shake', 'Shake', 'Shake the water off (S)', () => mind && mind.act('shake')),
-      button('ui-act', 'dunk', 'Dunk', 'Dunk the bill (D)', () => mind && mind.act('dunk')),
+      button('ui-act', 'shake', 'Shake', 'Shake the water off (Space)', () => mind && mind.act('shake')),
+      button('ui-act', 'dunk', 'Dunk', 'Dunk the bill (E)', () => mind && mind.act('dunk')),
       button('ui-act', 'reach', 'Reach', 'Reach forward and feed (R)', () => mind && mind.act('reach')),
       button('ui-act', 'film', 'Film', 'Play the film again (F)', () => director && director.replay()),
     );
@@ -125,6 +208,7 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
     }
     function toggleHidden() {
       const hidden = !root.classList.contains('hidden');
+      dropStick(); // it may be about to go out of reach
       root.classList.toggle('hidden', hidden);
       if (hidden && panelOpen) togglePanel();
       hide.title = hidden ? 'Show the controls (H)' : 'Hide the controls (H)';
@@ -191,6 +275,9 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
     const stat = el('span', 'ui-stat', '');
     foot.append(stat);
     panel.append(foot);
+    // Which paths this device took: on a phone there is nowhere else to read them.
+    const info = el('p', 'ui-stat ui-info', '');
+    panel.append(info);
 
     if (!coarse) {
       const keys = el('p', 'ui-keys', KEYS.map(([k, what]) => `<kbd>${k}</kbd> ${what}`).join(' &nbsp; '));
@@ -200,6 +287,7 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
 
     function togglePanel() {
       panelOpen = !panelOpen;
+      dropStick(); // on a phone the sheet covers it
       panel.hidden = !panelOpen;
       root.classList.toggle('panel-open', panelOpen);
       look.classList.toggle('on', panelOpen);
@@ -243,6 +331,14 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
 
     let sinceStat = 0;
     root._tick = (dt) => {
+      // with the keys doing the swimming, the stick shows what they ask for
+      if (stickPointer === null && interaction) {
+        const { x, y } = interaction.steering;
+        if (x !== shownX || y !== shownY) {
+          pushStick(x, y, false);
+          stick.classList.toggle('on', x !== 0 || y !== 0);
+        }
+      }
       if (!hintGone) {
         hintTimer += dt;
         if (hintTimer > 14) dropHint();
@@ -253,9 +349,29 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
           sinceStat = 0;
           const fps = engine.frameMs ? Math.round(1000 / engine.frameMs) : 0;
           stat.textContent = `${world.tier} · ${Math.round(engine.targetWidth)}×${Math.round(engine.targetHeight)} · ${fps} fps`;
+          const { caps } = ctx;
+          const samples = world.post.sceneTarget.samples;
+          info.textContent = [
+            caps.gpu || 'GPU not named',
+            caps.hdr ? 'half-float' : '8-bit',
+            samples > 0 ? `${samples}× multisampled` : caps.hdr && !caps.msaaHdr ? 'multisampling refused' : 'not multisampled',
+            `ripples ${world.ripple.precision}`,
+            `pixel ratio ${Math.round(engine.pixelRatio * 100) / 100}`,
+            `render scale ${engine.renderScale}`,
+            world.startError ? `WebGL error 0x${world.startError.toString(16)} at start` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ');
         }
       }
     };
+    // iOS Safari zooms the whole page when two fingers spread on anything that
+    // does not forbid it (it ignores user-scalable=no), and with the canvas
+    // taking every pinch for the camera there would be no easy way back.
+    // gesturestart is Safari's own event; other browsers obey touch-action (ui.css).
+    const noZoom = (e) => e.preventDefault();
+    document.addEventListener('gesturestart', noZoom, { passive: false });
+    offs.push(() => document.removeEventListener('gesturestart', noZoom));
     document.body.append(root);
   }
 
@@ -263,17 +379,34 @@ export function createUi(ctx, { world = null, enabled = true, instant = false } 
     /** The first frame is on the screen. */
     ready() {
       if (root) root.classList.add('ready');
-      if (!veil) return;
+      // a failure reported while the first frame was drawn stays on the page
+      if (!veil || failed) return;
       if (instant || !enabled) {
         veil.remove();
         return;
       }
       veil.classList.add('done');
-      veil.addEventListener('transitionend', () => veil.remove(), { once: true });
+      veil.addEventListener('transitionend', () => !failed && veil.remove(), { once: true });
     },
-    /** The scene could not start: say why, in place of the loading mark. */
-    fail(message) {
-      if (veil) veil.textContent = message;
+    /**
+     * Something is wrong: say what over the picture, where the loading mark
+     * was (it is put back if it has already gone, and stays).
+     * @param {string} message
+     * @param {string} [detail] small print, such as a graphics driver's own words
+     * @param {(() => void)|null} [onTap] makes the whole notice a button
+     */
+    fail(message, detail = '', onTap = null) {
+      failed = true;
+      if (!veil) return;
+      veil.classList.remove('done');
+      veil.textContent = message;
+      if (detail) {
+        const small = document.createElement('small');
+        small.textContent = detail;
+        veil.append(small);
+      }
+      if (onTap) veil.addEventListener('click', onTap, { once: true });
+      if (!veil.isConnected) document.body.append(veil);
     },
     update(dt) {
       if (root && root._tick) root._tick(dt);

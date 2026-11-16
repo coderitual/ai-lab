@@ -64,7 +64,7 @@ export class OrbitRig {
     this.onTap = null;
     /** Called when it is tapped twice within a third of a second. */
     this.onDoubleTap = null;
-    /** Called when a person starts moving the camera (drag, pinch or wheel). */
+    /** Called when a person starts moving the camera (a drag past the tap threshold, a second finger landing, the wheel, a key). */
     this.onGrab = null;
     /** Seconds since a person last moved the camera; large if never. */
     this.idle = 1e9;
@@ -107,6 +107,11 @@ export class OrbitRig {
         const [a, b] = [...this._pointers.values()];
         this._pinch = Math.hypot(a.x - b.x, a.y - b.y);
         a.moved = b.moved = true; // two fingers down is never a tap
+        // A pinch takes the camera here: marking both fingers as moved means
+        // the "first real movement" test in pointermove will never fire for
+        // them, and without this whoever is setting views from code (a blend,
+        // or a director writing the distance every frame) would undo the pinch.
+        grab();
       }
     });
 

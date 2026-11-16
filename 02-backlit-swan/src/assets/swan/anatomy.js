@@ -355,8 +355,9 @@ export const BILL_TIP = [0, -0.004, HEAD_LENGTH];
  * feather a ray of sun has to cross: six ellipsoids, in the side-view
  * coordinates above. Their sizes were found by a search that compared the
  * light they let through with the film's, point by point over the visible
- * flank, in the two side views (0.3 s and 7.5 s). What came out reads as a
- * bird:
+ * flank, in the two side views (0.3 s and 7.5 s); the wings' size and leading
+ * edge and the density of the shell were then retuned by hand against the
+ * same two views and 10.5 s. What came out reads as a bird:
  *
  *   - the plumage is a hollow shell about 0.07 L thick (an ellipsoid with a
  *     smaller one of negative density inside it). Light that crosses the
@@ -366,7 +367,9 @@ export const BILL_TIP = [0, -0.004, HEAD_LENGTH];
  *   - the two folded wings are lobes either side of the spine whose density
  *     fades in behind a slanting line running up and back from the breast
  *     (the wing's leading edge): `plane` gives that line as u = u0 + m v and
- *     the distance over which the density reaches its full value;
+ *     the distance over which the density reaches its full value. That
+ *     distance is what makes the edge from cream to teal soft; the line lies
+ *     further forward when the wings are relaxed;
  *   - inside the hollow, aft and low, is the body itself, far denser: the
  *     dark middle of the bird;
  *   - the tail is a thin wedge: cream all through.
@@ -383,17 +386,21 @@ export function proxyShapes(lift) {
   const beam = mix(0.305, 0.33, lift);
   const top = peak + 0.01;
   const wall = 0.07;
-  const edge = { u0: 0.223, m: 0.94, width: 0.3 };
+  const edge = { u0: mix(0.1, 0.35, lift), m: 0.45, width: 0.5 };
   // Arched wings are puffed up and loose, and let light through their upper
   // parts; relaxed wings lie flat and close and let almost none through (by
   // the end of the film the whole body is a dark shape with a lit outline).
-  const loose = mix(0.95, 0.42, lift);
+  // The plumage is still loose with the wings half down (7.5 s: the front
+  // third still glows) and closes over the last of the way.
+  // (the plumage closes early as the wings come down: half-relaxed, as at
+  // 7.5 s of the film, the body is already much darker than with them arched)
+  const loose = mix(0.95, 0.33, smooth(0.25, 0.95, lift));
   const wing = mix(3.2, 1.6, lift);
   return [
     { centre: [0.633, 0.25, 0], radii: [0.6, top - 0.25, beam], tilt: 0, density: loose, plane: null },
     { centre: [0.606, 0.23, 0], radii: [0.6 - 1.2 * wall, top - 0.25 - wall, beam - wall], tilt: 0, density: -loose, plane: null },
-    { centre: [0.66, 0.1, 0.15], radii: [0.42, peak - 0.11, beam - 0.16], tilt: 0, density: wing, plane: edge },
-    { centre: [0.66, 0.1, -0.15], radii: [0.42, peak - 0.11, beam - 0.16], tilt: 0, density: wing, plane: edge },
+    { centre: [0.66, 0.1, 0.15], radii: [0.42, peak - 0.08, beam - 0.13], tilt: 0, density: wing, plane: edge },
+    { centre: [0.66, 0.1, -0.15], radii: [0.42, peak - 0.08, beam - 0.13], tilt: 0, density: wing, plane: edge },
     { centre: [0.632, -0.014, 0], radii: [0.227, 0.232, 0.177], tilt: 0, density: 3, plane: null },
     { centre: [1.035, 0.28, 0], radii: [0.1, 0.045, 0.07], tilt: 0.75, density: 0.5, plane: null },
   ];

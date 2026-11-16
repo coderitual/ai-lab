@@ -145,7 +145,7 @@ export function createDroplets(ctx) {
             if (splash[i]) {
               ctx.ripple.disturb(x, z, size * 3, size * 0.2);
             } else {
-              ctx.ripple.disturb(x, z, size * 4, size * 0.32);
+              ctx.ripple.disturb(x, z, size * 3, size * 0.24);
               ctx.events.emit('drop', { x, z, size });
               // the rebound: a couple of specks hop up and out and are gone in a tenth of a second
               landed.push(x, z, size);

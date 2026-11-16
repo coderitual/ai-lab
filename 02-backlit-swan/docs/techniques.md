@@ -27,7 +27,8 @@ built:
 (`proxyShapes`).*
 
 The film's glow is not a rim light. Thin parts of the bird (tail, wing tips,
-the taper of the bow) are bright cream, slightly thicker parts amber, and the
+the taper of the bow) are bright cream, slightly thicker parts a dimmer
+cream that the print curve turns pale olive rather than amber, and the
 thick middle gets no sun at all. That is absorption along the light's path,
 so that is what is computed:
 
@@ -41,13 +42,20 @@ so that is what is computed:
   and ray against cylinder have closed forms, and so does a density that
   fades linearly behind a plane.
 - The light that arrives is `exp(-absorb * depth)` per channel, with blue
-  absorbed 2.3 times and green 1.45 times as fast as red: a little depth
-  gives cream, more gives amber, more gives nothing.
+  absorbed 1.4 times and green 1.12 times as fast as red (`swanAbsorb`): a
+  little depth gives cream, more gives a dimmer, slightly warmer cream, more
+  gives nothing. (Read back through the film's curves, its edge from cream to
+  teal is neutral dimming, not amber, so the factors are small.)
 - A surface facing away from the sun shows a share of that light (0.32 on the
-  body, 0.08 on the close-feathered neck and head); a surface facing the sun
-  shows the larger of that and plain wrapped sunlight.
+  body); a surface facing the sun
+  shows the larger of that and plain wrapped sunlight. On the neck and head
+  the share is 0.16 (`swanNeckThrough`: close, dense feathering) and a small
+  floor of the sun's own colour, 0.0065 of it (`swanNeckAround`), is kept
+  under the transmitted light: the film's neck is dim neutral olive inside,
+  and depth-based transmission alone cannot reach its thick lower part.
 - Everything else is the sky: a blue fill, strongest on surfaces tilted up,
-  weak on vertical ones and near the water, a third as strong on the neck.
+  weak on vertical ones and near the water, a tenth as strong on the neck and
+  head (`swanNeckSky`: the film's neck is olive inside, not teal).
   The print curve turns it teal.
 
 Because it is one sum over shapes that move with the pose (the neck's
@@ -124,7 +132,9 @@ That one construction gives everything the film's reflection does: sharp, the
 right height, fraying at its lower edge, breaking into horizontal slivers and
 closed loops under the reflected head. Nothing is blurred or stretched on
 purpose. The surroundings are looked up the same way, further along the ray,
-in a defocused mirror picture of the far layer, and the swan is laid over
+in a defocused mirror picture of the far layer (blurred by at least
+`LOOK.mirrorSoftness` of the full bokeh, since ripples too fine to draw spread
+a reflection from that far away), and the swan is laid over
 them by its alpha.
 
 ![](images/buffer-mirror.jpg)
@@ -201,7 +211,7 @@ nearest the water in view, fading toward the edge of its square and toward
 its range, so the hand-over to the next copy is never seen. The sheet drifts
 as one. A speck is lit by the sun or it is almost nothing: none in the
 wood's shadow (`sunReach`), few in the swan's. It is a point on the surface:
-it rides the ripples, is never smaller than about 1.3 pixels, has no mirror
+it rides the ripples, is never smaller than about 1.5 pixels, has no mirror
 image, and the swan hides it. A fifth are flat and show as short level
 dashes; a few are golden leaves.
 
@@ -276,3 +286,53 @@ generator with named streams; no code under `src/` reads the clock except
 the engine's loop and the gesture handling. So `?manual&t=1.27` is the same
 picture on every run, byte for byte, which the tests check and the
 screenshot tool relies on.
+
+## 14. A wood from limbs, clumps and one pattern of light
+
+*`assets/forest/trees.js`, `foliage.js`, `haze.js`, `Forest.js`;
+`canopyLight` in `assets/lighting.js`.*
+
+The film's background is a wood seen a little out of focus: dark trunks and
+boughs, masses of foliage with sun-dappled leaves in them, haze with a shaft
+of light coming down through it, and a clearing in full sun. It is built as
+that, not painted:
+
+- **Trees are skeletons of limbs**, and a limb is a bent tube that tapers: a
+  trunk that flares at the root and wanders on its way up, boughs that leave
+  it at an angle and curve toward the light, a few thin dead branches low
+  down on the trees at the water's edge. The trees on the bank lean out over
+  the pond. Every trunk and bough of the wood is one mesh.
+- **Foliage is two things.** Most of it is mass: flat cards hung where a tree
+  has leaves, out of each of which the fragment shader cuts a ragged clump
+  with holes between the leaves. They are solid, so a clump in front hides
+  the lights behind it, and as the camera moves the lights come and go in
+  its holes. The cards face the middle of the pond rather than the camera,
+  which never leaves the water and so never sees one edge-on. On top of the
+  mass are the lights: one soft point per lit leaf, a few of them far
+  brighter than white, which the defocus turns into small soft discs.
+- **Which leaves are lit is one pattern laid across the sunlight**
+  (`canopyLight`): it is drawn in two axes at right angles to the sun's
+  rays, so whatever is the same all the way along a ray (a gap between two
+  crowns) is the same on the leaves, on the bark, in the haze and on the
+  grass of the clearing, and the whole pattern slants and moves as one when
+  the sun is turned. `LOOK.canopyOpen` is the share of the canopy that lets
+  the sun through.
+- **The air**: every solid thing in the wood is seen through the haze between
+  it and the eye, which is blue from the sky and brighter and warmer looking
+  up the sunlight; a wall of that haze stands behind the last trunks.
+  **Shafts** are strips of lit haze that stand along the sun's own direction
+  (so they lean with it and follow it) and are turned about that axis to
+  face the eye; what is drawn on a strip is a soft round column, the same
+  from every side, so nothing is seen to turn.
+- **The edge of the wood's shadow on the pond** (`sunReach`) is broken into
+  flecks of sun and shade that stir slightly, as light through the last
+  leaves does; where it lies on average is unchanged.
+
+![](images/meadow.jpg)
+
+**Limits.** The cards are flat and the trees are few-sided tubes: this is a
+wood for the far layer, seen defocused from the water, not one to walk into.
+The pattern of light is noise, not the shadow of these particular crowns.
+The second half of this work (checking it from every angle, in the mirror,
+and on every tier) was cut short; see [ideas.md](ideas.md).
+
