@@ -1,0 +1,150 @@
+/* The HTML overlay. FIRST VERSION: plain readouts, to be designed in the HUD stage. System fonts only. */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #eef1f4;
+  font: 500 14px/1.25 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.hud button {
+  pointer-events: auto;
+  font: inherit;
+  color: inherit;
+  background: rgba(12, 16, 22, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.hud button.on {
+  background: rgba(230, 236, 242, 0.85);
+  color: #0b0e12;
+}
+.hud .panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 260px;
+  max-width: calc(100% - 32px);
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  padding: 20px 24px;
+  background: rgba(8, 11, 15, 0.72);
+  border-radius: 10px;
+  pointer-events: auto;
+}
+.hud .panel h1 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.hud .panel .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.hud .panel table {
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+.hud .panel td {
+  padding: 2px 12px 2px 0;
+}
+.hud .panel tr.ref td {
+  opacity: 0.6;
+}
+.hud .panel tr.new td {
+  color: #b7f0a8;
+}
+.hud [hidden] {
+  display: none !important;
+}
+
+.hud .bar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.hud .view {
+  position: absolute;
+  overflow: hidden;
+}
+.hud .view .timing {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+.hud .view .clock {
+  font-size: 26px;
+  font-weight: 600;
+}
+.hud .view .clock.wait {
+  opacity: 0.45;
+}
+.hud .view .flash.ahead {
+  color: #8fe07a;
+}
+.hud .view .flash.behind {
+  color: #f2b54a;
+}
+.hud .view .lamps {
+  font-size: 22px;
+  letter-spacing: 0.25em;
+  color: #ff3b2f;
+}
+.hud .view .drive {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+.hud .view .speed {
+  font-size: 30px;
+  font-weight: 600;
+}
+.hud .view .note {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+.hud .view .tools {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  display: flex;
+  gap: 6px;
+}
+.hud .stick {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+}
+.hud .stick i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+}

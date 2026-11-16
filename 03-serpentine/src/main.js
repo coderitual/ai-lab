@@ -18,7 +18,8 @@ try {
   /** Fast-forward `seconds` of the run without drawing, then draw one frame. */
   const skip = (seconds) => {
     const frames = Math.round(seconds * 60);
-    for (let i = 0; i < frames; i++) engine.advance(1 / 60, 1 / 60, false);
+    // a paused run stays where it is (the steps stop; the picture is still drawn)
+    for (let i = 0; i < frames; i++) engine.advance(engine.paused ? 0 : 1 / 60, 1 / 60, false);
     engine.advance(0);
   };
 
@@ -33,11 +34,13 @@ try {
     /** Play `seconds` of the run at `fps` frames a second, drawing every frame. Works with or without ?manual. */
     advance(seconds, fps = 60) {
       const frames = Math.round(seconds * fps);
-      for (let i = 0; i < frames; i++) engine.advance(1 / fps);
+      for (let i = 0; i < frames; i++) engine.advance(engine.paused ? 0 : 1 / fps, 1 / fps);
     },
     skip,
     /** Numbers about the run and the last frame drawn. */
     stats: () => game.stats(),
+    /** A plain JSON picture of the run: phase, mode, time of day, and per driver lap, place, speed, lamps, ... */
+    state: () => game.state(),
     /** Change a number of the light or of the run by its path, and show the result. */
     set(path, value) {
       const keys = String(path).split('.');
