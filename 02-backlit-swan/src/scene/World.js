@@ -256,6 +256,7 @@ void main() {
     light.uniforms.uSkyColor.value.fromArray(LOOK.skyColor);
     light.uniforms.uBounceColor.value.fromArray(LOOK.bounceColor);
     light.uniforms.uAmbient.value = LOOK.ambient;
+    light.uniforms.uShade.value.set(LOOK.shadeStart, LOOK.shadeSoftness, LOOK.shadeWander, 1 / Math.max(0.1, LOOK.shadeWanderLength));
     this.far.clearColor.fromArray(LOOK.farClear);
     this.farMirror.clearColor.fromArray(LOOK.farClear);
     this.post.setLook(LOOK, this.engine.pixelRatio);

@@ -13,7 +13,7 @@
  * radius) times cos(n * theta + phase).
  */
 export const SHORE = {
-  radius: 38,
+  radius: 11,
   lobes: [
     { n: 2, amp: 0.07, phase: 0.6 },
     { n: 3, amp: 0.045, phase: 2.1 },

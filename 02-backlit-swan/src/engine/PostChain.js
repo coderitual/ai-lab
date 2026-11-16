@@ -100,6 +100,7 @@ uniform float uSplitBalance;
 uniform float uSaturation;
 uniform vec2 uVignette;    // amount, where it starts (0 centre .. 1 corner)
 uniform float uChroma;
+uniform float uPrint;      // 0: neutral picture .. 1: the measured grade of the reference film
 
 vec3 sceneAt(vec2 uv) {
   return fromTarget(texture(uScene, uv)).rgb + fromTarget(texture(uBloom, uv)).rgb * uBloomStrength;
@@ -117,6 +118,24 @@ vec3 toneCurve(vec3 x) {
   x = x * x / (x + uCurve.x + 1.0e-6);
   x = 0.18 * pow(x / 0.18, vec3(uCurve.z));
   return x / pow(1.0 + pow(x, vec3(uCurve.y)), vec3(1.0 / uCurve.y));
+}
+
+// The print: what the reference film does to a neutral picture, measured.
+// Its pixels were sorted by brightness and the mean colour of each brightness
+// was read off; these three curves are the fit (to within 1 to 4 code values
+// of 255). They take an sRGB-encoded value and give the value on screen:
+//   black is not black but a blue-violet 5 to 7 %,
+//   dark greys lean teal, middle greys olive, light greys warm,
+//   and white is cream: blue never reaches the top.
+// Because dim light comes out olive and bright light cream, the glow round
+// anything hot shades from cream to olive by itself, as it does in the film.
+vec3 printCurve(vec3 x) {
+  x = clamp(x, 0.0, 1.0);
+  float u = pow(x.r, 1.04);
+  float r = 0.057 + 0.947 * mix(u, u * u * (3.0 - 2.0 * u), 0.40);
+  float g = 0.047 + 0.933 * pow(x.g, 0.96);
+  float b = 0.073 + 0.770 * pow(x.b, 1.26);
+  return vec3(r, g, b);
 }
 
 void main() {
@@ -146,6 +165,7 @@ void main() {
   c += uLift * (1.0 - hi) * (1.0 - hi);
 
   vec3 s = linearToSrgb(c);
+  s = mix(s, printCurve(s), uPrint);
 
   // Dither: noise of one 8-bit step, triangular so that it adds no visible
   // pattern of its own. Without it the long dark gradients show as bands.
@@ -348,6 +368,7 @@ export class PostChain {
           uShadowTint: { value: new THREE.Vector3(1, 1, 1) },
           uHighlightTint: { value: new THREE.Vector3(1, 1, 1) },
           uLift: { value: new THREE.Vector3(0, 0, 0) },
+          uPrint: { value: 1 },
           uSplitBalance: { value: 0.35 },
           uSaturation: { value: 1 },
           uVignette: { value: new THREE.Vector2(0.3, 0.3) },
@@ -393,6 +414,7 @@ export class PostChain {
     f.uShadowTint.value.fromArray(look.shadowTint);
     f.uHighlightTint.value.fromArray(look.highlightTint);
     f.uLift.value.fromArray(look.lift);
+    f.uPrint.value = look.print ?? 1;
     f.uSplitBalance.value = look.splitBalance;
     f.uSaturation.value = look.saturation;
     f.uVignette.value.set(look.vignette, look.vignetteStart);

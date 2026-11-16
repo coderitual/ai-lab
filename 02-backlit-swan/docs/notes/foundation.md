@@ -56,7 +56,8 @@ tools/shot.cjs          one screenshot of any URL
 - The swan faces `(sin h, 0, cos h)` for heading `h`; it starts at the origin
   facing west (`h = -PI/2`), side-on to the default camera.
 - Two clocks. Slowed time (`world.time`, the `uTime` uniform, the `dt`/`time`
-  given to assets and to `SwanMind`) is real time times `SIM.timeScale` (0.4).
+  given to assets and to `SwanMind`) is real time times `SIM.timeScale` (1: the film plays in real time; a
+  slow-motion control lowers it).
   Real time (`world.realTime`) drives the camera, Director, Interaction, Ui,
   Ambience and the film grain.
 - No `Math.random`, no `Date.now` anywhere in `src`. `performance.now` is read
@@ -287,7 +288,7 @@ doubles. Off with `?manual` and with `?dpr=`.
 | `ui=0` | no overlay; the veil is removed at once |
 | `az= el= dist= fov= tx= ty= tz=` | staged camera; any of them also stops the idle drift |
 | `t=` | seconds of real time to simulate before the first frame |
-| `time=` | time scale (default 0.4) |
+| `time=` | time scale (default 1) |
 | `ldr` | the 8-bit fallback, including the packed ripple simulation |
 | `nopost` | the scene target straight to the screen (exposure only) |
 | `only=swan,water,specks,forest,droplets` | build only these parts |
