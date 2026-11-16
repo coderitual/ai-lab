@@ -56,7 +56,7 @@ function createBeamTexture() {
 /**
  * @param {THREE.Object3D} object the car's root: the lights become its children
  * @param {(thing: { dispose: () => void }) => any} keep registers what must be disposed with the car
- * @returns {{ headlights: THREE.SpotLight[], taillight: THREE.PointLight, apply: (level: object) => void }}
+ * @returns {{ headlights: THREE.SpotLight[], taillight: THREE.SpotLight, apply: (level: object) => void }}
  */
 export function createLampLights(object, keep) {
   const beam = keep(createBeamTexture());
@@ -68,11 +68,13 @@ export function createLampLights(object, keep) {
     object.add(light, light.target);
     return light;
   });
-  // It sits under the boot floor, just ahead of the bumper's face: from there it reddens the road behind and
-  // cannot shine on the car's own tail (a point light this close to a panel would whiten it).
-  const taillight = new THREE.PointLight(0xff1408, 0, 7, 2);
-  taillight.position.set(0, 0.2, STATIONS.tail + 0.25);
-  object.add(taillight);
+  // It sits under the boot floor, just inside the bumper's face, and is a spot pointed back and down: from there
+  // it reddens the road behind and can shine neither on the car's own tail (a light this close to a panel would
+  // whiten it) nor forward onto the rear tyres (a point light did: nothing in the scene stops it).
+  const taillight = new THREE.SpotLight(0xff1408, 0, 7, 1.05, 0.7, 2);
+  taillight.position.set(0, 0.3, STATIONS.tail + 0.12);
+  taillight.target.position.set(0, -0.6, STATIONS.tail - 3);
+  object.add(taillight, taillight.target);
   return {
     headlights,
     taillight,

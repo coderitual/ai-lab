@@ -77,7 +77,7 @@ import { encodeForTarget } from './engine/glsl.js';
 import { DEG } from './engine/math.js';
 import { parseParams } from './engine/params.js';
 import { createRng } from './engine/rng.js';
-import { LAMPS } from './game/config.js';
+import { LIGHTS } from './game/config.js';
 import { createTrack } from './game/track.js';
 
 const params = parseParams();
@@ -109,6 +109,12 @@ if (given.s !== undefined) {
 }
 world.scene.add(stand);
 stand.updateMatrixWorld();
+
+/** The automatic lamps by time of day (game/config.js no longer exports these presets; built from its LIGHTS). */
+const LAMPS = {
+  drl: { drl: LIGHTS.drl },
+  low: { drl: LIGHTS.drlDimmed, low: 1, tail: 1, interior: LIGHTS.interior },
+};
 
 /** What the `lights` parameter means, as values for CarModel.setLights. */
 function lampPreset(name) {

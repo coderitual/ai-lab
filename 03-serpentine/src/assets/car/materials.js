@@ -21,6 +21,7 @@
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_PROBE, targetDefines } from '../../engine/glsl.js';
 import { RANGE } from './atlas.js';
+import { ARCHES } from './features.js';
 
 /** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
 export const PAINTS = {
@@ -36,6 +37,20 @@ export const PAINTS = {
  * Uniforms every car material shares (one object, so that setReflections and setLights touch one place).
  * @param {THREE.Texture[]} atlas
  */
+const f4 = (v) => v.toFixed(4);
+/** GLSL: is a point (|x|, y, z) of the body inside a wheel arch's hole (features.js ARCHES)? */
+const ARCH_HOLE = `bool carArchHole(vec3 p) {
+${[ARCHES.front, ARCHES.rear]
+  .map(
+    (a) => `  {
+    vec2 d = vec2((p.z - ${f4(a.z)}) / ${f4(a.a)}, max(p.y - ${f4(a.y)}, 0.0) / ${f4(a.b)});
+    if (p.x > ${f4(a.inner)} && dot(d, d) < 1.0) return true;
+  }`,
+  )
+  .join('\n')}
+  return false;
+}`;
+
 export function createShared(atlas) {
   return {
     carAtlas0: { value: atlas[0] },
@@ -90,6 +105,7 @@ float carSegment(vec3 p, vec3 a, vec3 b, vec3 v) {
   float t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
   return length(p - a - ab * t);
 }
+${ARCH_HOLE}
 float carBox(vec2 p, vec2 c, vec2 half_, float r) {
   vec2 q = abs(p - c) - half_ + r;
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
@@ -269,6 +285,9 @@ void carLamp(float lens, float w) {
   float glass = A.r;
   if (B.r < 0.0 || glass < -0.012) discard;
   vec3 p = vec3(abs(vCarPos.x), vCarPos.yz);
+  // the wheel arches' holes, exactly: the mesh leaves out only the quads wholly inside them, which would leave
+  // a saw-tooth over the tyre. Only the sideways-facing skin (the lip's band faces the wheel, x = 0).
+  if (abs(vCarNormal.x) > 0.25 && carArchHole(p)) discard;
   float ndv = abs(dot(normalize(vNormal), normalize(vViewPosition)));
   cBase = paintColor * mix(1.0, paintFlop, pow(1.0 - ndv, 1.5));
   cMetal = paintMetal; cRough = paintRough; cCoat = 1.0; cEmit = vec3(0.0); cPaint = 1.0;

@@ -108,6 +108,12 @@ const DETAIL = {
 };
 
 const TAU = Math.PI * 2;
+/**
+ * How much of the sky the parts deep inside the wheel (barrel, disc, caliper, dust shield) see: the arch, the
+ * tyre and the spokes hide most of it, which a probe at the car's middle does not know. Without this the disc
+ * mirrors the open sky and shines white through the windows; on the car it is a dark shape behind the spokes.
+ */
+const INNER_SKY = 0.3;
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const smoothstep = (a, b, v) => {
   const t = clamp01((v - a) / (b - a));
@@ -885,7 +891,7 @@ function buildStatic(detail, front) {
       [0.052, carrierEnd, 'iron'],
       [0, carrierEnd, 'iron'],
     ],
-    Math.max(12, round / 3),
+    Math.max(12, Math.round(round / 3)),
     [1, 0],
   );
 
@@ -1197,7 +1203,7 @@ export function createWheel({ front, left, tier = 'high', caps = null }) {
   // ---- materials: the tyre, the spokes and the shells are this wheel's own (each wheel turns at its own speed)
   const tyreOptions = { map: textures.tyreColor, roughnessMap: textures.tyreRough, normalMap: textures.tyreNormal, metalness: 0 };
   const tyreMaterial = detail.physical
-    ? new THREE.MeshPhysicalMaterial({ ...tyreOptions, sheen: 0.45, sheenRoughness: 0.55, sheenColor: new THREE.Color(0.2, 0.2, 0.21) })
+    ? new THREE.MeshPhysicalMaterial({ ...tyreOptions, sheen: 0.3, sheenRoughness: 0.5, sheenColor: new THREE.Color(0.05, 0.05, 0.052), specularIntensity: 0.6 })
     : new THREE.MeshStandardMaterial(tyreOptions);
   tyreMaterial.userData.uniforms = { uSpunMap: { value: textures.tyreSpun }, uSpun: { value: 0 } };
   tyreMaterial.onBeforeCompile = patchTyre;
@@ -1273,7 +1279,7 @@ export function createWheel({ front, left, tier = 'high', caps = null }) {
       for (const material of materials) {
         material.envMap = cube;
         // with no probe of its own the wheel mirrors the open sky: fade that where there is none overhead
-        material.envMapIntensity = cube ? 1 : 0.1 + 0.9 * sky;
+        material.envMapIntensity = (cube ? 1 : 0.1 + 0.9 * sky) * (material === fixedMaterial ? INNER_SKY : 1);
       }
     },
 

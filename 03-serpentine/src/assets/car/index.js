@@ -8,17 +8,17 @@
 // its own triangles (materials.js). The lamp units, the grille's insides, the
 // mirrors and the cabin are later work: the lamps have stand-ins drawn by the
 // paint under their lenses, the openings show the dark shell behind them.
-// The wheels are placeholders until wheel.js is fitted.
+// The four corners (tyre, wheel, brake) are wheel.js's, at the places spec.js gives.
 
 import * as THREE from 'three';
 import { ATLAS_SIZE, bakeAtlas } from './atlas.js';
 import { MESH_EDGE, createArchGeometry, createLayout, inArch, sampleSkin, skinGeometry, skinIndex } from './body.js';
 import { createLampLights } from './lamps.js';
 import { PAINTS, createGhostMaterial, createGlassMaterial, createPaintMaterial, createDarkMaterial, createShared } from './materials.js';
-import { createPlaceholderWheels } from './placeholderWheels.js';
 import { createContactShadow } from './shadow.js';
 import { createSkin } from './skin.js';
-import { DIMS, STATIONS } from './spec.js';
+import { DIMS, STATIONS, WHEELS } from './spec.js';
+import { createWheel } from './wheel.js';
 
 /** Atlas channels (features.js CHANNELS). */
 const GLASS = 0;
@@ -125,7 +125,14 @@ export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false
     lights = createLampLights(object, keep);
   }
 
-  const wheels = createPlaceholderWheels(object, keep);
+  // the corners: each wheel's origin is its centre, at the tyre's radius above the ground when the car stands
+  const wheels = WHEELS.map((spec) => {
+    const wheel = keep(createWheel({ front: spec.front, left: spec.left, tier, caps }));
+    wheel.object.position.set(spec.x, spec.tyre.radius, spec.z);
+    wheel.object.name = `wheel ${spec.name}`;
+    object.add(wheel.object);
+    return wheel;
+  });
   let triangles = 0;
   let drawCalls = 0;
   object.traverse((o) => {
@@ -152,7 +159,9 @@ export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false
     },
     /** What the car cost to build, and costs to draw (the contact shadow is one more draw call). */
     stats: { buildMs: performance.now() - t0, triangles, drawCalls },
-    setWheel: wheels.setWheel,
+    setWheel(i, pose) {
+      wheels[i].setPose(pose);
+    },
     setLights(change) {
       Object.assign(level, change);
       if (!lights) return;
@@ -161,6 +170,7 @@ export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false
       shared.carLampsB.value.set(level.brake, level.reverse, level.indicatorL, level.indicatorR);
     },
     setReflections({ cube, sky }) {
+      for (const wheel of wheels) wheel.setReflections({ cube, sky });
       if (!shared) return;
       shared.carProbe.value = cube || null;
       shared.carProbeOn.value = cube ? 1 : 0;
