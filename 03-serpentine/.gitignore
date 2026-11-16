@@ -1,0 +1,8 @@
+node_modules
+dist
+*.log
+.DS_Store
+# what the test scripts leave behind when run from here
+playtest/
+soundtest/
+nettest/

@@ -1,0 +1,21 @@
+{
+  "name": "serpentine",
+  "private": true,
+  "version": "0.1.0",
+  "displayName": "Serpentine",
+  "description": "A time trial over a mountain pass in a silver saloon, by day or by night, built with three.js. Solo or two-player split screen; keyboard, gamepad or touch.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "node tools/unit.mjs && node tools/playtest.cjs http://localhost:4190/",
+    "screenshots": "node tools/screenshots.cjs"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}
