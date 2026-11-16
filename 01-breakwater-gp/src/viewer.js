@@ -3,7 +3,7 @@
 // it can be checked in isolation and photographed by tools/shot.cjs and
 // tools/screenshots.cjs.
 //
-//   asset=sea|craft|crafts|world   what to show          team=0..3  whose boat
+//   asset=sea|craft|crafts|rocks|world   what to show    team=0..3  whose boat
 //   az, el, dist, tx, ty, tz, fov  where the camera is and what it looks at
 //   flat    hold a boat level instead of floating it      sea=0.05   wave height
 //   t=3     time of day on the sea clock                  spin=10    orbit, degrees per second

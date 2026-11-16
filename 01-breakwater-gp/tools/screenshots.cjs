@@ -72,8 +72,9 @@ const SHOTS = [
   { name: 'livery-sheet', kind: 'sheet', caption: 'The painted sheet, and the detail sheets every boat shares' },
 
   // ---- the island
-  { name: 'island', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=62&ty=5&tz=20&az=20&el=7&dist=70', caption: 'The island from beyond the pier' },
-  { name: 'beach', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=-52&ty=5&tz=-30&az=200&el=5&dist=26', caption: 'Palms, their shadows, and ripples in the sand' },
+  { name: 'island', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=40&ty=17&tz=12&az=20&el=5&dist=118', caption: 'The island from beyond the pier' },
+  { name: 'peaks', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=0&ty=20&tz=0&az=110&el=5&dist=150', caption: 'The rock massif from the open sea' },
+  { name: 'beach', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=22&ty=5&tz=46&az=78&el=5&dist=27', caption: 'Boulders, thicket and palms at the back of the beach' },
   { name: 'shore', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=64&ty=4&tz=34&az=-10&el=5&dist=24', caption: 'The sunny side: surf running up the sand' },
 
   // ---- the game as played
