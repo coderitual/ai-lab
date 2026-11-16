@@ -31,12 +31,13 @@ import { TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
 import { createRng } from '../engine/rng.js';
 import { CameraRig } from './Cameras.js';
-import { CAMERA, DRIVERS, EXPOSURE, LIGHTS, RULES, VIEW } from './config.js';
+import { CAMERA, DRIVERS, EXPOSURE, HUD, LIGHTS, RULES, VIEW } from './config.js';
 import { AutoDriver, PlayerDriver } from './drivers.js';
 import { Effects } from './effects.js';
 import { Ghost } from './Ghost.js';
 import { Hud } from './Hud.js';
-import { Race, formatMs, medalOf } from './Race.js';
+import { Race, medalOf } from './Race.js';
+import { TEXT } from './text.js';
 import { createTrack } from './track.js';
 import { Vehicle, collideVehicles } from './vehicle/Vehicle.js';
 
@@ -74,6 +75,8 @@ const soundModules = import.meta.glob(['./Sound.js', '../engine/Audio.js'], { ea
 
 /** How much of the car's bounding box, from the ground up, is left out of the motion blur's sharp box (m). */
 const SHARP_LIFT = 0.1;
+/** Set once a first-time player has got going, so the hint does not come back. */
+const HINT_KEY = 'serpentine.hinted.v1';
 /** The car at rest, held on its brakes (the title, the grid). */
 const HELD = { steer: 0, throttle: 0, brake: 0, handbrake: 1 };
 
@@ -156,6 +159,12 @@ export class Game {
     /** The day-night fade: { t, to, switched } or null. */
     this._fade = null;
     this._touchDirty = false;
+    this._hinted = false;
+    try {
+      this._hinted = localStorage.getItem(HINT_KEY) === '1';
+    } catch {
+      // no storage: the hint shows
+    }
     /** The title's attract lap: the autopilot drives behind the menu after a while with nobody at the controls. */
     this.attract = false;
     this._idle = 0;
@@ -268,6 +277,8 @@ export class Game {
     this._fxCars = this.racers.map((racer) => ({ vehicle: racer.vehicle, impacts: racer.impacts }));
 
     this.hud.setViews(n);
+    if (!this._map) this._map = this._mapOf();
+    for (const v of this.hud.views) v.setMap(this._map, n);
     this.views = this.racers.map((racer, i) => {
       // (ENGINE lane) what the car's paint mirrors: a cube picture of its surroundings, a face or two a frame
       const probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[this.tier].probeSize) : null;
@@ -322,7 +333,7 @@ export class Game {
       view.camera.aspect = w / h;
       view.camera.updateProjectionMatrix();
       view.rig.setAspect(w / h);
-      view.hud.setZone(view.zone);
+      view.hud.setZone(view.zone, engine.width * view.zone.width, engine.height * view.zone.height);
     });
     this.input.zones = views.map((view) => view.zone);
     this.hud.setSplit(two ? (sideBySide ? 'wide' : 'tall') : '');
@@ -552,11 +563,11 @@ export class Game {
       if (racer.roofTime > RULES.roofReset) this._resets.add(racer.index);
       racer.offer =
         racer.roofTime > RULES.offerRoof
-          ? 'On its roof'
+          ? 'roof'
           : v.stuckTime > RULES.offerStuck
-            ? 'Stuck'
+            ? 'stuck'
             : v.wrongWayTime > RULES.offerWrongWay
-              ? 'Wrong way'
+              ? 'wrong'
               : '';
     }
     if (this._resets.size) {
@@ -659,9 +670,10 @@ export class Game {
       case 'sector':
       case 'lap': {
         const ahead = e.gap !== null && e.gap <= 0;
-        const text = e.gap === null ? formatMs(e.ms) : formatMs(e.gap, true);
-        const label = e.type === 'lap' ? `Lap ${formatMs(e.ms)}${e.best ? '  best' : ''}${e.gap === null ? '' : '  ' + text}` : text;
-        if (view) view.hud.flashLine(label, e.gap === null ? '' : ahead ? 'ahead' : 'behind', race.clock + 2);
+        if (view) {
+          view.hud.flashLine(e.gap === null ? e.ms : e.gap, e.gap !== null, race.clock + HUD.flash);
+          if (e.type === 'lap') view.hud.lapBanner(e.lap, e.ms, !!e.best, race.clock + HUD.banner);
+        }
         if (sound) sound.cue(e.type, pan, { ahead });
         if (e.type === 'lap' && this.ghostCar) {
           // the race has just put the lap on the board if it is the best of its kind: then it is the new ghost
@@ -681,24 +693,53 @@ export class Game {
         break;
       }
       case 'end':
-        this.hud.setResults(this._resultsHtml());
+        this.hud.setResults(this._results());
         break;
     }
   }
 
-  _resultsHtml() {
+  /** What the results panel shows: each driver's laps, total and medal, and the board with this run's best marked. */
+  _results() {
     const race = this.race;
-    const parts = race.cars.map((c, i) => {
-      const best = race.bestLap(i);
-      const medal = medalOf(best);
-      const laps = c.times
-        .map((l, k) => `<tr><td>Lap ${k + 1}</td><td>${formatMs(l.ms)}</td><td>${l.ms === best ? 'best' : ''}${l.putBack ? ' put back' : ''}</td></tr>`)
-        .join('');
-      const who = race.cars.length > 1 ? `<div>Driver ${i + 1}: ${c.finished ? `P${c.position}` : 'did not finish'}</div>` : '';
-      return `${who}<table>${laps}</table><div>Total ${c.finished ? formatMs(c.finishMs) : '-'} · best lap ${formatMs(best)} · ${medal ? medal + ' medal' : 'no medal'}</div>`;
-    });
-    const mark = race.bestLap(0);
-    return parts.join('<hr>') + this.hud.boardHtml(race.table, RULES.medals, race.time, mark);
+    return {
+      time: race.time,
+      drivers: race.cars.map((c, i) => {
+        const best = race.bestLap(i);
+        return { laps: c.times, best, total: c.finishMs, finished: c.finished, position: c.position, medal: medalOf(best) };
+      }),
+      table: race.table,
+      medals: RULES.medals,
+      mark: race.bestLap(0),
+    };
+  }
+
+  /** The road seen from above, north up, in map units (the longer side 200): its outline, the start and sector lines. */
+  _mapOf() {
+    const track = this.track;
+    const pts = track.toTopDown(1, 8);
+    let x0 = Infinity;
+    let z0 = Infinity;
+    let x1 = -Infinity;
+    let z1 = -Infinity;
+    for (let i = 0; i < pts.length; i += 2) {
+      x0 = Math.min(x0, pts[i]);
+      x1 = Math.max(x1, pts[i]);
+      z0 = Math.min(z0, pts[i + 1]);
+      z1 = Math.max(z1, pts[i + 1]);
+    }
+    const k = 200 / Math.max(x1 - x0, z1 - z0);
+    const map = { k, x0, z0, w: (x1 - x0) * k, h: (z1 - z0) * k, d: '', lines: [] };
+    for (let i = 0; i < pts.length; i += 2) map.d += `${i ? 'L' : 'M'}${((pts[i] - x0) * k).toFixed(1)} ${((pts[i + 1] - z0) * k).toFixed(1)}`;
+    map.d += 'Z';
+    for (const s of [0, ...track.sectors]) {
+      const f = track.frameAt(s, frameOut);
+      const cx = (f.pos.x - x0) * k;
+      const cz = (f.pos.z - z0) * k;
+      const lx = f.left.x * 7;
+      const lz = f.left.z * 7;
+      map.lines.push([cx - lx, cz - lz, cx + lx, cz + lz]);
+    }
+    return map;
   }
 
   // -------------------------------------------------------------- a frame
@@ -807,40 +848,77 @@ export class Game {
 
   /** The HUD's readouts: every call is cheap, the DOM is only touched where something changed. */
   _hud() {
-    const { hud, race } = this;
-    hud.setState({ phase: this.phase, paused: this.engine.paused, mode: this.mode, time: this.world.time.name, muted: this.muted });
+    const { hud, race, input } = this;
+    const device = input.isTouch ? 'touch' : input.source[0] === 'pad' ? 'pad' : 'keys';
+    hud.setState({
+      phase: this.phase,
+      paused: this.engine.paused,
+      mode: this.mode,
+      time: this.world.time.name,
+      muted: this.muted,
+      device,
+      attract: this.attract,
+    });
+    hud.setFade(1 - this._fadeLevel);
     if (this.phase === 'title') {
-      hud.setTitleText(
-        `${this.mode === 'split' ? 'Two drivers' : 'One driver'}, ${this.world.time.name === 'day' ? 'by day' : 'by night'}. ` +
-          'Keys: WASD or arrows, Space handbrake, C view, B look back, R put back, N day or night, H high beam, P pause. Enter to drive.',
-      );
-      hud.setTitleBoard(hud.boardHtml(this._boardTable(), RULES.medals, this.world.time.name));
+      const table = this._boardTable();
+      hud.setTitleBest(table, this.world.time.name, medalOf(table.laps.length ? table.laps[0].ms : null));
+      return;
     }
     const rect = this._touchDirty ? this.container.getBoundingClientRect() : null;
+    const split = this.racers.length > 1;
+    const map = this._map;
+    // the first-time hint: until the first run in which the car has got going
+    if (!this._hinted && race && race.cars.some((c) => c.dist > HUD.hintDistance)) this._noteHinted();
     this.views.forEach((view, i) => {
       const h = view.hud;
-      const v = view.racer.vehicle;
+      const racer = view.racer;
+      const v = racer.vehicle;
       if (race) {
         const c = race.cars[i];
         const waiting = race.clock < 0;
-        h.setLamps(race.lit, waiting);
+        h.tick(race.clock);
+        h.setLamps(race.lit, waiting ? (race.lit > 0 ? 'wait' : 'off') : race.clock < 1 ? 'go' : 'off');
         h.setLap(c.lap, race.laps, c.finished);
         h.setClock(race.lapClock(i), waiting);
-        h.setLive(this.racers.length > 1 ? null : c.live);
-        h.setPosition(c.position, race.cars.length);
-        h.tick(race.clock);
+        h.setLive(split ? null : c.live);
+        h.setBest(race.table.laps.length ? race.table.laps[0].ms : null);
+        h.setBoard(race.table, RULES.medals, race.time, race.bestLap(i));
+        if (split) h.setPosition(c.position, c.lastGap);
+        const running = this.phase === 'run' && !c.finished && racer.driver === racer.player;
+        h.setWarn(running && v.wrongWayTime > HUD.wrongWay && racer.offer !== 'roof');
+        const how = input.source[i] === 'touch' ? TEXT.resetTouch : split ? TEXT.resetSplit(i === 0 ? 'R' : '/') : TEXT.resetKeys;
+        h.setOffer(racer.offer, how);
+        h.setHint(!this._hinted && !c.finished ? TEXT.hint[input.source[i]] || TEXT.hint.keys : '');
       }
       h.setSpeed(v.speed * 3.6);
-      h.setGear(v.gear, v.rpm);
+      h.setRev(v.rpm, v.gear);
       const a = v.assists;
-      const marks = [a.abs > 0.1 ? 'ABS' : '', a.tc > 0.1 ? 'TC' : '', a.esc > 0.1 ? 'ESC' : '', view.racer.lamps.high ? 'high beam' : '']
-        .filter(Boolean)
-        .join(' ');
-      h.setMarks(marks);
-      h.setOffer(view.racer.offer ? `${view.racer.offer}: R puts the car back` : '');
-      if (rect) h.setStick(this.input.stickOf(i), rect);
+      h.setTells({
+        abs: a.abs > 0.1,
+        tc: a.tc > 0.1,
+        esc: a.esc > 0.1,
+        hand: racer.controls.handbrake > 0.5,
+        high: racer.lamps.high > 0,
+      });
+      const p = racer.car.object.position;
+      for (let k = 0; k < this.racers.length; k++) {
+        const q = k === i ? p : this.racers[k].car.object.position;
+        h.setDot(k, (q.x - map.x0) * map.k, (q.z - map.z0) * map.k);
+      }
+      if (rect) h.setStick(input.stickOf(i), rect, input.brakeOf(i));
     });
     this._touchDirty = false;
+  }
+
+  /** The first-time hint has done its job: not again on this device. */
+  _noteHinted() {
+    this._hinted = true;
+    try {
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+      // no storage: the hint shows again next time
+    }
   }
 
   /** The board's table for the time of day showing (read from storage through a throwaway race when none runs). */
@@ -946,6 +1024,7 @@ export class Game {
       textures: info.memory.textures,
       geometries: info.memory.geometries,
       buffer: [engine.bufferWidth, engine.bufferHeight],
+      hudWrites: this.hud.writes,
       pixelRatio: engine.pixelRatio,
       renderScale: engine.renderScale,
       qualityStep: engine.qualityStep,

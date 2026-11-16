@@ -7,6 +7,7 @@ import { TIMES } from './assets/world/lighting.js';
 import { parseParams } from './engine/params.js';
 import { Game } from './game/Game.js';
 import * as config from './game/config.js';
+import { TEXT } from './game/text.js';
 
 const params = parseParams();
 const veil = document.getElementById('loading');
@@ -56,10 +57,22 @@ try {
   // ?t=5: let the run go on for a while before anyone looks; either way, the first complete frame
   skip(params.preAdvance);
   engine.start();
-  if (veil) veil.remove();
+  if (veil) {
+    // the veil fades over the first frames (at once in a still: ?manual draws nothing more to fade over)
+    if (params.manual) veil.remove();
+    else {
+      veil.classList.add('gone');
+      veil.addEventListener('transitionend', () => veil.remove(), { once: true });
+    }
+  }
   window.__ready = true;
 } catch (err) {
   console.error(err);
-  if (veil) veil.textContent = 'This device could not start WebGL 2. Try a recent version of Safari or Chrome.';
+  if (veil) {
+    const p = document.createElement('p');
+    p.textContent = TEXT.noWebgl;
+    veil.querySelector('i')?.remove();
+    veil.appendChild(p);
+  }
   window.__ready = true;
 }

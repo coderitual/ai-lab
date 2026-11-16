@@ -670,7 +670,7 @@ export class Hud {
   /** The title's line about this time of day's best lap and its medal. */
   setTitleBest(table, time, medal) {
     const best = table.laps.length ? table.laps[0].ms : null;
-    this.titleBest.text(`${TEXT.boardTitle(time)}  ${formatMs(best)}${medal ? '  ·  ' + TEXT.medal[medal] : ''}`);
+    this.titleBest.text(`${TEXT.boardTitle(time)}   ${best === null ? '—' : formatMs(best)}${medal ? '  ·  ' + TEXT.medal[medal] : ''}`);
   }
 
   /**
