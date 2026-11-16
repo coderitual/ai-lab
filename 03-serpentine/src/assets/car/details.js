@@ -214,8 +214,8 @@ function roundRect(hx, hy, r, n, slant = 0) {
   return shape.getSpacedPoints(n).slice(0, n);
 }
 
-/** A tail-pipe trim (6.4): a bright frame round a flattened hexagon, 50 mm deep, matte black inside. */
-function pipeTrim(bright, black, matrix) {
+/** A tail-pipe trim (6.4): a bright frame round a flattened hexagon, matte black inside; `wall`: how far its sides run back into the bumper. */
+function pipeTrim(bright, black, matrix, wall) {
   const n = 48;
   const outer = roundRect(0.12, 0.035, 0.014, n, 0.025);
   const inner = roundRect(0.11, 0.025, 0.008, n, 0.02);
@@ -227,11 +227,11 @@ function pipeTrim(bright, black, matrix) {
     const face = V(0, 0, 1).transformDirection(matrix);
     bright.quad(m(outer[i], 0.004), m(outer[j], 0.004), m(inner[j], 0.004), m(inner[i], 0.004), face);
     const ro = V(outer[i].x, outer[i].y, 0).normalize().transformDirection(matrix);
-    bright.quad(m(outer[i], 0.004), m(outer[j], 0.004), m(outer[j], -0.02), m(outer[i], -0.02), ro);
+    bright.quad(m(outer[i], 0.004), m(outer[j], 0.004), m(outer[j], -wall), m(outer[i], -wall), ro);
     const ri = ro.clone().negate();
     bright.quad(m(inner[i], 0.004), m(inner[j], 0.004), m(inner[j], -0.012), m(inner[i], -0.012), ri);
-    black.quad(m(inner[i], -0.012), m(inner[j], -0.012), m(inner[j], -0.05), m(inner[i], -0.05), ri);
-    black.tri(m(inner[i], -0.05), m(inner[j], -0.05), m(V(0, 0, 0), -0.05), back.clone().negate());
+    black.quad(m(inner[i], -0.012), m(inner[j], -0.012), m(inner[j], -wall - 0.05), m(inner[i], -wall - 0.05), ri);
+    black.tri(m(inner[i], -wall - 0.05), m(inner[j], -wall - 0.05), m(V(0, 0, 0), -wall - 0.05), back.clone().negate());
   }
 }
 
@@ -403,7 +403,10 @@ export function buildDetails(samples, { tier, plate }) {
   const chrome = new Tris();
   const gloss = new Tris();
   const matte = new Tris();
-  const glass = new Tris();
+  // the low tier saves two draw calls: the mirror glass goes in with the bright metal, the cabin's blocks are left
+  // out (only its glowing displays remain)
+  const low = tier === 'low';
+  const glass = low ? chrome : new Tris();
   const emit = new Tris();
   const dark = new Tris();
   const plates = new Tris();
@@ -450,22 +453,30 @@ export function buildDetails(samples, { tier, plate }) {
 
   // ---- rear: the tail-pipe trims, the diffuser's six fins (6.4)
   const trimNormal = V(0.385, 0, -0.923).normalize();
-  const t = hit(V(0.57, 0.31, -3.5), V(0, 0, 1));
-  const trimLeft = frame(V(0.57, 0.31, t.point.z), trimNormal);
-  pipeTrim(chrome, matte, trimLeft);
-  pipeTrim(chrome, matte, trimLeft.clone().premultiply(MIRROR));
+  // the frame's face stands just proud of the bumper everywhere along its edge (the bumper turns under here, so
+  // a face placed at the skin's centre point would sink into it at the top)
+  const centre = V(0.57, 0.31, hit(V(0.57, 0.31, -3.5), V(0, 0, 1)).point.z);
+  const trimLeft = frame(centre, trimNormal);
+  let proud = 0;
+  for (const [u, v] of [[-0.12, 0.035], [0.12, 0.035], [-0.12, -0.035], [0.145, -0.035], [0, 0.035], [0, -0.035]]) {
+    const corner = V(u, v, 0).applyMatrix4(trimLeft);
+    proud = Math.max(proud, hit(corner.clone().setZ(-3.5), V(0, 0, 1)).point.sub(centre).dot(trimNormal));
+  }
+  trimLeft.setPosition(centre.addScaledVector(trimNormal, proud + 0.003));
+  pipeTrim(chrome, matte, trimLeft, proud + 0.03);
+  pipeTrim(chrome, matte, trimLeft.clone().premultiply(MIRROR), proud + 0.03);
   for (const x of [0.0525, 0.1575, 0.2625]) {
     for (const s of [1, -1]) {
-      const z0 = hit(V(s * x, 0.3, -3.5), V(0, 0, 1)).point.z + 0.002;
-      // a blade standing 25 mm off the insert, its back edge sloping: 60 mm high at the insert, 40 at its edge
+      const z0 = hit(V(s * x, 0.345, -3.5), V(0, 0, 1)).point.z + 0.002;
+      // a blade standing 16 mm off the insert, its back edge sloping: 60 mm high at the insert, 40 at its edge
       for (const dx of [-0.006, 0.006]) {
         const X = s * x + dx;
-        matte.quad(V(X, 0.33, z0), V(X, 0.27, z0), V(X, 0.27, z0 - 0.025), V(X, 0.31, z0 - 0.025), V(Math.sign(dx), 0, 0));
+        matte.quad(V(X, 0.375, z0), V(X, 0.315, z0), V(X, 0.315, z0 - 0.016), V(X, 0.355, z0 - 0.016), V(Math.sign(dx), 0, 0));
       }
       const [x0, x1] = [s * x - 0.006, s * x + 0.006];
-      matte.quad(V(x0, 0.33, z0), V(x1, 0.33, z0), V(x1, 0.31, z0 - 0.025), V(x0, 0.31, z0 - 0.025), V(0, 1, -1));
-      matte.quad(V(x0, 0.31, z0 - 0.025), V(x1, 0.31, z0 - 0.025), V(x1, 0.27, z0 - 0.025), V(x0, 0.27, z0 - 0.025), V(0, 0, -1));
-      matte.quad(V(x0, 0.27, z0), V(x1, 0.27, z0), V(x1, 0.27, z0 - 0.025), V(x0, 0.27, z0 - 0.025), V(0, -1, 0));
+      matte.quad(V(x0, 0.375, z0), V(x1, 0.375, z0), V(x1, 0.355, z0 - 0.016), V(x0, 0.355, z0 - 0.016), V(0, 1, -1));
+      matte.quad(V(x0, 0.355, z0 - 0.016), V(x1, 0.355, z0 - 0.016), V(x1, 0.315, z0 - 0.016), V(x0, 0.315, z0 - 0.016), V(0, 0, -1));
+      matte.quad(V(x0, 0.315, z0), V(x1, 0.315, z0), V(x1, 0.315, z0 - 0.016), V(x0, 0.315, z0 - 0.016), V(0, -1, 0));
     }
   }
 
@@ -505,7 +516,7 @@ export function buildDetails(samples, { tier, plate }) {
   }
 
   // ---- the cabin
-  cabin(dark, emit);
+  cabin(low ? new Tris() : dark, emit);
 
   // ---- number plates (5.3, 6.3): front leaning back 6 degrees under the grille, rear upright in its recess
   let plateTex = null;
@@ -524,7 +535,7 @@ export function buildDetails(samples, { tier, plate }) {
     face(plateTex.rows.rear, frame(rp.point.clone().add(V(0, 0, -0.006)), V(0, 0, -1)));
   }
 
-  const geometries = { chrome, gloss, matte, glass, emit, dark, plates };
+  const geometries = low ? { chrome, gloss, matte, emit, plates } : { chrome, gloss, matte, glass, emit, dark, plates };
   const out = {};
   let triangles = 0;
   for (const [name, tris] of Object.entries(geometries)) {

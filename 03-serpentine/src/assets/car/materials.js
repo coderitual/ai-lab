@@ -269,6 +269,18 @@ void carGrille(vec3 p, float w) {
   CAR_REGION(w, col, met, rough, 1.0);
 }
 
+float carTriangle(vec2 p, vec2 p0, vec2 p1, vec2 p2) {
+  vec2 e0 = p1 - p0; vec2 e1 = p2 - p1; vec2 e2 = p0 - p2;
+  vec2 v0 = p - p0; vec2 v1 = p - p1; vec2 v2 = p - p2;
+  vec2 q0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0.0, 1.0);
+  vec2 q1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0.0, 1.0);
+  vec2 q2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0.0, 1.0);
+  float s = sign(e0.x * e2.y - e0.y * e2.x);
+  vec2 d = min(min(vec2(dot(q0, q0), s * (v0.x * e0.y - v0.y * e0.x)), vec2(dot(q1, q1), s * (v1.x * e1.y - v1.y * e1.x))),
+               vec2(dot(q2, q2), s * (v2.x * e2.y - v2.y * e2.x)));
+  return -sqrt(d.x) * sign(d.y);
+}
+
 /** Where the ray from the eye through this pixel of a lens meets a layer d behind it (car space, left side). */
 vec3 carDeep(vec3 eye, float cosv, float d) {
   vec3 q = vCarPos - eye * (d / cosv);
@@ -426,6 +438,15 @@ void carLamp(float lens, float w) {
   CAR_REGION(max(carCover(A.g), carCover(glass)), vec3(0.01, 0.01, 0.012), 0.0, 0.06, 1.0);
   // red reflectors
   CAR_REGION(carCover(B.g), vec3(0.30, 0.01, 0.015), 0.0, 0.1, 1.0);
+  // the rear bumper's corner scoops (6.4): a shallow triangular recess, darker inside, with a lit lower edge
+  if (p.z < -2.1 && p.z > -2.4 && p.y > 0.33 && p.y < 0.64 && p.x > 0.68) {
+    vec3 dv = normalize(vec3(0.7, 0.0, -0.7));
+    vec3 o = vec3(0.78, 0.6, -2.3);
+    float tri = carTriangle(carPlane(p, o, dv), vec2(0.0), carPlane(vec3(0.845, 0.375, -2.155), o, dv), carPlane(vec3(0.74, 0.38, -2.32), o, dv));
+    float scoop = carInside(tri);
+    cBase *= 1.0 - 0.45 * scoop * smoothstep(0.0, 0.03, -tri);
+    cBase *= 1.0 + 0.5 * carInside(abs(tri + 0.003) - 0.0015) * step(p.y, 0.42);
+  }
   // matte black: the front lip, the diffuser (whose top rail is gloss), and the tail-pipe trims set in it
   if (p.z > 1.6) CAR_REGION(carInside(p.y - 0.215), vec3(0.02, 0.02, 0.022), 0.0, 0.65, 0.0);
   if (p.z < -2.15) {
