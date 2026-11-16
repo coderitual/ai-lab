@@ -13,8 +13,19 @@
 import * as THREE from 'three';
 import { ATLAS_SIZE, bakeAtlas } from './atlas.js';
 import { MESH_EDGE, createArchGeometry, createLayout, inArch, sampleSkin, skinGeometry, skinIndex } from './body.js';
+import { buildDetails } from './details.js';
 import { createLampLights } from './lamps.js';
-import { PAINTS, createGhostMaterial, createGlassMaterial, createPaintMaterial, createDarkMaterial, createShared } from './materials.js';
+import {
+  PAINTS,
+  createDarkMaterial,
+  createEmitterMaterial,
+  createGhostMaterial,
+  createGlassMaterial,
+  createPaintMaterial,
+  createPlateMaterial,
+  createShared,
+  createTrimMaterial,
+} from './materials.js';
 import { createContactShadow } from './shadow.js';
 import { createSkin } from './skin.js';
 import { DIMS, STATIONS, WHEELS } from './spec.js';
@@ -45,7 +56,7 @@ function coarseIndex(samples, arch) {
 /**
  * @param {{ paint?: string, plate?: string, tier?: 'low'|'medium'|'high', caps?: object, ghost?: boolean }} [options]
  */
-export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false } = {}) {
+export function createCar({ paint = 'silver', plate = 'AI LAB03', tier = 'high', caps, ghost = false } = {}) {
   const t0 = performance.now();
   const object = new THREE.Group();
   object.name = ghost ? 'ghost car' : 'car';
@@ -102,7 +113,15 @@ export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false
     const extremes = (channel, i, k) => atlas.extremes(channel, u.coords[i], u.coords[i + 1], v.coords[k], v.coords[k + 1]);
     shared = createShared(textures);
     const paintMaterial = keep(createPaintMaterial(shared, caps, paint));
-    const body = skinMesh((i, k) => extremes(GLASS, i, k)[1] > -0.012 && extremes(OPENING, i, k)[1] > 0, paintMaterial);
+    // the grille's field is drawn by the paint (its pins and relief), so its quads stay in; the intakes are holes
+    const grilleQuad = (i, k) => {
+      const j = (i * rows + k) * 3;
+      return P[j + 1] > 0.45 && P[j + 1] < 0.72 && Math.abs(P[j]) < 0.56 && P[j + 2] > 1.9;
+    };
+    const body = skinMesh(
+      (i, k) => extremes(GLASS, i, k)[1] > -0.012 && (extremes(OPENING, i, k)[1] > 0 || grilleQuad(i, k)),
+      paintMaterial,
+    );
     body.castShadow = body.receiveShadow = true;
     // the glass and the lenses lie on the paint's own surface: drawn after it, at the same depth
     skinMesh((i, k) => extremes(GLASS, i, k)[0] < 0.002, keep(createGlassMaterial(shared, caps, GLASS))).renderOrder = 1;
@@ -122,7 +141,28 @@ export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false
     object.add(lip, new THREE.Mesh(archGeometry.liner, keep(createDarkMaterial(THREE.DoubleSide, 0.012))));
     shadow = createContactShadow(samples.position, samples.columns * samples.rows, tier);
     disposables.push(shadow);
-    lights = createLampLights(object, keep);
+    lights = createLampLights(object, keep, tier);
+    // the solid details, one mesh per material
+    const details = buildDetails(samples, { tier, plate });
+    const trim = {
+      chrome: () => createTrimMaterial(shared, caps, { color: [0.83, 0.84, 0.86], metal: 1, rough: 0.08 }),
+      gloss: () => createTrimMaterial(shared, caps, { color: [0.01, 0.01, 0.012], metal: 0, rough: 0.05 }),
+      matte: () => createTrimMaterial(shared, caps, { color: [0.02, 0.02, 0.022], metal: 0, rough: 0.65 }),
+      glass: () => createTrimMaterial(shared, caps, { color: [0.62, 0.63, 0.64], metal: 1, rough: 0.02 }),
+      emit: () => createEmitterMaterial(shared, caps),
+      dark: () => createDarkMaterial(THREE.FrontSide, 0.018, 0.75),
+      plates: () => createPlateMaterial(shared, caps, details.plate),
+    };
+    for (const [name, geometry] of Object.entries(details.geometries)) {
+      const mesh = new THREE.Mesh(keep(geometry), keep(trim[name]()));
+      mesh.name = `car ${name}`;
+      mesh.castShadow = name !== 'dark' && name !== 'emit';
+      object.add(mesh);
+    }
+    if (details.plate) {
+      keep(details.plate.map);
+      keep(details.plate.normalMap);
+    }
   }
 
   // the corners: each wheel's origin is its centre, at the tyre's radius above the ground when the car stands
@@ -168,6 +208,7 @@ export function createCar({ paint = 'silver', tier = 'high', caps, ghost = false
       lights.apply(level);
       shared.carLampsA.value.set(level.drl, level.low, level.high, level.tail);
       shared.carLampsB.value.set(level.brake, level.reverse, level.indicatorL, level.indicatorR);
+      shared.carLampsC.value.set(level.interior, 0, 0, 0);
     },
     setReflections({ cube, sky }) {
       for (const wheel of wheels) wheel.setReflections({ cube, sky });
