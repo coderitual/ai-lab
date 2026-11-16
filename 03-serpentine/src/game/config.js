@@ -136,7 +136,7 @@ export const CAMERA = {
    * The title's slow circle round the parked car (rate in rad/s, slower by `linger` over the three-quarter views),
    * its radius drifting between `near` and `far` and its height between `low` and `high`.
    */
-  orbit: { near: 4.6, far: 5.4, low: 1.1, high: 1.4, driftRate: 0.23, rate: 0.16, linger: 0.55, lookHeight: 0.62, fov: 38, narrowBack: 1.5 },
+  orbit: { near: 5.0, far: 5.5, low: 1.1, high: 1.4, driftRate: 0.23, rate: 0.16, linger: 0.55, lookHeight: 0.5, fov: 40, narrowBack: 1.5 },
   /** The orbit behind the results: blended in from the chase view over `blend` s while the car rolls home. */
   results: { near: 6.2, far: 7.2, low: 1.2, high: 1.6, driftRate: 0.2, rate: 0.36, linger: 0.4, lookHeight: 0.7, fov: 44, narrowBack: 1.4, blend: 1.5 },
   /**
@@ -145,14 +145,14 @@ export const CAMERA = {
    */
   sweep: {
     path: [
-      [2.6, 0.55, 4.8],
-      [4.2, 0.8, 2.0],
-      [4.4, 1.05, -1.8],
-      [2.6, 1.35, -5.0],
+      [3.2, 0.55, 5.6],
+      [5.2, 0.8, 2.2],
+      [5.4, 1.05, -2.0],
+      [3.0, 1.35, -5.6],
     ],
     lookHeight: 0.6,
     lookZ: 0.3,
-    fov: 40,
+    fov: 44,
   },
   /** Keeping clear: of a solid edge, of the ground, of the tunnel's roof (and this far beyond the portals). */
   clear: { wall: 0.6, ground: 0.45, roof: 1.2, portal: 3 },
