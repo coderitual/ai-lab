@@ -20,8 +20,8 @@ It is an original demo. Two things were looked at for what "good" looks like
 and never for names, tracks, interface or art: an old XNA starter-kit racing
 game (the shape of the thing: a time trial on a scenic road with a chase
 camera, a speedometer, lap times and a best-times board, heavy motion blur
-and glow) and a modern console racer (how a car should sit in the frame and
-how a road is lit). The car is an unofficial model made out of enthusiasm for
+and glow) and two other racers (how a car should sit in the frame, how a
+road is lit by day, and what a wet road does with lights at night). The car is an unofficial model made out of enthusiasm for
 the real one; this project is not affiliated with its maker.
 
 ## What it is built round
@@ -115,7 +115,10 @@ portals.
 - **Start.** The camera sweeps from the car's nose to its place behind the
   boot while the gantry's lamps count down. Lights out, go.
 - **Three laps.** Each lap is cut into three sectors; crossing a sector line
-  flashes the gap to your best lap (green ahead, amber behind).
+  flashes the gap to your best lap (green ahead, amber behind). The lap
+  counter, the running and best times, the five best laps on this device and
+  a rev counter with the gear and the speed are on screen throughout, and a
+  faint ghost of your best lap drives with you.
 - **Results.** Lap times, the best lap, a medal against three target times,
   and the five best laps set on this device for that time of day.
 - **Two players** race each other over the same three laps, each in half the
@@ -166,12 +169,22 @@ a few seconds it is offered).
   daytime running lamps always on; tail lamps red with a hot core; brake lamps
   three times brighter; warm tunnel lamps; lit windows at the chalet by the
   start. Exposure about 5 stops above day.
+- **Night is the night after rain.** The asphalt is wet: dark, glossy, with
+  water standing in the wheel tracks, and it mirrors what stands on it: the
+  tail lamps as long red smears, the car, the lamps, the head lamps' pool.
+  Lit studs along the centre line and the edges draw every bend from far
+  away, and a town by the lake glitters below with its glow on the sky.
+- **Day has the sun in it.** Heading into the low sun the picture is washed
+  by its glare, lens ghosts lie across the frame, and the road goes pale
+  towards the light.
 - The paint is a metallic silver under a clear coat: a sharp mirror image of
   the real surroundings over a soft, flake-sparkling base.
 
 ## Left out on purpose (for now)
 
-- **Weather.** Rain, wet asphalt, spray and fog are the planned next step.
+- **Weather.** Rain, spray, fog and a wet road that changes the grip are the
+  planned next step. (The wet road at night is a look, not weather: it is
+  always there at night and the tyres do not notice it.)
 - **Opponents driven by the computer**, damage, a career, more tracks, more
   cars, tuning.
 - **Online play.** Demo 01 has it; this one does not need it.
