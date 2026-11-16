@@ -112,7 +112,8 @@ export function createPosts({ track, atmosphere }) {
   }
 
   const chevron = chevronTexture();
-  const boardMaterial = retroReflective(standard({ map: chevron, roughness: 0.4 }));
+  // large sheets: less gain than the small reflectors, or the whole board would be one white blot
+  const boardMaterial = retroReflective(standard({ map: chevron, roughness: 0.4 }), 0.4);
   const boardBack = standard({ color: 0x6b6f72, roughness: 0.6, metalness: 0.4 });
   const pole = standard({ color: 0x7d8286, roughness: 0.45, metalness: 0.6 });
   const W = 0.55;
@@ -131,7 +132,7 @@ export function createPosts({ track, atmosphere }) {
 
   // warning triangles: a pole and a board each
   const triangleTexture = warningTexture();
-  const triangleMaterial = retroReflective(standard({ map: triangleTexture, roughness: 0.4, alphaTest: 0.5 }));
+  const triangleMaterial = retroReflective(standard({ map: triangleTexture, roughness: 0.4, alphaTest: 0.5 }), 0.4);
   const signs = triangles.map(({ at, yaw }) => upright(at.clone().setY(at.y + 1.45), yaw));
   const signPoles = triangles.map(({ at, yaw }) => upright(at.clone().setY(at.y - 0.3), yaw, 1, 2.6, 1));
   const triangleGeometry = new THREE.PlaneGeometry(0.9, 0.8).translate(0, 0.4, 0.03);
