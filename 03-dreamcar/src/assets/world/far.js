@@ -53,8 +53,8 @@ const MASSIF = {
   height: 2600,
   peaks: 9,
   slope: 31,
-  cols: { low: 150, medium: 260, high: 340 },
-  rows: { low: 60, medium: 110, high: 140 },
+  cols: { low: 110, medium: 260, high: 340 },
+  rows: { low: 44, medium: 110, high: 140 },
 };
 
 /**
