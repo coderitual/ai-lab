@@ -469,13 +469,15 @@ export class ViewHud {
 
   setWarn(wrongWay) {
     this.warn.show(wrongWay);
+    this._warned = wrongWay;
   }
 
   /** The reset offer: a reason code ('roof' | 'stuck' | 'wrong', or '' for none), and how to take it on this device. */
   setOffer(reason, how) {
     this.offer.show(!!reason);
     if (!reason) return;
-    this.offerWhy.text(TEXT.offer[reason] || '');
+    // the warning above already says it
+    this.offerWhy.text(TEXT.offer[reason] || '').show(!(reason === 'wrong' && this._warned));
     this.offerButton.text(how);
   }
 

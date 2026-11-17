@@ -886,10 +886,11 @@ export class Game {
         h.setBoard(race.table, RULES.medals, race.time, race.bestLap(i));
         if (split) h.setPosition(c.position, c.lastGap);
         const running = this.phase === 'run' && !c.finished && racer.driver === racer.player;
-        h.setWarn(running && v.wrongWayTime > HUD.wrongWay && racer.offer !== 'roof');
+        const warn = running && v.wrongWayTime > HUD.wrongWay && racer.offer !== 'roof';
+        h.setWarn(warn);
         const how = input.source[i] === 'touch' ? TEXT.resetTouch : split ? TEXT.resetSplit(i === 0 ? 'R' : '/') : TEXT.resetKeys;
         h.setOffer(racer.offer, how);
-        h.setHint(!this._hinted && !c.finished ? TEXT.hint[input.source[i]] || TEXT.hint.keys : '');
+        h.setHint(!this._hinted && !c.finished && !racer.offer && !warn ? TEXT.hint[input.source[i]] || TEXT.hint.keys : '');
       }
       h.setSpeed(v.speed * 3.6);
       h.setRev(v.rpm, v.gear);
