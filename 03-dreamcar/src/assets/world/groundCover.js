@@ -12,7 +12,8 @@
 // only.
 
 import * as THREE from 'three';
-import { plantMaterial } from './forest.js';
+import { alphaMips, chainTexture } from './forestTextures.js';
+import { plantMaterial } from './treeMaterial.js';
 import { planeNoise } from './shading.js';
 
 const SURFACE_GRASS = 2;
@@ -30,7 +31,7 @@ function coverTexture(rng) {
   const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.lineCap = 'round';
   // grass: blades from the bottom edge, curving
   for (let k = 0; k < 70; k++) {
@@ -63,10 +64,15 @@ function coverTexture(rng) {
     ctx.ellipse(x, y, rng.range(3, 6), rng.range(2, 4), rng.range(0, Math.PI), 0, Math.PI * 2);
     ctx.fill();
   }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.flipY = false;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
+  // (trees lane) mip levels that keep each half's coverage at the cut, as the trees' atlas does: no thinning and no
+  // crawling edges at a distance, on the tiers whose alpha is a plain cut
+  const { levels } = alphaMips(ctx.getImageData(0, 0, size, size).data, size, size, {
+    regions: [
+      [0, 0, size / 2, size],
+      [size / 2, 0, size, size],
+    ],
+  });
+  return chainTexture(levels);
 }
 
 /** Crossed upright cards standing on y = 0, `n` of them, `w` wide and `h` tall, picturing [u0, u1] of the map. */
@@ -340,8 +346,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
     }
   }
 
-  const coverMaterial = plantMaterial({ map: texture, atmosphere, uniforms, wind: { height: 1, sway: 0.04, tip: 0.0 }, facing: 0 });
-  const rockMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, facing: 0, flat: true });
+  const coverMaterial = plantMaterial({ map: texture, atmosphere, uniforms, wind: { height: 1, sway: 0.04 } });
+  const rockMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, flat: true });
   const parts = [];
   if (grassItems.length) parts.push(scatter({ geometry: cards(2, 1, 1, 0.02, 0.48), material: coverMaterial, items: grassItems, reach: T.grassReach, name: 'cover-grass', group }));
   if (bushItems.length) parts.push(scatter({ geometry: cards(3, 1, 1, 0.52, 0.98), material: coverMaterial, items: bushItems, reach: T.bushReach, name: 'cover-bushes', group }));

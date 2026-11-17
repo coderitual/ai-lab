@@ -35,7 +35,7 @@ import { TIMES } from './lighting.js';
 import { createGroundMaterial } from './groundMaterial.js';
 import { createLake } from './lake.js';
 import { createFar } from './far.js';
-import { createForest } from './forest.js';
+import { CASTER_LAYER, createForest } from './forest.js';
 import { createGroundCover } from './groundCover.js';
 import { selectBake } from './shading.js';
 import { createSky } from './sky.js';
@@ -46,6 +46,7 @@ import { createStructures } from './structures.js';
 import { createStuds } from './studs.js';
 import { ROW_STEP, createTerrain } from './terrain.js';
 import { PlanarMirror } from '../../engine/PlanarMirror.js';
+import { TIERS } from '../../engine/caps.js';
 
 /**
  * The wet road's planar reflection, per tier: the target's height against the view's, and how far it reaches (m).
@@ -86,9 +87,10 @@ const MIRROR = { medium: { scale: 0.35, far: 220 }, high: { scale: 0.5, far: 320
  * @param {object} options.track the Track (game/track.js): the road and its corridor
  * @param {import('../../engine/rng.js').Rng} options.rng
  * @param {import('../../engine/params.js').Params} options.params
+ * @param {(x: number, z: number) => boolean} [options.keepOut] where no tree may stand (the start area, the town)
  * @returns {World}
  */
-export function createWorld({ renderer, caps, tier, track, rng, params }) {
+export function createWorld({ renderer, caps, tier, track, rng, params, keepOut }) {
   const scene = new THREE.Scene();
   /** Start-up milliseconds of each part (world.stats.ms). */
   const ms = {};
@@ -123,7 +125,11 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   lap('rock');
   const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
   lap('lake');
-  const forest = createForest({ track, terrain, tier, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high });
+  // (the trees' alpha becomes coverage where the scene target is multisampled: the pipeline's rule, caps.js)
+  const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
+  const forest = createForest({ renderer, track, terrain, tier, coverage, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high, keepOut });
+  // the trees' shadow-only proxies live on a layer only the sun's shadow camera sees
+  sun.light.shadow.camera.layers.enable(CASTER_LAYER);
   lap('forest');
   const cover = createGroundCover({ track, terrain, tier, rng: rng.fork('cover'), atmosphere, uniforms: forest.uniforms });
   lap('cover');
@@ -144,6 +150,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   const setWetness = (value) => {
     wetness = Math.min(1, Math.max(0, value));
     road.setWetness(wetness);
+    forest.setWetness(wetness);
   };
   let startLights = 0;
   /** What the wet road's mirror leaves out: the road itself and what lies under or far beyond it. */
@@ -174,6 +181,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     mirror,
     atmosphere,
     terrain,
+    /** The trees (forest.js): where they stand (woodAt, turnedAt), single trees for the viewer (specimen). */
+    forest,
     /** Start-up milliseconds per part, and the terrain's own counts. */
     stats: { ms, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
 

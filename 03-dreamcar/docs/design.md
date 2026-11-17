@@ -228,3 +228,40 @@ a few seconds it is offered).
 - **Online play.** Demo 01 has it; this one does not need it.
 - **A cockpit view.** The cabin is modelled only as far as it shows through
   the glass.
+
+## The forest (trees lane, rework 2026-11)
+
+Early autumn: most broadleaves green, maples (and some limes and birches)
+turned in groups, most of them round the start; larch green-gold; spruce and
+fir dark. Built in `src/assets/world/`:
+
+- `treeSpecies.js` seven species (spruce, fir, larch, birch, maple, lime,
+  hazel for the undergrowth) and nine grown individuals; per species a
+  `green` tint, `autumn` tints and how readily it `turns`.
+- `forestTextures.js` the foliage atlas (broadleaf tiles painted nearly grey,
+  the tint colours them) and the bark, with coverage-preserving mip levels.
+- `treeGeometry.js` grows each individual into a full and a reduced mesh;
+  broadleaf crowns are leaf masses clumped round the last limbs, normals out
+  of the crown, occlusion dark inside and below.
+- `treeMaterial.js` the standard material plus light through the leaves (sun
+  behind, sky behind and above), light and shade carrying the crown's colour
+  (`crownTone`), wind, coverage. No hashed or dithered transparency at any
+  tier: alpha to coverage where the scene target is multisampled, a plain cut
+  on low.
+- `impostors.js` bakes, at start-up, 8 level and 8 raised pictures of each
+  individual (colour; normal in the tree's frame and the crown's light).
+- `forest.js` plants and draws. Where trees stand is asked of `woodAt(track,
+  noise, s, side)` (the Track's own `woodAt` when it has one, else the sides
+  whose edge kind is TREES), from 2 m behind the barrier; `turnedAt` is how
+  much of the wood has turned; `createWorld({ keepOut })` keeps places free.
+  Levels per tier (m): full to 0 / 34 / 50, reduced to 60 / 95 / 130,
+  impostors to 650 / 900 / 1200 (low / medium / high), cross-faded by
+  coverage over 8 m on medium and high. Shadows (medium, high): impostor
+  cards on a layer only the sun's shadow camera sees, turned to the light.
+  The mirror and the probe see reduced trees and impostors only.
+
+Measured (software WebGL, chase view in the green wood at s 667, 1280x720):
+forest draw calls / triangles low 10 / 61 k, medium 19 / 294 k, high
+20 / 540 k (plus one shadow call of 2 triangles per caster); start-up
+(plant, textures, grow, bake, meshes) about 0.53 s low, 1.16 s medium,
+1.27 s high. Not measured on a real phone or a real GPU.
