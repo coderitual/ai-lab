@@ -118,8 +118,8 @@ vec3 treeCrown = vec3( 0.0, 0.0, 1.0 );      // the crown's own normal, view spa
  */
 const CROWN_TONE = /* glsl */ `
 vec3 crownTone( float lit, float turn ) {
-  vec3 shade = mix( vec3( 0.78, 0.92, 1.12 ), vec3( 1.15, 0.72, 0.6 ), turn );
-  vec3 light = mix( vec3( 1.12, 1.06, 0.78 ), vec3( 1.0, 0.98, 0.8 ), turn );
+  vec3 shade = mix( vec3( 0.78, 0.92, 1.12 ), vec3( 1.12, 0.8, 0.62 ), turn );
+  vec3 light = mix( vec3( 1.12, 1.06, 0.78 ), vec3( 1.0, 0.93, 0.8 ), turn );
   return mix( shade, light, smoothstep( 0.2, 0.95, lit ) );
 }
 `;
@@ -249,7 +249,7 @@ export function treeMaterial({ foliage, bark, barkNormal, atmosphere, uniforms, 
   }
   diffuseColor *= tex;
   // (a turned crown's shade is rust, lit by the light that crosses it, not near black)
-  diffuseColor.rgb *= mix( 1.0, pow( vShade.x, 1.3 ), mix( 0.92, 0.72, vTurn ) );
+  diffuseColor.rgb *= mix( 1.0, pow( vShade.x, 1.3 ), mix( 0.92, 0.6, vTurn ) );
 }
 ${TREE_BACK}`,
       )

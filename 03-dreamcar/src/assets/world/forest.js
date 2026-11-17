@@ -236,7 +236,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     const span = (track.delta(straight.s0, straight.s1) + track.length) % track.length;
     const FIR = SPECIES.indexOf('fir');
     // most of it maples; a lime or a birch here and there; a dark fir or two among them
-    const startWood = (r) => (r < 0.84 ? MAPLE : r < 0.91 ? LIME : r < 0.95 ? BIRCH : FIR);
+    const startWood = (r) => (r < 0.88 ? MAPLE : r < 0.92 ? LIME : r < 0.94 ? BIRCH : FIR);
     for (const side of [1, -1]) {
       const land = !!woodAt(track, noise, straight.s0 + span / 2, side);
       const rows = land
