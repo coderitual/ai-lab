@@ -20,13 +20,21 @@
 
 import * as THREE from 'three';
 import { levelFrame } from './furniture.js';
-import { BOARD_COUNT, TALL_COUNT } from './signs.js';
+import { BOARD_COUNT, DESIGN, TALL_COUNT } from './signs.js';
 import { PIT } from './gantry.js';
 import { STAND } from './pits.js';
 
 /** The boards: width, height, height of the foot over the ground, metres beyond the edge, gap between panels. */
 const TALL = { w: 7.6, h: 3.8, foot: 1.0, beyond: 1.4, gap: 0.14 };
 const SMALL = { w: 4.4, h: 1.1, foot: 0.25, beyond: 0.55, gap: 0.35 };
+/** The low walls (walls.js): their top over the road at the edge, and where a board on them stands (m beyond the edge). */
+const WALL = { top: 0.93, board: 0.42 };
+/** How far into the ledge (frame D3) its runs carry their own palette, and the palettes (signs.js DESIGN order). */
+const D3_REACH = 300;
+const D3_OUTSIDE = [0, 10, 6];
+const D3_INSIDE = [0, 6, 5, 10];
+/** The tall run is phased at this many metres before the line (frame D1's camera). */
+const D1_ANCHOR = 200;
 /** A tyre stack: radius, height (four tyres), spacing along the wall. */
 const TYRE = { r: 0.31, h: 1.0, step: 0.62 };
 /** The distance boards: size, height of the foot over the road. */
@@ -34,7 +42,8 @@ const DIST = { size: 1.5, foot: 1.1 };
 /** The distance boards before the first bend: big enough to read from 150 m. */
 const FIRST_BEND_SIZE = 2.2;
 /** The start's tyre wall (D4): where it begins after the line (m) and how long it is. */
-const START_TYRES = { from: PIT.s1 + 30, length: 32 };
+/** The start's own (frame D4), from the gantry's s: where it begins, the wide dark boards, the pale ones. */
+const START = { from: PIT.s1 + 8, dark: { w: 6.4, h: 1.6 }, pale: { w: 4.4, h: 1.1 } };
 
 /**
  * @param {object} options
@@ -85,9 +94,27 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
   const byDistanceBoard = (s, side) => firstBend.some((d) => d.side === side && Math.abs(track.delta(d.s, s)) < FIRST_BEND_SIZE / 2 + TALL.w / 2);
 
   // ---- boards
+  const EDGE_WALL = 2;
+  /** The solid edge's kind on a side at s (the Track's per-sample kinds). */
+  const kindAt = (s, side) => (side > 0 ? track.kindL : track.kindR)?.[Math.round(track.wrap(s) / track.ds) % track.count];
+  // the ledge's first bend (frame D3): its runs carry their own palette, red and white outside, red, white and
+  // green inside
+  const ledge = track.sections.find((sec) => sec.id === 'ledge');
+  const d3 = ledge ? { s0: ledge.s0, s1: ledge.s0 + D3_REACH } : null;
+  const inD3 = (r) => d3 && track.wrap(r.s0 - d3.s0) < D3_REACH;
+  // the tall run of the straight is phased so that the panels nearest D1's camera read navy, red, white, blue, white
+  const tallAnchor = track.wrap(g0 - D1_ANCHOR);
+  // runs: the Track's, and on bends whose inside is a wall too, the same stretch on the inside
+  const runs = [];
+  for (const run of track.boards) {
+    runs.push(run);
+    const len = track.wrap(run.s1 - run.s0);
+    const mid = run.s0 + len / 2;
+    if (track.sectionAt(mid).id !== 'straight' && kindAt(mid, -run.side) === EDGE_WALL) runs.push({ ...run, side: -run.side, inside: true });
+  }
   let boards = 0;
   let order = 0;
-  for (const run of track.boards) {
+  for (const run of runs) {
     const len = track.wrap(run.s1 - run.s0);
     const big = track.sectionAt(run.s0 + len / 2).id === 'straight';
     // the land side of the straight stays open: grass, the barrier, the pits
@@ -95,27 +122,35 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
     const T = big ? TALL : SMALL;
     const n = Math.floor(len / (T.w + T.gap));
     const pitch = len / n;
+    const palette = inD3(run) ? (run.inside ? D3_INSIDE : D3_OUTSIDE) : null;
+    // the tall run's panel index at the anchor
+    const k0 = big ? Math.round(track.wrap(tallAnchor - run.s0) / pitch - 0.5) : 0;
     for (let k = 0; k < n; k++) {
       const s = track.wrap(run.s0 + (k + 0.5) * pitch);
       if (nearGantry(s, T.w / 2 + 2.5)) continue;
       if (big && (inStand(s) || byDistanceBoard(s, run.side))) continue;
       levelFrame(track, s, frame);
-      const dist = track.edgeAt(s, run.side) + T.beyond;
+      // on a wall the board stands on its top, just behind its face; elsewhere on legs behind the barrier
+      const onWall = !big && kindAt(s, run.side) === EDGE_WALL;
+      const dist = track.edgeAt(s, run.side) + (onWall ? WALL.board : T.beyond);
       const p = spot(s, run.side, dist);
-      const g = groundAt(p, p.y);
+      const g = onWall ? p.y + WALL.top - T.foot + 0.02 : groundAt(p, p.y);
       const along = frame.ahead.clone().multiplyScalar(run.side);
       const face = frame.flat.clone().multiplyScalar(-run.side);
-      const count = big ? TALL_COUNT : BOARD_COUNT;
-      const design = (order * 3 + Math.floor(order / count)) % count;
+      let design;
+      if (big) design = (((k - k0) % TALL_COUNT) + TALL_COUNT) % TALL_COUNT;
+      else if (palette) design = palette[k % palette.length];
+      else design = (order * 3 + Math.floor(order / BOARD_COUNT)) % BOARD_COUNT;
       order++;
       // the panel: its face towards the road, the rest dark
       C.copy(p).setY(g + T.foot + T.h / 2);
       M.makeBasis(X.copy(along).multiplyScalar(T.w), Y.set(0, T.h, 0), Z.copy(face).multiplyScalar(0.08)).setPosition(C);
       b.box(M, { pz: (big ? signs.tall : signs.boards)[design], rest: sw.frame }, { skip: ['ny'] });
-      // legs, and on the big ones a rail along the back
+      // legs (on a wall, short brackets to its top), and on the big ones a rail along the back
+      const legH = onWall ? T.foot + T.h * 0.8 : T.foot + T.h + 0.3;
       for (const e of [-0.36, 0.36]) {
-        C.copy(p).addScaledVector(along, e * T.w).addScaledVector(face, -0.12).setY(g + (T.foot + T.h) / 2 - 0.2);
-        boxAt(C, along, face, big ? 0.14 : 0.1, T.foot + T.h + 0.4 - 0.1, big ? 0.14 : 0.1, sw.steel);
+        C.copy(p).addScaledVector(along, e * T.w).addScaledVector(face, -0.12).setY(g + legH / 2 - 0.1);
+        boxAt(C, along, face, big ? 0.14 : 0.1, legH, big ? 0.14 : 0.1, sw.steel, onWall ? nb : b);
       }
       if (big) {
         C.copy(p).addScaledVector(face, -0.12).setY(g + T.foot + T.h * 0.5);
@@ -124,6 +159,8 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
       boards++;
     }
   }
+  // the small "150" of frame D3 on the inside wall, past the end of the bend's boards
+  const d3Run = d3 ? runs.find((r) => r.inside && inD3(r)) : null;
 
   // ---- tyre walls: a row of stacks bound by a belt, their tops under a dark cap
   const sides = tier === 'low' ? 4 : 6;
@@ -134,6 +171,8 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
     const pitch = len / n;
     for (let k = 0; k < n; k++) {
       const s = track.wrap(s0 + (k + 0.5) * pitch);
+      // behind a low wall a tyre wall would not show: none there
+      if (kindAt(s, side) === EDGE_WALL) continue;
       levelFrame(track, s, frame);
       const p = spot(s, side, track.edgeAt(s, side) + TYRE.r + inset);
       const g = groundAt(p, p.y) - 0.05;
@@ -154,25 +193,42 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
   };
   track.tyreWalls.forEach((wall, i) => tyreRun(wall.s0, track.wrap(wall.s1 - wall.s0), wall.side, tyreFaces[i % tyreFaces.length]));
 
-  // ---- the start's own (D4): past the pit exit on the land side, a tyre wall, and behind it low boards on a
-  // low wall of their own
+  // ---- the start's own (frame D4), on the land side past the pit exit, read from the grid right to left (along
+  // the road): two wide dark boards on the low wall, a stack of tyres, then two pale boards
   {
-    const s0 = track.wrap(g0 + START_TYRES.from);
-    tyreRun(s0, START_TYRES.length, -1, signs.special.tyresWhite);
-    const n = Math.round(START_TYRES.length / (SMALL.w + 0.1));
-    for (let k = 0; k < n; k++) {
-      const s = track.wrap(s0 + ((k + 0.5) * START_TYRES.length) / n);
+    /** One board standing on the wall's top just behind its face: from s over `w` m, `h` high, design. */
+    const wallBoard = (s, w, h, uv) => {
       levelFrame(track, s, frame);
-      const p = spot(s, -1, track.edgeAt(s, -1) + 1.75);
-      const g = groundAt(p, p.y);
+      const p = spot(s, -1, track.edgeAt(s, -1) + WALL.board);
       const along = frame.ahead.clone().negate();
       const face = frame.flat.clone();
-      C.copy(p).setY(g + 0.45);
-      boxAt(C, along, face, START_TYRES.length / n + 0.02, 1.0, 0.3, sw.concrete);
-      C.copy(p).addScaledVector(face, -0.05).setY(g + 0.95 + SMALL.h / 2);
-      M.makeBasis(X.copy(along).multiplyScalar(SMALL.w), Y.set(0, SMALL.h, 0), Z.copy(face).multiplyScalar(0.08)).setPosition(C);
-      b.box(M, { pz: signs.boards[(k * 3 + 1) % BOARD_COUNT], rest: sw.frame }, { skip: ['ny'] });
+      C.copy(p).setY(p.y + WALL.top + 0.02 + h / 2);
+      M.makeBasis(X.copy(along).multiplyScalar(w), Y.set(0, h, 0), Z.copy(face).multiplyScalar(0.1)).setPosition(C);
+      b.box(M, { pz: uv, rest: sw.frame }, { skip: ['ny'] });
       boards++;
+    };
+    let s = g0 + START.from;
+    for (const design of [DESIGN.miralta, DESIGN.solmere]) {
+      wallBoard(track.wrap(s + START.dark.w / 2), START.dark.w, START.dark.h, signs.boards[design]);
+      s += START.dark.w + 0.3;
+    }
+    // the tyres: three stacks of six, two rows deep, right behind the wall, standing well over it
+    const tyreS = s + 0.4;
+    for (let k = 0; k < 3; k++) {
+      const st = track.wrap(tyreS + (k + 0.5) * TYRE.step);
+      levelFrame(track, st, frame);
+      for (const row of [0, 1]) {
+        const p = spot(st, -1, track.edgeAt(st, -1) + 0.35 + TYRE.r + row * 2 * TYRE.r);
+        const z = frame.flat.clone().negate();
+        const axis = { x: new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), z), y: new THREE.Vector3(0, 1, 0), z };
+        nb.prism(p.clone().setY(p.y - 0.1), TYRE.r, TYRE.h * 1.5, 6, k === 1 ? signs.special.tyresWhite : signs.special.tyres, { top: true, topUv: sw.rubber, axis });
+      }
+    }
+    s = tyreS + 3 * TYRE.step + 0.4;
+    // two pale boards on the wall (D4's wall there is white: the wall's paint is walls.js's)
+    for (const design of [DESIGN.torvel, DESIGN.pellora]) {
+      wallBoard(track.wrap(s + START.pale.w / 2), START.pale.w, START.pale.h, signs.boards[design]);
+      s += START.pale.w + 0.3;
     }
   }
 
@@ -201,6 +257,8 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
   for (const d of track.distanceBoards) distanceBoard(d.s, d.side, DIST.size, d.label, d.bridge, d.bridge ? 0.35 : 0.6);
   // and before the first bend after the straight, on its outside, big (the tall run leaves a gap for each)
   for (const d of firstBend) distanceBoard(d.s, d.side, FIRST_BEND_SIZE, d.label, false, 0.5);
+  // and frame D3's small "150" on the inside wall a little past the bend's boards
+  if (d3Run) distanceBoard(track.wrap(d3Run.s1 + 14), d3Run.side, 0.9, '150', false, WALL.board);
 
   // ---- marshal posts: a hut with an opening towards the road, a light panel on a pole beside it
   for (const m of track.marshals) {
