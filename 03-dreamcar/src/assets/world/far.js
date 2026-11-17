@@ -273,8 +273,10 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const z = start.pos.z + Math.sin(a) * r;
         // the crest: where it lies, and how high, with a little jag of its own so the skyline is not a curve
         const crestR = MASSIF.crest * (1 + 0.12 * (crestNoise.fbm(o * 0.06 + 3, 0.7, 3) - 0.5));
-        const jag = 1 + 0.07 * (crestNoise.ridged(o * 0.55 + 1, 2.3, 3) - 0.5);
-        const crestH = eyeY + crestR * Math.tan(profile(o) * DEG) * jag;
+        // (the jag is smooth and only touches the top of the face: a jag that changed from column to column tilted
+        // whole columns of the face and striped it like a curtain in a raking light)
+        const jag = 0.05 * (crestNoise.fbm(o * 0.35 + 1, 2.3, 3) - 0.5);
+        const crestH = eyeY + crestR * Math.tan(profile(o) * DEG);
         // gullies across the face (about one per 1.5 degrees, i.e. 150 m), wandering, deeper low on the face
         const along = (o * DEG * crestR) / 160;
         // (warped, so they wander and fork instead of hanging like a curtain)
@@ -288,10 +290,10 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
           const face = t ** 1.7 * 0.82 + 0.18 * t;
           // the gullies bite deepest mid-face and fade out at the crest, so the ridge line stays whole
           const cut = 1 - (0.2 * (1 - g) + 0.05 * (1 - fine)) * Math.sin(Math.PI * Math.min(1, t * 1.05)) ** 0.7;
-          y = -60 + (crestH + 60) * face * cut;
+          y = -60 + (crestH + 60) * face * cut * (1 + jag * t ** 3);
         } else {
           const t = Math.min(1, (r - crestR) / 2600);
-          y = -60 + (crestH + 60) * (1 - 0.55 * t * t) * (0.94 + 0.06 * g);
+          y = -60 + (crestH + 60) * (1 + jag) * (1 - 0.55 * t * t) * (0.94 + 0.06 * g);
         }
         // the ends of the field fade into the land, so it never ends in a wall
         const edge = smoothstep(0, 0.06, u) * smoothstep(1, 0.94, u) * smoothstep(1, 0.92, v);
