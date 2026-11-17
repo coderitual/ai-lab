@@ -1,47 +1,49 @@
 // The road: one mesh of the pavement built from the Track sample by sample,
-// and the asphalt it is made of.
+// and the asphalt it is made of. The kerbs that stand on its margins are
+// kerbs.js's.
 //
 // The mesh. Each row is a cross-section of the Track at one sample: the edges
-// of the paved strip, the pavement's edge, the wheel tracks and the crown.
-// Every vertex is track.pointAt(s, lat), the very surface the physics drives
-// on, and its outermost vertices are the terrain band's innermost ones
-// (terrain.js uses the same rows), so road and verge meet without a crack.
-// Along the town street (corridor.js) the mesh stops at the pavement's edge:
-// gutter, kerb and pavement are paving.js's.
+// of the margin (the 1.2 m strip beyond the pavement's edge), the pavement's
+// edges and a few columns between. Every vertex is track.pointAt(s, lat), the
+// very surface the physics drives on, except on the margin where a kerb
+// stands: there the mesh lies on the pavement's plane under the kerb, which
+// kerbs.js draws exactly on track.profile(). Its outermost vertices are the
+// terrain band's innermost ones (terrain.js uses the same rows), so road and
+// verge meet without a crack.
 //
 // Conventions for whoever builds on it: `aRoad` is (lat, s, paved, open) per
 // vertex: metres left of the centre line, metres from the start line (the
 // last row repeats the first with s = length, so s never jumps inside a
-// triangle), 1 where the strip beyond the pavement is paved (tunnel, viaduct)
-// rather than loose gravel, and how much sky is overhead.
+// triangle), 1 where the strip beyond the margin is paved (tunnel, bridges),
+// and how much sky is overhead.
 //
-// The asphalt is drawn in the fragment shader from (lat, s), in layers, each
-// at the scale it belongs to:
+// The asphalt is a circuit's: dark, fine and smooth, drawn in the fragment
+// shader from (lat, s), in layers, each at the scale it belongs to:
 //  - the stones (roadTextures.js): tone, height, polish and relief of the
 //    wearing course, looked up twice at shifted places and blended, the
 //    choice of places changing from one patch of road to the next, so the
 //    texture never repeats; each stone glints on its own near the camera and
 //    the mip chain's record of what it averaged away turns that into a steady
-//    satin further off;
-//  - the lane: darker, polished wheel tracks, a paler crown, a drip line down
-//    each lane's middle, rubber laid on the racing line into the bends
-//    (corridor.js works the line out from the Track);
-//  - the road's history (roadHistory.js): surfacing of different ages with
-//    joints between, patches and trenches of newer asphalt with sealed edges,
-//    sealed cracks, covers and gratings, expansion joints, stains: single
-//    things placed by rule, drawn exactly;
-//  - paint: edge lines, the centre line (dashed; double through bends and the
-//    tunnel, parted and hatched in the hairpins), the start line and grid, the
-//    sector lines, the town's crossings and stop lines; a few millimetres
-//    proud (it catches the light along its edges), worn where tyres run, cut
-//    away where the road was dug up, crossed by the cracks, and full of glass
-//    beads that send a car's head lamps back;
-//  - the edges: a ragged end to the asphalt, a gravel shoulder of the same
-//    stones three times the size, a flush painted kerb round the inside of
-//    every tight bend, leaves where trees stand over the road;
-//  - water (world.wetness; lighting.js makes dusk and night wet). Not a gloss
-//    slider: a level. The surface has a height in millimetres (the crown or
-//    the banking, the ruts, dips, whatever was laid proud or has sunk) and the
+//    satin further off (no sparkle, no crawl). This is what breaks up the low
+//    sun's glare: GGX at a grazing angle, its lobe drawn out towards the sun.
+//  - the racing line (corridor.js): a broad polished band where every car
+//    runs, darker and glossier rubber on it through the bends and into the
+//    braking zones;
+//  - the road's history (roadHistory.js): runs of surfacing of different ages
+//    with joints between, the paver's seams along the road, patches, sealed
+//    cracks, expansion joints on the decks, drains at the portals, drips, and
+//    the tyre marks before the slow corner: single things placed by rule,
+//    drawn exactly;
+//  - paint: a solid white line inside each edge of the pavement, the start
+//    line and the grid's boxes, nothing else; a few millimetres proud (it
+//    catches the light along its edges), worn where tyres cross it, cut away
+//    where the road was patched, full of glass beads that send a car's head
+//    lamps back;
+//  - the margin beyond the edge line: the same asphalt, older and dusty,
+//    leaves where woods stand behind the barrier;
+//  - water (world.wetness; lighting.js says how wet each time of day is). Not
+//    a gloss slider: a level. The surface has a height in millimetres (the
+//    crown or the banking, dips, whatever was laid proud or has sunk) and the
 //    rain a level against it. Below the level by more than the stones' own
 //    height, water stands: a mirror. Within the stones' height the gaps are
 //    full and the tops stand clear: a broken film. Above it the asphalt is
@@ -57,21 +59,14 @@ import * as THREE from 'three';
 import { GLSL_HASH } from '../../engine/glsl.js';
 import { createRng } from '../../engine/rng.js';
 import { corridorOf } from './corridor.js';
-import { FEATURE_CELL, roadHistory } from './roadHistory.js';
+import { FEATURE_CELL, GRID_SLOTS, SEAM_LAT, roadHistory } from './roadHistory.js';
 import { BIG_TILE, ROUGH_GAIN, VARIANCE_GAIN, roadTextures } from './roadTextures.js';
 import { WET_UNIFORMS, extend, withBake } from './shading.js';
 
-/** Lane dashes: a dash this long (m) in every period of about DASH_PERIOD (adjusted to divide the lap). */
-const DASH = 4;
-const DASH_PERIOD = 12;
-/** Where the centre line is a solid double one: bends tighter than this (1/m), and this far round them (m). */
-const DOUBLE_CURVATURE = 1 / 40;
-const DOUBLE_REACH = 45;
-/** Where the two lines part and are hatched between them: the hairpins proper. */
-const HATCH_CURVATURE = 1 / 28;
-const HATCH_REACH = 20;
-/** And on the way into each tunnel (m before its portal) as well as all through it. */
-const TUNNEL_DOUBLE = 60;
+/** The edge line: its width (m), its outer edge on the pavement's edge. */
+const EDGE_LINE = 0.15;
+/** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
+const INNER = [4, 2, 0, -2, -4];
 /** Head lamp brightness (THROW in assets/car/index.js: candela-like units at the beam's peak, per lamp). */
 const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;
@@ -100,32 +95,8 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
   const co = corridorOf(track);
   const history = roadHistory({ track, rng: rng.fork('history'), tier });
 
-  // ---- what each metre of road is painted with: r solid double line, g lines parted and hatched, b edge lines
-  const codes = new Uint8Array(n * 4);
-  {
-    const near = (i, reach, test) => {
-      const k = Math.round(reach / ds);
-      for (let j = -k; j <= k; j++) if (test((i + j + n) % n)) return true;
-      return false;
-    };
-    const tight = (limit) => (j) => Math.abs(track.curvature[j]) > limit;
-    const inTunnel = (i) =>
-      track.tunnels.some((t) => {
-        const s = i * ds;
-        return track.delta(t.s0, s) > -TUNNEL_DOUBLE && track.delta(t.s1, s) < 15;
-      });
-    for (let i = 0; i < n; i++) {
-      const hatch = near(i, HATCH_REACH, tight(HATCH_CURVATURE));
-      codes[i * 4] = hatch || inTunnel(i) || near(i, DOUBLE_REACH, tight(DOUBLE_CURVATURE)) ? 255 : 0;
-      codes[i * 4 + 1] = hatch ? 255 : 0;
-      // a street with kerbs has no edge lines
-      codes[i * 4 + 2] = Math.round(255 * (1 - co.town[i]));
-      codes[i * 4 + 3] = Math.round(255 * co.town[i]);
-    }
-  }
-
   // ---- the mesh, in chunks of about 150 m
-  const ACROSS = [1, 1, half, 2.925, 1.325, 0, -1.325, -2.925, -half, -1, -1]; // ±1: outer and pave, filled below
+  const ACROSS = [1, pave, half, ...INNER, -half, -pave, -1]; // ±1: the outer columns, filled below
   const cols = ACROSS.length;
   const geometries = [];
   const pt = new THREE.Vector3();
@@ -143,24 +114,26 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     const road = new Float32Array(count * 4);
     const along = new Float32Array(count * 4);
     const bake = new Float32Array(count * 3);
-    const codeA = new Uint8Array(count * 4);
     const codeB = new Uint8Array(count * 4);
     for (let r = 0; r < list.length; r++) {
       const i = list[r] % n;
       const s = list[r] * ds;
       const pavedL = track.vergeL[i] === 0; // SURFACE.ASPHALT: paved up to the wall or the parapet
       const pavedR = track.vergeR[i] === 0;
-      // in the town the gutter and the kerb begin at the pavement's edge: the mesh ends there
-      const town = co.paved[i] === 1;
       const lats = ACROSS.slice();
-      lats[0] = pavedL ? track.edgeL[i] : town ? half : pave;
-      lats[1] = town ? half : pave;
-      lats[cols - 2] = town ? -half : -pave;
-      lats[cols - 1] = pavedR ? -track.edgeR[i] : town ? -half : -pave;
-      track.frameAt(s % track.length, frame);
+      lats[0] = pavedL ? track.edgeL[i] : pave;
+      lats[cols - 1] = pavedR ? -track.edgeR[i] : -pave;
+      const sw = s % track.length;
+      track.frameAt(sw, frame);
+      // the pavement's plane, for the margin under a kerb: the cross-section is one banked plane out to the margin's edge
+      const y0 = track.pointAt(sw, 0, pt).y;
+      const yL = track.pointAt(sw, half, pt).y;
+      const yR = track.pointAt(sw, -half, pt).y;
       for (let k = 0; k < cols; k++) {
         const v = r * cols + k;
-        track.pointAt(s % track.length, lats[k], pt);
+        track.pointAt(sw, lats[k], pt);
+        const a = Math.abs(lats[k]);
+        if (a > half && a <= pave + 1e-6) pt.y = y0 + ((lats[k] > 0 ? yL : yR) - y0) * (a / half);
         pt.toArray(pos, v * 3);
         // pavement and shoulder are one banked plane: its normal is the Track's own
         frame.up.toArray(nor, v * 3);
@@ -172,7 +145,6 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
         frame.tan.toArray(along, v * 4);
         along[v * 4 + 3] = co.pond[i];
         terrain.bakeAt(pt.x, pt.z, bake, v * 3);
-        codeA.set(codes.subarray(i * 4, i * 4 + 4), v * 4);
         codeB[v * 4] = byte(0.5 + co.line[i] / 8);
         codeB[v * 4 + 1] = byte(co.rubber[i]);
         codeB[v * 4 + 2] = byte(co.tongue[i]);
@@ -193,16 +165,15 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     geometry.setAttribute('aRoad', new THREE.BufferAttribute(road, 4));
     geometry.setAttribute('aAlong', new THREE.BufferAttribute(along, 4));
     geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
-    geometry.setAttribute('aCodeA', new THREE.BufferAttribute(codeA, 4, true));
     geometry.setAttribute('aCodeB', new THREE.BufferAttribute(codeB, 4, true));
     geometry.setIndex(index);
     geometry.computeBoundingSphere();
     geometries.push(geometry);
   }
 
-  // ---- what lies along each edge, per metre: r, g leaves left and right; b, a a painted kerb left and right
+  // ---- what lies along each edge, per metre: r, g leaves left and right; b, a a kerb left and right
   const edges = new Uint8Array(n * 4);
-  for (let i = 0; i < n; i++) edges.set([byte(co.leafL[i]), byte(co.leafR[i]), byte(co.apexL[i]), byte(co.apexR[i])], i * 4);
+  for (let i = 0; i < n; i++) edges.set([byte(co.leafL[i]), byte(co.leafR[i]), byte(co.kerbL[i]), byte(co.kerbR[i])], i * 4);
   const edgeTexture = new THREE.DataTexture(edges, n, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
   edgeTexture.magFilter = edgeTexture.minFilter = THREE.LinearFilter;
   edgeTexture.wrapS = THREE.RepeatWrapping;
@@ -210,20 +181,15 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
 
   const textures = roadTextures({ caps, tier });
 
-  // the grid's boxes and the lines, in track coordinates (s counted back from the line is negative)
+  // the grid's boxes, in track coordinates (s counted back from the line is negative)
   const where = { index: -1, s: 0, lat: 0 };
   const slots = [];
-  for (let slot = 0; slot < 4; slot++) {
+  for (let slot = 0; slot < GRID_SLOTS; slot++) {
     const g = track.grid(slot);
     track.locate(g.x, g.z, -1, where);
     const s = where.s > track.length / 2 ? where.s - track.length : where.s;
     slots.push(new THREE.Vector4(s, where.lat, 0, 0));
   }
-  const period = track.length / Math.round(track.length / DASH_PERIOD);
-  const crossings = [0, 1].map((k) => {
-    const c = co.crossings[k];
-    return c ? new THREE.Vector4(c.s, c.half, c.stopBefore, c.stopAfter) : new THREE.Vector4(0, 0, 0, 0);
-  });
 
   const uniforms = {
     uAgg: { value: textures.surface },
@@ -232,10 +198,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     uEdge: { value: edgeTexture },
     uFeat: { value: history.texture },
     uLength: { value: track.length },
-    uDash: { value: new THREE.Vector2(period, DASH) },
-    uLines: { value: new THREE.Vector3(0, track.sectors[0] ?? -1e4, track.sectors[1] ?? -1e4) },
     uGrid: { value: slots },
-    uCross: { value: crossings },
     uHalf: { value: half },
     uBeamPos: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, -1e4, 0)) },
     uBeamDir: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, 0, 1)) },
@@ -251,6 +214,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
   material.defines = {
     ...material.defines,
     ROAD_TIER: shade.tier,
+    AGG_TILE: textures.tile.toFixed(3),
     ROAD_SLOTS: history.slots,
     ...(mirror && shade.taps ? { ROAD_MIRROR: 1, ROAD_TAPS: shade.taps } : {}),
   };
@@ -259,11 +223,11 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute vec4 aRoad;\nattribute vec4 aAlong;\nattribute vec4 aCodeA;\nattribute vec4 aCodeB;\nvarying vec4 vRoad;\nvarying vec4 vRoadWorld;\nvarying vec4 vRoadAlong;\nvarying vec4 vCodeA;\nvarying vec4 vCodeB;',
+        '#include <common>\nattribute vec4 aRoad;\nattribute vec4 aAlong;\nattribute vec4 aCodeB;\nvarying vec4 vRoad;\nvarying vec4 vRoadWorld;\nvarying vec4 vRoadAlong;\nvarying vec4 vCodeB;',
       )
       .replace(
         '#include <begin_vertex>',
-        `#include <begin_vertex>\nvRoad = aRoad;\nvRoadAlong = aAlong;\nvCodeA = aCodeA;\nvCodeB = aCodeB;\nvRoadWorld = vec4( ( modelMatrix * vec4( transformed, 1.0 ) ).xyz, ${EYE_FROM_PROJECTION} );`,
+        `#include <begin_vertex>\nvRoad = aRoad;\nvRoadAlong = aAlong;\nvCodeB = aCodeB;\nvRoadWorld = vec4( ( modelMatrix * vec4( transformed, 1.0 ) ).xyz, ${EYE_FROM_PROJECTION} );`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${GLSL_HASH}\n${WET_MIRROR_PARS}\n${ASPHALT_PARS}`)
@@ -413,10 +377,7 @@ uniform sampler2D uBig;
 uniform sampler2D uEdge;
 uniform highp sampler2D uFeat;
 uniform float uLength;
-uniform vec2 uDash;
-uniform vec3 uLines;
-uniform vec4 uGrid[4];
-uniform vec4 uCross[2];
+uniform vec4 uGrid[${GRID_SLOTS}];
 uniform float uHalf;
 uniform float uWet;
 uniform vec3 uBeamPos[${BEAMS}];
@@ -425,7 +386,6 @@ uniform float uBeamPower[${BEAMS}];
 varying vec4 vRoad;       // lat, s, paved beyond the pavement, sky overhead
 varying vec4 vRoadWorld;  // world position; w: 0 in a reflection probe's cube face (retro.js says why)
 varying vec4 vRoadAlong;  // the road's direction; w: how readily water stands here
-varying vec4 vCodeA;      // double centre line, hatched, edge lines, town
 varying vec4 vCodeB;      // the racing line, rubber on it, water carried in, banking
 float roadRoughness;
 float roadMetal;
@@ -489,18 +449,18 @@ float rMottle = rAgg.a;
 roadTilt = ( rRelief.xy * 2.0 - 1.0 ) / max( rRelief.z * 2.0 - 1.0, 0.25 );
 float rVariance = rRelief.a / ${VARIANCE_GAIN.toFixed(1)};
 
-// ================= the lane: where tyres run
-float rWander = 0.07 * sin( rS * 0.043 ) + 0.05 * sin( rS * 0.11 + 1.3 );
-float rTracks = exp( -pow( ( rA - 1.33 + rWander ) / 0.32, 2.0 ) ) + exp( -pow( ( rA - 2.93 + rWander ) / 0.34, 2.0 ) );
-rTracks *= rOnRoad * ( 0.7 + 0.6 * rBig.b );
-float rCrown = exp( -pow( rLat / 0.8, 2.0 ) );
-float rDrip = exp( -pow( ( rA - 2.13 ) / 0.26, 2.0 ) ) * ( 0.3 + 1.4 * rBig2.r ) * rOnRoad;
-// rubber on the racing line, two tyres wide
-float rLineD = rLat - ( vCodeB.x - 0.5 ) * 8.0;
-float rRubber = vCodeB.y * exp( -pow( ( abs( rLineD ) - 0.8 ) / 0.27, 2.0 ) );
+// ================= the racing line: where every car runs, and the rubber it lays
+float rLine = ( vCodeB.x - 0.5 ) * 8.0;
+float rLineD = rLat - rLine;
+// a broad band, polished and a shade darker, wandering a little as drivers do
+float rWander = 0.25 * sin( rS * 0.021 ) + 0.15 * sin( rS * 0.057 + 1.3 );
+float rTracks = 0.55 * exp( -pow( ( rLineD + rWander ) / 1.7, 2.0 ) ) * rOnRoad * ( 0.75 + 0.5 * rBig.b );
+float rCrown = exp( -pow( rLat / 1.6, 2.0 ) );
+float rDrip = 0.0;
+// rubber on the line, two tyres wide, as long smears drawn out along the road
+float rRubber = vCodeB.y * ( exp( -pow( ( abs( rLineD + 0.6 * rWander ) - 0.8 ) / 0.35, 2.0 ) ) + 0.35 * exp( -pow( rLineD / 1.3, 2.0 ) ) );
 #if ROAD_TIER > 0
-  // laid down in streaks: a field drawn out along the road
-  rRubber *= 1.4 * smoothstep( 0.3, 0.62, texture2D( uBig, vec2( rLat * 0.9, rS * 0.017 ) ).b );
+  rRubber *= 0.5 + 1.0 * smoothstep( 0.25, 0.65, texture2D( uBig, vec2( rLat * 0.9, rS * 0.017 ) ).b );
 #endif
 rRubber = min( rRubber, 1.0 ) * rOnRoad;
 
@@ -625,45 +585,27 @@ rAlpha2 *= 0.8 + 0.4 * rBig.b;
 rAlpha2 = mix( rAlpha2, 0.07, 0.6 * rRubber );
 roadTiltGain = 1.0 - 0.35 * min( rTracks, 1.0 ) * rWorn;
 
-// ================= paint
-float rDash = roadCover( mod( rS, uDash.x ) - uDash.y * 0.5, uDash.y * 0.5, aaS );
-float rDouble = smoothstep( 0.3, 0.7, vCodeA.x );
-float rHatch = smoothstep( 0.3, 0.7, vCodeA.y );
-float rSplit = 0.11 + 0.33 * rHatch;
-float rZone = 0.0;      // the crossings' own stretch of road: no centre line through it
-float rZebra = 0.0;
-for ( int i = 0; i < 2; i ++ ) {
-  vec4 c = uCross[ i ];
-  if ( c.y <= 0.0 ) continue;
-  rZone += roadCover( rS - c.x, c.y + 3.2, aaS );
-  // bars along the road, half a metre wide, and a stop line before them for each direction
-  rZebra += roadCover( fract( rLat + 0.5 ) - 0.5, 0.25, aaL ) * roadCover( rS - c.x, c.y, aaS ) * roadCover( rLat, uHalf - 0.3, aaL );
-  rZebra += roadCover( rS - c.z, 0.2, aaS ) * roadCover( rLat + uHalf * 0.5, uHalf * 0.5 - 0.28, aaL );
-  rZebra += roadCover( rS - c.w, 0.2, aaS ) * roadCover( rLat - uHalf * 0.5, uHalf * 0.5 - 0.28, aaL );
-}
-float rCentre = roadCover( rLat, 0.06, aaL ) * rDash * ( 1.0 - rDouble );
-rCentre += ( roadCover( rLat - rSplit, 0.05, aaL ) + roadCover( rLat + rSplit, 0.05, aaL ) ) * rDouble;
-rCentre += rHatch * roadCover( fract( ( rS + rLat * 1.2 ) / 1.6 ) - 0.5, 0.14, ( aaS + 1.2 * aaL ) / 1.6 ) * roadCover( rLat, max( rSplit - 0.05, 0.01 ), aaL );
-rCentre *= 1.0 - min( rZone, 1.0 );
-float rMarks = roadCover( rA - ( uHalf - 0.3 ), 0.075, aaL ) * vCodeA.z + rCentre + rZebra;
-rMarks += roadCover( rS0, 0.2, aaS ) + roadCover( rS - uLines.y, 0.075, aaS ) + roadCover( rS - uLines.z, 0.075, aaS );
-for ( int i = 0; i < 4; i ++ ) {
+// ================= paint: an edge line inside each edge, the start line, the grid
+float rMarks = roadCover( rA - ( uHalf - ${(EDGE_LINE / 2).toFixed(3)} ), ${(EDGE_LINE / 2).toFixed(3)}, aaL );
+rMarks += roadCover( rS0, 0.2, aaS ) * roadCover( rLat, uHalf - ${EDGE_LINE.toFixed(3)}, aaL );
+for ( int i = 0; i < ${GRID_SLOTS}; i ++ ) {
   float d = rS0 - uGrid[ i ].x;
   float l = rLat - uGrid[ i ].y;
-  rMarks += roadCover( d - 2.7, 0.06, aaS ) * roadCover( l, 1.15, aaL );
-  rMarks += roadCover( abs( l ) - 1.09, 0.06, aaL ) * roadCover( d - 2.18, 0.58, aaS );
+  // a bar across in front of the place, and short arms back along its sides
+  rMarks += roadCover( d - 2.7, 0.07, aaS ) * roadCover( l, 1.25, aaL );
+  rMarks += roadCover( abs( l ) - 1.18, 0.07, aaL ) * roadCover( d - 2.05, 0.65, aaS );
 }
 // worn: thin where the tyres run, gone in places, broken by the stones up close, newer where the road is
-float rWear = 0.6 * rBig.b + 0.4 * rMottle - 0.26 * min( rTracks, 1.0 ) - 0.3 * rRubber + 0.2 * ( rAgg.g - 0.5 ) * rNear + 0.35 * ( 1.0 - rAge );
+float rWear = 0.55 + 0.25 * rBig.b + 0.2 * rMottle - 0.3 * rRubber + 0.2 * ( rAgg.g - 0.5 ) * rNear + 0.2 * ( 1.0 - rAge );
 roadPaint = clamp( rMarks, 0.0, 1.0 ) * rOnRoad * smoothstep( 0.14, 0.38, rWear ) * ( 1.0 - ftErase );
-rCol = mix( rCol, vec3( 0.6, 0.6, 0.575 ) * ( 0.84 + 0.2 * rAgg.r ) * ( 0.82 + 0.18 * rBig.r ), roadPaint );
+rCol = mix( rCol, vec3( 0.68, 0.68, 0.655 ) * ( 0.88 + 0.16 * rAgg.r ) * ( 0.88 + 0.12 * rBig.r ), roadPaint );
 rAlpha2 = mix( rAlpha2, 0.085, roadPaint );
 roadTiltGain *= 1.0 - 0.65 * roadPaint;
 
 // ================= what lies on top of the paint: tar, stains, iron
 // cracks that broke the old road into blocks, and the seam between the lanes
 float rBlocks = roadCover( rBig.g * 5.3, 0.011, aaM ) * smoothstep( 0.55, 0.75, rBig2.b ) * smoothstep( 0.5, 0.8, rAge ) * ( 1.0 - ftFresh );
-float rSeam = 0.7 * roadCover( rLat - 0.3 - 0.02 * sin( rS * 0.3 ), 0.017, aaL ) * smoothstep( 0.5, 0.62, rBig2.g + rAge * 0.3 );
+float rSeam = 0.45 * roadCover( abs( rLat ) - ${SEAM_LAT.toFixed(2)} - 0.015 * sin( rS * 0.3 ), 0.012, aaL ) * smoothstep( 0.35, 0.6, rBig2.g + rAge * 0.3 );
 float rTar = clamp( max( max( ftTar, rSeamTar ), max( rBlocks, rSeam ) ), 0.0, 1.0 ) * rOnRoad;
 rCol = mix( rCol, vec3( 0.021, 0.021, 0.023 ), 0.93 * rTar );
 rAlpha2 = mix( rAlpha2, 0.012, rTar );
@@ -679,45 +621,30 @@ roadMetal = ftMetal * 0.8 * ( 1.0 - ftHole );
 roadTiltGain *= 1.0 - 0.8 * ftMetal;
 roadBump = ( ftHeight + 2.5 * roadPaint + 1.2 * rTar ) * 0.001;
 
-// ================= the edge: where the asphalt ends, the gravel shoulder or a painted kerb, leaves
+// ================= the margin beyond the edge line: the same asphalt, older, dusty, leaves where woods stand
 roadGravel = 0.0;
 float rLeaves = 0.0;
 float rOut = rA - uHalf;
-if ( rOut > -0.95 ) {
+if ( rOut > -0.6 ) {
   vec4 rEdge = textureLod( uEdge, vec2( rS / uLength, 0.5 ), 0.0 );
   float leafy = rLat > 0.0 ? rEdge.r : rEdge.g;
-  float apex = rLat > 0.0 ? rEdge.b : rEdge.a;
-  // the same stones three times the size: gravel, and the shapes of fallen leaves
+  // the same stones three times the size: grit blown off the verge, and the shapes of fallen leaves
   vec2 gP = rUv / ( AGG_TILE * 3.1 ) + 0.37;
   vec4 gAgg = textureGrad( uAgg, gP, rDx / ( AGG_TILE * 3.1 ), rDy / ( AGG_TILE * 3.1 ) );
-  vec4 gRelief = textureGrad( uAggN, gP, rDx / ( AGG_TILE * 3.1 ), rDy / ( AGG_TILE * 3.1 ) );
   float loose = 1.0 - step( 0.5, vRoad.z );
-  // the asphalt's edge is broken: it ends a hand's width early here, late there
-  float ragged = ( rBig.b - 0.5 ) * 0.12 + ( gAgg.a - 0.5 ) * 0.07;
-  float beyond = smoothstep( -aaL, aaL, rOut + ragged ) * loose * ( 1.0 - apex );
-  vec3 gravel = vec3( 0.2, 0.19, 0.17 ) * ( 0.35 + 1.3 * gAgg.r ) * mix( 0.5, 1.0, smoothstep( 0.2, 0.5, gAgg.g ) );
-  // a flush kerb of concrete blocks round the inside of a tight bend, painted red and white, scuffed
-  float kerb = smoothstep( -aaL, aaL, rOut ) * loose * apex;
-  float block = roadCover( fract( rS / 3.0 ) - 0.5, 0.25, aaS / 3.0 );
-  vec3 kerbCol = mix( vec3( 0.5, 0.49, 0.46 ), vec3( 0.4, 0.04, 0.03 ), block ) * ( 0.6 + 0.5 * gAgg.a ) * ( 0.8 + 0.3 * rBig.r );
-  kerbCol *= 1.0 - 0.6 * roadCover( fract( rS / 1.5 ) - 0.5, 0.008, aaS / 1.5 );
-  kerbCol *= 1.0 - 0.45 * vCodeB.y * smoothstep( 0.35, 0.6, rBig.b );
-  rCol = mix( rCol, gravel, beyond );
-  rCol = mix( rCol, kerbCol, kerb );
-  rAlpha2 = mix( rAlpha2, 0.5, beyond );
-  rAlpha2 = mix( rAlpha2, 0.2, kerb );
-  roadPaint *= 1.0 - max( beyond, kerb );
-  roadMetal *= 1.0 - beyond;
-  roadGravel = beyond;
+  float margin = smoothstep( -aaL, aaL, rOut ) * loose;
+  // dust thickens outwards, in drifts
+  float dust = margin * smoothstep( 0.0, 1.3, rOut + 0.4 * ( rBig.b - 0.5 ) ) * ( 0.55 + 0.6 * gAgg.a );
+  rCol = mix( rCol, vec3( 0.1, 0.095, 0.085 ) * ( 0.8 + 0.5 * rAgg.r ), 0.5 * margin );
+  rCol = mix( rCol, vec3( 0.16, 0.152, 0.14 ) * ( 0.6 + 0.8 * gAgg.r ), clamp( dust, 0.0, 0.7 ) );
+  rAlpha2 = mix( rAlpha2, 0.35, margin );
+  roadGravel = clamp( dust, 0.0, 1.0 );
   // leaves gather along the edge under trees
-  float lying = leafy * smoothstep( -0.95, -0.05, rOut ) * ( 0.55 + 0.9 * rBig2.r );
-  rLeaves = smoothstep( 1.02 - 0.3 * lying, 1.06 - 0.3 * lying, gAgg.b + 0.25 ) * step( 0.02, lying ) * ( 1.0 - kerb * 0.5 );
+  float lying = leafy * smoothstep( -0.6, 0.6, rOut ) * ( 0.55 + 0.9 * rBig2.r );
+  rLeaves = smoothstep( 1.02 - 0.3 * lying, 1.06 - 0.3 * lying, gAgg.b + 0.25 ) * step( 0.02, lying );
   rCol = mix( rCol, mix( vec3( 0.16, 0.085, 0.025 ), vec3( 0.05, 0.03, 0.015 ), gAgg.r ), rLeaves );
   rAlpha2 = mix( rAlpha2, 0.2, rLeaves );
-  roadTilt = mix( roadTilt, ( gRelief.xy * 2.0 - 1.0 ) / max( gRelief.z * 2.0 - 1.0, 0.25 ) * 2.4, beyond );
-  rVariance = mix( rVariance, gRelief.a / ${VARIANCE_GAIN.toFixed(1)} * 5.0, beyond );
-  roadTiltGain = mix( roadTiltGain, 1.0, beyond ) * ( 1.0 - 0.8 * max( kerb, rLeaves ) );
-  rAgg.g = mix( rAgg.g, gAgg.g, beyond );
+  roadTiltGain *= 1.0 - 0.8 * rLeaves;
 }
 
 // ================= water
@@ -734,7 +661,7 @@ float hMacro = mix( hBank, hCrown, 1.0 - smoothstep( 0.08, 0.4, abs( rBank ) ) )
 hMacro -= ( 2.0 + 2.5 * rBig.b ) * min( rTracks, 1.2 ) * rWorn;
 // held back along the pavement's edge by the edge line and the verge
 hMacro -= 2.5 * exp( -pow( ( rA - ( uHalf - 0.55 ) ) / 0.3, 2.0 ) );
-hMacro += ftHeight + 2.5 * roadPaint + 1.2 * rTar + 4.0 * roadGravel;
+hMacro += ftHeight + 2.5 * roadPaint + 1.2 * rTar + 2.0 * roadGravel;
 float rDepth = mix( -10.0, 6.0, rRain ) - 6.0 * ( 1.0 - vRoadAlong.w ) - hMacro;
 // measured in stones' heights: below 0 only the pores are full, at 1 the last tops go under
 float rFill = clamp( rDepth / 2.4, -4.0, 1.3 );

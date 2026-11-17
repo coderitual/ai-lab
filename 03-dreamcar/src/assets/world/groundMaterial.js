@@ -94,10 +94,10 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
   extend(material, 'ground', (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec2 aMask;\nvarying vec2 vMask;\nvarying vec3 vGroundPos;\nvarying vec3 vGroundNormal;')
+      .replace('#include <common>', '#include <common>\nattribute vec2 aMask;\nattribute vec4 aVerge;\nvarying vec2 vMask;\nvarying vec4 vVerge;\nvarying vec3 vGroundPos;\nvarying vec3 vGroundNormal;')
       .replace(
         '#include <begin_vertex>',
-        '#include <begin_vertex>\nvMask = aMask;\nvGroundPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\nvGroundNormal = normalize( mat3( modelMatrix ) * objectNormal );',
+        '#include <begin_vertex>\nvMask = aMask;\nvVerge = aVerge;\nvGroundPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\nvGroundNormal = normalize( mat3( modelMatrix ) * objectNormal );',
       );
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${GROUND_PARS}`)
@@ -128,6 +128,7 @@ uniform sampler2D uRockN;
 uniform sampler2D uLarge;
 uniform float uSnowLight;
 varying vec2 vMask;
+varying vec4 vVerge;  // the band beside the road: m beyond the margin, s, m beyond the barrier, 0 (1 elsewhere)
 varying vec3 vGroundPos;
 varying vec3 vGroundNormal;
 float groundRoughness;
@@ -177,6 +178,31 @@ vec4 gDetRock = mix( vec4( 0.5 ), groundSample( uDetail, vGroundPos, gN, ${(DETA
 vec3 gRockCol = mix( vec3( 0.15, 0.14, 0.125 ), vec3( 0.12, 0.118, 0.112 ), gLarge.g ) * ( 0.62 + 0.45 * gDetRock.g + 0.2 * gDet.g );
 vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 
+// (env lane) the verge: mown grass in stripes along the road, a strip of worn earth and loose stones along the
+// kerbs' outer edge, longer grass at the foot of the barrier
+float gVerge = ( 1.0 - step( 0.5, vVerge.w ) ) * ( 1.0 - smoothstep( 0.0, 1.5, vVerge.z ) );
+if ( gVerge > 0.0 ) {
+  float vd = vVerge.x;
+  float vAa = 0.6 * ( abs( dFdx( vd ) ) + abs( dFdy( vd ) ) ) + 1.0e-3;
+  // the mower's passes: bands about 1.6 m wide whose blades lean one way or the other
+  float pass = abs( fract( vd / 3.2 ) * 2.0 - 1.0 );
+  float stripe = clamp( ( pass - 0.5 ) / max( vAa / 1.6, 1.0e-3 ) + 0.5, 0.0, 1.0 );
+  stripe = mix( stripe, 0.5, smoothstep( 0.3, 1.0, vAa / 1.6 ) );
+  vec3 mown = mix( vec3( 0.05, 0.085, 0.022 ), vec3( 0.075, 0.115, 0.03 ), stripe ) * ( 0.8 + 0.4 * gDet.r ) * ( 0.85 + 0.3 * gMid.r );
+  // worn earth: ragged, wider where cars have run wide
+  float rag = 0.55 + 0.5 * ( gDet.b - 0.5 ) + 0.6 * ( gLarge.b - 0.5 ) + 0.4 * ( gDet2.r - 0.5 );
+  float earth = 1.0 - smoothstep( rag - 0.15, rag + 0.15, vd );
+  vec3 earthCol = mix( vec3( 0.16, 0.135, 0.1 ), vec3( 0.24, 0.215, 0.18 ), gDet.b ) * ( 0.75 + 0.4 * gDet2.g );
+  // a few stones thrown out onto the grass beyond it
+  float stones = smoothstep( 0.82, 0.9, gDet.b ) * ( 1.0 - smoothstep( 0.4, 2.0, vd - rag ) );
+  // long grass at the barrier's foot
+  float rough = smoothstep( -1.2, -0.3, vVerge.z );
+  vec3 vergeCol = mix( mown, gGrass * 1.1, rough );
+  vergeCol = mix( vergeCol, earthCol, max( earth, stones * 0.8 ) );
+  gGrass = mix( gGrass, vergeCol, gVerge );
+  gScree *= 1.0 - gVerge;
+  gForest *= 1.0 - gVerge;
+}
 vec3 gAlbedo = gGrass;
 gAlbedo = mix( gAlbedo, gForestCol, gForest );
 gAlbedo = mix( gAlbedo, gScreeCol, gScree );

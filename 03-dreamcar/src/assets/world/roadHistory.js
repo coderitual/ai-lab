@@ -32,14 +32,16 @@ export const FEATURE_SLOTS = { low: 3, medium: 5, high: 7 };
 
 /** Which of two things in a crowded cell is kept. */
 const WEIGHT = { 8: 10, 6: 9, 7: 8, 1: 7, 2: 6, 3: 6, 9: 4, 4: 3, 5: 3 };
+/** Grid places marked on the straight (track.grid gives each). */
+export const GRID_SLOTS = 12;
 
-/** The age of each named stretch's surfacing (0 new .. 1 old); a stretch not named here is middle-aged. */
-const AGES = { straight: 0.6, sweeper: 0.74, esses: 0.86, tunnel: 0.5, viaduct: 0.6, hairpins: 0.76, summit: 0.66, descent: 0.13, hook: 0.7 };
-/** The descent was resurfaced only this far down (share of its length); below, the old road. */
-const RESURFACED = 0.58;
-const OLD_DESCENT = 0.72;
-/** A bridge deck's own surfacing. */
+/** A circuit is resurfaced a stretch at a time: the age of each (0 new .. 1 old) is drawn per run of this length (m). */
+const RUN = { min: 260, max: 620 };
+/** Ages of the runs lie in this range; a bridge deck has its own surfacing. */
+const AGE_RANGE = [0.12, 0.62];
 const DECK_AGE = 0.2;
+/** Paving seams along the road: the paver laid the width in strips; their joints lie this far either side of the middle (m). */
+export const SEAM_LAT = 2;
 
 /**
  * @param {object} options
@@ -57,15 +59,18 @@ export function roadHistory({ track, rng, tier }) {
   const at = (s) => Math.round(wrap(s) / ds) % n;
   const inRanges = (s, ranges, margin = 0) => (ranges ?? []).some((r) => s > r.s0 - margin && s < r.s1 + margin);
 
-  // ---- the surfacing: an age per sample, joints where it changes
+  // ---- the surfacing: runs of one age, joints where it changes
   const age = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const s = i * ds;
-    const sec = track.sectionAt ? track.sectionAt(s) : null;
-    let a = AGES[sec?.id] ?? 0.6;
-    if (sec?.id === 'descent' && track.wrap(s - sec.s0) > RESURFACED * track.wrap(sec.s1 - sec.s0)) a = OLD_DESCENT;
-    if (inRanges(s, track.bridges)) a = DECK_AGE;
-    age[i] = a;
+  {
+    const r = rng.fork('surfacing');
+    let s0 = 0;
+    while (s0 < L) {
+      const len = Math.min(L - s0, r.range(RUN.min, RUN.max));
+      const a = r.range(AGE_RANGE[0], AGE_RANGE[1]);
+      for (let i = Math.ceil(s0 / ds); i * ds < s0 + len && i < n; i++) age[i] = a;
+      s0 += len;
+    }
+    for (let i = 0; i < n; i++) if (inRanges(i * ds, track.bridges)) age[i] = DECK_AGE;
   }
 
   /** @type {Array<{ kind: number, s: number, lat: number, hl: number, hw: number, seed: number, param: number, reach: number }>} */
@@ -76,87 +81,44 @@ export function roadHistory({ track, rng, tier }) {
     things.push({ kind, s: wrap(s), lat, hl: Math.min(40.9, hl), hw: Math.min(40.9, hw), seed, param, reach: Math.min(40.9, reach) + 0.1 });
     counts[kind] = (counts[kind] ?? 0) + 1;
   };
-  /** Stretches where nothing is dug or cracked: the grid and its lines, the crossings. */
+  /** Stretches where nothing is patched or cracked: the grid and the start line. */
   const kept = (s, margin) => {
     const d = track.delta(0, s);
-    if (d > -36 - margin && d < 3 + margin) return true;
-    return co.crossings.some((c) => Math.abs(track.delta(c.s, s)) < c.half + 2 + margin);
+    return d > -GRID_REACH - margin && d < 3 + margin;
   };
+  const GRID_REACH = 8 * GRID_SLOTS + 10;
 
   // ---- patches: the older the road, the more of them
   {
     const r = rng.fork('patches');
     for (let s = r.range(5, 30); s < L; ) {
       const a = age[at(s)];
-      const density = (0.25 + 4.4 * a * a) * (inRanges(s, track.tunnels) ? 0.5 : 1); // per 100 m
+      const density = 0.08 + 0.9 * a * a; // per 100 m: a circuit is kept well
       const len = r.range(1.2, 6) * (r.next() < 0.25 ? 2 : 1);
       if (!kept(s, len) && !inRanges(s, track.bridges, 3)) {
         const side = r.sign();
         const style = r.next();
         const tone = r.range(0.05, 0.85);
-        if (style < 0.45) {
-          // part of one lane, or all of it
-          const full = r.next() < 0.5;
-          const w = full ? 1.78 : r.range(0.55, 1.3);
-          const lat = side * (full ? 2.03 : r.range(0.3 + w, 3.8 - w));
-          add(FEATURE.PATCH, s, lat, len, w, r.next(), tone);
-        } else if (style < 0.65) {
-          // a strip along a wheel track
-          add(FEATURE.PATCH, s, side * (r.next() < 0.5 ? 1.33 : 2.93), len * 2.2, r.range(0.4, 0.62), r.next(), tone);
+        if (style < 0.5) {
+          // one paver's strip, between its seams
+          const lat = r.pick([-2 * SEAM_LAT, 0, 2 * SEAM_LAT]);
+          add(FEATURE.PATCH, s, lat, len * 2.5, SEAM_LAT - 0.02, r.next(), tone);
         } else if (style < 0.8) {
           // right across the road
           add(FEATURE.PATCH, s, 0, len, half - 0.34, r.next(), tone);
         } else {
           // a small square over a pothole
           const w = r.range(0.4, 0.9);
-          add(FEATURE.PATCH, s, side * r.range(0.6, 3.2), w * r.range(0.8, 1.4), w, r.next(), tone);
+          add(FEATURE.PATCH, s, side * r.range(0.6, half - 1), w * r.range(0.8, 1.4), w, r.next(), tone);
         }
       }
       s += (100 / density) * r.range(0.35, 1.65);
     }
   }
 
-  // ---- trenches and covers: under the town's street, pipes; a trench runs to a manhole
+  // ---- a slot drain across the road outside each portal
   {
     const r = rng.fork('trenches');
-    if (co.townRange) {
-      const length = wrap(co.townRange.s1 - co.townRange.s0);
-      for (const side of [1, -1]) {
-        // one long trench down each lane, a cover at each of its ends
-        const from = co.townRange.s0 + length * (side > 0 ? r.range(0.5, 0.58) : r.range(0.08, 0.14));
-        const len = r.range(40, 64);
-        const lat = side * r.range(1.95, 2.25);
-        if (!kept(from + len / 2, len / 2 + 2)) add(FEATURE.TRENCH, from + len / 2, lat, len / 2, r.range(0.32, 0.42), 0.5, r.range(0.1, 0.5));
-        add(FEATURE.COVER, from - 0.2, lat, 0.36, 0.36, r.next(), 0);
-        add(FEATURE.COVER, from + len + 0.2, lat, 0.36, 0.36, r.next(), 0);
-      }
-      // covers down the street, and a cut from the kerb to some of them
-      const count = Math.max(2, Math.round(length / 34));
-      for (let k = 0; k < count; k++) {
-        const s = co.townRange.s0 + ((k + r.range(0.3, 0.7)) * length) / count;
-        if (kept(s, 3) || co.town[at(s)] < 0.9) continue;
-        const side = k % 2 === 0 ? -1 : 1;
-        const lat = side * r.range(1.9, 2.3);
-        add(FEATURE.COVER, s, lat, 0.33, 0.33, r.next(), 0);
-        if (r.next() < 0.6) {
-          const reach = half - 0.05 - Math.abs(lat);
-          add(FEATURE.CUT, s + r.range(-0.4, 0.4), lat + side * (reach / 2 + 0.3), reach / 2, r.range(0.24, 0.34), 0.5 + r.range(-0.12, 0.12), r.range(0.1, 0.5), 1.2);
-        }
-      }
-      // gratings in the gutter, both sides
-      const drains = Math.max(2, Math.round(length / 26));
-      for (let k = 0; k < drains; k++) {
-        const s = co.townRange.s0 + ((k + 0.5) * length) / drains;
-        if (co.town[at(s)] < 0.9) continue;
-        for (const side of [1, -1]) add(FEATURE.DRAIN, s + side * 3, side * (half - 0.19), 0.25, 0.15, r.next(), 0);
-      }
-    }
-    // out of town: a culvert relaid here and there, right across the old road
-    for (let s = r.range(200, 500); s < L; s += r.range(240, 520)) {
-      if (age[at(s)] < 0.55 || co.town[at(s)] > 0 || kept(s, 4) || inRanges(s, track.tunnels, 20) || inRanges(s, track.bridges, 10)) continue;
-      add(FEATURE.CUT, s, 0, half - 0.05, r.range(0.4, 0.6), 0.5 + r.range(-0.16, 0.16), r.range(0.1, 0.6), 2);
-    }
-    // a slot drain across the road outside each portal
     for (const t of track.tunnels ?? []) {
       add(FEATURE.DRAIN, t.s0 - 6, 0, 0.11, half + 0.4, r.next(), 1);
       add(FEATURE.DRAIN, t.s1 + 6, 0, 0.11, half + 0.4, r.next(), 1);
@@ -175,24 +137,24 @@ export function roadHistory({ track, rng, tier }) {
   // ---- cracks, sealed with tar: along the road in the wheel tracks and the joints between lanes, and right across it
   {
     const r = rng.fork('cracks');
-    const lines = [0.28, -0.28, 1.33, -1.33, 2.93, -2.93, 3.6, -3.6];
+    const lines = [SEAM_LAT, -SEAM_LAT, SEAM_LAT, -SEAM_LAT, half - 0.4, -(half - 0.4)];
     for (let s = r.range(0, 20); s < L; ) {
       const a = age[at(s)];
       const len = r.range(3, 14);
       if (a > 0.3 && !kept(s, len) && !inRanges(s, track.bridges, 2)) {
-        const lat = r.next() < 0.75 ? r.pick(lines) + r.range(-0.15, 0.15) : r.range(-3.7, 3.7);
+        const lat = r.next() < 0.75 ? r.pick(lines) + r.range(-0.08, 0.08) : r.range(-(half - 0.3), half - 0.3);
         add(FEATURE.CRACK, s, lat, len, r.range(0.06, 0.3), r.next(), r.next() * a);
       }
-      s += r.range(5, 26) / (0.12 + 1.9 * a * a);
+      s += r.range(20, 90) / (0.12 + 1.9 * a * a);
     }
     for (let s = r.range(0, 30); s < L; ) {
       const a = age[at(s)];
       if (a > 0.45 && !kept(s, 1) && !inRanges(s, track.bridges, 2)) {
         const whole = r.next() < 0.55;
         const side = r.sign();
-        add(FEATURE.CRACK_ACROSS, s, whole ? 0 : side * 2.1, r.range(0.08, 0.3), whole ? half - 0.1 : r.range(1.2, 2.1), r.next(), r.next() * a, 0.5);
+        add(FEATURE.CRACK_ACROSS, s, whole ? 0 : side * SEAM_LAT * 1.5, r.range(0.08, 0.3), whole ? half - 0.1 : r.range(1.2, 2.8), r.next(), r.next() * a, 0.5);
       }
-      s += r.range(12, 44) / (0.1 + 1.6 * a * a);
+      s += r.range(40, 160) / (0.1 + 1.6 * a * a);
     }
   }
 
@@ -200,7 +162,7 @@ export function roadHistory({ track, rng, tier }) {
   {
     const r = rng.fork('stains');
     const where = { index: -1, s: 0, lat: 0 };
-    for (let slot = 0; slot < 4; slot++) {
+    for (let slot = 0; slot < GRID_SLOTS; slot++) {
       const g = track.grid(slot);
       track.locate(g.x, g.z, -1, where);
       const s = where.s;
@@ -210,14 +172,19 @@ export function roadHistory({ track, rng, tier }) {
       add(FEATURE.STAIN, s + 1.95, lat + r.range(-0.3, 0.3), r.range(0.22, 0.4), r.range(0.12, 0.2), r.next(), 0.5);
       for (const side of [1, -1]) add(FEATURE.STAIN, s - 1.4 + 2.6, lat + side * 0.8, 2.6, 0.125, r.next(), 0.9);
     }
-    for (let s = r.range(0, 30); s < L; ) {
-      const climbing = track.grade[at(s)] > 0.03 ? 1.8 : 1;
-      if (!kept(s, 2)) {
-        const lane = r.sign() * 2.13;
-        const size = r.range(0.08, 0.3) * (r.next() < 0.15 ? 2.2 : 1);
-        add(FEATURE.STAIN, s, lane + r.range(-0.35, 0.35), size * r.range(1, 2.4), size, r.next(), r.next() < 0.8 ? 0.1 : 0.5);
-      }
-      s += r.range(8, 46) / climbing;
+    // a few drips where cars run, and tyre marks where they braked hardest: pairs of black lines on the racing line
+    for (let s = r.range(0, 60); s < L; s += r.range(40, 140)) {
+      if (kept(s, 2)) continue;
+      const lat = co.line[at(s)] + r.range(-1.2, 1.2);
+      const size = r.range(0.08, 0.25);
+      add(FEATURE.STAIN, s, lat, size * r.range(1, 2.4), size, r.next(), r.next() < 0.8 ? 0.1 : 0.5);
+    }
+    for (let s = 0; s < L; s += r.range(1.5, 6)) {
+      const b = co.braking[at(s)];
+      if (b < 0.05 || r.next() > b) continue;
+      const lat = co.line[at(s)] + r.range(-0.6, 0.6);
+      const len = r.range(4, 16) * (0.5 + 0.5 * b);
+      for (const side of [1, -1]) if (r.next() < 0.85) add(FEATURE.STAIN, s + len / 2 + r.range(-0.6, 0.6), lat + side * 0.8, len / 2, r.range(0.09, 0.13), r.next(), 0.95);
     }
   }
 

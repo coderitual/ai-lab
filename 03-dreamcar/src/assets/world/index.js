@@ -10,6 +10,7 @@
 //   sun.js          the sun or moon, its shadow, the fill light
 //   terrain.js, groundMaterial.js   the mountain (height field, band, grid, far land, baked light)
 //   road.js         the pavement and its asphalt
+//   kerbs.js        the red and white kerbs on the margins, from track.kerbs
 //   rock.js         the cut rock faces at the rock edges
 //   lake.js         the water beside the straight
 //   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
@@ -44,6 +45,7 @@ import { createRoad } from './road.js';
 import { createRockFaces } from './rock.js';
 import { createStructures } from './structures.js';
 import { createStuds } from './studs.js';
+import { createKerbs } from './kerbs.js';
 import { ROW_STEP, createTerrain } from './terrain.js';
 import { PlanarMirror } from '../../engine/PlanarMirror.js';
 
@@ -119,6 +121,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   if (mirror) mirror.uniforms.uMirrorPlane = { value: new THREE.Vector4(0, 1, 0, 0) };
   const road = createRoad({ track, caps, tier, atmosphere, terrain, rowStep: ROW_STEP[tier] ?? 1, mirror });
   lap('road');
+  const kerbs = createKerbs({ track, caps, tier, atmosphere, terrain });
+  lap('kerbs');
   const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock') });
   lap('rock');
   const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
@@ -135,7 +139,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   const studs = createStuds({ track, caps });
   lap('studs');
 
-  scene.add(studs.points, terrain.group, road.group, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -147,7 +151,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   };
   let startLights = 0;
   /** What the wet road's mirror leaves out: the road itself and what lies under or far beyond it. */
-  const mirrorHidden = [road.group, terrain.group, rock.group, lake.mesh, cover.group, far.group];
+  const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, lake.mesh, cover.group, far.group];
   const mirrorPoint = new THREE.Vector3();
   const mirrorFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
   const drawing = new THREE.Vector2();
@@ -175,7 +179,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     atmosphere,
     terrain,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
+    stats: { ms, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -285,6 +289,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       rock.dispose();
       structures.dispose();
       studs.dispose();
+      kerbs.dispose();
       groundMaterial.dispose();
       mirror?.dispose();
     },

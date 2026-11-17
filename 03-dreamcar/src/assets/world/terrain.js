@@ -465,10 +465,15 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     const pos = new Float32Array(count * 3);
     const bake = new Float32Array(count * 3);
     const mask = new Float32Array(count * 2);
+    // the verge in track terms for the ground material: metres beyond the margin, s (continuous through the
+    // line), metres beyond the solid edge, and 0 (vertices without it read the default 1: not a verge)
+    const verge = new Float32Array(count * 4);
     const offs = new Float32Array(cols);
+    let lapOffset = 0;
     for (let r = 0; r < rowList.length; r++) {
       const i = rowList[r];
       const s = i * ds;
+      if (r > 0 && i < rowList[r - 1]) lapOffset += track.length;
       for (let half = 0; half < 2; half++) {
         const side = half === 0 ? 1 : -1;
         const edge = side > 0 ? track.edgeL[i] : track.edgeR[i];
@@ -503,6 +508,10 @@ export function createTerrain({ track, tier, rng, material, lights }) {
           bakeAt(pt.x, pt.z, bake, v * 3);
           const slope = k >= 2 && k <= 6 && c.height > 0.01 ? 0.9 : 0;
           mask[v * 2] = k <= 1 ? 0 : forestOf(pt.x, pt.z, y, slope, s, lat, d);
+          verge[v * 4] = Math.abs(lat) - pave;
+          verge[v * 4 + 1] = s + lapOffset;
+          verge[v * 4 + 2] = Math.abs(lat) - edge;
+          verge[v * 4 + 3] = 0;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
         }
@@ -525,6 +534,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
     geometry.setAttribute('aMask', new THREE.BufferAttribute(mask, 2));
+    geometry.setAttribute('aVerge', new THREE.BufferAttribute(verge, 4));
     geometry.setIndex(index);
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();

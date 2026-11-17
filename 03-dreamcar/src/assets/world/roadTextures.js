@@ -47,6 +47,8 @@ const EXAGGERATE = 2.2;
 const FACET = 0.2;
 /** The variance channel holds variance times this (a spread of 0.25 is already a very rough pixel). */
 export const VARIANCE_GAIN = 4;
+/** The polish channel (0..1) times this is the stone's roughness as alpha squared (GGX): 0.3 a polished top, 1 dull. */
+export const ROUGH_GAIN = 0.3;
 /** Metres one repeat of the large field covers. */
 export const BIG_TILE = 37;
 
