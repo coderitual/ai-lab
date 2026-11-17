@@ -98,7 +98,8 @@ the lake shore and the top (110 m above the water). Paved 12 m wide (three
 lanes, `HALF_WIDTH` 6), a 1.2 m strip beyond each edge line that is a red and
 white kerb in the bends and a paved margin elsewhere, then mown grass 3 to 10 m
 wide (widest on the outside of the fast bends) to a barrier: a steel rail by
-default, a low concrete wall along the start straight, rock where the road is
+default, a low concrete wall along the lake side of the start straight and
+beside the pits (the rest of the land side is a rail), rock where the road is
 cut into the hill, parapets on the bridges, walls in the tunnel. Trees stand
 behind the barrier, never as it.
 
@@ -122,8 +123,8 @@ limestone where the edge is rock. Viaduct piers are slender eight-sided
 shafts under flared capitals; the short bridge spans a V-shaped gully across
 it with a stream's notch. Gradients up to 8 per cent; banking by rule
 from the curvature (up to 9 degrees) and per piece, up to 10 degrees on the
-sky road and the first bend of the ledge. The numbers by stretch (s from the line, m; speeds are the
-autopilot's at full pace):
+sky road and the first bend of the ledge. The numbers by stretch (s from the
+line, m; speeds are the autopilot's at full pace):
 
 | stretch | s | what it is |
 | --- | --- | --- |
@@ -166,8 +167,8 @@ boards on a low wall behind it. At the far end of the straight a footbridge
 carrying boards, a marshal's tower, and on the outside of the first bend a
 small stand and distance boards 200, 150 and 100. Low boards along the bends,
 tyre walls, distance boards before the carousel and marshal huts come from
-the Track's data; nothing stands inside the solid edges. Past the end of the straight a town climbs the slope beyond the
-shore bend with a church tower and a large pale hotel on the height; a hamlet
+the Track's data; nothing stands inside the solid edges. Past the end of the straight a town
+climbs the slope beyond the shore bend with a church tower and a large pale hotel on the height; a hamlet
 lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
 
 ## A run
@@ -274,6 +275,7 @@ is the same picture every time. Frame D1's camera on the start straight is
 about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
 
 ## The look
+
 - Linear HDR frame, filmic tone curve, bloom from real brightness (lamps are
   hundreds of times brighter than paint), camera and object motion blur with
   the car held sharp, a slight vignette and grain. No effect that is not also

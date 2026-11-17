@@ -2,7 +2,7 @@
 //
 //   npm run dev                                    (in another terminal: http://localhost:5190/)
 //   node tools/screenshots.cjs                     all of them, into docs/images/ (and public/og.jpg)
-//   node tools/screenshots.cjs --only day,night    the pictures of some page loads (see --list)
+//   node tools/screenshots.cjs --only night,tunnel some page loads or single pictures (see --list)
 //   node tools/screenshots.cjs --list              what there is
 //   options: --base http://localhost:5190/   --out docs/images   --q medium
 //
@@ -46,6 +46,8 @@ const PHONE = { w: 390, h: 844, dpr: 2, mobile: true }; // a phone held upright
 //           lap is the Track's length, printed by tools/trackmap.mjs)
 //   skip    run the steps this many seconds further
 //   photo   the staging camera's pose { back, right, up, yaw, pitch, fov } (null: the game's own camera, HUD on)
+//   shutter with a photo: the share of the game's motion-blur shutter (default 0.2: the staged camera rides with
+//           the car, so at the game's shutter the whole world would streak past it)
 //   size    a different window size for this picture (the page lays itself out again)
 //   out     a file of its own instead of docs/images/<name>.jpg
 const LOADS = [
@@ -70,13 +72,13 @@ const LOADS = [
       {
         name: 'sky-road',
         dist: 2240,
-        photo: { back: 30, right: 34, up: -16, yaw: -40, pitch: 16, fov: 50 },
+        photo: { back: 45, right: 18, up: 24, yaw: 8, pitch: -20, fov: 55 },
         caption: 'The sky road: a left-hand bend of 576 m on piers, 42 m over the valley',
       },
       {
         name: 'carousel',
         dist: 2800,
-        photo: { back: -10, right: 30, up: 34, yaw: 150, pitch: -40, fov: 60 },
+        photo: { back: 10, right: -25, up: 40, yaw: -60, pitch: -50, fov: 60 },
         caption: 'The carousel: the slow corner, 190 degrees round a radius of 55 m',
       },
       { name: 'chase', dist: 10010, caption: 'The chase view at speed on the straight, driving into the sun' },
@@ -159,8 +161,17 @@ const LOADS = [
     // the page builds its whole world before 'load' fires: wait for it to say it has drawn instead
     await page.goto(`${base}?manual&seed=1&${query}`, { waitUntil: 'commit', timeout: 120000 });
     await page.waitForFunction('window.__ready === true', null, { timeout: 900000 });
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const h = window.__dreamcar;
+      // the game's shutter (VIEW in config.js), so that a staged camera riding with a fast car can shorten it: the
+      // same module instance the game reads (the dev server serves it by its path; a build has no such path, and
+      // its staged pictures keep the game's shutter)
+      try {
+        h.view = (await import(new URL('src/game/config.js', location.href).href)).VIEW;
+        h.shutter = [h.view.motionBlurSlow, h.view.motionBlur];
+      } catch {
+        h.view = null;
+      }
       // the steps without drawing, until the first car has covered `dist` m of the run or `seconds` have gone
       h.runTo = (dist, seconds) => {
         const e = h.engine;
@@ -175,6 +186,16 @@ const LOADS = [
 
     for (const shot of load.shots) {
       const t1 = Date.now();
+      // a picture not asked for still moves the run on, so that the others are taken at their own moments
+      if (only && !only.includes(load.name) && !only.includes(shot.name)) {
+        await page.evaluate(({ shot }) => {
+          const h = window.__dreamcar;
+          if (shot.start) h.game.start();
+          if (shot.skip) h.runTo(null, shot.skip);
+          if (shot.dist != null) h.runTo(shot.dist);
+        }, { shot });
+        continue;
+      }
       if (shot.size) await page.setViewportSize({ width: shot.size.w, height: shot.size.h });
       await page.evaluate(
         ({ shot }) => {
@@ -182,6 +203,12 @@ const LOADS = [
           if (shot.start) h.game.start();
           if (shot.skip) h.runTo(null, shot.skip);
           if (shot.dist != null) h.runTo(shot.dist);
+          // a staged camera moves with the car: at the game's shutter everything but the car would be a smear
+          if (h.view) {
+            const k = shot.photo ? (shot.shutter ?? 0.2) : 1;
+            h.view.motionBlurSlow = h.shutter[0] * k;
+            h.view.motionBlur = h.shutter[1] * k;
+          }
           h.photo(shot.photo || null);
           // a frame drawn twice: the first after a cut fills the blur's history and the probe's faces
           h.engine.advance(0);

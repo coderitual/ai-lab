@@ -37,7 +37,7 @@ SwiftShader on four busy cores. Times below are from that machine.
 | `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch, window, hud, options, start, photo, determinism, params, tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
 | `node tools/soundtest.cjs [URL] [outDir]` | Renders scenarios offline with the game's own audio code (the dev server's `sound.html`) and measures them: partials, levels, sides, tails, jumps, gestures, mute. With `outDir` it keeps the WAV files so that someone can listen. | 62 | about 45 s idle |
 | `node tools/frametest.cjs` | The tone curve's numbers (no browser); with `--url` milliseconds per frame for variants of a page (`--vary "ao=0\|ao=1"`), the pipeline's targets, and a pair of frames 1/60 s apart for a flicker check (`--pair`). | | |
-| `node tools/screenshots.cjs` | Regenerates every picture of the README and these documents, and `public/og.jpg`. `--list`, `--only day,night` (page loads or picture names), `--base URL` (default 5190), `--q medium`, `--out dir`. | | about 30 min |
+| `node tools/screenshots.cjs` | Regenerates every picture of the README and these documents, and `public/og.jpg`. `--list`, `--only day,night` (page loads or picture names), `--base URL` (default 5190), `--q medium`, `--out dir`. | | 45 to 60 min |
 | `node tools/shot.cjs --url URL` | One screenshot of any URL. `--out --w --h --dpr --mobile --eval "js" --resize WxH --wait`. | | 1 to 3 min |
 | `tools/soundlab.cjs` | The arithmetic the soundtest is built on (spectra, levels); not run by itself. | | |
 
@@ -48,13 +48,18 @@ other.
 
 `tools/screenshots.cjs` loads the page once per time of day and once per kind
 of screen (five loads: day, dusk, night, split, phone) and makes several
-pictures in each, because building the world takes two to three minutes on
-software WebGL and each 1280x720 picture at `medium` one to two more. Each
+pictures in each, because building the world takes three to five minutes on
+software WebGL on a busy machine and each 1280x720 picture at `medium` two
+to five more. Each
 picture is a moment of an autopilot run (`?ap`, `?seed=1`, `?manual`), given
 as a distance covered (`dist`, in metres from the line) or a time, and a
 staging camera's pose (`photo`); with no pose it is the game's own camera
-with the HUD. Nothing depends on the machine's speed, so the same command
-makes the same pictures.
+with the HUD. A staged camera rides with the car, so for those pictures the
+tool shortens the game's motion-blur shutter to a fifth (`shutter`), or the
+whole world would streak past (this needs the dev server, where the tool can
+reach `VIEW` in config.js; against a build the game's shutter stays).
+Nothing depends on the machine's speed, so the same command makes the same
+pictures.
 
 | load | pictures |
 | --- | --- |
