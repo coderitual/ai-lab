@@ -213,6 +213,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       lake.update(simTime);
       forest.update(dt, simTime);
       far.update(dt, simTime);
+      structures.update(dt);
     },
 
     prepareView(camera, focus, beams) {

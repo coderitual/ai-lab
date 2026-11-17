@@ -1,14 +1,15 @@
 // What people built along the road, gathered for index.js: the lamps and
 // their pool of real light (lamps.js), the tunnel (tunnel.js), the viaduct
 // (viaduct.js), the guard rails (rails.js), the guide posts, chevrons and
-// warning signs (posts.js) and the start (gantry.js).
+// warning signs (posts.js) and the circuit's dressing: the start, boards,
+// tyre walls, pit building, town (dressing.js).
 //
 // All of it is placed from the Track (never from map coordinates), and
 // whatever answers the cars' head lamps reads them from prepareView's beams.
 
 import * as THREE from 'three';
 import { disposeGroup } from './furniture.js';
-import { createStart } from './gantry.js';
+import { createDressing } from './dressing.js';
 import { createLamps } from './lamps.js';
 import { createPosts } from './posts.js';
 import { createRails } from './rails.js';
@@ -45,17 +46,21 @@ export function createStructures({ track, terrain, caps, tier, atmosphere }) {
   lap('posts');
   const viaducts = createViaducts({ track, terrain, atmosphere });
   lap('viaduct');
-  const start = createStart({ track, terrain, atmosphere });
-  lap('start');
-  const parts = [lamps, tunnels, rails, posts, viaducts, start];
+  const dressing = createDressing({ track, terrain, caps, tier, atmosphere });
+  lap('dressing');
+  const parts = [lamps, tunnels, rails, posts, viaducts, dressing];
   for (const part of parts) group.add(part.group);
 
   return {
     group,
-    stats: { ms, lamps: lamps.stats, rails: rails.stats, posts: posts.stats, viaducts: viaducts.stats },
+    stats: { ms, lamps: lamps.stats, rails: rails.stats, posts: posts.stats, viaducts: viaducts.stats, dressing: dressing.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {
       for (const part of parts) part.setTime?.(time);
+    },
+    /** The fixed step (the start lamps' green is timed in it). */
+    update(dt) {
+      dressing.update(dt);
     },
     prepareView(camera, focus, beams) {
       setRetroBeams(beams);
