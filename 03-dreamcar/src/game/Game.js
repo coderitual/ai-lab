@@ -77,6 +77,27 @@ const soundModules = import.meta.glob(['./Sound.js', '../engine/Audio.js'], { ea
 const SHARP_LIFT = 0.1;
 /** Set once a first-time player has got going, so the hint does not come back. */
 const HINT_KEY = 'dreamcar.hinted.v1';
+/** The player's choices kept on this device: the quality (auto, low, medium, high), the speed's units, the map. */
+const QUALITY_KEY = 'dreamcar.quality';
+const UNITS_KEY = 'dreamcar.units';
+const MAP_KEY = 'dreamcar.map';
+const QUALITIES = ['auto', 'low', 'medium', 'high'];
+
+/** Read a kept choice (null when there is none or no storage). */
+function kept(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function keep(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // no storage: the choice lasts this page only
+  }
+}
 /** The car at rest, held on its brakes (the title, the grid). */
 const HELD = { steer: 0, throttle: 0, brake: 0, handbrake: 1 };
 
@@ -101,7 +122,14 @@ export class Game {
     this.engine = engine;
     this.caps = probeCaps(engine.renderer, { ldr: params.ldr });
     /** @type {import('../engine/caps.js').Tier} */
-    this.tier = params.quality ?? this.caps.tier;
+    // ?q= wins; then the quality chosen in the options (dreamcar.quality); 'auto' is what the probe chose
+    const stored = kept(QUALITY_KEY);
+    /** The options' choice: 'auto' | 'low' | 'medium' | 'high'. */
+    this.qualityChoice = QUALITIES.includes(stored) ? stored : 'auto';
+    this.tier = params.quality ?? (this.qualityChoice !== 'auto' ? this.qualityChoice : this.caps.tier);
+    /** km/h or mph, and whether the map shows (the options; kept on the device). */
+    this.units = kept(UNITS_KEY) === 'mph' ? 'mph' : 'kmh';
+    this.mapShown = kept(MAP_KEY) !== 'off';
     engine.setMaxPixelRatio(TIERS[this.tier].pixelRatio);
     this.rng = createRng(params.seed);
 
@@ -429,6 +457,42 @@ export class Game {
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
+    // the options
+    if (name.startsWith('quality:')) {
+      const q = name.slice(8);
+      if (QUALITIES.includes(q) && q !== this.qualityChoice) {
+        this.qualityChoice = q;
+        keep(QUALITY_KEY, q);
+        // a tier is chosen once, when the page is built: the page is built again with the new one
+        if (!this.params.noreload && typeof location !== 'undefined') location.reload();
+      }
+      return;
+    }
+    if (name.startsWith('units:')) {
+      this.units = name.slice(6) === 'mph' ? 'mph' : 'kmh';
+      keep(UNITS_KEY, this.units);
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
+    if (name.startsWith('map:')) {
+      this.mapShown = name.slice(4) !== 'off';
+      keep(MAP_KEY, this.mapShown ? 'on' : 'off');
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
+    if (name === 'sound:on' || name === 'sound:off') {
+      if (this.muted !== (name === 'sound:off')) this.action('mute', driver);
+      return;
+    }
+    // a pad in a menu: the d-pad moves through the open panel's buttons, A presses the one it is on
+    if (name.startsWith('nav:')) {
+      if (this.phase === 'title' || paused || this.phase === 'results' || this.hud.optionsOpen) this.hud.navigate(name.slice(4));
+      return;
+    }
+    if (name === 'press') {
+      if (!this.hud.pressFocused()) this.action('start', driver);
+      return;
+    }
     switch (name) {
       case 'start':
         if (this.phase === 'title') this.start();
@@ -445,7 +509,9 @@ export class Game {
         if (this.phase === 'title' && name !== this.mode) this.setup(name);
         break;
       case 'pause':
-        if (racing) this.engine.paused = !paused;
+        // Escape or Start on the options sheet goes back to where it was opened from
+        if (this.hud.optionsOpen) this.hud.closeOptions();
+        else if (racing) this.engine.paused = !paused;
         break;
       case 'camera':
         if (racing && !paused) {
@@ -923,15 +989,19 @@ export class Game {
       time: this.world.time.name,
       times: Object.keys(TIMES),
       muted: this.muted,
+      canSound: !!this.sound,
       device,
       attract: this.attract,
+      quality: this.qualityChoice,
+      tier: this.tier,
+      qualityFixed: !!this.params.quality,
+      units: this.units,
+      map: this.mapShown,
     });
     hud.setFade(1 - this._fadeLevel);
-    if (this.phase === 'title') {
-      const table = this._boardTable();
-      hud.setTitleBest(table, this.world.time.name, medalOf(table.laps.length ? table.laps[0].ms : null));
-      return;
-    }
+    // the board: on the title and the pause sheet (and in the results), never over the run
+    if (this.phase === 'title' || this.engine.paused) hud.setBoard(this._boardTable(), RULES.medals, this.world.time.name);
+    if (this.phase === 'title') return;
     const rect = this._touchDirty ? this.container.getBoundingClientRect() : null;
     const split = this.racers.length > 1;
     const map = this._map;
@@ -1099,6 +1169,36 @@ export class Game {
         };
       }),
     };
+  }
+
+  /**
+   * Where car `i` is drawn in its view, as a rectangle of the page in CSS pixels (its box's corners projected),
+   * for tests that check nothing of the HUD covers it.
+   */
+  carRect(i = 0) {
+    const view = this.views[i];
+    if (!view) return null;
+    const { car } = view.racer;
+    const b = car.box;
+    const v = new THREE.Vector3();
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let k = 0; k < 8; k++) {
+      v.set(b.center.x + (k & 1 ? 1 : -1) * b.half.x, b.center.y + (k & 2 ? 1 : -1) * b.half.y, b.center.z + (k & 4 ? 1 : -1) * b.half.z);
+      v.applyMatrix4(car.object.matrixWorld).project(view.camera);
+      x0 = Math.min(x0, v.x);
+      x1 = Math.max(x1, v.x);
+      y0 = Math.min(y0, v.y);
+      y1 = Math.max(y1, v.y);
+    }
+    const W = this.engine.width;
+    const H = this.engine.height;
+    const z = view.zone;
+    const px = (x) => (z.left + ((x + 1) / 2) * z.width) * W;
+    const py = (y) => (z.top + ((1 - y) / 2) * z.height) * H;
+    return { left: px(x0), right: px(x1), top: py(y1), bottom: py(y0) };
   }
 
   /** Numbers about the run and the last frame drawn (counted over all its passes). */

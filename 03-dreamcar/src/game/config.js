@@ -181,7 +181,7 @@ export const CAMERA = {
    */
   orbit: {
     quarter: 0.72,
-    frontBias: 0.35,
+    frontBias: 1.2,
     sunBeside: 1.75,
     distance: 8.6,
     height: 0.85,
@@ -191,12 +191,12 @@ export const CAMERA = {
     lookHeight: 0.62,
     lookZ: 0,
     fov: 34,
-    narrowBack: 1.35,
+    narrowBack: 1.0,
     uprightBelow: 1.15,
-    across: 0.16,
+    across: 0.2,
     down: 0.56,
     tallDown: 0.3,
-    times: { dusk: { sunBeside: 0.9 } },
+    times: { day: { sunBeside: 2.1 }, dusk: { sunBeside: 0.9 } },
   },
   /** The orbit behind the results: blended in from the chase view over `blend` s while the car rolls home; framed
    * clear of the results panel the same way as the title (the panel is on the right). */
@@ -243,7 +243,7 @@ export const CAMERA = {
  * correctly exposed whatever the time of day: `default`, or a time of day's own value. Eased in and out over
  * `ease` s through the same exposure the game drives.
  */
-export const SHOWCASE = { default: 0.5, dusk: 0.9, night: 0.8, ease: 0.6 };
+export const SHOWCASE = { default: 0.5, day: 0.3, dusk: 0.9, night: 0.6, ease: 0.6 };
 
 /**
  * How the eye follows the light: time constants (s) of the exposure closing down (towards brighter light: fast)

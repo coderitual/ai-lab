@@ -476,6 +476,32 @@ export class CameraRig {
   }
 
   /**
+   * Seen at a three-quarter angle the near end of the car is drawn larger than the far one, so the car's middle is
+   * not the middle of what is drawn: turn the look so that the midpoint of the drawn nose and tail is at `fx`.
+   */
+  _centreEnds(e, t, fx, fov, h) {
+    const tanH = Math.tan((this._fit(fov) * Math.PI) / 360) * this.aspect;
+    const look = Math.atan2(t.x - e.x, t.z - e.z);
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const z of [STATIONS.nose, STATIONS.tail]) {
+      for (const x of [-0.9, 0.9]) {
+        v.set(x, h, z).applyQuaternion(q).add(p);
+        const rel = angleDiff(look, Math.atan2(v.x - e.x, v.z - e.z));
+        const sx = 0.5 - Math.tan(clamp(rel, -1.4, 1.4)) / (2 * tanH);
+        lo = Math.min(lo, sx);
+        hi = Math.max(hi, sx);
+      }
+    }
+    const mid = (lo + hi) / 2;
+    const turn = Math.atan((2 * fx - 1) * tanH) - Math.atan((2 * mid - 1) * tanH);
+    fwd.subVectors(t, e);
+    const c = Math.cos(turn);
+    const sn = Math.sin(turn);
+    t.set(e.x + fwd.x * c + fwd.z * sn, t.y, e.z - fwd.x * sn + fwd.z * c);
+  }
+
+  /**
    * The title's hero picture: a three-quarter view from low down, swinging slowly to and fro, on the side of the
    * car that has the brightest part of the sky beside it (so the paint has it to mirror), the car clear of the menu.
    */
@@ -494,6 +520,7 @@ export class CameraRig {
     const fov = pick('fov');
     const at = this._place(o, -1);
     this._frameOn(eyeOut, target2, at.x, at.y, fov, targetOut);
+    this._centreEnds(eyeOut, targetOut, at.x, fov, o.lookHeight);
     return fov;
   }
 

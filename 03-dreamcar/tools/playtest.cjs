@@ -274,9 +274,9 @@ const SECTIONS = {
     const text = await p.page.evaluate(`document.querySelector('.hud .results').innerText`);
     check('the results show the lap time', text.includes(fmt(d.laps[0].ms)), fmt(d.laps[0].ms));
     check('the board shows the medal rows', /gold/i.test(text) && /silver/i.test(text) && /bronze/i.test(text));
-    const stored = await p.page.evaluate(`JSON.parse(localStorage.getItem('dreamcar.best.v1'))`);
-    check('the lap is kept under dreamcar.best.v1 for day', stored && stored.day && stored.day.laps.length === 1);
-    check('the ghost of the lap is kept', await p.page.evaluate(`!!localStorage.getItem('dreamcar.ghost.v1')`));
+    const stored = await p.page.evaluate(`JSON.parse(localStorage.getItem('dreamcar.best.v2'))`);
+    check('the lap is kept under dreamcar.best.v2 for day', stored && stored.day && stored.day.laps.length === 1);
+    check('the ghost of the lap is kept', await p.page.evaluate(`!!localStorage.getItem('dreamcar.ghost.v2')`));
     await p.advance(0.2);
     await clickText(p, 'Again', '.results');
     await p.skip(0.2);
@@ -301,7 +301,7 @@ const SECTIONS = {
     await p.page.reload();
     await p.page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
     await p.page.evaluate('window.__dreamcar.skip(0.1)');
-    const kept = await p.page.evaluate(`window.__dreamcar.game._board ? window.__dreamcar.game._board.board : JSON.parse(localStorage.getItem('dreamcar.best.v1'))`);
+    const kept = await p.page.evaluate(`window.__dreamcar.game._board ? window.__dreamcar.game._board.board : JSON.parse(localStorage.getItem('dreamcar.best.v2'))`);
     check('best laps kept across a reload (two laps for day)', kept && kept.day && kept.day.laps.length === 2,
       kept && kept.day ? kept.day.laps.map((l) => l.ms).join(', ') : 'none');
     check('nothing for the other times of day', Object.keys(kept).filter((k) => k !== 'length' && k !== 'day' && kept[k].laps.length).length === 0);
@@ -319,7 +319,7 @@ const SECTIONS = {
     check('the total is the sum of the laps', d.total === d.laps.reduce((a, l) => a + l.ms, 0), `${d.total}`);
     check('lap one standing, the others flying', d.laps[0].standing && !d.laps[1].standing && !d.laps[2].standing);
     check('flying laps faster than the standing lap', d.laps[1].ms < d.laps[0].ms, d.laps.map((l) => l.ms).join(', '));
-    const board = await p.page.evaluate(`JSON.parse(localStorage.getItem('dreamcar.best.v1'))`);
+    const board = await p.page.evaluate(`JSON.parse(localStorage.getItem('dreamcar.best.v2'))`);
     const t = s.time;
     check('a three-lap total on the board', board && board[t] && board[t].best3 === d.total, `${board && board[t] && board[t].best3}`);
     await p.close('three laps');
@@ -339,7 +339,7 @@ const SECTIONS = {
     // a reload onto the title, as somebody coming back would see it
     await p.go('?manual&q=low');
     await p.page.evaluate('window.__dreamcar.game.draw = () => {}');
-    const stored = await p.page.evaluate(`JSON.parse(localStorage.getItem('dreamcar.best.v1'))`);
+    const stored = await p.page.evaluate(`JSON.parse(localStorage.getItem('dreamcar.best.v2'))`);
     for (const time of times) {
       const kept = stored && stored[time] ? stored[time].laps.map((l) => l.ms) : [];
       check(`after a reload, ${time} keeps its own lap and only that`, kept.length === 1 && kept[0] === laps[time][0], `${kept.join(', ')}`);

@@ -20,7 +20,7 @@
 
 import { RULES } from './config.js';
 
-const STORE_KEY = 'dreamcar.best.v1';
+const STORE_KEY = 'dreamcar.best.v2';
 
 /**
  * @typedef {object} Lap
