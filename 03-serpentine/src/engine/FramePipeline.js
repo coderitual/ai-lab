@@ -420,7 +420,7 @@ vec3 ghosts(vec2 uv) {
   // the glare: a white core about a fifth of the view across that washes out the sky round the source, and a
   // weak warm tail that reaches the far side of the view without greying it
   float d = length((uv - f) * vec2(uGhosts.z, 1.0));
-  float core = 1.0 / (1.0 + (d * d) / (0.11 * 0.11));
+  float core = 1.0 / (1.0 + (d * d) / (0.15 * 0.15));
   float tail = 1.0 / (1.0 + (d * d) / (0.35 * 0.35));
   vec3 veil = uGhosts.y * (vec3(1.0, 0.97, 0.92) * 40.0 * core * core + vec3(1.0, 0.9, 0.75) * 2.0 * tail);
   return e * (sum * uGhosts.x + veil);
@@ -1071,7 +1071,7 @@ export class FramePipeline {
           // how far outside the frame, in heights of the view: the flare fades out over `fl.reach` of them
           const out = Math.max(0, -ux, ux - 1) * (w / h) + Math.max(0, -uy, uy - 1);
           const fade = 1 - Math.min(1, out / (fl.reach || 0.2));
-          fu.uSun.value.set(ux, uy, fl.light || 0, fade * fade);
+          fu.uSun.value.set(ux, uy, fl.light || 0, fade);
           fu.uSunSky.value = fl.sky || 1;
         }
       }

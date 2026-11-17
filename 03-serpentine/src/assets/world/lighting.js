@@ -179,7 +179,7 @@ export const TIMES = {
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 0.3, reach: 0.6, sky: 0.3 }, contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.12, ghosts: 0.011, glare: 0.2 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.12, ghosts: 0.008, glare: 0.3 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
