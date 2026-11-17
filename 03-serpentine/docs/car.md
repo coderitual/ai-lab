@@ -128,7 +128,9 @@ depth, so the inside moves against the lens as the camera moves.
   its hook just under the lens. DRL lights the eyebrow (amber when
   indicating), dipped beam the projector, main beam the matrix rows. The
   emission is set for night exposure: the eyebrow at 3.5, the projector at
-  0.5 (they were 30 and 1.5 and bloomed into one white blob).
+  0.5 (they were 30 and 1.5 and bloomed into one white blob). The brake
+  light guide is 20 and the housing glow 0.6 (were 30 and 1.6: the whole
+  tail went red in the bloom).
 - **Light cast** (`lamps.js`): two spot lights at 5700 K with a picture of
   the beam (`SpotLight.map`): dipped beam's cut-off with its kick-up to the
   right, main beam's spot added; shadows on the high tier. One red spot at the
@@ -190,15 +192,19 @@ the viewer.
 
 ## What each tier costs
 
-Measured in the viewer (headless Chromium, software WebGL; build time is
-`car.stats.buildMs`, on a desktop CPU):
+Measured in the viewer, one page at a time (headless Chromium on a 4-core
+desktop, software WebGL; build time is `car.stats.buildMs`: everything from
+`createCar()` to the returned handle, shader compilation not included):
 
 | tier | triangles | draw calls (at rest) | build |
 | --- | --- | --- | --- |
-| low | 49k | 28 (24) | ~300 ms |
-| medium | 103k | 30 (26) | ~450 ms |
-| high | 178k | 30 (26) | ~600 ms |
+| low | 49.4k | 28 (24) | ~480 ms |
+| medium | 102.6k | 30 (26) | ~620 ms |
+| high | 178.3k | 30 (26) | ~730 ms |
+| ghost | 92.5k | 10 | ~140 ms |
 
+The atlas bake is most of the difference between tiers; the wheels are about
+150 ms of every build (their textures are shared by the four corners).
 Plus one draw call for the contact shadow. The wheels are about 15k
 triangles each on high; the blur shells replace the spokes once the wheel
 turns, so the count stays the same at speed.
@@ -215,8 +221,16 @@ Most visible first:
   a lower camera shows more of them).
 - **The front intakes** are black openings with a dark recess, without the
   real car's horizontal slats.
-- **Night bloom** round the brake lamps is the frame pipeline's and spreads
-  red over the whole tail at night exposure.
+- **At night the paint is dark** where nothing bright is near: it mirrors
+  what the probe sees (street lamps show as sharp highlights with a soft
+  metal glow round them), but the placeholder world gives it little to
+  mirror; the glossy, saturated car of the owner's night reference needs the
+  wet road and the town.
+- **By day in low sun** the silver goes warm (beige) in the game's grade; it
+  reads silver under a higher sun.
+- **Bloom** round the brake lamps is the frame pipeline's; with the lamps'
+  emission lowered it no longer swallows the tail, but at night it still
+  tints the boot lid red.
 - The rear-screen heating lines, the shark fin (this car has none) and badge
   lettering are not modelled.
 - Untested: real phones, Safari, real device frame rates. Everything above
