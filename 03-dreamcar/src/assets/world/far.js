@@ -50,6 +50,9 @@ const MASSIF = {
     [-75, 2.5], [-40, 3.5], [-22, 4.5], [-10, 7], [-3, 9], [3, 10.5], [8, 13], [12, 15.5], [15, 18], [17, 19],
     [20, 17], [23, 17.5], [28, 21], [34, 24], [40, 26.5], [52, 28], [70, 24], [95, 12],
   ],
+  // (round three: the angles of the table times this; set from the D1 camera's still beside the frame, where the
+  // main peak stood too low)
+  lift: 1.15,
   right: -75, // the field's ends, degrees left of the heading
   left: 95,
   near: 2600, // the foot's distance from the start line, at least (m)
@@ -281,7 +284,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         // (the jag is smooth and only touches the top of the face: a jag that changed from column to column tilted
         // whole columns of the face and striped it like a curtain in a raking light)
         const jag = 0.05 * (crestNoise.fbm(o * 0.35 + 1, 2.3, 3) - 0.5);
-        const crestH = eyeY + crestR * Math.tan(profile(o) * DEG);
+        const crestH = eyeY + crestR * Math.tan(profile(o) * MASSIF.lift * DEG);
         // gullies across the face (about one per 1.5 degrees, i.e. 150 m), wandering, deeper low on the face
         const along = (o * DEG * crestR) / 160;
         // (warped, so they wander and fork instead of hanging like a curtain)

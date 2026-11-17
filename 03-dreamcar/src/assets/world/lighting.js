@@ -128,10 +128,10 @@ export function towards(bearing, elevation) {
  *   day    3 degrees RIGHT of the heading, 16 up: straight down the road, as in D1 and A. The chase view drives
  *          into it, its glare lies along the asphalt, shadows fall straight back and a little left, and nothing
  *          beside the road hides the disc. The massif (far.js) stands under it, back-lit.
- *   dusk   125 degrees left of the heading (out over the lake, behind the driver's left shoulder), 3.5 up.
+ *   dusk   125 degrees left of the heading (out over the lake, behind the driver's left shoulder), 2 up.
  *   moon   8 degrees left of the heading, 17 up, beside the massif's main peak.
  */
-export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 3.5 }, moon: { left: 8, up: 17 } };
+export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 2 }, moon: { left: 8, up: 17 } };
 const SUN = towards(90 - PLACES.day.left, PLACES.day.up);
 
 /**
@@ -170,8 +170,8 @@ export const TIMES = {
     name: 'day',
     sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 7.5 },
     sky: {
-      zenith: [0.03, 0.12, 0.46],
-      horizon: [0.2, 0.36, 0.68],
+      zenith: [0.16, 0.32, 0.72],
+      horizon: [0.5, 0.62, 0.8],
       falloff: 0.15,
       phase: 0.4,
       // (look lane: the aureole, `tight`, was 7: now a white-hot halo about four times the disc's radius, which is
@@ -183,51 +183,53 @@ export const TIMES = {
       stars: 0,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      clouds: { cover: 0.4, wisps: 0.15, lit: 0.22, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.4, wisps: 0.35, lit: 0.22, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
     },
     // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
-    env: { intensity: 0.7 },
+    // (round three) the drawn sky was raised to the frames' brightness; its light on the scene is kept where it was
+    env: { intensity: 0.56 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
-    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.04 },
-    fog: { color: [0.22, 0.33, 0.56], sun: [0.16, 0.1, 0.05], sunLobe: 16, density: 0.0001, heightFalloff: 0.011, air: 0.00006 },
-    exposure: 0.72,
+    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.1 },
+    fog: { color: [0.3, 0.42, 0.65], sun: [0.16, 0.1, 0.05], sunLobe: 16, density: 0.0001, heightFalloff: 0.011, air: 0.00006 },
+    exposure: 0.66,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.18, saturation: 1.04, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015, ao: 0.8, star: 0.02 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.06, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015, ao: 0.8, star: 0.02 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
   },
 
-  // (sky lane) GOLDEN HOUR: dry, the sun low and orange, the shade blue, the sky pale gold low towards the sun, rose
-  // opposite it and blue overhead, the clouds lit from below. The lamps and windows are coming on.
+  // (sky lane) GOLDEN HOUR, late (D4): dry, the sun 2 degrees up and red-orange, the sky a warm haze low down
+  // deepening to dusky blue-violet overhead, the clouds lit from below; the fill low, so that the lit crowns and the
+  // lamps carry the picture. The lamps and windows are on.
   dusk: {
     name: 'dusk',
-    sun: { dir: DUSK_SUN, color: [1.0, 0.6, 0.3], intensity: 3.4 },
+    sun: { dir: DUSK_SUN, color: [1.0, 0.48, 0.2], intensity: 2.6 },
     sky: {
-      zenith: [0.012, 0.04, 0.13],
-      horizon: [0.1, 0.1, 0.13],
+      zenith: [0.009, 0.014, 0.045],
+      horizon: [0.11, 0.07, 0.055],
       falloff: 0.18,
       phase: 0.3,
-      glow: { color: [1.0, 0.62, 0.3], wide: [0.35, 0.62], tight: [20, 0.985] },
-      disc: { size: 0.45, radiance: 900, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
+      glow: { color: [1.0, 0.5, 0.22], wide: [0.4, 0.55], tight: [16, 0.985] },
+      disc: { size: 0.45, radiance: 600, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
       // the rose belt low all round, gold under the sun (sky.js: radiance at the horizon, height)
-      band: { color: [0.08, 0.04, 0.035], height: 0.1 },
+      band: { color: [0.09, 0.045, 0.03], height: 0.14 },
       ground: [0.03, 0.026, 0.024],
       stars: 0,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      clouds: { cover: 0.38, wisps: 0.4, lit: 0.06, silver: 1.6, shade: [0.035, 0.035, 0.06], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.45, wisps: 0.4, lit: 0.07, silver: 1.6, shade: [0.022, 0.018, 0.032], drift: [0.0011, 0.0004] },
     },
-    env: { intensity: 0.8 },
-    ambient: { sky: [0.6, 0.7, 1.0], ground: [1.0, 0.7, 0.45], intensity: 0.025 },
-    fog: { color: [0.085, 0.085, 0.11], sun: [0.3, 0.16, 0.06], sunLobe: 6, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
-    exposure: 3.2,
+    env: { intensity: 0.7 },
+    ambient: { sky: [0.6, 0.6, 0.9], ground: [1.0, 0.6, 0.35], intensity: 0.012 },
+    fog: { color: [0.075, 0.055, 0.06], sun: [0.35, 0.15, 0.05], sunLobe: 6, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
+    exposure: 4.5,
     tunnelExposure: 6,
-    look: { flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 }, contrast: 1.12, saturation: 1.12, tint: [1.03, 1.0, 0.95], lift: [0, 0, 0], vignette: 0.28, chroma: 0.001, grain: 0.6, bloom: 0.09, ghosts: 0.0003, glare: 0.03, ao: 1.0, star: 0.015, halo: 0.05 },
+    look: { flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 }, contrast: 1.12, saturation: 1.08, tint: [0.97, 1.0, 1.02], lift: [0, 0, 0], vignette: 0.28, chroma: 0.001, grain: 0.6, bloom: 0.09, ghosts: 0.0003, glare: 0.03, ao: 1.0, star: 0.015, halo: 0.05 },
     lamps: { street: 1, tunnel: 1, windows: 0.7 },
     wetness: 0,
     carLights: 'low',
