@@ -76,7 +76,7 @@ const soundModules = import.meta.glob(['./Sound.js', '../engine/Audio.js'], { ea
 /** How much of the car's bounding box, from the ground up, is left out of the motion blur's sharp box (m). */
 const SHARP_LIFT = 0.1;
 /** Set once a first-time player has got going, so the hint does not come back. */
-const HINT_KEY = 'serpentine.hinted.v1';
+const HINT_KEY = 'dreamcar.hinted.v1';
 /** The car at rest, held on its brakes (the title, the grid). */
 const HELD = { steer: 0, throttle: 0, brake: 0, handbrake: 1 };
 
