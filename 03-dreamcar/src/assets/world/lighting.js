@@ -139,11 +139,11 @@ export function towards(bearing, elevation) {
 const SUN = towards(116, 20);
 
 /**
- * The moon: opposite the sun on the map and high. On the straight it is behind and to the right, over the wood,
- * so the tail of the car is moonlit and the moon rides in the rear screen; over the viaduct it is dead ahead; on
- * the descent it lights the rock face that the afternoon leaves in shade.
+ * (sky lane) The moon: low, ahead and to the right of the start straight, over the massif, so that the massif stands
+ * as a silhouette with moonlit edges, the moon itself rides in the chase view down the straight, and the car is
+ * rim-lit from ahead (its lamps and the street lamps light what faces the camera).
  */
-const MOON = towards(330, 50);
+const MOON = towards(68, 22);
 
 /**
  * (look lane, dusk) Where the sun went down: bearing 100 (along the lake, a little out over it), 5 degrees under
@@ -165,7 +165,7 @@ export const TIMES = {
   // valleys; a few clouds that catch the light.
   day: {
     name: 'day',
-    sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 6.2 },
+    sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 7.5 },
     sky: {
       zenith: [0.03, 0.12, 0.46],
       horizon: [0.2, 0.36, 0.68],
@@ -173,27 +173,27 @@ export const TIMES = {
       phase: 0.4,
       // (look lane: the aureole, `tight`, was 7: now a white-hot halo about four times the disc's radius, which is
       // what the bloom and the glare of the frame spread over the top of the picture)
-      glow: { color: [1.0, 0.9, 0.74], wide: [0.9, 0.74], tight: [40, 0.965] },
+      glow: { color: [1.0, 0.9, 0.74], wide: [0.3, 0.8], tight: [60, 0.985] },
       disc: { size: 0.4, radiance: 3000, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
       // grass, rock and forest of albedo 0.11 under the 3.1 the sun and sky lay on them
       ground: [0.105, 0.112, 0.09],
       stars: 0,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      clouds: { cover: 0.3, wisps: 0.35, lit: 0.22, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.4, wisps: 0.15, lit: 0.22, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
     },
     // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
-    env: { intensity: 0.72 },
+    env: { intensity: 0.55 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
-    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.06 },
-    fog: { color: [0.3, 0.44, 0.7], sun: [0.25, 0.16, 0.08], sunLobe: 16, density: 0.0002, heightFalloff: 0.011 },
-    exposure: 1.1,
+    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.04 },
+    fog: { color: [0.3, 0.44, 0.7], sun: [0.16, 0.1, 0.05], sunLobe: 16, density: 0.0002, heightFalloff: 0.011 },
+    exposure: 1.0,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.07, ghosts: 0.0015, glare: 0.04 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.07, ghosts: 0.0003, glare: 0.04 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
@@ -223,8 +223,8 @@ export const TIMES = {
       stars: 6e-7,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      // a few thin clouds: their undersides lit rose by the set sun, their tops grey
-      clouds: { cover: 0.16, wisps: 0.55, lit: 0, light: [0.075, 0.036, 0.034], silver: 0.8, shade: [0.017, 0.017, 0.024], drift: [0.0011, 0.0004] },
+      // (sky lane) broken cumulus: their undersides lit rose and orange by the set sun, their tops violet-grey
+      clouds: { cover: 0.36, wisps: 0.5, lit: 0, light: [0.12, 0.052, 0.04], silver: 1.2, shade: [0.014, 0.0135, 0.022], drift: [0.0011, 0.0004] },
     },
     env: { intensity: 1 },
     ambient: { sky: [0.8, 0.78, 1.0], ground: [0.55, 0.47, 0.5], intensity: 0.012 },
@@ -256,7 +256,7 @@ export const TIMES = {
       stars: 1.5e-6,
       milkyWay: 0.0005,
       airglow: [0.0003, 0.00055, 0.0004],
-      clouds: { cover: 0.44, wisps: 0.6, lit: 0.2, silver: 2.2, shade: [0.0004, 0.00055, 0.001], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.3, wisps: 0.25, lit: 0.12, silver: 2.2, shade: [0.0003, 0.00042, 0.0008], drift: [0.0011, 0.0004] },
     },
     env: { intensity: 1 },
     // the night sky lays only about a tenth of the moon's light on the ground; this keeps the moon's shadows

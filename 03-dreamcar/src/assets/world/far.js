@@ -50,7 +50,9 @@ const MASSIF = {
   clear: 1200,
   depth: 5000,
   span: 100,
-  height: 3200,
+  height: 2600,
+  peaks: 9,
+  slope: 31,
   cols: { low: 150, medium: 260, high: 340 },
   rows: { low: 60, medium: 110, high: 140 },
 };
@@ -87,11 +89,10 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         // bump map would, and darkens the beds' joints and the runnels, so faces read as stone in sun and shade.
         shader.fragmentShader = shader.fragmentShader
           .replace('#include <common>', `#include <common>\n${GLSL_HASH}\n${GLSL_NOISE}\nvarying vec3 vRockWorld;\nfloat rockHeight(vec3 p, out float joint) {
-  float beds = p.y / 34.0 + 1.6 * fbm(p.xz / 420.0, 3);
-  float bed = fract(beds);
-  joint = smoothstep(0.12, 0.0, bed) + smoothstep(0.9, 1.0, bed);
-  float runnel = abs(fbm(vec2(p.x + p.z, p.y * 0.6) / 70.0, 3) - 0.5);
-  return 9.0 * smoothstep(0.0, 0.25, bed) + 16.0 * fbm(p.xz / 55.0, 3) - 14.0 * smoothstep(0.08, 0.0, runnel);
+  // broken rock: crags and runnels down the fall line; no level beds (they read as contour lines at distance)
+  float runnel = abs(fbm(vec2(p.x + p.z, p.y * 0.35) / 60.0, 3) - 0.5);
+  joint = smoothstep(0.06, 0.0, runnel);
+  return 22.0 * fbm(p / 70.0, 3) - 10.0 * joint;
 }`)
           .replace(
             '#include <normal_fragment_maps>',
@@ -104,7 +105,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   float det = dot(sx, r1);
   vec3 grad = sign(det) * (dFdx(hb) * r1 + dFdy(hb) * r2);
   normal = normalize(abs(det) * normal - grad);
-  diffuseColor.rgb *= 1.0 - 0.35 * joint * uRockRelief;
+  diffuseColor.rgb *= 1.0 - 0.15 * joint * uRockRelief;
 }`,
           )
           .replace('void main() {', 'uniform float uRockRelief;\nvoid main() {');
@@ -242,6 +243,26 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     const base = Math.atan2(massifDir.y, massifDir.x);
     const at = (i, j) => j * (cols + 1) + i;
     const crestNoise = planeNoise(rng.int(1 << 30));
+    const peakRng = rng.fork('massif');
+    // (sky lane, after the lead's review) Real relief, not a dune: a chain of summits along the crest, each a steep
+    // cone (about 35 degrees) whose flanks are cut by gullies that run straight down from it (ridged noise in the
+    // angle round the summit and the distance from it), the arêtes between them sharp. The low sun then draws the
+    // form: lit facets on the arêtes' sunward sides, deep blue-grey in the gullies.
+    const peaks = [];
+    for (let k = 0; k < MASSIF.peaks; k++) {
+      const u = 0.12 + (0.76 * (k + peakRng.range(0.2, 0.8))) / MASSIF.peaks;
+      const w = 0.38 + peakRng.range(-0.1, 0.12);
+      const pa = base + (u - 0.5) * MASSIF.span * DEG;
+      const pr = massifNear + MASSIF.depth * w;
+      const middle = Math.exp(-(((u - 0.5) / 0.3) ** 2));
+      peaks.push({
+        x: start.pos.x + Math.cos(pa) * pr,
+        z: start.pos.z + Math.sin(pa) * pr,
+        h: MASSIF.height * (0.5 + 0.5 * middle) * peakRng.range(0.78, 1.0),
+        seed: k * 7.3,
+      });
+    }
+    const slope = Math.tan(MASSIF.slope * DEG);
     for (let j = 0; j <= rows; j++) {
       const v = j / rows; // 0 at the far edge, 1 at the near edge: rows are laid out far first
       const r = massifNear + MASSIF.depth * (1 - v);
@@ -250,25 +271,25 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const a = base + (u - 0.5) * MASSIF.span * DEG;
         const x = start.pos.x + Math.cos(a) * r;
         const z = start.pos.z + Math.sin(a) * r;
-        // the envelope: high in the middle of the span and along the crest, falling to foothills at the near edge
-        // and to the sides, and down again behind the crest
-        const across = Math.exp(-(((u - 0.5) / 0.36) ** 2));
-        const crestAt = 0.42 + 0.12 * (crestNoise.fbm(u * 3, 0.5, 2) - 0.5);
-        const w = 1 - v; // 1 at the far edge
-        const along = w < crestAt ? smoothstep(0, crestAt, w) ** 0.45 : 1 - 0.5 * smoothstep(crestAt, 1, w);
-        const env = MASSIF.height * (0.3 + 0.7 * across) * along * (0.75 + 0.5 * crestNoise.fbm(u * 1.7 + 4, 1.3, 3));
-        // spurs and gullies: ridged noise in the plane, stretched down the slope so the gullies run downhill
-        const k = 1 / 1100;
-        const dx = Math.cos(a), dz = Math.sin(a);
-        const pu = (x * -dz + z * dx) * k; // across the slope
-        const pv = (x * dx + z * dz) * k * 0.55; // down it
-        const ridges = 0.55 * crestNoise.ridged(pu + 11, pv + 3, 6) + 0.45 * crestNoise.ridged(pu * 2.3 + 5, pv * 2.3 + 1, 4);
-        const fine = crestNoise.ridged(pu * 3.7 + 2, pv * 2.9 + 9, 4);
-        // limestone stands in steps: the height is pulled towards terraces a little, which makes cliff bands
-        let y = -60 + env * (0.3 + 0.7 * ridges ** 1.3) + 140 * fine * smoothstep(300, 1200, env);
-        const step = 170;
-        const t = y / step - Math.floor(y / step);
-        y += step * 0.35 * (smoothstep(0.15, 0.85, t) - t) * smoothstep(500, 1100, y);
+        let y = -80;
+        for (const pk of peaks) {
+          const dx = x - pk.x;
+          const dz = z - pk.z;
+          const d = Math.hypot(dx, dz);
+          const ang = Math.atan2(dz, dx);
+          // gullies: about one every 350 m round the summit at 1 km out, merging as they climb; deeper lower down
+          const g = crestNoise.ridged(Math.cos(ang) * 2.9 + pk.seed + d / 2600, Math.sin(ang) * 2.9 + d / 2600, 4);
+          const fine = crestNoise.ridged(x / 260 + pk.seed, z / 260, 3);
+          // the cone, its flanks bowed (steep high up, easing into the foot), the arêtes standing out of it
+          const reach = pk.h / slope;
+          const t = Math.max(0, 1 - d / (reach * 1.5));
+          const cone = pk.h * t ** 1.6 * (1.25 - 0.25 * t);
+          const cut = (0.55 + 0.45 * g) * (0.9 + 0.1 * fine);
+          y = Math.max(y, -80 + cone * (t > 0.92 ? 1 : cut + (1 - cut) * smoothstep(0.75, 0.95, t)));
+        }
+        // foothills and the edges fade to nothing, so the field never ends in a wall
+        const edge = smoothstep(0, 0.12, u) * smoothstep(1, 0.88, u) * smoothstep(1, 0.85, v);
+        y = -80 + (y + 80) * edge;
         const p = at(i, j);
         pos[p * 3] = x;
         pos[p * 3 + 1] = y;
