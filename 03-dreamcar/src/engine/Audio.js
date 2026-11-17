@@ -93,7 +93,7 @@ export class GameAudio {
    * @param {number} [o.seed] of the noise and of the reverb
    * @param {Partial<ReverbShape>} [o.reverb]
    */
-  constructor({ mute = false, storageKey = 'serpentine.muted', context = null, clock = null, seed = 1, reverb = {} } = {}) {
+  constructor({ mute = false, storageKey = 'dreamcar.muted', context = null, clock = null, seed = 1, reverb = {} } = {}) {
     /** @type {BaseAudioContext|null} */
     this.ctx = null;
     this.muted = !!mute;

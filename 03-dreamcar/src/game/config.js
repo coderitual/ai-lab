@@ -1,5 +1,5 @@
 // Tuning numbers of the run, defined once. Everything in game/ reads them
-// from here; `__serp.set('camera.chase.distance', 6)` changes them on a
+// from here; `__dreamcar.set('camera.chase.distance', 6)` changes them on a
 // running page. (What is true of the car is in assets/car/spec.js, the light
 // in assets/world/lighting.js, the road in the Track.)
 //

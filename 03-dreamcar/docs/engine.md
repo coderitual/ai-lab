@@ -1,6 +1,6 @@
 # The engine and the frame
 
-How a picture of Serpentine is made: the passes of one view, the targets they
+How a picture of Dreamcar is made: the passes of one view, the targets they
 use on each tier, the tone curve and the grade, the motion blur, the
 reflections, and the rules that are easy to break when adding something. Every
 number here is in the source and should be changed there first; a number here
@@ -49,7 +49,7 @@ road's mirror; the car's reflection probe is updated just before the call.
 "Half-float" means the 8-bit encoding of glsl.js where `caps.hdr` is false
 (`?ldr` forces it). The road mirror is not made at all then.
 
-Measured with `__serp.stats().pipeline` at 960x540 on dusk, medium: scene
+Measured with `__dreamcar.stats().pipeline` at 960x540 on dusk, medium: scene
 960x540 (4 samples), blur 960x540, AO 480x270 (two) + 960x540, bloom 480x270
 down to 30x17, star 240x135; 15 full-screen passes with AO, 11 without. High
 adds a sixth bloom level (15x9) and has 19 passes by day with AO, the star and

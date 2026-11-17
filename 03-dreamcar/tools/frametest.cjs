@@ -6,7 +6,7 @@
 //        --pair out.png                            also: two frames 1/60 s apart, and how much they differ
 //        --w 960 --h 540
 //
-// Timing: each frame is stepped with __serp.advance(1/60) (or __viewer.frames(1)), then one pixel is read back
+// Timing: each frame is stepped with __dreamcar.advance(1/60) (or __viewer.frames(1)), then one pixel is read back
 // so that the time includes the GPU's work; the first frame after loading is not counted (it compiles shaders).
 // Console errors and warnings of the page are printed and make the exit code 1.
 //
@@ -52,8 +52,8 @@ async function pageRun(browser, url, a, problems) {
   await page.waitForFunction(() => window.__ready === true);
   const frames = parseInt(a.frames || 5, 10);
   const times = await page.evaluate(async (n) => {
-    const step = () => (window.__serp ? window.__serp.advance(1 / 60) : window.__viewer.frames(1));
-    const engine = window.__serp ? window.__serp.engine : window.__viewer.engine;
+    const step = () => (window.__dreamcar ? window.__dreamcar.advance(1 / 60) : window.__viewer.frames(1));
+    const engine = window.__dreamcar ? window.__dreamcar.engine : window.__viewer.engine;
     const gl = engine.renderer.getContext();
     const px = new Uint8Array(4);
     const sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
@@ -70,14 +70,14 @@ async function pageRun(browser, url, a, problems) {
   }, frames);
   let stats = null;
   try {
-    stats = await page.evaluate(() => (window.__serp ? window.__serp.stats().pipeline : window.__viewer.pipeline.stats()));
+    stats = await page.evaluate(() => (window.__dreamcar ? window.__dreamcar.stats().pipeline : window.__viewer.pipeline.stats()));
   } catch {
     stats = null;
   }
   let pair = null;
   if (a.pair) {
     const first = await page.screenshot();
-    await page.evaluate(() => (window.__serp ? window.__serp.advance(1 / 60) : window.__viewer.frames(1)));
+    await page.evaluate(() => (window.__dreamcar ? window.__dreamcar.advance(1 / 60) : window.__viewer.frames(1)));
     const second = await page.screenshot();
     pair = { first, second };
   }
