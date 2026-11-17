@@ -28,7 +28,7 @@ import * as THREE from 'three';
  * Per tier: the map's edge in texels, half the side of the square it covers (m), and how wide the shadow's edge
  * is filtered (texels). A texel is 2 * reach / size: 9, 5 and 3 cm.
  */
-const SHADOW = {
+export const SHADOW = {
   low: { size: 1024, reach: 46, radius: 1.2 },
   medium: { size: 2048, reach: 56, radius: 1.8 },
   high: { size: 4096, reach: 66, radius: 2.5 },

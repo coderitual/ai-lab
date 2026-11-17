@@ -21,11 +21,13 @@ export const ATLAS = {
   BARK: [0, 0.25, 0.25, 0.5],
   BIRCH: [0.25, 0.25, 0.5, 0.5],
   MASS: [0.5, 0.25, 1, 0.5],
+  // (a transparent gutter of 0.04 above them: the opaque bark and needle regions must not bleed into their tops
+  // in the small mip levels)
   SIL: [
-    [0, 0.5, 0.25, 1],
-    [0.25, 0.5, 0.5, 1],
-    [0.5, 0.5, 0.75, 1],
-    [0.75, 0.5, 1, 1],
+    [0.01, 0.54, 0.24, 1],
+    [0.26, 0.54, 0.49, 1],
+    [0.51, 0.54, 0.74, 1],
+    [0.76, 0.54, 0.99, 1],
   ],
 };
 
@@ -61,7 +63,7 @@ export function createForestAtlas(size, rng) {
       ctx.stroke();
     };
     // side shoots, both sides, with needles along them
-    for (let t = 0.04; t < 0.97; t += 0.035 + rng.next() * 0.02) {
+    for (let t = 0.03; t < 0.97; t += 0.022 + rng.next() * 0.014) {
       for (const side of [-1, 1]) {
         const reach = envelope(t) * h * rng.range(0.8, 1.05);
         const x0 = u0 + t * w;
@@ -69,12 +71,12 @@ export function createForestAtlas(size, rng) {
         const len = reach / Math.sin(Math.abs(a));
         const ex = x0 + Math.cos(a) * Math.min(len, w * 0.3);
         const ey = cy + side * reach;
-        const steps = Math.max(4, Math.round(reach / (5 * px)));
+        const steps = Math.max(5, Math.round(reach / (3.5 * px)));
         for (let k = 0; k <= steps; k++) {
           const f = k / steps;
           const x = x0 + (ex - x0) * f;
           const y = cy + (ey - cy) * f;
-          const nl = (6 + 4 * (1 - f)) * px * rng.range(0.8, 1.2);
+          const nl = (9 + 6 * (1 - f)) * px * rng.range(0.8, 1.2);
           const l = rng.range(0.62, 0.95) * (0.8 + 0.2 * f);
           needle(x, y, a * 0.3 - 0.7 + rng.range(-0.3, 0.3), nl, l);
           needle(x, y, a * 0.3 + 0.7 + rng.range(-0.3, 0.3), nl, l * 0.9);

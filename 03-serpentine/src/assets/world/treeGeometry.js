@@ -29,9 +29,9 @@ export const SPECIES = ['spruce', 'fir', 'birch', 'larch'];
 const SHAPES = {
   // crownBase: share of H below the lowest live branches; R: the widest branch (m); whorls; per: branches per whorl;
   // rise and droop: how a branch climbs at first and then hangs (per metre of its length)
-  spruce: { H: 20, trunk: 0.3, crownBase: 0.1, R: 2.9, whorls: 17, per: 5, rise: 0.22, droop: 0.42, power: 0.95, core: 0.5 },
-  fir: { H: 18, trunk: 0.27, crownBase: 0.12, R: 2.4, whorls: 16, per: 5, rise: 0.08, droop: 0.12, power: 0.7, core: 0.6 },
-  larch: { H: 18, trunk: 0.26, crownBase: 0.22, R: 2.6, whorls: 12, per: 4, rise: 0.4, droop: 0.75, power: 0.9, core: 0.25 },
+  spruce: { H: 20, trunk: 0.3, crownBase: 0.08, R: 3.0, whorls: 17, per: 6, rise: 0.25, droop: 0.6, power: 0.95, core: 0.28 },
+  fir: { H: 18, trunk: 0.27, crownBase: 0.1, R: 2.5, whorls: 16, per: 6, rise: 0.12, droop: 0.25, power: 0.7, core: 0.3 },
+  larch: { H: 18, trunk: 0.26, crownBase: 0.2, R: 2.6, whorls: 13, per: 5, rise: 0.4, droop: 0.8, power: 0.9, core: 0.15 },
   birch: { H: 15, trunk: 0.16 },
 };
 export const TEMPLATE_HEIGHT = Object.fromEntries(SPECIES.map((name) => [name, SHAPES[name].H]));
@@ -107,7 +107,7 @@ function core(b, { y0, y1, r, sides = 7, rings = 4 }) {
       const a = (k / sides) * Math.PI * 2 + j * 0.4;
       const c = Math.cos(a);
       const s = Math.sin(a);
-      row.push(b.vertex(c * rr, y, s * rr, c, 0.55, s, lerp(u0, u1, k / sides), lerp(v0, v1, t), 0.35 + 0.35 * t, 0));
+      row.push(b.vertex(c * rr, y, s * rr, c, 0.55, s, lerp(u0, u1, k / sides), lerp(v0, v1, t), 0.3 + 0.3 * t, 0));
     }
     rows.push(row);
   }
@@ -118,14 +118,14 @@ function core(b, { y0, y1, r, sides = 7, rings = 4 }) {
  * One branch card: from (0, y, 0) out along bearing `a` for `len` m. `region` is where its picture is; the
  * picture's u runs along the branch.
  */
-function branch(b, { y, a, len, rise, droop, width, fold, region, heightShare, crownTop }) {
+function branch(b, { y, a, len, rise, droop, width, fold, region, heightShare, crownTop, hang = 0 }) {
   const [u0, v0, u1, v1] = region;
   const dx = Math.cos(a);
   const dz = Math.sin(a);
   const sx = -dz;
   const sz = dx;
   const rows = [];
-  const steps = 3;
+  const steps = 2;
   for (let j = 0; j <= steps; j++) {
     const t = j / steps;
     const d = len * t;
@@ -136,7 +136,7 @@ function branch(b, { y, a, len, rise, droop, width, fold, region, heightShare, c
     const drop = fold * half;
     // the crown's normal here: out from the trunk and up, more up near the top of the tree
     const up = 0.45 + 0.6 * heightShare;
-    const ao = (0.35 + 0.65 * Math.pow(t, 0.8)) * (0.6 + 0.4 * heightShare);
+    const ao = (0.5 + 0.5 * Math.pow(t, 0.8)) * (0.7 + 0.3 * heightShare);
     const u = lerp(u0, u1, Math.min(1, t));
     const row = [];
     for (const [k, v] of [
@@ -155,6 +155,26 @@ function branch(b, { y, a, len, rise, droop, width, fold, region, heightShare, c
   for (let j = 0; j < steps; j++) {
     b.quad(rows[j][0], rows[j + 1][0], rows[j + 1][1], rows[j][1]);
     b.quad(rows[j][1], rows[j + 1][1], rows[j + 1][2], rows[j][2]);
+  }
+  if (hang > 0) {
+    // the branchlets that hang from the outer half of a spruce's branch: one card along it, hanging down
+    const t0 = 0.35;
+    const ax = dx * len * t0;
+    const az = dz * len * t0;
+    const ay = y + len * (rise * t0 - droop * t0 * t0);
+    const bx = dx * len;
+    const bz = dz * len;
+    const by = y + len * (rise - droop);
+    const drop = hang * len;
+    const up = 0.45 + 0.6 * heightShare;
+    const ao = 0.75 * (0.6 + 0.4 * heightShare);
+    // the picture turned on its side: its stem along the top edge
+    const vm = (v0 + v1) / 2;
+    const a0 = b.vertex(ax, ay, az, ax, up, az, u0 + (u1 - u0) * 0.4, vm, ao, 0);
+    const a1 = b.vertex(bx, by, bz, bx, up, bz, u1, vm, ao, 0);
+    const a2 = b.vertex(bx * 0.97, by - drop * 0.7, bz * 0.97, bx, up * 0.6, bz, u1, v1, ao * 0.8, 0);
+    const a3 = b.vertex(ax, ay - drop, az, ax, up * 0.6, az, u0 + (u1 - u0) * 0.4, v1, ao * 0.7, 0);
+    b.quad(a0, a1, a2, a3);
   }
   return crownTop;
 }
@@ -182,10 +202,11 @@ function conifer(name, rng) {
         len,
         rise: p.rise + 0.5 * t * t,
         droop: p.droop * (1 - 0.6 * t),
-        width: len * (name === 'larch' ? 0.6 : 0.95),
-        fold: 0.35,
+        width: len * (name === 'larch' ? 0.7 : 1.05),
+        fold: 0.6,
         region: ATLAS.FROND,
         heightShare: t,
+        hang: name === 'fir' ? 0.18 : name === 'larch' ? 0.45 : 0.32,
       });
     }
     a += 2.39996; // the next whorl turned by the golden angle
