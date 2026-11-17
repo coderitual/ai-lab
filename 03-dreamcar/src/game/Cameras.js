@@ -54,7 +54,8 @@ const KERB = 17; // how many wheels are on a kerb, eased 0..1
 const ACCEL = 18; // the car's acceleration along its path, low-passed (m/s2): what the distance spring is driven by
 const BANK = 19; // the road's bank under the car as the picture has taken it up (rad)
 const GRID = 20; // 0..1: how much of the grid's low look up at the start lamps is in (read off the race clock)
-const SLOTS = 21;
+const SLIDE = 21; // 0..1: the car's slide (vehicle.drift) as the camera has taken it up
+const SLOTS = 22;
 
 const p = new THREE.Vector3();
 const q = new THREE.Quaternion();
@@ -158,7 +159,11 @@ export class CameraRig {
     const speed = vehicle.speed;
     const hspeed = Math.hypot(vehicle.velocity.x, vehicle.velocity.z);
     const travel = speed > 4 ? Math.atan2(vehicle.velocity.x, vehicle.velocity.z) : vehicle.yaw;
-    const behind = vehicle.yaw + angleDiff(vehicle.yaw, travel) * c.slide;
+    // in a slide the camera keeps nearer the way the car is going (the car is seen yawed, the road ahead stays in
+    // view), taking the slide up and letting it go gently; it never turns beyond the direction of travel
+    s[SLIDE] = damp(s[SLIDE], clamp01(vehicle.drift || 0), (vehicle.drift || 0) > s[SLIDE] ? c.slideIn : c.slideOut, dt);
+    const share = Math.min(1, lerp(c.slide, c.slideHeld, s[SLIDE]));
+    const behind = vehicle.yaw + angleDiff(vehicle.yaw, travel) * share;
     s[YAW] += angleDiff(s[YAW], behind) * (1 - Math.exp(-c.yawRate * dt));
 
     // the bend coming up: how far the road turns over the next stretch, plus how fast the car is turning now
@@ -387,7 +392,7 @@ export class CameraRig {
     const yaw = this.was[YAW] + angleDiff(this.was[YAW], this.now[YAW]) * this._alpha + (back ? Math.PI : 0);
     const grade = (back ? -1 : 1) * at(GRADE);
     const y = at(Y);
-    const fov = lerp(m.fov ?? c.fov, m.fovFast ?? c.fovFast, feel);
+    const fov = lerp(m.fov ?? c.fov, m.fovFast ?? c.fovFast, feel) + c.slideFov * at(SLIDE);
     const distance = (m.distance + feel * (m.pullBack ?? c.pullBack) + at(PULL)) * lerp(1, c.narrowBack, narrow) * lerp(1, c.wideBack, wide);
     // the composition on this picture's lens
     const tanHalf = Math.tan((this._fit(fov) * Math.PI) / 360);
@@ -458,6 +463,14 @@ export class CameraRig {
     const yaw = heading + ((o.yaw ?? 0) * Math.PI) / 180;
     const pitch = ((o.pitch ?? 0) * Math.PI) / 180;
     target.set(eye.x + Math.sin(yaw) * Math.cos(pitch), eye.y + Math.sin(pitch), eye.z + Math.cos(yaw) * Math.cos(pitch));
+    // never under the ground (beyond the road's edge the land may stand higher than the car)
+    if (this.track) {
+      this.track.locate(eye.x, eye.z, this._hint, spot);
+      this._hint = spot.index;
+      this.track.profile(spot.s, spot.lat, prof);
+      eye.y = Math.max(eye.y, prof.y + CAMERA.clear.ground);
+      target.y = eye.y + Math.sin(pitch);
+    }
     camera.position.copy(eye);
     camera.lookAt(target);
     return o.fov ?? 50;

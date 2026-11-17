@@ -595,62 +595,108 @@
   color: #5fb4ff;
 }
 
-/* ---- the drift readout: over the road above the car, only while sliding; it fades out */
+/* ---- the slide readout: small, just above the speed; it shows while the car slides and fades a second after */
 
 .hud .drift {
   position: absolute;
-  left: 50%;
-  top: 30%;
-  transform: translateX(-50%);
+  right: calc(var(--pad) + var(--sr));
+  bottom: calc(var(--pad) + var(--sb) + var(--u) * 19.5);
+  width: calc(var(--u) * 24);
   display: flex;
+  justify-content: center;
   align-items: baseline;
-  gap: calc(var(--u) * 1);
-  padding: calc(var(--u) * 0.4) calc(var(--u) * 1.2);
-  background: var(--plate);
-  border-radius: calc(var(--u) * 1);
+  gap: calc(var(--u) * 0.9);
   opacity: 0;
-  transition: opacity 0.8s ease-out;
+  transition: opacity 0.6s ease-out 1s;
   pointer-events: none;
 }
 .hud .drift.on {
   opacity: 1;
-  transition: opacity 0.15s ease-out;
+  transition: opacity 0.12s ease-out;
 }
 .hud .drift .angle {
-  font-size: calc(var(--u) * 3);
+  font-size: calc(var(--u) * 2.6);
   font-weight: 800;
   color: var(--amber);
 }
 .hud .drift .score {
   font-size: calc(var(--u) * 2.2);
   font-weight: 800;
-}
-.hud .view.tall .drift {
-  top: 40%;
+  padding: 0 calc(var(--u) * 0.6);
+  background: var(--plate);
+  border-radius: calc(var(--u) * 0.5);
 }
 
-/* ---- under the right thumb (touch): room for a handbrake or drift button, left of the speed */
+/* ---- touch: DRIFT (and GAS) under the right thumb; the speed steps left of them */
 
-.hud .thumbs {
+.hud .pads {
   position: absolute;
-  right: calc(var(--pad) + var(--sr) + var(--u) * 25);
-  bottom: calc(var(--pad) + var(--sb));
-  display: flex;
-  gap: 10px;
+  inset: 0;
+  pointer-events: none;
 }
-.hud .thumbs .thumb {
-  width: max(64px, calc(var(--u) * 11));
-  height: max(64px, calc(var(--u) * 11));
-  padding: 0;
+.hud .pad {
+  position: absolute;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
-  background: rgba(10, 16, 22, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  background: rgba(10, 16, 22, 0.42);
   font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.hud .view:not(.touch) .thumbs {
+.hud .pad.held {
+  background: rgba(255, 180, 60, 0.55);
+  border-color: var(--amber);
+}
+.hud .pad.gas.held {
+  background: rgba(92, 240, 142, 0.5);
+  border-color: var(--green);
+}
+.hud .view:not(.touch) .pads,
+.hud .view.done .pads {
   display: none;
+}
+.hud .view.touch .cluster,
+.hud .view.touch .drift {
+  right: calc(var(--pad) + var(--sr) + 116px);
+}
+/* the zones named on the first touch run, ghosted: STEER over the left part, BRAKE over the right */
+.hud .zonehint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: hud-fade-in 0.4s ease-out;
+}
+.hud .zonehint span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  font-size: max(16px, calc(var(--u) * 3));
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.07);
+  border: 2px dashed rgba(255, 255, 255, 0.35);
+  box-sizing: border-box;
+}
+.hud .zonehint .steer {
+  left: 0;
+  width: var(--steer);
+}
+.hud .zonehint .brake {
+  right: 0;
+  left: var(--steer);
+}
+@keyframes hud-fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 /* ---- the buttons: small and together, at the right under the time to beat, away from the thumbs and the figures */
@@ -1070,6 +1116,14 @@
   margin-bottom: 14px;
   font-size: 26px;
   font-weight: 250;
+}
+.hud .slideline {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber);
 }
 .hud .medalline {
   margin-top: 10px;

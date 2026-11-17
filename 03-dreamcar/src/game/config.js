@@ -64,6 +64,8 @@ export const HUD = {
   banner: 4,
   /** Driving the wrong way this long before the warning shows (s). */
   wrongWay: 1.2,
+  /** On the first run on a touch screen the zones (steer, brake, drift) are named until this much of the race clock (s). */
+  zonesFor: 3,
   /** The first-time hint shows until the car has covered this much road in a run (m). */
   hintDistance: 25,
 };
@@ -188,7 +190,15 @@ export const CAMERA = {
     feelTime: 0.6,
     /** How much of the angle between where the car points and where it is going the camera takes up. */
     slide: 0.6,
-    /** How quickly it swings round behind the car: slowly, so it swings late into a bend and shows the flank. */
+    /**
+     * In a slide (vehicle.drift 0..1, taken up at `slideIn` and let go at `slideOut` /s) the share of the way the car
+     * is going rises from `slide` to `slideHeld`, and the lens opens `slideFov` degrees.
+     */
+    slideHeld: 0.9,
+    slideIn: 4,
+    slideOut: 1.5,
+    slideFov: 4,
+        /** How quickly it swings round behind the car: slowly, so it swings late into a bend and shows the flank. */
     yawRate: 3.4,
     /**
      * Looking into the bend: the road's turn over the next `bendReach` m (more at speed) times `bendRoad`, plus the
@@ -394,7 +404,13 @@ export const FX = {
   smokeRate: 18,
   dustRate: 22,
   stoneRate: 10,
-  /** Spray from this speed (m/s); rate at 25 m/s above it on a soaked road. */
+  /** A held slide: the rear wheels mark from `slideFrom` degrees of the car's slide (vehicle.slideAngle), fully
+   * `slideFull` degrees above it, and smoke at `slideSmoke` of full (a thin trail); spray grows by `slideSpray`. */
+  slideFrom: 8,
+  slideFull: 14,
+  slideSmoke: 0.45,
+  slideSpray: 1,
+    /** Spray from this speed (m/s); rate at 25 m/s above it on a soaked road. */
   sprayFrom: 5,
   sprayRate: 40,
   /** Sparks: a burst per hit (per m/s of closing speed, at most burstMax), a stream while scraping. */

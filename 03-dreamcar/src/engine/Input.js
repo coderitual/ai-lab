@@ -9,10 +9,16 @@
 // not fight it.
 //
 // Touch is cut into zones, one per view rectangle, so that two people can
-// share a tablet. In a zone the first finger is a stick that appears where it
-// lands: sideways steers, pulled down brakes; the throttle is automatic. A
-// second finger in the same zone is the brake. Holding the brake at a
-// standstill reverses (the vehicle does that; this only reports the brake).
+// share a tablet. In a zone the left part (TOUCH.steerShare) steers: the first
+// finger there is a stick that appears where it lands and reads sideways
+// travel only (a second finger there is ignored). Anywhere in the right part
+// is the brake, except two round buttons at its bottom right that the HUD
+// draws: DRIFT (the handbrake while held) and, with the throttle on manual,
+// GAS. With the throttle on auto (the default) the car drives while the
+// steering thumb is down, or was a moment ago (TOUCH.grace s, counted in the
+// fixed step by step()), and not while the brake or DRIFT is held. Holding
+// the brake at a standstill reverses (the vehicle does that; this only
+// reports the brake).
 //
 // Steering, pedals and the held look back are read by the drivers in the
 // fixed step (read). Everything else is a moment: an action ('camera',
@@ -22,9 +28,19 @@
 
 import { clamp } from './math.js';
 
-const STEER_RANGE = 62; // px of thumb travel for full lock
-const BRAKE_DEAD = 26; // px the thumb may drift down before the brake starts to bite
-const BRAKE_RANGE = 44; // px from there to full brake
+const STEER_RANGE = 96; // px of thumb travel for full lock
+const STEER_CURVE = 1.15; // power of the thumb's response
+/**
+ * The touch layout of a zone: the share of its width (from the left) that steers, the round buttons by their
+ * radius and their centre's distance from the zone's right and bottom edges (CSS px, inside the safe area), and
+ * how long the automatic throttle stays on after the steering thumb lifts (s).
+ */
+export const TOUCH = {
+  steerShare: 0.55,
+  drift: { r: 38, right: 64, bottom: 150 },
+  gas: { r: 44, right: 64, bottom: 56 },
+  grace: 0.4,
+};
 const PAD_DEAD = 0.12; // of the stick's travel that does nothing
 const PAD_CURVE = 1.6; // power of the stick's response: fine near the centre, all of the lock at the edge
 const PAD_PEDAL_DEAD = 0.04;
@@ -87,11 +103,15 @@ export class Input {
     if (this.isTouch) this.source = ['touch', 'touch'];
     /** Touch zones as fractions of the surface from its top left: { left, top, width, height } per driver. */
     this.zones = [{ left: 0, top: 0, width: 1, height: 1 }];
-    /** Per zone: the stick { id, originX, originY, x, y } and the brake finger { id }. */
-    this.touch = [
-      { stick: null, brake: null },
-      { stick: null, brake: null },
-    ];
+    /**
+     * Per zone: the stick { id, originX, originY, x, y }, the fingers on the brake (pointer ids), on DRIFT and on
+     * GAS, and how long the automatic throttle has left after the stick went (s of simulated time).
+     */
+    this.touch = [this._zone(), this._zone()];
+    /** The throttle on touch: 'auto' (the car drives while a thumb steers) or 'manual' (the GAS button). */
+    this.throttle = 'auto';
+    /** The safe area's right and bottom insets (CSS px), which the buttons stand inside (set by the game). */
+    this.insets = { right: 0, bottom: 0 };
     /** (name, driver) for each action as it happens. */
     this.onAction = null;
     /** (input) whenever a stick appears, moves or goes, for drawing it. */
@@ -119,7 +139,7 @@ export class Input {
     this._keyup = (e) => this.keys.delete(e.code);
     this._blur = () => {
       this.keys.clear();
-      for (const z of this.touch) z.stick = z.brake = null;
+      for (let i = 0; i < this.touch.length; i++) this.touch[i] = this._zone();
       this._notify();
     };
     window.addEventListener('keydown', this._keydown);
@@ -180,6 +200,31 @@ export class Input {
     return this.zones.length ? 0 : -1;
   }
 
+  _zone() {
+    return { stick: null, brakes: new Set(), drift: null, gas: null, grace: 0 };
+  }
+
+  /** The zone's rectangle in client pixels. */
+  _rectOf(i) {
+    const r = this.surface.getBoundingClientRect();
+    const z = this.zones[i] || this.zones[0];
+    return { left: r.left + z.left * r.width, top: r.top + z.top * r.height, width: z.width * r.width, height: z.height * r.height };
+  }
+
+  /** Which of a zone's round buttons (TOUCH.drift, TOUCH.gas) is under a point, or ''. */
+  _buttonAt(i, x, y) {
+    const zr = this._rectOf(i);
+    const hit = (b) => {
+      const cx = zr.left + zr.width - this.insets.right - b.right;
+      const cy = zr.top + zr.height - this.insets.bottom - b.bottom;
+      // a little more than the drawn circle, never less than a 64 px target
+      return Math.hypot(x - cx, y - cy) <= Math.max(32, b.r + 6);
+    };
+    if (hit(TOUCH.drift)) return 'drift';
+    if (this.throttle === 'manual' && hit(TOUCH.gas)) return 'gas';
+    return '';
+  }
+
   _down(e) {
     if (e.pointerType === 'mouse' || this._onButton(e)) return;
     e.preventDefault();
@@ -192,9 +237,14 @@ export class Input {
       /* not capturable: the moves still arrive while the finger is over the surface */
     }
     const z = this.touch[zi];
-    // the first finger down in a zone is its stick, wherever it lands; one more is the brake
-    if (!z.stick) z.stick = { id: e.pointerId, originX: e.clientX, originY: e.clientY, x: e.clientX, y: e.clientY };
-    else if (!z.brake) z.brake = { id: e.pointerId };
+    const zr = this._rectOf(zi);
+    const button = this._buttonAt(zi, e.clientX, e.clientY);
+    if (button === 'drift') z.drift = e.pointerId;
+    else if (button === 'gas') z.gas = e.pointerId;
+    else if ((e.clientX - zr.left) / Math.max(1, zr.width) < TOUCH.steerShare) {
+      // the left part steers: the first finger is the stick, wherever it lands; another one there is ignored
+      if (!z.stick) z.stick = { id: e.pointerId, originX: e.clientX, originY: e.clientY, x: e.clientX, y: e.clientY };
+    } else z.brakes.add(e.pointerId);
     this.source[zi] = 'touch';
     this._notify();
     if (this.onAnyInput) this.onAnyInput('touch');
@@ -210,10 +260,7 @@ export class Input {
       // the origin trails the thumb, so reversing direction answers at once
       if (s.x - s.originX > STEER_RANGE) s.originX = s.x - STEER_RANGE;
       if (s.x - s.originX < -STEER_RANGE) s.originX = s.x + STEER_RANGE;
-      // likewise up and down: the brake is a pull from wherever the thumb has got to
-      const maxPull = BRAKE_DEAD + BRAKE_RANGE + 12;
-      if (s.y < s.originY) s.originY = s.y;
-      if (s.y - s.originY > maxPull) s.originY = s.y - maxPull;
+      s.originY = s.y;
       this._notify();
     }
   }
@@ -222,16 +269,25 @@ export class Input {
     let changed = false;
     for (const z of this.touch) {
       if (z.stick && z.stick.id === e.pointerId) {
-        // the brake finger, if any, stays a brake: it does not become the stick
         z.stick = null;
         changed = true;
       }
-      if (z.brake && z.brake.id === e.pointerId) {
-        z.brake = null;
+      if (z.brakes.delete(e.pointerId)) changed = true;
+      if (z.drift === e.pointerId) {
+        z.drift = null;
+        changed = true;
+      }
+      if (z.gas === e.pointerId) {
+        z.gas = null;
         changed = true;
       }
     }
     if (changed) this._notify();
+  }
+
+  /** Once per fixed step: the automatic throttle's moment after the steering thumb lifts runs out. */
+  step(dt) {
+    for (const z of this.touch) z.grace = z.stick ? TOUCH.grace : Math.max(0, z.grace - dt);
   }
 
   _notify() {
@@ -243,14 +299,16 @@ export class Input {
     return this.touch[i] ? this.touch[i].stick : null;
   }
 
-  /** How hard zone `i`'s thumbs brake right now, 0..1 (the pull of the stick, or a second finger). */
+  /** How hard zone `i`'s fingers brake right now, 0 or 1. */
   brakeOf(i) {
     const z = this.touch[i];
-    if (!z) return 0;
-    let brake = z.brake ? 1 : 0;
-    const s = z.stick;
-    if (s) brake = Math.max(brake, clamp((s.y - s.originY - BRAKE_DEAD) / BRAKE_RANGE, 0, 1));
-    return brake;
+    return z && z.brakes.size ? 1 : 0;
+  }
+
+  /** Which of zone `i`'s buttons are held: { drift, gas } (for drawing them pressed). */
+  heldOf(i) {
+    const z = this.touch[i];
+    return { drift: !!(z && z.drift !== null), gas: !!(z && z.gas !== null) };
   }
 
   /** The pad driver `d` holds, or null. */
@@ -322,6 +380,7 @@ export class Input {
     out.handbrake = held(map.hand) ? 1 : 0;
     out.lookBack = held(map.back);
     out.analog = false;
+    out.device = 'keys';
     return out;
   }
 
@@ -337,28 +396,34 @@ export class Input {
     out.steer = Math.sign(x) * Math.min(1, v);
     out.throttle = pedal(7);
     out.brake = pedal(6);
-    out.handbrake = pedal(0) > 0.5 ? 1 : 0;
+    // the handbrake on A, and on the right shoulder (RB) under the finger that rests there
+    out.handbrake = pedal(0) > 0.5 || pedal(5) > 0.5 ? 1 : 0;
     out.lookBack = pedal(2) > 0.5;
     out.analog = true;
+    out.device = 'pad';
     return out;
   }
 
   _readTouch(out, zone) {
-    const z = this.touch[zone] || this.touch[0];
+    const i = this.touch[zone] ? zone : 0;
+    const z = this.touch[i];
     const s = z.stick;
     let steer = 0;
-    const brake = this.brakeOf(this.touch[zone] ? zone : 0);
     if (s) {
       const v = clamp((s.x - s.originX) / STEER_RANGE, -1, 1);
-      steer = Math.sign(v) * Math.pow(Math.abs(v), 1.25);
+      steer = Math.sign(v) * Math.pow(Math.abs(v), STEER_CURVE);
     }
+    const brake = this.brakeOf(i);
+    const drift = z.drift !== null ? 1 : 0;
     out.steer = steer;
     out.brake = brake;
-    // the throttle is automatic, but only while a thumb is on the glass: lifting both hands lets the car roll
-    out.throttle = s && brake < 0.12 ? 1 : 0;
-    out.handbrake = 0;
+    out.handbrake = drift;
+    // auto: the car drives while a thumb steers (and a moment after), not while the brake or DRIFT is held;
+    // manual: only while GAS is held
+    out.throttle = this.throttle === 'manual' ? (z.gas !== null ? 1 : 0) : (s || z.grace > 0) && !brake && !drift ? 1 : 0;
     out.lookBack = false;
     out.analog = true;
+    out.device = 'touch';
     return out;
   }
 

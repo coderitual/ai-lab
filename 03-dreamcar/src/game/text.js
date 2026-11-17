@@ -72,9 +72,17 @@ export const TEXT = {
 
   lamps: { abs: 'ABS', tc: 'TC', esc: 'ESC', hand: 'P', high: 'High beam' },
   buttons: { camera: 'Camera', lights: 'High beam', reset: 'Reset', pause: 'Pause' },
+  pads: { steer: 'Steer', brake: 'Brake', drift: 'Drift', gas: 'Gas' },
+  drivingHelp: 'Driving help',
+  throttle: 'Throttle',
+  auto: 'Auto',
+  manual: 'Manual',
+  bestSlide: 'Best slide',
+  /** A driving-help level's name (ASSISTS.levels in config.js; any other id is shown capitalised). */
+  assistName: (id) => ({ full: 'Full', sport: 'Sport', off: 'Off' })[id] || id.charAt(0).toUpperCase() + id.slice(1),
 
   hint: {
-    touch: 'Touch and drag to steer, pull down to brake',
+    touch: 'Left thumb steers, right thumb brakes, Drift slides',
     keys: 'W or ↑ to drive, A D or ← → to steer, S or ↓ to brake',
     pad: 'Right trigger to drive, left stick to steer, left trigger to brake',
   },
@@ -83,7 +91,7 @@ export const TEXT = {
   legend: {
     keys: [
       ['W A S D / ← ↑ → ↓', 'drive'],
-      ['Space', 'handbrake'],
+      ['Space', 'handbrake, drift'],
       ['C', 'camera'],
       ['B', 'look back'],
       ['R', 'reset'],
@@ -102,16 +110,16 @@ export const TEXT = {
     pad: [
       ['RT / LT', 'drive / brake'],
       ['Left stick', 'steer'],
-      ['A', 'handbrake, start'],
+      ['A / RB', 'handbrake, start'],
       ['X', 'look back'],
       ['Y', 'camera'],
       ['B', 'reset'],
       ['Start', 'pause'],
     ],
     touch: [
-      ['Drag', 'steer'],
-      ['Pull down', 'brake'],
-      ['Second finger', 'brake'],
+      ['Left side', 'steer (the car drives itself)'],
+      ['Right side', 'brake'],
+      ['Drift', 'handbrake'],
     ],
   },
 };
