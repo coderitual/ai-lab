@@ -220,14 +220,19 @@ export const FX = {
   /** On a wet road (wetness above wetFrom) marks are this much as dark, and spray replaces smoke. */
   wetFrom: 0.3,
   markWet: 0.22,
-  /** Smoke from this skid up. */
+  /** Smoke from this skid up, and only once the rubber scrubs over the road faster than smokeScrub (m/s), full
+   * smokeScrubFull above it: a launch's brief wheelspin is ~3-5 m/s, a locked wheel or a real slide 8-30. While an
+   * assist (TC, ABS, ESC) is working, smoke is cut by up to smokeHeld. */
   smokeFrom: 0.3,
-  smokeRate: 26,
+  smokeScrub: 5,
+  smokeScrubFull: 10,
+  smokeHeld: 0.9,
+  smokeRate: 18,
   dustRate: 22,
   stoneRate: 10,
   /** Spray from this speed (m/s); rate at 25 m/s above it on a soaked road. */
   sprayFrom: 5,
-  sprayRate: 55,
+  sprayRate: 40,
   /** Sparks: a burst per hit (per m/s of closing speed, at most burstMax), a stream while scraping. */
   burstPer: 2.5,
   burstMax: 40,

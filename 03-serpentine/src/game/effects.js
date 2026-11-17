@@ -112,16 +112,23 @@ export class Effects {
       const o = i * 4;
       const ground = p.y;
       if (w.surface === SURFACE.ASPHALT && !wetRoad) {
-        // smoke: only a hard slide on dry asphalt
-        const s = clamp01((w.skid - FX.smokeFrom) / (1 - FX.smokeFrom));
+        // smoke: only a tyre really sliding on dry asphalt (a locked wheel, a slide past the limit, a burnout),
+        // judged by how fast the rubber scrubs over the road, not by the skid alone: a wheel that spins a little
+        // off the line, or one an assist is holding at its limit, makes next to none
+        const ref = Math.max(Math.abs(w._vlong ?? speed), 1);
+        const across = Math.tan(Math.max(-1.4, Math.min(1.4, w.slipAngle))) * ref;
+        const scrub = Math.hypot(w._slip ?? w.slipRatio * ref, across);
+        const held = 1 - FX.smokeHeld * Math.max(v.assists.tc, v.assists.abs, v.assists.esc);
+        const s = clamp01((w.skid - FX.smokeFrom) / (1 - FX.smokeFrom)) * clamp01((scrub - FX.smokeScrub) / FX.smokeScrubFull) * held;
         this._owed[o] += s * FX.smokeRate * t.rate * dt;
         while (this._owed[o] >= 1) {
           this._owed[o] -= 1;
+          const big = 0.5 + 0.5 * s;
           this.particles.emit(
             KINDS.smoke,
-            p.x + rng.range(-0.15, 0.15), ground + 0.2, p.z + rng.range(-0.15, 0.15),
-            vel.x * 0.25 + rng.range(-1, 1), rng.range(0.2, 0.9), vel.z * 0.25 + rng.range(-1, 1),
-            this.time, rng.range(2.0, 3.4), rng.range(0.25, 0.4), rng.range(1.1, 1.8), rng.next(), ground,
+            p.x + rng.range(-0.1, 0.1), ground + 0.12, p.z + rng.range(-0.1, 0.1),
+            vel.x * 0.3 + rng.range(-0.5, 0.5), rng.range(0.05, 0.35), vel.z * 0.3 + rng.range(-0.5, 0.5),
+            this.time, rng.range(1.0, 1.8), rng.range(0.12, 0.2), rng.range(0.45, 0.8) * big, rng.next(), ground,
           );
         }
       } else if (w.surface !== SURFACE.ASPHALT && speed > 2) {
@@ -151,7 +158,7 @@ export class Effects {
         }
       }
       if (wetRoad && paved && speed > FX.sprayFrom) {
-        // spray: a fine mist thrown up behind the tyre, growing with speed; the rear wheels throw most
+        // spray: a low, fine mist behind the tyre (never a wall), growing with speed; the rear wheels throw most
         const rear = j >= 2 ? 1 : 0.45;
         const k = clamp01((speed - FX.sprayFrom) / 25) * clamp01((wet - FX.wetFrom) / 0.4) * rear;
         this._owed[o + 3] += FX.sprayRate * t.rate * k * dt;
@@ -159,9 +166,9 @@ export class Effects {
           this._owed[o + 3] -= 1;
           this.particles.emit(
             KINDS.spray,
-            p.x + rng.range(-0.12, 0.12), ground + 0.12, p.z + rng.range(-0.12, 0.12),
-            vel.x * 0.62 + rng.range(-0.8, 0.8), rng.range(0.5, 1.6), vel.z * 0.62 + rng.range(-0.8, 0.8),
-            this.time, rng.range(0.8, 1.4), rng.range(0.2, 0.32), rng.range(1.2, 2.0) * (0.6 + 0.4 * k), rng.next(), ground,
+            p.x + rng.range(-0.1, 0.1), ground + 0.08, p.z + rng.range(-0.1, 0.1),
+            vel.x * 0.62 + rng.range(-0.6, 0.6), rng.range(0.15, 0.6), vel.z * 0.62 + rng.range(-0.6, 0.6),
+            this.time, rng.range(0.5, 0.9), rng.range(0.12, 0.2), rng.range(0.4, 0.75) * (0.6 + 0.4 * k), rng.next(), ground,
           );
         }
       }
