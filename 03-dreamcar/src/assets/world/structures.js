@@ -45,7 +45,7 @@ export function createStructures({ track, terrain, caps, tier, atmosphere }) {
   lap('walls');
   // (a circuit has no guide posts, chevrons or warning signs: posts.js is kept for a public road)
   const posts = { group: new THREE.Group(), stats: { posts: 0 } };
-  const viaducts = createViaducts({ track, terrain, atmosphere });
+  const viaducts = createViaducts({ track, terrain, atmosphere, tier });
   lap('viaduct');
   const start = createStart({ track, terrain, atmosphere });
   lap('start');

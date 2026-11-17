@@ -4,13 +4,17 @@
 // each with a steel rail on posts along its top; the deck's edge beams and a
 // box girder under it; expansion joints across the road at both ends; piers
 // at a regular span, standing upright whatever the road's banking and sunk
-// into the ravine's floor; and an abutment block at each end where the deck
+// into the ravine's floor (tall slender eight-sided shafts, tapering a little,
+// under a flared capital, in board-marked concrete cast in lifts, stained by
+// water running off the deck: frame A); and an abutment block at each end where the deck
 // meets the hillside.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { along, footBox, levelFrame, row, stripGeometry, upright } from './furniture.js';
+import { GLSL_HASH, GLSL_NOISE } from '../../engine/glsl.js';
 import { concreteDetail } from './tunnel.js';
+import { extend } from './shading.js';
 
 /**
  * The deck's cross-section beyond the parapet's inner face, the left half: [lat beyond the face, h] (m). From the
@@ -37,6 +41,11 @@ const RAIL = { h: 1.12, out: 0.26, radius: 0.045 };
 /** Span between piers (fitted to the bridge), and the shortest pier worth standing. */
 const SPAN = 30;
 const MIN_PIER = 3;
+/** Metres between the deck's cross-sections, by tier. */
+const STEP = { low: 6, medium: 3, high: 2 };
+/** The pier's shaft (across the road, along it, m; how much it narrows to the top) and its capital. */
+const SHAFT = { across: 2.3, along: 1.45, taper: 0.82 };
+const CAPITAL = { across: 5.6, along: 2.3, height: 1.7 };
 
 /**
  * @param {object} options
@@ -44,7 +53,7 @@ const MIN_PIER = 3;
  * @param {object} options.terrain terrain.js (heightAt)
  * @param {import('./atmosphere.js').Atmosphere} options.atmosphere
  */
-export function createViaducts({ track, terrain, atmosphere }) {
+export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) {
   const group = new THREE.Group();
   group.name = 'viaducts';
   const concrete = concreteDetail(atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0x95928a, roughness: 0.9, side: THREE.DoubleSide })));
@@ -64,7 +73,7 @@ export function createViaducts({ track, terrain, atmosphere }) {
   for (const b of track.bridges) {
     const s0 = b.s0 - 1.5;
     const s1 = b.s1 + 1.5;
-    const steps = Math.ceil((s1 - s0) / 2);
+    const steps = Math.ceil((s1 - s0) / (STEP[tier] ?? 3));
     const sections = Array.from({ length: steps + 1 }, (_, k) => s0 + ((s1 - s0) * k) / steps);
     /** A point at (lat from the centre line, h above the road at the face on that side) in the level frame at s. */
     const at = (s, side, lat, h) => {
@@ -121,8 +130,8 @@ export function createViaducts({ track, terrain, atmosphere }) {
       }
       const foot = ground - 1.5;
       if (top - ground < MIN_PIER) continue;
-      piers.push(upright(new THREE.Vector3(frame.pos.x, foot, frame.pos.z), frame.yaw, 3.6, top - 0.7 - foot, 1.9));
-      caps.push(upright(new THREE.Vector3(frame.pos.x, top - 0.75, frame.pos.z), frame.yaw, 5.4, 0.75, 2.4));
+      piers.push(upright(new THREE.Vector3(frame.pos.x, foot, frame.pos.z), frame.yaw, SHAFT.across, top - CAPITAL.height - foot + 0.05, SHAFT.along));
+      caps.push(upright(new THREE.Vector3(frame.pos.x, top - CAPITAL.height, frame.pos.z), frame.yaw, CAPITAL.across, CAPITAL.height, CAPITAL.along));
     }
     for (const [s, out] of [
       [b.s0, -1],
@@ -151,17 +160,57 @@ export function createViaducts({ track, terrain, atmosphere }) {
     group.add(deck, rails, joints);
     for (const g of [...deckParts, ...railParts, ...jointParts]) g.dispose();
   }
-  // a pier: a slab that narrows a little towards its top
-  const pier = footBox();
-  const pos = pier.attributes.position;
-  for (let i = 0; i < pos.count; i++) if (pos.getY(i) > 0.5) pos.setX(i, pos.getX(i) * 0.86);
-  pier.computeVertexNormals();
+  // a pier: an eight-sided shaft (a rectangle with its corners cut) narrowing a little towards its top, and a
+  // capital that flares out from it to carry the girder
+  const octagon = (top, bottom, open) => {
+    const g = new THREE.CylinderGeometry(top, bottom, 1, 8, 1, open).rotateY(Math.PI / 8).translate(0, 0.5, 0);
+    g.scale(1 / Math.cos(Math.PI / 8), 1, 1 / Math.cos(Math.PI / 8));
+    g.computeVertexNormals();
+    return g;
+  };
+  const pier = octagon(0.5 * SHAFT.taper, 0.5, true);
+  const capital = octagon(0.5, (0.5 * SHAFT.across * SHAFT.taper) / CAPITAL.across, false);
+  const pierConcrete = pierFinish(atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0x9a968d, roughness: 0.92 })));
   group.add(
-    row(pier, concrete, piers, { name: 'viaduct-piers' }),
-    row(footBox(), concrete, caps, { name: 'viaduct-pier-caps' }),
+    row(pier, pierConcrete, piers, { name: 'viaduct-piers' }),
+    row(capital, pierConcrete, caps, { name: 'viaduct-pier-caps' }),
     row(footBox(), concrete, blocks, { name: 'viaduct-abutments' }),
     row(new THREE.BoxGeometry(0.05, 0.26, 0.05).translate(0, 0.13, 0), steel, railPosts, { shadow: false, name: 'viaduct-rail-posts' }),
   );
 
   return { group, stats: { piers: piers.length, posts: railPosts.length } };
+}
+
+/**
+ * Cast concrete on a pier, from the world position: lifts of 2.4 m with a dark construction joint between them,
+ * vertical board marks, a darker splash zone at the foot, and stains running down from the capital where water
+ * drips off the deck.
+ */
+function pierFinish(material) {
+  return extend(material, 'pier-concrete', (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPierWorld;\nvarying float vPierUp;')
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\nvPierWorld = ( modelMatrix * instanceMatrix * vec4( transformed, 1.0 ) ).xyz;\nvPierUp = position.y;',
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${GLSL_HASH}\n${GLSL_NOISE}\nvarying vec3 vPierWorld;\nvarying float vPierUp;`)
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+{
+  vec3 p = vPierWorld;
+  float aa = fwidth( p.y ) + 1.0e-3;
+  float lift = 1.0 - smoothstep( 0.02, 0.02 + aa, abs( fract( p.y / 2.4 + 0.5 ) - 0.5 ) * 2.4 );
+  float boards = 0.93 + 0.07 * hash11( floor( ( p.x + p.z ) / 0.2 ) );
+  float tone = 0.9 + 0.2 * valueNoise( vec2( ( p.x + p.z ) * 0.15, p.y * 0.05 ) );
+  // streaks hanging from the top
+  float streak = valueNoise( vec2( ( p.x - p.z ) * 2.2, 0.0 ) ) * valueNoise( vec2( ( p.x + p.z ) * 0.7, p.y * 0.02 ) );
+  float fromTop = smoothstep( 0.35, 1.0, vPierUp );
+  float splash = 1.0 - smoothstep( 0.0, 0.12, vPierUp );
+  diffuseColor.rgb *= boards * tone * ( 1.0 - 0.5 * lift ) * ( 1.0 - 0.55 * streak * ( 0.4 + 0.6 * fromTop ) ) * ( 1.0 - 0.35 * splash );
+}`,
+      );
+  });
 }

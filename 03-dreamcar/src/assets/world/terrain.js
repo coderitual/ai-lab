@@ -177,7 +177,17 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     return h > cap - 30 ? cap - 30 * Math.exp(-(h - (cap - 30)) / 30) : h;
   }
   /** Small hills and gullies on top of the land's shape, zero on average. */
-  const detail = (x, z) => 18 * (noise.ridged(x / 280, z / 280, 4) - 0.35) + 5 * (noise.fbm(x / 70, z / 70, 3) - 0.5);
+  // (env lane) land, not domes: ridged spurs at two scales, and drainage lines cut down the slopes between them
+  // (the creases of a noise field: where it crosses its middle, a gully)
+  const detail = (x, z) => {
+    const gully = Math.pow(1 - Math.abs(2 * noise.fbm(x / 190 + 5, z / 190 - 3, 4) - 1), 5);
+    return (
+      22 * (noise.ridged(x / 260, z / 260, 4) - 0.35) +
+      8 * (noise.ridged(x / 85 + 2, z / 85, 3) - 0.4) +
+      4 * (noise.fbm(x / 35, z / 35, 2) - 0.5) -
+      12 * gully
+    );
+  };
 
   // ---- layer 2: the shape of the land, on a coarse grid
   const minX = track.bounds.minX - MARGIN;

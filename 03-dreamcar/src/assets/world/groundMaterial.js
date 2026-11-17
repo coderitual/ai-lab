@@ -185,7 +185,7 @@ vec3 gRockCol = mix( vec3( 0.13, 0.13, 0.125 ), vec3( 0.1, 0.104, 0.108 ), gLarg
 // a cut face: limestone in beds, pale and grey by turns, streaked dark where water runs down it
 float gBed = vGroundPos.y / 0.85 + 0.6 * gDet.g;
 float gBedTone = fract( sin( floor( gBed ) * 12.9898 ) * 43758.5453 );
-vec3 gLime = mix( vec3( 0.27, 0.265, 0.25 ), vec3( 0.42, 0.41, 0.385 ), 0.35 + 0.65 * gBedTone ) * ( 0.8 + 0.3 * gDetRock.g );
+vec3 gLime = mix( vec3( 0.15, 0.15, 0.145 ), vec3( 0.26, 0.255, 0.24 ), 0.3 + 0.7 * gBedTone ) * ( 0.8 + 0.3 * gDetRock.g );
 float gStreak = smoothstep( 0.55, 0.8, texture2D( uLarge, vec2( ( vGroundPos.x + vGroundPos.z ) / 23.0, vGroundPos.y / 400.0 ) ).b );
 gLime *= 1.0 - 0.45 * gStreak;
 gRockCol = mix( gRockCol, gLime, gCut );

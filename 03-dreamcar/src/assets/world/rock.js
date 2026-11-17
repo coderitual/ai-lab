@@ -19,9 +19,9 @@ import { planeNoise } from './shading.js';
 /** How far the face leans back (m out per m up), less than the terrain's cliff (terrain.js LEAN). */
 const LEAN = 0.17;
 /** Rows of the face from its buried foot to its top, and the rows that fold over the lip. */
-const FACE_ROWS = 14;
+const FACE_ROWS_BY_TIER = { low: 8, medium: 14, high: 14 };
 /** Rows along the road: one every this many metres, per tier. */
-const STEP = { low: 2, medium: 1, high: 1 };
+const STEP = { low: 3, medium: 1, high: 1 };
 
 /**
  * @param {object} options
@@ -33,6 +33,7 @@ const STEP = { low: 2, medium: 1, high: 1 };
 export function createRockFaces({ track, terrain, tier, rng }) {
   const noise = planeNoise(rng.int(1 << 30));
   const step = STEP[tier] ?? 1;
+  const FACE_ROWS = FACE_ROWS_BY_TIER[tier] ?? 14;
   const ds = track.ds;
   const n = track.count;
   const pt = new THREE.Vector3();
