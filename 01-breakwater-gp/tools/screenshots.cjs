@@ -76,13 +76,11 @@ const SHOTS = [
   { name: 'peaks', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=0&ty=20&tz=0&az=110&el=5&dist=150', caption: 'The rock massif from the open sea' },
   { name: 'beach', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=22&ty=5&tz=46&az=78&el=5&dist=27', caption: 'Boulders, thicket and palms at the back of the beach' },
   { name: 'shore', kind: 'viewer', size: DESKTOP, query: 'asset=world&fov=50&tx=64&ty=4&tz=34&az=-10&el=5&dist=24', caption: 'The sunny side: surf running up the sand' },
-  { name: 'sea', kind: 'viewer', size: DESKTOP, query: 'asset=sea&t=12&fov=55&ty=2&az=330&el=11&dist=30', caption: 'The open sea: crests breaking, foam left on their backs' },
-  { name: 'sea-sun', kind: 'viewer', size: DESKTOP, query: 'asset=sea&t=12&fov=55&ty=2.5&az=235&el=7&dist=38', caption: 'The open sea toward the sun' },
 
   // ---- the game as played
   { name: 'title', kind: 'game', size: DESKTOP, query: '', at: 6, caption: 'Title screen' },
   { name: 'race', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 31, caption: 'Racing: the view from the chase camera' },
-  { name: 'race-open-sea', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 22, caption: 'On the open-ocean side' },
+  { name: 'race-open-sea', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 40, caption: 'On the open-ocean side' },
   { name: 'rain', kind: 'game', size: DESKTOP, query: 'auto&ap', at: 13, caption: "In the pack: other boats' spray as rain on the lens" },
   { name: 'split-screen', kind: 'game', size: DESKTOP, query: 'mode=split&auto', drive: true, at: 22, caption: 'Two players on one keyboard' },
   { name: 'phone', kind: 'game', size: PHONE, query: 'auto&ap', at: 31, thumb: [660, 262, 688, 268], scale: 0.75, caption: 'Phone, held sideways, one thumb on the glass' },
@@ -254,16 +252,7 @@ async function downscale(page, pngBuffer, scale, quality = 0.88) {
             const fz = Math.cos(boat.yaw);
             // port is (fz, -fx)
             const camera = v.camera;
-            const cx = p.x - fx * c.back + fz * c.side;
-            const cz = p.z - fz * c.back - fx * c.side;
-            // `up` is above the water under the boat; on a big sea the water where the camera stands, or between
-            // it and the boat, can be metres higher: keep the lens clear of that as well
-            let y = boat.waterY + c.up;
-            for (let k = 0; k <= 4; k++) {
-              const t = k / 8;
-              y = Math.max(y, window.__bw.waterAt(cx + (p.x - cx) * t, cz + (p.z - cz) * t) + 0.7 - t * 0.8);
-            }
-            camera.position.set(cx, y, cz);
+            camera.position.set(p.x - fx * c.back + fz * c.side, boat.waterY + c.up, p.z - fz * c.back - fx * c.side);
             camera.fov = c.fov;
             camera.updateProjectionMatrix();
             camera.up.set(0, 1, 0);

@@ -47,7 +47,7 @@ names, characters, courses or art.
 - **Grid.** Four boats abreast, fourteen metres short of the arch, idling on
   the swell.
 - **Countdown.** Three beeps and a higher one. The lights on the arch go out.
-- **Three laps** round the island, a little under a minute each. Nine
+- **Three laps** round the island, about 50 seconds each. Nine
   slalom marks per lap alternate sides, so the fast line swings from one side
   of the course to the other and crosses the swell at changing angles.
 - **Flag.** The first boat home wins; the rest are classified as they finish.
@@ -125,11 +125,7 @@ sand going dark and glossy where the sea reaches it, and groves of coconut
 palms laying long afternoon shadows across it. The peak is the landmark of
 the lap: you can tell where you are on the course from which side of it you
 see. The swell comes from the open
-ocean on one side; the island shelters the other. On the open side it is a
-big sea: hills of water four to six metres from trough to crest and a hundred
-metres apart, steep enough at the top to break into white, with the light
-coming through their crests. The boat climbs them, loses the horizon in the
-troughs and finds it again on top. So each lap has a rough
+ocean on one side; the island shelters the other. So each lap has a rough
 half, where the boat is in the air a good part of the time, and a calm half,
 where you can make up places. The start arch stands on the calm side.
 

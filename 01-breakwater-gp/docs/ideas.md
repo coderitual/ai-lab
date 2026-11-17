@@ -20,8 +20,8 @@ Nothing here has been seen on a phone or in Safari (see
 
 - **A second course.** `game/track.js` is already data: ten control points and
   a list of marks. A course needs its own islands (`game/World.js`), and
-  ideally its own sea (`SEA` in `engine/waves.js` is global today: seven
-  numbers and a seed; make it a property of the course).
+  ideally its own sea (the wave table in `engine/waves.js` is global today;
+  make it a property of the course).
 - **Time trial with a ghost.** The network code already records and replays a
   boat's state 20 times a second (`OnlinePlay._store`, `applyRemote`). Save
   the best lap to `localStorage` and feed it through the same path.
@@ -31,13 +31,7 @@ Nothing here has been seen on a phone or in Safari (see
   change `pace` and the cap on power.
 - **Weather.** `sea.scale` already exists (`?sea=`). A calm race and a rough
   race are one number apart; a squall that passes over mid-race would be a
-  slow ramp of it plus a darker sky. A different *kind* of sea (short and
-  steep, or a long oily swell) is a different `SEA`: `peakLength`, `tail` and
-  `chop`, measured with `tools/sea.mjs` and raced before it is believed.
-- **Seeing over the waves.** The open sea now stands 4 to 6 m from trough to
-  crest and a mark's sign 4.2 m, so a mark a hundred metres off can be hidden
-  for a second or two. If that costs races, raise the signs or the chase
-  camera in a trough, or draw the next mark's arrow through the water.
+  slow ramp of it plus a darker sky.
 
 ## The boat and the driving
 
@@ -65,22 +59,6 @@ Nothing here has been seen on a phone or in Safari (see
   the water could evaluate it in the reflected direction as it does the sky.
 - **Soft particles.** Spray and mist cut hard where they cross a hull. With a
   depth texture they could fade there.
-- **Whitecaps to the horizon.** Beyond 430 m the sea is flat water with
-  ripples: the tables have no smaller copies of themselves, so reading them
-  that far off would flicker. Mip levels for the 3D textures (they need the
-  float colour-buffer extension to be generated) or a second, coarse table
-  for the far field would carry the big waves and their foam all the way out.
-- **Spray off the crests.** The tables know where a crest is breaking
-  (`squeeze`); the fixed step could throw particles from those places near
-  the boats, as it does from the hulls.
-- **Smoother time.** The tables are blended in a straight line between
-  frames. A curve through four frames would let them hold a longer period in
-  the same memory, at four lookups instead of one.
-- **A sea that is computed, not stored.** The alternative that was weighed:
-  transform the spectrum a few times a second while the game runs (in a
-  worker) and blend between snapshots. No repeat in time and any weather at
-  will, for a few milliseconds a snapshot and a harder time keeping every
-  machine's sea the same.
 - **A bow wave you can see.** Write displacement into a fourth channel of the
   wake field and add it in the ocean's vertex shader.
 - **A second reflection probe** for the other split-screen player (today both

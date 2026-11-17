@@ -14,7 +14,6 @@
 //   ?netlag=80&netjitter=30&netloss=5
 //              online play: hold back (ms) and drop (%) what this page receives
 
-import { waterHeight } from './engine/waves.js';
 import { Game } from './game/Game.js';
 
 const q = new URLSearchParams(location.search);
@@ -52,8 +51,6 @@ try {
       const n = Math.round(seconds * fps);
       for (let i = 0; i < n; i++) game.engine.advance(1 / fps);
     },
-    /** How high the sea stands at (x, z) now (the picture tool keeps its cameras out of the water with it). */
-    waterAt: (x, z) => waterHeight(x, z, game.engine.simTime),
     /** Fast-forward without drawing, then draw once. */
     skip(seconds) {
       const n = Math.round(seconds * 60);
