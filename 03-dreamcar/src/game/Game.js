@@ -727,7 +727,9 @@ export class Game {
       const diveEnd = race ? race.firstLamp + RULES.lampStep * (RULES.lamps - 1) : 0;
       const sweep = race && race.clock < diveEnd ? clamp01((race.clock + race.lead) / (diveEnd + race.lead)) : 1;
       const finished = !!race && this.phase !== 'title' && race.cars[racer.index].finished;
-      view.rig.update(dt, racer.vehicle, this.track, { impacts: racer.impacts, sweep, finished, sun: time.sun?.dir, time: time.name });
+      // the grid's look up at the lamps: while the clock is under zero, easing out over CAMERA.chase.gridOut after go
+      const grid = race && this.phase !== 'title' ? 1 - clamp01(race.clock / CAMERA.chase.gridOut) : 0;
+      view.rig.update(dt, racer.vehicle, this.track, { impacts: racer.impacts, sweep, finished, sun: time.sun?.dir, time: time.name, grid });
       // the title's hero picture and the results' orbit: the car exposed for, eased in and out (SHOWCASE)
       const show = this.phase === 'title' && !this.attract ? 1 : finished ? 1 : 0;
       view.showcase = damp(view.showcase, show, 1 / SHOWCASE.ease, dt);

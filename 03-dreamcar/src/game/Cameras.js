@@ -53,7 +53,8 @@ const LEANR = 16;
 const KERB = 17; // how many wheels are on a kerb, eased 0..1
 const ACCEL = 18; // the car's acceleration along its path, low-passed (m/s2): what the distance spring is driven by
 const BANK = 19; // the road's bank under the car as the picture has taken it up (rad)
-const SLOTS = 20;
+const GRID = 20; // 0..1: how much of the grid's low look up at the start lamps is in (read off the race clock)
+const SLOTS = 21;
 
 const p = new THREE.Vector3();
 const q = new THREE.Quaternion();
@@ -235,6 +236,7 @@ export class CameraRig {
     if (sweep < 1 && this.was[SWEEP] >= 1) this.cut = true;
     if (sweep >= 1 && this.was[SWEEP] < 1 && this.mode !== 'chase' && this.mode !== 'far') this.cut = true;
     s[SWEEP] = sweep;
+    s[GRID] = ctx.grid ?? 0;
     const mounted = this.mode === 'bonnet' || this.mode === 'bumper';
     // after the flag: blended in from the chase view, or cut to from a camera fixed to the car
     if (ctx.finished && s[BLEND] === 0 && mounted) {
@@ -397,7 +399,9 @@ export class CameraRig {
     const below = pitch + Math.atan(2 * (carAt - 0.5) * tanHalf);
     const reach = distance + c.middle[1];
     const lift = Math.abs(bend) * c.bendLift;
-    const height = c.middle[0] + reach * Math.tan(below) + lift;
+    // on the grid: lower, and looking up so that the start lamps are in the picture (eased out after go)
+    const grid = back ? 0 : ease(clamp01(at(GRID)));
+    const height = (c.middle[0] + reach * Math.tan(below) + lift) * lerp(1, c.gridLow, grid);
     // behind the car along the swung heading, a little to the inside of the bend
     const bx = Math.sin(yaw);
     const bz = Math.cos(yaw);
@@ -408,7 +412,7 @@ export class CameraRig {
     eyeOut.set(p.x - bx * distance + bz * side, y + height - sink, p.z - bz * distance - bx * side);
     // looking down by `pitch` from the grade, turned into the bend
     const ly = yaw + bend;
-    const elev = Math.atan(grade) - pitch;
+    const elev = Math.atan(grade) - pitch + grid * ((c.gridUp * Math.PI) / 180 + pitch);
     const ce = Math.cos(elev);
     targetOut.set(eyeOut.x + Math.sin(ly) * ce * 10, eyeOut.y + Math.sin(elev) * 10, eyeOut.z + Math.cos(ly) * ce * 10);
     return fov;

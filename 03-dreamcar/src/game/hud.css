@@ -660,9 +660,12 @@
 .hud .view.split .banner {
   display: none;
 }
-.hud .view.tall .warn,
-.hud .view.tall .hint {
+.hud .view.tall .warn {
   top: 36%;
+}
+.hud .view.tall .hint {
+  top: 26%;
+  max-width: 58%;
 }
 .hud .view.tall .offer {
   top: 40%;
