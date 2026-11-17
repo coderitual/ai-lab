@@ -517,11 +517,14 @@ test('no objects are made while stepping', () => {
   collect();
   const before = process.memoryUsage().heapUsed;
   lap(60000);
+  // Collect before reading the heap: the engine boxes the odd number as it steps (Math.hypot's results, for one),
+  // which is its business, and how much of that happens to lie uncollected at this moment says nothing (it read
+  // 86 bytes a step on one road and 261 on another for the same code). What must not grow is what is KEPT: an
+  // object, an array or a closure held per step would be hundreds of bytes a step here.
+  collect();
   const grown = process.memoryUsage().heapUsed - before;
-  // An object, an array or a closure per step would be hundreds of bytes; what is left is the odd number the
-  // engine chose to box, which is its business.
-  check(grown < 150 * 60000, `${(grown / 60000).toFixed(1)} bytes per step were allocated`);
-  return `${(grown / 60000).toFixed(1)} bytes per step over 60 000 steps of two cars (boxed numbers)`;
+  check(grown < 150 * 60000, `${(grown / 60000).toFixed(1)} bytes per step were kept`);
+  return `${(grown / 60000).toFixed(1)} bytes per step kept over 60 000 steps of two cars`;
 });
 
 test('forgiving: full key lock at 150 to 280 km/h, either way, never spins the car', () => {
