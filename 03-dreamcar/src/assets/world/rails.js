@@ -1,5 +1,5 @@
-// Guard rails: wherever the Track's solid edge is a RAIL, a galvanised W-beam
-// on posts, its face standing exactly at the edge distance (that is where the
+// Guard rails: wherever the Track's solid edge is a RAIL, a circuit's steel
+// barrier: two galvanised W-beams stacked on posts, its face standing exactly at the edge distance (that is where the
 // physics stops a car), with a reflector every few posts.
 //
 // The beam is one profile swept along each run, closer in bends than on the
@@ -27,12 +27,24 @@ const BEAM = [
   [0, 0.71],
   [0.03, 0.745],
   [0.075, 0.76],
+  // the second beam, stacked on the first (a circuit's barrier stands about 1.1 m)
+  [0.075, 0.78],
+  [0.03, 0.795],
+  [0, 0.83],
+  [0, 0.87],
+  [0.03, 0.905],
+  [0.055, 0.94],
+  [0.03, 0.975],
+  [0, 1.01],
+  [0, 1.05],
+  [0.03, 1.085],
+  [0.075, 1.1],
 ];
 /** Posts: spacing (m) by tier, and where they stand behind the beam. */
 const POST_SPACING = { low: 4, medium: 2, high: 2 };
 const POST_OUT = 0.16;
 /** A reflector on every this many posts. */
-const REFLECTOR_EVERY = 6;
+const REFLECTOR_EVERY = 1e9; // (a circuit's barrier carries none)
 /** The terminals: metres over which a free end goes down into the ground, and how far it turns away. */
 const RAMP = 7;
 const FLARE = 0.5;
@@ -139,8 +151,9 @@ export function createRails({ track, tier, atmosphere }) {
 
   // a C-section post, a spacer block in front of it at the beam's height
   const postGeometry = mergeGeometries([
-    new THREE.BoxGeometry(0.11, 1.2, 0.06).translate(0, 0.6, 0),
-    new THREE.BoxGeometry(0.1, 0.32, 0.1).translate(0, 1.05, 0),
+    new THREE.BoxGeometry(0.11, 1.55, 0.06).translate(0, 0.775, 0),
+    new THREE.BoxGeometry(0.1, 0.3, 0.1).translate(0, 1.05, 0),
+    new THREE.BoxGeometry(0.1, 0.3, 0.1).translate(0, 1.39, 0),
   ]);
   group.add(row(postGeometry, postSteel, posts, { name: 'rail-posts' }));
 
@@ -157,7 +170,10 @@ export function createRails({ track, tier, atmosphere }) {
   };
 }
 
-/** Galvanised steel: dull bands where the splices overlap every 4 m, and a little grime towards the bottom. */
+/**
+ * Galvanised steel: dull bands where the splices overlap every 4 m, a row of bolt heads on each post and on each
+ * splice (they read at speed as a rhythm), streaks of road dirt thrown up on the lower beam, grime at the bottom.
+ */
 function railSteel(material) {
   return extend(material, 'rail-steel', (shader) => {
     shader.vertexShader = shader.vertexShader
@@ -170,12 +186,22 @@ function railSteel(material) {
         `#include <color_fragment>
 {
   float splice = smoothstep(0.2, 0.14, abs(fract(vRail.x / 4.0 + 0.5) - 0.5) * 4.0);
+  float aaX = fwidth(vRail.x) + 1.0e-3;
+  // bolt heads on the beams' flat middles: over each post (every 2 m), and a group at each splice
+  float boltRow = smoothstep(0.03, 0.012, min(abs(vRail.y - 0.51), abs(vRail.y - 0.85)));
+  float atPost = 1.0 - smoothstep(0.03 - aaX, 0.03 + aaX, abs(fract(vRail.x / 2.0 + 0.5) - 0.5) * 2.0);
+  float atSplice = 1.0 - smoothstep(0.06 - aaX, 0.06 + aaX, abs(abs(fract(vRail.x / 4.0 + 0.5) - 0.5) * 4.0 - 0.12));
+  float bolt = boltRow * max(atPost, atSplice) * (1.0 - smoothstep(0.05, 0.2, aaX));
+  // dirt sprayed up from the road on the lower beam, in streaks along it
+  float spray = smoothstep(0.75, 0.45, vRail.y) * (0.55 + 0.45 * sin(vRail.x * 0.9 + 2.0 * sin(vRail.x * 0.23)));
   diffuseColor.rgb *= mix(1.0, 0.78, splice) * mix(0.82, 1.0, smoothstep(0.44, 0.7, vRail.y));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.29, 0.25), 0.35 * spray);
+  diffuseColor.rgb *= 1.0 - 0.6 * bolt;
 }`,
       )
       .replace(
         '#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\nroughnessFactor = mix( roughnessFactor, 0.6, smoothstep( 0.6, 0.44, vRail.y ) );',
+        '#include <roughnessmap_fragment>\nroughnessFactor = mix( roughnessFactor, 0.62, smoothstep( 0.7, 0.44, vRail.y ) );',
       );
   });
 }

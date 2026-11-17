@@ -10,8 +10,8 @@ import * as THREE from 'three';
 import { disposeGroup } from './furniture.js';
 import { createStart } from './gantry.js';
 import { createLamps } from './lamps.js';
-import { createPosts } from './posts.js';
 import { createRails } from './rails.js';
+import { createWalls } from './walls.js';
 import { setRetroBeams } from './retro.js';
 import { createTunnels } from './tunnel.js';
 import { createViaducts } from './viaduct.js';
@@ -41,18 +41,20 @@ export function createStructures({ track, terrain, caps, tier, atmosphere }) {
   lap('tunnel');
   const rails = createRails({ track, tier, atmosphere });
   lap('rails');
-  const posts = createPosts({ track, atmosphere });
-  lap('posts');
+  const walls = createWalls({ track, atmosphere });
+  lap('walls');
+  // (a circuit has no guide posts, chevrons or warning signs: posts.js is kept for a public road)
+  const posts = { group: new THREE.Group(), stats: { posts: 0 } };
   const viaducts = createViaducts({ track, terrain, atmosphere });
   lap('viaduct');
   const start = createStart({ track, terrain, atmosphere });
   lap('start');
-  const parts = [lamps, tunnels, rails, posts, viaducts, start];
+  const parts = [lamps, tunnels, rails, walls, posts, viaducts, start];
   for (const part of parts) group.add(part.group);
 
   return {
     group,
-    stats: { ms, lamps: lamps.stats, rails: rails.stats, posts: posts.stats, viaducts: viaducts.stats },
+    stats: { ms, lamps: lamps.stats, rails: rails.stats, walls: walls.stats, posts: posts.stats, viaducts: viaducts.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {
       for (const part of parts) part.setTime?.(time);

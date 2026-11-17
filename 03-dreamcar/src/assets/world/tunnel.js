@@ -22,8 +22,9 @@ import { LAMP_KINDS, SPOT_GLSL } from './lamps.js';
 import { extend, withBake } from './shading.js';
 
 /** The bore: walls up to SPRING above the road, then a vault to CROWN at the middle. */
-const SPRING = 4.6;
-const CROWN = 6.9;
+const SPRING = 4.3;
+/** The crown: TUNNEL.height in game/trackLayout.js (the cameras keep under it). */
+const CROWN = 6.4;
 const KERB = { width: 0.3, height: 0.12 };
 /** The painted band along the foot of each wall (m above the road). */
 const BAND = 1.4;
@@ -35,7 +36,7 @@ const NICHE = 60;
 /** How far daylight carries into the bore (m to fall to a third). */
 const DAYLIGHT = 5;
 /** The Track's tunnel walls stand this far beyond the pavement (TUNNEL.wallOffset in game/trackLayout.js). */
-const WALL_OFFSET = 0.9;
+const WALL_OFFSET = 1.5;
 
 /**
  * Half the bore's cross-section, the left side (lat > 0), from the kerb's foot up to the crown: [lat, h, nLat, nH]
@@ -83,7 +84,8 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
   group.name = 'tunnels';
   const frame = {};
   const disposables = [];
-  const W = track.halfWidth + WALL_OFFSET;
+  // the walls stand at the Track's solid edge in the bore (TUNNEL.wallOffset beyond the pavement)
+  const W = track.tunnels.length ? track.edgeAt((track.tunnels[0].s0 + track.tunnels[0].s1) / 2, 1) : track.halfWidth + WALL_OFFSET;
   const spec = LAMP_KINDS.tunnel;
 
   track.tunnels.forEach((t, which) => {

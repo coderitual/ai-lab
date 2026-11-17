@@ -36,8 +36,8 @@ import { planeNoise, smoothstep, withBake } from './shading.js';
 const EDGE_ROCK = 1;
 const EDGE_TREES = 4;
 const SURFACE_GRAVEL = 3;
-/** The tunnel's ceiling above the road (TUNNEL.height in game/trackLayout.js): the ground stays above it. */
-const BORE_HEIGHT = 5.6;
+/** The tunnel's crown above the road (TUNNEL.height in game/trackLayout.js) and its lining: the ground stays above it. */
+const BORE_HEIGHT = 7.2;
 
 /** Grid cell (m) per tier. */
 const CELL = { low: 8, medium: 6, high: 5 };
