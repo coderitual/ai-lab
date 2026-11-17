@@ -75,12 +75,13 @@ void main() {
  * @param {import('./treeGeometry.js').TreeModel[]} o.models
  * @param {THREE.Texture} o.foliage @param {THREE.Texture} o.bark
  * @param {number} o.cell texels of one picture's edge
+ * @param {number} [o.rings] 2: the level and the raised pictures; 1: the level ones only (the low tier)
  * @returns {ImpostorAtlas}
  */
-export function bakeImpostors({ renderer, models, foliage, bark, cell }) {
+export function bakeImpostors({ renderer, models, foliage, bark, cell, rings = 2 }) {
   const started = performance.now();
   const n = models.length;
-  const perRow = VIEWS * 2;
+  const perRow = VIEWS * rings;
   const width = cell * perRow;
   const height = cell * n;
   const target = (srgb) => {
@@ -142,7 +143,7 @@ export function bakeImpostors({ renderer, models, foliage, bark, cell }) {
       const top = model.top * 1.02;
       if (pass === 0) {
         cells.push(new THREE.Vector4(0, v / n, 1 / perRow, 1 / n));
-        runs.push(new THREE.Vector4(perRow, 0, VIEWS, VIEWS));
+        runs.push(new THREE.Vector4(perRow, 0, VIEWS, rings > 1 ? VIEWS : 0));
         boxes.push(new THREE.Vector4(half, bottom, top, 0));
       }
       const halfH = (top - bottom) / 2;
@@ -184,13 +185,14 @@ export function bakeImpostors({ renderer, models, foliage, bark, cell }) {
     color: colorTarget.texture,
     normal: shapeTarget.texture,
     variants: n,
-    rows: 2,
+    rows: rings,
     elevation: ELEVATION,
     cells,
     runs,
     boxes,
     inset: new THREE.Vector2(1.5 / cell, 1.5 / cell),
     bytes: Math.round(width * height * 4 * 2 * 1.34),
+    size: [width, height],
     ms: Math.round(performance.now() - started),
     targets: [colorTarget, shapeTarget],
     dispose() {

@@ -24,12 +24,12 @@ export const SPECIES = ['spruce', 'fir', 'larch', 'birch', 'maple', 'lime', 'haz
  * (+) or blue (-); `lean` the largest lean (rad); `through` how much light its foliage lets through (0..1).
  */
 export const SPECIES_DATA = {
-  spruce: { height: [15, 30], green: [0.389, 0.483, 0.43], autumn: [], turns: 0, value: [0.8, 1.12], hue: 0.15, lean: 0.05, through: 0.3 },
-  fir: { height: [13, 25], green: [0.333, 0.441, 0.374], autumn: [], turns: 0, value: [0.82, 1.1], hue: 0.1, lean: 0.04, through: 0.25 },
+  spruce: { height: [15, 30], green: [0.52, 0.66, 0.56], autumn: [], turns: 0, value: [0.8, 1.12], hue: 0.15, lean: 0.05, through: 0.3 },
+  fir: { height: [13, 25], green: [0.46, 0.61, 0.5], autumn: [], turns: 0, value: [0.82, 1.1], hue: 0.1, lean: 0.04, through: 0.25 },
   larch: { height: [14, 26], green: [0.447, 0.621, 0.38], autumn: [[0.855, 0.779, 0.564]], turns: 0.35, value: [0.85, 1.15], hue: 0.3, lean: 0.07, through: 0.75 },
   birch: { height: [10, 19], green: [0.457, 0.618, 0.283], autumn: [[0.944, 0.851, 0.422], [0.857, 0.737, 0.348]], turns: 0.4, value: [0.88, 1.15], hue: 0.4, lean: 0.13, through: 0.9 },
-  maple: { height: [9, 16], green: [0.383, 0.557, 0.235], autumn: [[1.053, 0.523, 0.249], [1.058, 0.709, 0.301], [0.852, 0.296, 0.182], [1.056, 0.862, 0.366]], turns: 1, value: [0.85, 1.12], hue: 0.35, lean: 0.08, through: 1.0 },
-  hazel: { height: [2.4, 4.6], green: [0.344, 0.518, 0.223], autumn: [[0.848, 0.772, 0.502]], turns: 0.3, value: [0.8, 1.1], hue: 0.35, lean: 0.12, through: 0.9 },
+  maple: { height: [9, 16], green: [0.383, 0.557, 0.235], autumn: [[1.2, 0.4, 0.07], [1.18, 0.55, 0.08], [1.05, 0.25, 0.07], [1.2, 0.45, 0.07], [1.15, 0.56, 0.08]], turns: 1, value: [0.85, 1.12], hue: 0.35, lean: 0.08, through: 1.0 },
+  hazel: { height: [1.8, 3.4], green: [0.3, 0.5, 0.16], autumn: [[0.95, 0.42, 0.07], [1.0, 0.55, 0.08]], turns: 0.7, value: [0.8, 1.1], hue: 0.35, lean: 0.12, through: 0.9 },
   lime: { height: [12, 21], green: [0.403, 0.577, 0.255], autumn: [[0.973, 0.819, 0.377], [0.897, 0.656, 0.294]], turns: 0.3, value: [0.85, 1.12], hue: 0.3, lean: 0.06, through: 0.95 },
 };
 
@@ -132,6 +132,7 @@ export const VARIANTS = [
     kind: 'broadleaf',
     frame: 'wide',
     tile: TILE.MAPLE,
+    massTile: TILE.MAPLE_MASS,
     bark: BARK.BROADLEAF,
     // a round crown on a short trunk that divides into a few strong rising limbs
     P: {
@@ -161,6 +162,7 @@ export const VARIANTS = [
     kind: 'broadleaf',
     frame: 'wide',
     tile: TILE.MAPLE,
+    massTile: TILE.MAPLE_MASS,
     bark: BARK.BROADLEAF,
     // an older one: twin stems from low down, a wider, flatter, more open crown
     P: {
@@ -190,6 +192,7 @@ export const VARIANTS = [
     kind: 'broadleaf',
     frame: 'wide',
     tile: TILE.LIME,
+    massTile: TILE.LIME_MASS,
     bark: BARK.BROADLEAF,
     // an avenue tree: a clear stem, a leader most of the way up, a tall dense dome
     P: {
@@ -219,6 +222,7 @@ export const VARIANTS = [
     kind: 'broadleaf',
     frame: 'wide',
     tile: TILE.LIME,
+    massTile: TILE.LIME_MASS,
     bark: BARK.BROADLEAF,
     // the undergrowth at the wood's edge: a shrub of many stems from the ground, leafy to the ground
     P: {

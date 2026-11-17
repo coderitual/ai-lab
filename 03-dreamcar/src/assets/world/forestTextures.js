@@ -1,14 +1,17 @@
 // The trees' textures, all made at start-up: what the leaves, the needles and
 // the bark are drawn with.
 //
-// FOLIAGE is one atlas of eight tiles drawn on a canvas, so that every tree of
+// FOLIAGE is one atlas of twelve tiles drawn on a canvas, so that every tree of
 // every species is one material. A tile is a picture of what one card of a
 // tree carries: a spruce bough seen from above, the curtain of twigs that
 // hangs under it, a fir spray, a larch spray, a hanging spray of birch leaves,
-// a cluster of maple leaves, one of lime leaves, and a bare twig. The pictures
+// a cluster of maple leaves, one of lime leaves, a bare twig; then, for the
+// reduced trees' large cards, a mass of many small maple leaves and one of
+// lime leaves (so a big card still shows leaves of a leaf's size), and, for
+// the wood's floor, a patch of fallen leaves and one of grass and moss. The pictures
 // are painted in their own colours at a middling brightness; a tree's tint
 // (treeSpecies.js) multiplies them down to what its foliage sends back.
-//   FAN tiles (all but the two below): the stem comes in at the middle of the
+//   FAN tiles (all but the two below and the floor's two): the stem comes in at the middle of the
 //     left edge and runs to the right (+u).
 //   HANG tiles (SPRUCE_HANG, BIRCH): what hangs is attached along the top
 //     edge and hangs down (+v).
@@ -33,9 +36,9 @@ import * as THREE from 'three';
 import { gradientField, heightToNormals, valueField, worleyField } from '../../engine/noise.js';
 
 /** Tiles of the foliage atlas, in a 4 x 2 grid. */
-export const TILE = { SPRUCE: 0, SPRUCE_HANG: 1, FIR: 2, LARCH: 3, BIRCH: 4, MAPLE: 5, LIME: 6, TWIG: 7 };
+export const TILE = { SPRUCE: 0, SPRUCE_HANG: 1, FIR: 2, LARCH: 3, BIRCH: 4, MAPLE: 5, LIME: 6, TWIG: 7, MAPLE_MASS: 8, LIME_MASS: 9, LITTER: 10, FLOOR: 11 };
 const TILE_COLS = 4;
-const TILE_ROWS = 2;
+const TILE_ROWS = 3;
 /** The margin of a tile nothing is drawn in (share of the tile): so the small mip levels do not mix neighbours. */
 const GUTTER = 0.03;
 
@@ -536,6 +539,73 @@ function paintBirch(ctx, rng, px) {
   ctx.stroke();
 }
 
+/**
+ * A leaf mass (the reduced trees' cards): many small leaves heaped in a ragged clump of a few lobes, the lower and
+ * inner ones darker, a few twigs showing through: so that a big card still shows leaves of a leaf's size.
+ */
+function paintMass(ctx, rng, px, { colours, shape, size, leaves, wood }) {
+  const lobes = [];
+  for (let k = 0; k < 6; k++) lobes.push([rng.range(0.3, 0.7) + (k - 2.5) * 0.06, rng.range(0.3, 0.7), rng.range(0.16, 0.26)]);
+  ctx.strokeStyle = wood;
+  for (let k = 0; k < 7; k++) {
+    const [x, y] = lobes[k % lobes.length];
+    ctx.lineWidth = rng.range(2, 3.5) * px;
+    ctx.beginPath();
+    ctx.moveTo(0.03, 0.5 + rng.range(-0.08, 0.08));
+    ctx.quadraticCurveTo(0.3, 0.5 + rng.range(-0.15, 0.15), x, y);
+    ctx.stroke();
+  }
+  const lean = rng.range(0.25, 0.75);
+  for (let k = 0; k < leaves; k++) {
+    const [lx, ly, lr] = lobes[rng.int(lobes.length)];
+    const a = rng.range(0, Math.PI * 2);
+    const r = Math.sqrt(rng.next()) * lr;
+    const x = Math.min(0.94, Math.max(0.06, lx + Math.cos(a) * r));
+    const y = Math.min(0.94, Math.max(0.06, ly + Math.sin(a) * r));
+    // drawn from the back to the front: the first ones are the inside of the mass, in its own shade
+    const depth = k / leaves;
+    const rim = r / lr;
+    const [h, sat, l] = autumn(colours, lean + rng.range(-0.3, 0.3), rng);
+    const light = l * (0.5 + 0.38 * depth + 0.2 * rim) * (0.85 + 0.3 * (1 - y));
+    leaf(ctx, x, y, rng.range(0, Math.PI * 2), size * rng.range(0.7, 1.2), hsl(h, sat, light), hsl(h - 4, sat, light * 0.72), hsl(h + 6, sat * 0.8, Math.min(92, light * 1.25)), shape, px);
+  }
+}
+
+/** Fallen leaves on the ground: a patch, dense in its middle, thinning to nothing at its edge. */
+function paintLitter(ctx, rng, px) {
+  for (let k = 0; k < 900; k++) {
+    const a = rng.range(0, Math.PI * 2);
+    const r = 0.44 * Math.pow(rng.next(), 0.7);
+    if (rng.next() < r / 0.44 - 0.35) continue;
+    const x = 0.5 + Math.cos(a) * r;
+    const y = 0.5 + Math.sin(a) * r;
+    const [h, sat, l] = autumn(MAPLE_COLOURS, rng.next(), rng);
+    const light = l * rng.range(0.55, 1.0);
+    leaf(ctx, x, y, rng.range(0, Math.PI * 2), rng.range(0.03, 0.05), hsl(h, sat, light), hsl(h - 4, sat, light * 0.7), hsl(h, sat, light * 0.8), rng.next() < 0.5 ? mapleShape : limeShape, px);
+  }
+}
+
+/** The wood's floor: grass, moss and low herbs in a patch that thins out at its edge. */
+function paintFloor(ctx, rng, px) {
+  ctx.lineCap = 'round';
+  for (let k = 0; k < 2600; k++) {
+    const a = rng.range(0, Math.PI * 2);
+    const r = 0.45 * Math.pow(rng.next(), 0.6);
+    if (rng.next() < r / 0.45 - 0.4) continue;
+    const x = 0.5 + Math.cos(a) * r;
+    const y = 0.5 + Math.sin(a) * r;
+    const l = rng.range(30, 62);
+    ctx.strokeStyle = hsl(rng.range(60, 100), rng.range(25, 45), l);
+    ctx.lineWidth = rng.range(2, 4.5) * px;
+    const b = rng.range(0, Math.PI * 2);
+    const len = rng.range(0.008, 0.03);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(b) * len, y + Math.sin(b) * len);
+    ctx.stroke();
+  }
+}
+
 /** A bare twig, forking: dead lower branches and the fine ends of limbs. */
 function paintTwig(ctx, rng, px) {
   const grow = (x, y, a, l, w, depth) => {
@@ -560,7 +630,7 @@ function paintTwig(ctx, rng, px) {
 
 /**
  * The foliage atlas.
- * @param {number} tile edge of one tile in texels (the atlas is 4 x 2 of them)
+ * @param {number} tile edge of one tile in texels (the atlas is 4 x 3 of them)
  * @param {import('../../engine/rng.js').Rng} rng
  * @param {number} anisotropy
  * @returns {{ texture: THREE.DataTexture, bytes: number, width: number, height: number }}
@@ -597,6 +667,10 @@ export function createFoliageAtlas(tile, rng, anisotropy = 4) {
     [TILE.MAPLE]: (r) => paintCluster(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.115, leaves: 190, wood: 'rgb(60,44,36)' }),
     [TILE.LIME]: (r) => paintCluster(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.085, leaves: 260, wood: 'rgb(56,46,40)' }),
     [TILE.TWIG]: (r) => paintTwig(ctx, r, px),
+    [TILE.MAPLE_MASS]: (r) => paintMass(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.05, leaves: 1500, wood: 'rgb(60,44,36)' }),
+    [TILE.LIME_MASS]: (r) => paintMass(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.042, leaves: 1900, wood: 'rgb(56,46,40)' }),
+    [TILE.LITTER]: (r) => paintLitter(ctx, r, px),
+    [TILE.FLOOR]: (r) => paintFloor(ctx, r, px),
   };
   const regions = [];
   for (const [key, paint] of Object.entries(painters)) {
@@ -615,7 +689,7 @@ export function createFoliageAtlas(tile, rng, anisotropy = 4) {
   const pixels = ctx.getImageData(0, 0, width, height).data;
   // The broadleaves' tiles keep only their light and a hint of their hue: the tree's tint (treeSpecies.js) gives
   // them their colour, green or turned, so one picture serves a green lime and a red maple.
-  for (const k of [TILE.BIRCH, TILE.MAPLE, TILE.LIME]) {
+  for (const k of [TILE.BIRCH, TILE.MAPLE, TILE.LIME, TILE.MAPLE_MASS, TILE.LIME_MASS, TILE.LITTER, TILE.FLOOR]) {
     const x0 = (k % TILE_COLS) * tile;
     const y0 = Math.floor(k / TILE_COLS) * tile;
     for (let y = y0; y < y0 + tile; y++) {
