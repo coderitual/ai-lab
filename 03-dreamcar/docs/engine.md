@@ -292,8 +292,9 @@ The dusk split toning moves the measured road from (65, 56, 69) to
 is (78, 68, 74), less blue than ours, and its sky top (150, 145, 168) more. It
 is a small correction; most of the sky's difference is the sky's own colour.
 
-The game's shutter (`VIEW.motionBlur` in game/config.js) is 0.5 at speed;
-0.8 to 0.9 matches references D1 and D3.
+The game's shutter (`VIEW.motionBlur` in game/config.js) is 0.9 at 70 m/s
+and above, 0.12 at rest (eased between by the 1.5th power of the speed's
+share): 0.8 to 0.9 matches references D1 and D3.
 
 ## The probe and the mirror in materials
 

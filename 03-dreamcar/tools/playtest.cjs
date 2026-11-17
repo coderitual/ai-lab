@@ -596,19 +596,28 @@ const SECTIONS = {
    * of the lap. The line's gap and the lap banner are forced on, so that they are checked too.
    */
   async hud() {
-    const sizes = [
-      [1920, 1080, 1, false],
-      [1280, 720, 1, false],
-      [852, 393, 3, true],
-      [932, 430, 3, true],
-      [393, 852, 3, true],
-      [1180, 820, 2, true],
+    // one page per kind of screen; the sizes are taken by resizing it, the layouts by setting the run up again
+    const groups = [
+      [1, false, [[1920, 1080], [1280, 720]]],
+      [3, true, [[852, 393], [932, 430], [393, 852]]],
+      [2, true, [[1180, 820]]],
     ];
-    for (const [w, h, dpr, mobile] of sizes) {
+    for (const [dpr, mobile, sizes] of groups) {
+      const p = await open('?manual&q=low&auto&ap&time=day&dpr=1', { w: sizes[0][0], h: sizes[0][1], mobile, gpu: false, dpr });
+      for (const [w, h] of sizes) {
+      await p.page.setViewportSize({ width: w, height: h });
       for (const layout of ['solo', 'wide', 'tall']) {
-        const mode = layout === 'solo' ? 'solo' : 'split';
-        const p = await open(`?manual&q=low&auto&ap&time=day&mode=${mode}&dpr=1`, { w, h, mobile, gpu: false, dpr });
-        if (layout !== 'solo') await p.page.evaluate((l) => window.__dreamcar.set('view.split', l), layout);
+        await p.page.evaluate((layout) => {
+          const g = window.__dreamcar.game;
+          const mode = layout === 'solo' ? 'solo' : 'split';
+          if (layout !== 'solo') window.__dreamcar.set('view.split', layout);
+          if (g.mode !== mode) {
+            g.leave();
+            g.setup(mode);
+            g.start();
+          }
+          g.layout();
+        }, layout);
         const places = await p.page.evaluate(() => {
           const t = window.__dreamcar.game.track;
           let bank = 0;
@@ -683,8 +692,9 @@ const SECTIONS = {
         const label = `${w}x${h}${mobile ? ` (touch, x${dpr})` : ''} ${layout}`;
         check(`${label}: nothing over the car, nothing over anything else, all inside the view`, hits.length === 0, [...new Set(hits)].join('; '));
         if (mobile) check(`${label}: touch buttons at least 44 px`, small.length === 0, small.join(', '));
-        await p.close(`hud ${label}`);
       }
+      }
+      await p.close(`hud x${dpr}${mobile ? ' touch' : ''}`);
     }
   },
 

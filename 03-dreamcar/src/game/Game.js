@@ -940,7 +940,7 @@ export class Game {
       view.frame.exposure = view.exposure * fade;
       view.frame.look = time.look;
       // the shutter opens with speed; while the camera itself dives at the start it is held short
-      view.frame.motionBlur = lerp(VIEW.motionBlurSlow, VIEW.motionBlur, clamp01(speed / VIEW.blurSpeed)) * lerp(VIEW.diveShutter, 1, view.rig.settled);
+      view.frame.motionBlur = lerp(VIEW.motionBlurSlow, VIEW.motionBlur, clamp01(speed / VIEW.blurSpeed) ** 1.5) * lerp(VIEW.diveShutter, 1, view.rig.settled);
       view.frame.cut = view.frame.cut || view.rig.cut;
     }
 

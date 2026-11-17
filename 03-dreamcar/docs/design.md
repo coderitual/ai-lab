@@ -110,17 +110,43 @@ portals.
 
 ## A run
 
-- **Title.** The car parked on the grid, the camera circling it slowly. Choose
-  one driver or two, day or night.
-- **Start.** The camera sweeps from the car's nose to its place behind the
-  boot while the gantry's lamps count down. Lights out, go.
+- **Title.** A hero picture: the car parked on the grid seen from low down
+  (0.85 m) at a front or rear three-quarter view, 8.6 m out through a 34°
+  lens, swinging slowly to and fro. Of the four three-quarter views it takes
+  the one whose look runs beside the brightest part of the sky (the sun's
+  direction from the time of day's table; `CAMERA.orbit.times` may override
+  per time of day), so the paint has the sky to mirror. The car is exposed
+  for: `SHOWCASE` in game/config.js adds stops to the exposure on the title
+  and the results (eased in and out). On a wide screen the menu is a column on
+  the left and the car is framed to the right of it; on an upright phone the
+  car is in the upper third and the menu is a sheet under it. The menu: Drive,
+  one or two players, the time of day, Options, the best-laps board of the
+  time of day showing (and the keys, on a tall desk screen).
+- **Options** (on the title and the pause sheet): quality (auto, low, medium,
+  high; kept under `dreamcar.quality`, applied by reloading the page; `?q=` in
+  the address wins; auto is what the capability probe chose), sound, time of
+  day, speed in km/h or mph (`dreamcar.units`), the map shown or hidden
+  (`dreamcar.map`). Keys reach every button by Tab and Enter, a pad by its
+  d-pad and A; every touch target is at least 44 px.
+- **Start.** On the one race clock: the camera dives from 16 m up, 34 m behind
+  and 9 m to the side onto the car's tail while the gantry's five lamps come
+  on, and is settled in the chase view as the last one lights; the hold, then
+  lights out, go. No cut and no jump at go. While it dives the shutter is cut
+  to a quarter.
 - **Three laps.** Each lap is cut into three sectors; crossing a sector line
-  flashes the gap to your best lap (green ahead, amber behind). The lap
-  counter, the running and best times, the five best laps on this device and
-  a rev counter with the gear and the speed are on screen throughout, and a
-  faint ghost of your best lap drives with you.
+  flashes the gap to your best lap large at the top (green ahead, amber
+  behind). On screen throughout, and nothing else: the lap n / N, the lap
+  clock with the live gap beside it and the best lap under it (top left); the
+  next time to beat, as one line (top right; in split screen the place and
+  the gap); the speed in large figures under a rev arc with the gear above it
+  and the lamps of ABS, traction and stability control under it (bottom
+  right); a small map that can be hidden (bottom left); on touch screens four
+  small buttons (camera, lamps, put back, pause) together under the time to
+  beat. The best-laps board is on the title, the pause sheet and the results,
+  not on the run. A faint ghost of your best lap drives with you.
 - **Results.** Lap times, the best lap, a medal against three target times,
-  and the five best laps set on this device for that time of day.
+  and the five best laps set on this device for that time of day; the camera
+  orbits the car, framed clear of the panel.
 - **Two players** race each other over the same three laps, each in half the
   screen, and can lean on each other.
 
@@ -143,15 +169,32 @@ a few seconds it is offered).
 
 ## The camera
 
-- **Chase (default):** about 5.7 m behind the car's middle and 1.45 m up,
-  lens about 50° top to bottom widening to about 58° at speed. The car sits
-  in the lower middle third of the frame and is about a third of the frame
-  wide on a 16:9 screen; on an upright phone the camera backs off and lifts so
-  the same road is in view. It looks ahead into the bend, follows gradient
-  lazily, never goes through a tunnel wall or under the road.
-- **Far chase**, **bonnet** and **bumper** views, changed with a key or a
-  button; **look back** while a key is held.
-- **Title orbit** and **start sweep** as above.
+- **Chase (default):** composed, not just placed (game/Cameras.js `_chase`,
+  numbers in `CAMERA.chase`). On a level road the horizon lies 37 % of the way
+  down the picture and the middle of the car 60 %; the camera's height follows
+  from those, so the road ahead shows over the roof at every lens. The lens
+  opens from 58° to 72° (top to bottom on 16:9) and the camera drops back
+  1.5 m (from 5.4 m behind the car's origin) as the speed signal rises from
+  70 to 270 km/h, eased over 0.6 s so a gear change does not pump it. The car
+  is then about 17 % of a 16:9 picture's width at 255 km/h (its box; measured
+  with the page handle), larger when slow. It swings round late into bends
+  (3.4 /s) and looks into them; the picture rolls with 40 % of the road's
+  banking; height and grade are followed lazily, so over the crest and
+  through the compression the picture lags a little. A fine shake above
+  200 km/h, more on kerbs and the verge, a knock on impacts. It never goes
+  through a barrier, the ground or the tunnel's roof. On a picture narrower
+  than 4:3 (an upright phone, a side-by-side half) the lens keeps a 4:3
+  picture's width of view, the camera backs off a quarter and the horizon
+  rises to 30 %; on one wider than 16:9 (a stacked half) it keeps a 16:9
+  picture's width.
+- **Far chase** (9.5 m, 54° to 66°), **bonnet** (62° to 74°) and **bumper**
+  (66° to 78°) views, changed with a key or a button; **look back** while a
+  key is held.
+- **Title**, **start** and **results** cameras as above.
+- **Speed.** The shutter opens with speed (`VIEW.motionBlurSlow` 0.12 at rest
+  to `VIEW.motionBlur` 0.9 of a sixtieth at 70 m/s, eased by the 1.5th power),
+  so at 80 km/h the roadside is nearly crisp and at 250 km/h it streaks while
+  the car, held sharp by the engine, does not.
 
 ## The look
 

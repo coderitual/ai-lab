@@ -78,10 +78,14 @@ export const DRIVERS = [
 export const VIEW = {
   near: 0.25,
   far: 5000,
-  /** Shutter, as a fraction of a sixtieth of a second, standing still and at `blurSpeed` m/s (and above). */
-  motionBlurSlow: 0.3,
-  motionBlur: 0.5,
-  blurSpeed: 40,
+  /**
+   * Shutter, as a fraction of a sixtieth of a second, standing still and at `blurSpeed` m/s (and above), eased
+   * between: the streaks grow faster than the speed, so at 80 km/h the roadside is nearly crisp and at 250 it
+   * streaks (the engine clamps a streak per tier: 4 / 6 / 7.5 per cent of the view's width).
+   */
+  motionBlurSlow: 0.12,
+  motionBlur: 0.9,
+  blurSpeed: 70,
   /** While the camera dives at the start the shutter is cut to this share (the camera's own motion would smear all). */
   diveShutter: 0.25,
   /** How split screen shares the window: 'auto' (side by side on a wide window, stacked on a tall one), 'wide', 'tall'. */
@@ -97,7 +101,7 @@ export const VIEW = {
 export const CAMERA = {
   chase: {
     /** How far behind the car's origin it stands (m), at rest; it drops back `pullBack` more as the speed signal rises. */
-    distance: 5.6,
+    distance: 5.4,
     pullBack: 1.5,
     /**
      * The composition on a level straight: the horizon `horizon` of the way down the picture and the middle of the
