@@ -197,3 +197,60 @@ export const LIGHTS = {
   /** Cabin glow at night. */
   interior: 0.6,
 };
+
+/**
+ * The effects of driving (game/effects.js, drawn by assets/fx/). Per tier: quads kept in each wheel's ring of
+ * skid marks (they last the whole run), the most soft particles (smoke, dust, stones, spray) and sparks alive at
+ * once, and a factor on every emission rate. Rates are particles a second at full strength, per wheel.
+ */
+export const FX = {
+  tiers: {
+    low: { marks: 800, soft: 192, sparks: 48, rate: 0.5 },
+    medium: { marks: 1500, soft: 320, sparks: 96, rate: 0.8 },
+    high: { marks: 2000, soft: 400, sparks: 128, rate: 1 },
+  },
+  /** A mark: a tyre's width, from this skid (Vehicle wheel.skid 0..1) to full darkness this much above it. */
+  markWidth: 0.235,
+  markFrom: 0.12,
+  markFull: 0.45,
+  /** How fast a mark fades in and out (1/s), how far apart its points are (m), its darkest alpha. */
+  markEase: 10,
+  markStep: 0.3,
+  markDark: 0.75,
+  /** On a wet road (wetness above wetFrom) marks are this much as dark, and spray replaces smoke. */
+  wetFrom: 0.3,
+  markWet: 0.22,
+  /** Smoke from this skid up. */
+  smokeFrom: 0.3,
+  smokeRate: 26,
+  dustRate: 22,
+  stoneRate: 10,
+  /** Spray from this speed (m/s); rate at 25 m/s above it on a soaked road. */
+  sprayFrom: 5,
+  sprayRate: 40,
+  /** Sparks: a burst per hit (per m/s of closing speed, at most burstMax), a stream while scraping. */
+  burstPer: 2.5,
+  burstMax: 40,
+  scrapeFrom: 0.08,
+  scrapeRate: 90,
+  /** What a car's lamps lay on its own smoke and spray (irradiance at 1 m, scene units): the two head lamps on
+   * dipped beam (2 x 3200 cd), main beam's gain, the tail lamps' red glow and the brake lamps' gain over it. */
+  lampHead: 6400,
+  highGain: 2.7,
+  lampTail: 0.1,
+  brakeGain: 4,
+};
+
+/**
+ * The car's reflection probe, per tier: the cube's edge and how it is kept up to date. At speed (`moving`) a few
+ * faces are redrawn each `every`-th frame; with the car nearly still (the title's orbit, the grid: below `stillBelow`
+ * m/s, back to moving above `movingAbove`) a larger cube is redrawn whole over a few frames (`stillFaces` a frame)
+ * so the paint's mirror is crisp where it is looked at closely.
+ */
+export const PROBE = {
+  low: { size: 64, faces: 1, every: 2, stillSize: 128, stillFaces: 1 },
+  medium: { size: 128, faces: 1, every: 1, stillSize: 256, stillFaces: 2 },
+  high: { size: 256, faces: 2, every: 1, stillSize: 512, stillFaces: 3 },
+  stillBelow: 1.5,
+  movingAbove: 4,
+};

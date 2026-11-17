@@ -81,7 +81,7 @@
 
 .hud .view {
   --u: 10px;
-  --pad: calc(var(--u) * 2.2);
+  --pad: max(10px, calc(var(--u) * 2.6));
   position: absolute;
   z-index: 1;
   overflow: hidden;
@@ -121,7 +121,7 @@
   gap: calc(var(--u) * 0.8);
 }
 .hud .lapnum {
-  font-size: calc(var(--u) * 10.5);
+  font-size: calc(var(--u) * 8);
   font-weight: 300;
   line-height: 0.76;
   letter-spacing: -0.02em;
@@ -200,9 +200,9 @@
   position: absolute;
   right: calc(var(--pad) + var(--sr));
   top: calc(var(--pad) + var(--st));
-  width: calc(var(--u) * 19);
-  padding: calc(var(--u) * 0.9) calc(var(--u) * 1.1) calc(var(--u) * 0.5);
-  background: linear-gradient(180deg, rgba(5, 9, 13, 0.5), rgba(5, 9, 13, 0.32));
+  width: max(148px, calc(var(--u) * 25));
+  padding: max(5px, calc(var(--u) * 0.9)) max(6px, calc(var(--u) * 1.1)) max(3px, calc(var(--u) * 0.5));
+  background: linear-gradient(180deg, rgba(5, 9, 13, 0.36), rgba(5, 9, 13, 0.18));
   border-top: max(1px, calc(var(--u) * 0.12)) solid var(--ice);
 }
 .hud .board .head {
@@ -215,12 +215,12 @@
 }
 .hud .row {
   display: grid;
-  grid-template-columns: calc(var(--u) * 1.8) 1fr auto;
+  grid-template-columns: 1.3em 1fr auto;
   align-items: baseline;
-  height: calc(var(--u) * 2.8);
-  line-height: calc(var(--u) * 2.8);
+  height: 1.6em;
+  line-height: 1.6em;
   border-top: 1px solid var(--hair);
-  font-size: calc(var(--u) * 1.9);
+  font-size: max(11px, calc(var(--u) * 2.1));
   font-weight: 500;
 }
 .hud .row .rank {
@@ -555,7 +555,7 @@
   padding-bottom: calc(var(--u) * 0.6);
 }
 .hud .speed {
-  font-size: calc(var(--u) * 8.8);
+  font-size: calc(var(--u) * 6.6);
   font-weight: 400;
   line-height: 0.8;
   letter-spacing: -0.01em;
@@ -624,8 +624,8 @@
 }
 
 .hud .dial {
-  width: calc(var(--u) * 21);
-  height: calc(var(--u) * 21);
+  width: calc(var(--u) * 16.5);
+  height: calc(var(--u) * 16.5);
   overflow: visible;
 }
 .hud .dial path,
@@ -746,11 +746,11 @@
   margin-top: calc(var(--u) * -3);
 }
 .hud .view.tall .dial {
-  width: calc(var(--u) * 19);
-  height: calc(var(--u) * 19);
+  width: calc(var(--u) * 15);
+  height: calc(var(--u) * 15);
 }
 .hud .view.tall .speed {
-  font-size: calc(var(--u) * 10);
+  font-size: calc(var(--u) * 7);
 }
 .hud .view.tall .touchcol {
   flex-direction: column;
@@ -872,6 +872,30 @@
   min-width: 150px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
+}
+/* the time of day: a segmented choice under the buttons, the one showing lit */
+.hud .timechoice {
+  display: inline-flex;
+  margin-top: 10px;
+}
+.hud .timechoice button {
+  min-width: 84px;
+  border-radius: 0;
+  color: var(--dim);
+}
+.hud .timechoice button + button {
+  border-left-width: 0;
+}
+.hud .timechoice button:first-child {
+  border-radius: 3px 0 0 3px;
+}
+.hud .timechoice button:last-child {
+  border-radius: 0 3px 3px 0;
+}
+.hud .timechoice button.on {
+  color: var(--ink);
+  background: rgba(150, 205, 235, 0.18);
+  box-shadow: inset 0 -2px 0 var(--ice);
 }
 .hud .titlebest {
   margin-top: 18px;

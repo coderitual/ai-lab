@@ -13,6 +13,8 @@ export const TEXT = {
   onePlayer: 'One player',
   day: 'Day',
   night: 'Night',
+  /** A time of day's name on a button (lighting.js may add times: any other name is shown capitalised). */
+  timeName: (name) => ({ day: 'Day', dusk: 'Dusk', night: 'Night' })[name] || name.charAt(0).toUpperCase() + name.slice(1),
   soundOn: 'Sound on',
   soundOff: 'Sound off',
   resume: 'Resume',
@@ -32,7 +34,7 @@ export const TEXT = {
   total: 'Total',
   toBeat: 'To beat',
   allBeaten: 'Board cleared',
-  boardTitle: (time) => `Best laps · ${time === 'night' ? 'night' : 'day'}`,
+  boardTitle: (time) => `Best laps · ${time}`,
   you: 'you',
   medal: { gold: 'gold', silver: 'silver', bronze: 'bronze' },
   noMedal: 'no medal',
@@ -72,7 +74,7 @@ export const TEXT = {
       ['B', 'look back'],
       ['R', 'reset'],
       ['H', 'high beam'],
-      ['N', 'day / night'],
+      ['N', 'time of day'],
       ['P', 'pause'],
     ],
     split: [
@@ -80,7 +82,7 @@ export const TEXT = {
       ['← ↑ → ↓ · R Shift', 'player 2'],
       ['C / .', 'camera'],
       ['R / /', 'reset'],
-      ['N', 'day / night'],
+      ['N', 'time of day'],
       ['P', 'pause'],
     ],
     pad: [

@@ -22,7 +22,7 @@
 import * as THREE from 'three';
 import { createCar } from '../assets/car/index.js';
 import { createWorld } from '../assets/world/index.js';
-import { TIME_NAMES } from '../assets/world/lighting.js';
+import { TIMES } from '../assets/world/lighting.js';
 import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
 import { Input } from '../engine/Input.js';
@@ -31,7 +31,7 @@ import { TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
 import { createRng } from '../engine/rng.js';
 import { CameraRig } from './Cameras.js';
-import { CAMERA, DRIVERS, EXPOSURE, HUD, LIGHTS, RULES, VIEW } from './config.js';
+import { CAMERA, DRIVERS, EXPOSURE, FX, HUD, LIGHTS, PROBE, RULES, VIEW } from './config.js';
 import { AutoDriver, PlayerDriver } from './drivers.js';
 import { Effects } from './effects.js';
 import { Ghost } from './Ghost.js';
@@ -108,9 +108,20 @@ export class Game {
     this.pipeline = new FramePipeline(engine.renderer, this.caps, { tier: this.tier, post: params.post });
     this.pipeline.debug = params.debug;
     this.track = createTrack();
+    // the times of day are whatever lighting.js has, in its order; the demo opens at dusk when there is one
+    params = { ...params, time: params.time && TIMES[params.time] ? params.time : TIMES.dusk ? 'dusk' : 'day' };
+    this.params = params;
     this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params });
     if (this.world.time.name !== params.time) this.world.setTime(params.time);
-    this.effects = new Effects({ scene: this.world.scene, track: this.track, tier: this.tier, rng: this.rng.fork('effects') });
+    this.effects = new Effects({
+      scene: this.world.scene,
+      track: this.track,
+      tier: this.tier,
+      rng: this.rng.fork('effects'),
+      world: this.world,
+      cars: 2,
+      enabled: params.fx,
+    });
 
     this.input = new Input(container);
     this.input.onAction = (name, driver) => this.action(name, driver);
@@ -123,6 +134,7 @@ export class Game {
       enabled: params.ui,
       onAction: (name, driver) => {
         this._unlockSound();
+        if (this.sound) this.sound.cue('ui');
         this.action(name, driver);
       },
     });
@@ -133,11 +145,15 @@ export class Game {
     const Audio = soundModules['../engine/Audio.js'];
     const SoundModule = soundModules['./Sound.js'];
     if (Audio && SoundModule && Audio.GameAudio && SoundModule.Sound) {
-      this.audio = new Audio.GameAudio();
-      if (params.mute) this.audio.setMuted(true);
-      this.sound = new SoundModule.Sound(this.audio, { voices: 2 });
+      // ?mute: silent for this page only (not remembered); otherwise the last visit's choice
+      this.audio = new Audio.GameAudio({ mute: params.mute });
+      // every gesture on the page unlocks it; a hidden tab puts it to sleep
+      this.audio.listen(container);
+      this.sound = new SoundModule.Sound(this.audio, { voices: 2, seed: params.seed });
+      this._carSound = SoundModule.carSound;
+      this._sounds = [{}, {}];
     }
-    this.muted = params.mute || !this.sound;
+    this.muted = !this.sound || this.audio.muted;
 
     /** title | countdown | run | results */
     this.phase = 'title';
@@ -171,6 +187,8 @@ export class Game {
     this._attractDist = 0;
     this._woke = false;
     this._fxCars = [];
+    /** Per car, what its lamps throw on the smoke (effects.render). */
+    this._fxLamps = [];
     this._events = [];
     /** @type {Racer[]} */
     this.racers = [];
@@ -182,7 +200,7 @@ export class Game {
     // pictures that only lived on the GPU (the environment map, the reflection probes) are drawn again
     engine.onContextRestored(() => {
       this.world.restore();
-      for (const view of this.views) if (view.probe) view.probe.reset();
+      for (const view of this.views) for (const p of view.probes) p.reset();
     });
 
     engine.onUpdate = (dt, simTime) => this.update(dt, simTime);
@@ -205,7 +223,7 @@ export class Game {
       if (racer.car.shadow) world.scene.remove(racer.car.shadow);
       racer.car.dispose();
     }
-    for (const view of this.views) if (view.probe) view.probe.dispose();
+    for (const view of this.views) for (const p of view.probes) p.dispose();
     if (this.ghostCar) {
       world.scene.remove(this.ghostCar.object);
       this.ghostCar.dispose();
@@ -281,7 +299,10 @@ export class Game {
     for (const v of this.hud.views) v.setMap(this._map, n);
     this.views = this.racers.map((racer, i) => {
       // (ENGINE lane) what the car's paint mirrors: a cube picture of its surroundings, a face or two a frame
-      const probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[this.tier].probeSize) : null;
+      // two sizes (PROBE in config.js): the smaller at speed, the larger, redrawn whole, while the car is nearly still
+      const table = PROBE[this.tier] || PROBE.medium;
+      const probe = params.probe ? new ReflectionProbe(engine.renderer, table.size) : null;
+      const still = params.probe ? new ReflectionProbe(engine.renderer, table.stillSize) : null;
       return {
         racer,
         camera: new THREE.PerspectiveCamera(CAMERA.chase.fov, 1, VIEW.near, VIEW.far),
@@ -291,7 +312,10 @@ export class Game {
         zone: { left: 0, top: 0, width: 1, height: 1 },
         frame: { exposure: 1, look: world.time.look, motionBlur: VIEW.motionBlur, cut: true, sharp, probe: probe?.texture },
         exposure: this._exposureFor(racer.vehicle),
+        /** The probe the paint reads now; `still` says which of the two it is. */
         probe,
+        probes: probe ? [probe, still] : [],
+        still: false,
       };
     });
     this.layout();
@@ -391,6 +415,13 @@ export class Game {
     const d = Math.max(0, Math.min(this.racers.length - 1, driver));
     const racing = this.phase === 'countdown' || this.phase === 'run' || this.phase === 'results';
     const paused = this.engine.paused;
+    // 'time:dusk' (the title's choice): fade to that time of day
+    if (name.startsWith('time:')) {
+      const to = name.slice(5);
+      if (TIMES[to] && to !== this.world.time.name && !this._fade) this._fade = { t: 0, to, switched: false };
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
     switch (name) {
       case 'start':
         if (this.phase === 'title') this.start();
@@ -419,9 +450,12 @@ export class Game {
       case 'reset':
         if (this.phase === 'run' && !paused) this._resets.add(d);
         break;
-      case 'time':
-        if (!this._fade) this._fade = { t: 0, to: TIME_NAMES[(TIME_NAMES.indexOf(this.world.time.name) + 1) % TIME_NAMES.length], switched: false };
+      case 'time': {
+        // the next time of day in lighting.js's order (read each time: the table may grow)
+        const names = Object.keys(TIMES);
+        if (!this._fade) this._fade = { t: 0, to: names[(names.indexOf(this.world.time.name) + 1) % names.length], switched: false };
         break;
+      }
       case 'ghost':
         this.ghostOn = !this.ghostOn;
         break;
@@ -432,6 +466,8 @@ export class Game {
         if (this.audio) {
           this.muted = !this.muted;
           this.audio.setMuted(this.muted);
+          // unmuting is itself a gesture: a page that started muted has no context yet
+          if (!this.muted) this.audio.unlock();
         }
         break;
       default:
@@ -477,6 +513,7 @@ export class Game {
   /** Apply numbers that were changed by hand (lighting.js, config.js) to everything that copied them. */
   refresh() {
     this.world.refresh();
+    this.effects.refresh();
     this.layout();
     for (const view of this.views) view.exposure = this._exposureFor(view.racer.vehicle);
   }
@@ -591,7 +628,7 @@ export class Game {
     });
 
     // the lamps: running lights always, the low beam when the time of day asks or a while into the tunnel
-    const night = time.name === 'night';
+    const dark = time.carLights === 'low';
     for (const racer of racers) {
       const v = racer.vehicle;
       if (v.sky < LIGHTS.tunnelSky) {
@@ -611,7 +648,7 @@ export class Game {
       l.tail = low ? 1 : 0;
       l.brake = v.brake > LIGHTS.brakeOn ? 1 : 0;
       l.reverse = v.gear === -1 ? 1 : 0;
-      l.interior = night ? LIGHTS.interior : 0;
+      l.interior = dark ? LIGHTS.interior : 0;
     }
 
     this.world.update(dt, simTime);
@@ -791,7 +828,17 @@ export class Game {
       b.pos.set(0, 0.65, 2.2).applyQuaternion(obj.quaternion).add(obj.position);
       b.low = racer.lamps.low;
       b.high = racer.lamps.high;
+
+      // what lights the smoke and the spray: the head lamps' cone and a red glow round the tail lamps
+      const fl = (this._fxLamps[racer.index] ||= { headPos: new THREE.Vector3(), headDir: new THREE.Vector3(), tailPos: new THREE.Vector3(), head: 0, tail: 0 });
+      fl.headPos.copy(b.pos);
+      fl.headDir.copy(b.dir);
+      fl.head = FX.lampHead * (b.low + FX.highGain * b.high);
+      fl.tailPos.set(0, 0.8, -2.3).applyQuaternion(obj.quaternion).add(obj.position);
+      fl.tail = FX.lampTail * (racer.lamps.tail + FX.brakeGain * racer.lamps.brake);
     }
+    this._fxLamps.length = this.racers.length;
+    this.effects.render(alpha, FIXED_DT, this.world.time, this._fxLamps);
 
     this._poseGhost(alpha);
 
@@ -810,19 +857,12 @@ export class Game {
     this._rendering = false;
     if (this.params.ui) this._hud();
     if (this.sound) {
-      this.sound.update(
-        frameDt,
-        this.racers.map((r) => {
-          const v = r.vehicle;
-          let skid = 0;
-          let surf = 0;
-          for (const w of v.wheels) {
-            skid = Math.max(skid, w.skid);
-            surf = Math.max(surf, w.surface);
-          }
-          return { rpm: v.rpm, throttle: v.throttle, speed: v.speed, gear: v.gear, skid, surface: surf, scrape: v.scrape, pan: this._pan(r.index), sky: v.sky };
-        }),
-      );
+      // the cars quieten while the run is paused (the signals do not)
+      this.sound.setPaused(this.engine.paused);
+      const cars = this._soundCars || (this._soundCars = []);
+      cars.length = this.racers.length;
+      for (const r of this.racers) cars[r.index] = this._carSound(r.vehicle, this._pan(r.index), this._sounds[r.index]);
+      this.sound.update(frameDt, cars);
     }
   }
 
@@ -855,6 +895,7 @@ export class Game {
       paused: this.engine.paused,
       mode: this.mode,
       time: this.world.time.name,
+      times: Object.keys(TIMES),
       muted: this.muted,
       device,
       attract: this.attract,
@@ -924,23 +965,41 @@ export class Game {
 
   /** The board's table for the time of day showing (read from storage through a throwaway race when none runs). */
   _boardTable() {
-    if (this.race) return this.race.board[this.world.time.name];
+    const name = this.world.time.name;
+    if (this.race) {
+      this.race.setTime(name);
+      return this.race.table;
+    }
     if (!this._board || this._boardRuns !== this.runs) {
-      this._board = new Race(this.track, { racers: 1, time: 'day', mode: 'solo', rng: createRng(1) }).board;
+      this._board = new Race(this.track, { racers: 1, time: name, mode: 'solo', rng: createRng(1) });
       this._boardRuns = this.runs;
     }
-    return this._board[this.world.time.name];
+    this._board.setTime(name);
+    return this._board.table;
   }
 
   /** Draw every view into its rectangle. */
   draw() {
-    const { probeFaces, probeEvery } = TIERS[this.tier];
+    const table = PROBE[this.tier] || PROBE.medium;
     const n = this.views.length;
     this.views.forEach((view, i) => {
       const car = view.racer.car;
       this.world.prepareView(view.camera, car.object.position, this.beams);
       // (ENGINE lane) the car's probe, from the middle of the car, without the car itself; after prepareView, so
-      // that the shadows it shows are this view's. In split screen the two take turns.
+      // that the shadows it shows are this view's. In split screen the two take turns. Nearly still (the title's
+      // orbit, the grid): the larger cube, redrawn whole over a few frames; at speed the smaller one, a face or two.
+      if (view.probes.length) {
+        const speed = Math.abs(view.racer.vehicle.speed);
+        const still = view.still ? speed < PROBE.movingAbove : speed < PROBE.stillBelow;
+        if (still !== view.still) {
+          view.still = still;
+          view.probe = view.probes[still ? 1 : 0];
+          // the one taken up is refreshed face by face from what it last showed (its very first update draws all six)
+          view.frame.probe = view.probe.texture;
+        }
+      }
+      const probeEvery = view.still ? 1 : table.every;
+      const probeFaces = view.still ? table.stillFaces : table.faces;
       if (view.probe && this.engine.frame % (probeEvery * n) === i * probeEvery) {
         probeAt.copy(car.box.center).applyMatrix4(car.object.matrixWorld);
         probeHidden.length = 0;
@@ -950,6 +1009,8 @@ export class Game {
         }
         probeHidden.push(...this.world.probeHidden);
         if (this.ghostCar) probeHidden.push(this.ghostCar.object);
+        // smoke and sparks in a reflection would smear over the whole car
+        probeHidden.push(...this.effects.objects);
         view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces);
       }
       this.pipeline.render(this.world.scene, view.camera, view.rect, view.frame);

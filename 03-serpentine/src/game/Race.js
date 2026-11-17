@@ -45,13 +45,15 @@ const emptyTable = () => ({ laps: [], best3: null, standing: null, flying: null 
 
 /** The board, as kept: validated on load, dropped if it was set on a road of another length. */
 function loadBoard(length) {
-  const board = { length: Math.round(length), day: emptyTable(), night: emptyTable() };
+  // one table per time of day, made when first asked for (lighting.js decides which times there are)
+  const board = { length: Math.round(length) };
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (!raw || raw.length !== board.length) return board;
-    for (const time of ['day', 'night']) {
+    for (const time of Object.keys(raw)) {
       const t = raw[time];
-      if (!t) continue;
+      if (time === 'length' || !/^[a-z]{1,16}$/.test(time) || !t || typeof t !== 'object') continue;
+      board[time] = emptyTable();
       const ms = (v) => Number.isInteger(v) && v > 0 && v < 3600000;
       board[time].laps = Array.isArray(t.laps) ? t.laps.filter((l) => l && ms(l.ms)).slice(0, RULES.boardRows) : [];
       board[time].best3 = ms(t.best3) ? t.best3 : null;
@@ -100,7 +102,7 @@ export class Race {
    * @param {object} options
    * @param {number} options.racers 1 or 2
    * @param {number} [options.laps]
-   * @param {'day'|'night'} options.time which table of the board the run is set against
+   * @param {string} options.time which table of the board the run is set against
    * @param {'solo'|'split'} options.mode
    * @param {import('../engine/rng.js').Rng} options.rng the start's hold is drawn from rng.fork('start')
    */
@@ -156,10 +158,10 @@ export class Race {
 
   /** The table of the board this run is set against. */
   get table() {
-    return this.board[this.time];
+    return (this.board[this.time] ||= emptyTable());
   }
 
-  /** Switch the time of day the board follows (day and night are kept apart). */
+  /** Switch the time of day the board follows (each time of day has its own). */
   setTime(time) {
     this.time = time;
   }
