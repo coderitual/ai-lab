@@ -43,7 +43,7 @@ const DIST = { size: 1.5, foot: 1.1 };
 const FIRST_BEND_SIZE = 2.2;
 /** The start's tyre wall (D4): where it begins after the line (m) and how long it is. */
 /** The start's own (frame D4), from the gantry's s: where it begins, the wide dark boards, the pale ones. */
-const START = { from: PIT.s1 + 8, dark: { w: 6.4, h: 1.6 }, pale: { w: 4.4, h: 1.1 } };
+const START = { from: 4, dark: { w: 12, h: 1.9 }, pale: { w: 11, h: 1.4 }, stacks: 5 };
 
 /**
  * @param {object} options
@@ -220,6 +220,18 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
       b.box(M, { pz: uv, rest: sw.frame }, { skip: ['ny'] });
       boards++;
     };
+    // the low white wall that carries them, from the first board to the last (the Track has a rail here, no wall)
+    const wallLen = 2 * (START.dark.w + 0.3) + START.stacks * TYRE.step + 0.8 + 2 * (START.pale.w + 0.3);
+    for (let k = 0, n = Math.ceil(wallLen / 6); k < n; k++) {
+      const sc = track.wrap(g0 + START.from + (k + 0.5) * (wallLen / n));
+      levelFrame(track, sc, frame);
+      const p = spot(sc, -1, track.edgeAt(sc, -1) + 0.2);
+      const along = frame.ahead.clone().negate();
+      const face = frame.flat.clone();
+      C.copy(p).setY(p.y + WALL.top / 2 - 0.05);
+      M.makeBasis(X.copy(along).multiplyScalar(wallLen / n + 0.05), Y.set(0, WALL.top + 0.1, 0), Z.copy(face).multiplyScalar(0.4)).setPosition(C);
+      b.box(M, { pz: sw.white, rest: sw.white }, { skip: ['ny'] });
+    }
     let s = g0 + START.from;
     for (const design of [DESIGN.miralta, DESIGN.solmere]) {
       wallBoard(track.wrap(s + START.dark.w / 2), START.dark.w, START.dark.h, signs.boards[design]);
@@ -227,17 +239,17 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
     }
     // the tyres: three stacks of six, two rows deep, right behind the wall, standing well over it
     const tyreS = s + 0.4;
-    for (let k = 0; k < 3; k++) {
+    for (let k = 0; k < START.stacks; k++) {
       const st = track.wrap(tyreS + (k + 0.5) * TYRE.step);
       levelFrame(track, st, frame);
       for (const row of [0, 1]) {
         const p = spot(st, -1, track.edgeAt(st, -1) + 0.35 + TYRE.r + row * 2 * TYRE.r);
         const z = frame.flat.clone().negate();
         const axis = { x: new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), z), y: new THREE.Vector3(0, 1, 0), z };
-        nb.prism(p.clone().setY(p.y - 0.1), TYRE.r, TYRE.h * 1.5, 6, k === 1 ? signs.special.tyresWhite : signs.special.tyres, { top: true, topUv: sw.rubber, axis });
+        nb.prism(p.clone().setY(p.y - 0.1), TYRE.r, TYRE.h * 1.5, 6, k === 2 ? signs.special.tyresWhite : signs.special.tyres, { top: true, topUv: sw.rubber, axis });
       }
     }
-    s = tyreS + 3 * TYRE.step + 0.4;
+    s = tyreS + START.stacks * TYRE.step + 0.4;
     // two pale boards on the wall (D4's wall there is white: the wall's paint is walls.js's)
     for (const design of [DESIGN.torvel, DESIGN.pellora]) {
       wallBoard(track.wrap(s + START.pale.w / 2), START.pale.w, START.pale.h, signs.boards[design]);
