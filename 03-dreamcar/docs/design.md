@@ -268,8 +268,16 @@ bottom (as given, whatever the picture's shape); the HUD is hidden unless
 `?photo=back,right,up,yaw,pitch,fov` (add `,hud` to keep the HUD), so that
 `node tools/shot.cjs --url "…?manual&auto&ap&t=20&photo=4.5,2.2,0.9,22,1,46"`
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
-is the same picture every time. Frame D1's camera on the start straight is
-about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
+is the same picture every time. The reference frames' cameras are named
+places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
+day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 81 s) and
+`?photo=d4` (the grid at golden hour, t 4.2 s, the lamps counting); a name
+brings its own moment of the autopilot's run and its time of day unless the
+address gives `t` or `time`, and also works on the handle
+(`__dreamcar.photo('d1')`). The camera moves with the car, so the engine's
+motion blur streaks the roadside at the moment's speed while the car stays
+sharp. The reflection probe needs a few drawn frames to fill: stage stills
+with a short `advance` after loading.
 
 ## The look
 
