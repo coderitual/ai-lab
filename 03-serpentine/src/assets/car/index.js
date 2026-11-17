@@ -140,10 +140,10 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       { ...attributes, position: new THREE.BufferAttribute(recessed, 3) },
       skinIndex(samples, (i, k) => extremes(OPENING, i, k)[0] < 0.005),
     );
-    object.add(new THREE.Mesh(keep(recess), keep(createDarkMaterial(THREE.FrontSide, 0.02, 0.6, { mesh: true }))));
+    object.add(new THREE.Mesh(keep(recess), keep(createDarkMaterial(THREE.FrontSide, 0.02, 0.6, { mesh: true, sky: 0.45 }))));
     const lip = new THREE.Mesh(archGeometry.lip, paintMaterial);
     lip.castShadow = lip.receiveShadow = true;
-    object.add(lip, new THREE.Mesh(archGeometry.liner, keep(createDarkMaterial(THREE.DoubleSide, 0.012))));
+    object.add(lip, new THREE.Mesh(archGeometry.liner, keep(createDarkMaterial(THREE.DoubleSide, 0.012, 0.9, { sky: 0.22 }))));
     shadow = createContactShadow(samples.position, samples.columns * samples.rows, tier);
     disposables.push(shadow);
     lights = createLampLights(object, keep, tier);

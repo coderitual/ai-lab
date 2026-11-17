@@ -1,11 +1,14 @@
 # The car
 
 One car: the owner's silver Mercedes-Benz C-Class saloon (W206, AMG Line), as
-seen from a chase camera a few metres behind it, by day and by night.
-Everything about it is generated at start-up: the body from a table of lines,
-the glass, lamps and shut lines from outlines baked into a texture of
-distances, the wheels from a plan measured on a photograph, the plates on a
-canvas. There are no model, texture or font files and nothing is fetched.
+seen from a chase camera a few metres behind it, circled on the title screen,
+and from a metre and a half in a close-up, by day and by night. Everything
+about it is generated at start-up: the body from a table of lines, the glass,
+lenses and shut lines from outlines baked into a texture of distances, the
+lamp units, grille and cabin as small solid parts placed by rays at the skin,
+the wheels from a plan measured on a photograph, the plates and the tyres'
+size marking with a pen of its own on a canvas. There are no model, texture
+or font files and nothing is fetched.
 
 The measurements are in the modelling sheet (`specs/car-reference.md` in the
 build's scratchpad, with its tables as data in `carref-tools/tables.json`);
@@ -13,7 +16,9 @@ every number there is marked published, measured or estimated. The viewer
 (`viewer.html?asset=car`, parameters at the top of `src/viewer.js`) shows the
 car alone under the world's light; `pin=` puts its camera exactly where one of
 three photographs was taken from, so a still can be laid over the photograph
-pixel on pixel.
+pixel on pixel; `studio=1` stands it in a plain studio and `stripes=1` in a
+light tunnel (with `mirror=1`: the paint as a plain mirror), for judging
+surfaces.
 
 Axes (car space, `spec.js`): origin on the ground, on the centre line, midway
 between the axles; +Z forward, +Y up, +X the car's left. Metres.
@@ -29,11 +34,15 @@ between the axles; +Z forward, +Y up, +X the car's left. Metres.
 | `body.js` | the skin sampled into a mesh (per tier), the atlas layout, wheel-arch holes, lips and liners |
 | `features.js` | outlines of everything flush with the skin: glass, lenses, grille, intakes, shut lines, reflectors, arches |
 | `atlas.js` | bakes those outlines into two RGBA8 textures of signed distances over the skin |
-| `materials.js` | paint (and every flush region it turns into), glass and lenses, trim, emitters, plates, dark insides, ghost |
-| `details.js` | the solid small parts: stars, louvre, pipe trims, diffuser fins, mirrors, plates, third brake light, plate lamps, cabin |
+| `materials.js` | paint (and every flush region it turns into), glass and lenses, trim, lamp parts, plates, dark insides, ghost; how every car material reads the reflection probe |
+| `parts.js` | the tools for small solid parts: rays at the skin, a list of triangles per material |
+| `details.js` | the solid small parts: stars, grille pins and louvre, intake slats, pipe trims, diffuser fins, mirrors, handle grips, wipers, plates and their frames, third brake light, plate lamps, cabin |
+| `lampUnits.js` | the head and tail lamp units behind their lenses, as geometry |
+| `plate.js` | the Polish number plate's picture, and the stroke characters it (and the tyres' marking) are written with |
 | `lamps.js` | the lights the lamps cast: two head-lamp spots with beam pictures, one red spot behind |
 | `wheel.js`, `wheelTextures.js` | a corner: tyre, five-twin-spoke 18-inch wheel, brake; the blur shells for a turning wheel |
 | `shadow.js` | the contact shadow, laid on the road by the game |
+| `studio.js` | dev only: the studio and the light tunnel of the viewer |
 | `index.js` | `createCar()`: assembles it all and returns the handle (`CarModel`, see the build contract) |
 
 ## How it is made
@@ -50,15 +59,20 @@ shoulder, the boot lid's lip, the foot of each screen) are rails placed close
 together, not kinks. The net is reflected in the centre plane, so the halves
 meet without a seam.
 
-`body.js` samples the surface once per tier at an edge length of 85 / 55 /
+`body.js` samples the surface once per tier at an edge length of 95 / 55 /
 36 mm (low / medium / high), finer where rails crowd. Normals are the
 surface's own, so even the coarse mesh mirrors cleanly. The same vertices are
 drawn several times with different index lists: paint, glass, lenses, and a
 dark shell (every other vertex, BackSide) that shows through openings.
 
-Small forms a few millimetres high but sharp (the bonnet's power domes, the
-door's lower crease, the sill's groove and blade, the band round the arches)
-are not geometry: the paint shader tilts the normal (`carForm`).
+Small forms a few millimetres high but sharp are not geometry; the paint
+shader shades them. The bonnet's power domes, the door's lower crease, the
+sill's groove and blade and the band round the arches are tilts of the normal
+(`carForm`); the plate's dish, the dishes behind the door handles, the rear
+corner scoops and the apron's wing are heights over the skin, turned into a
+slope by `carBump` from the height's own screen derivatives. A height must
+run out smoothly at the edge of the region it is defined in: a cut-off height
+is a crease, and a crease shaded from derivatives is a staircase.
 
 ### The feature atlas
 
@@ -69,7 +83,9 @@ lens). `atlas.js` projects every texel's skin point into each view and stores
 the signed distance to the outline, 8 bits over +-30 mm. Shaders threshold
 the distance and antialias it with its own screen derivative, so an edge
 stays sharp at any distance. No mip maps on purpose: a mip level would average
-a thin line away.
+a thin line away. Nothing can be asked of the atlas beyond its 30 mm: a band
+wider than that inside a pane covers the whole pane (the rear screen's black
+band was 35 mm, and the screen was opaque).
 
 | tier | atlas | bake (desktop) |
 | --- | --- | --- |
@@ -79,83 +95,160 @@ a thin line away.
 
 ### The paint
 
-`createPaintMaterial` is a `MeshPhysicalMaterial` with `onBeforeCompile`. The
-base layer is metal flake (`PAINTS` in `materials.js`: colour, metalness,
-roughness, flop, flake); over it a clear coat of roughness 0.03 mirrors the
-car's own reflection probe (`setReflections`), scaled by how much sky is
-overhead so the car goes dark in a tunnel.
+`createPaintMaterial` is a `MeshPhysicalMaterial` with `onBeforeCompile`: a
+layer of metal flake under a clear coat.
 
-- **Silver** (high-tech silver, this car): linear 0.45 face-on, metal,
-  roughness 0.30, falling to 35 % edge-on (flop). That darker face and the
-  broad metal highlight are what make it read as metallic paint under a coat
-  and not as white plastic; the coat supplies the crisp mirror at grazing
-  angles. (It was 0.63 and slightly blue before: white, flat and lilac in low
-  sun.)
-- **Flake**: below about a pixel per 0.4 mm cell the base normal is jittered
-  per cell, so it sparkles close up and fades before it could shimmer.
+- **Base** (`PAINTS`: colour, metalness, roughness, flop, flake). Silver, this
+  car's high-tech silver: linear 0.56, metalness 0.9, roughness 0.4, falling
+  to 42 % edge-on (flop). The broad metal sheen and the darker faces turned
+  away from the light are what make it metallic paint and not white plastic.
+- **Clear coat**, roughness 0.03, 1.6 times a plain lacquer's reflectance
+  (`COAT_GAIN`): the crisp mirror image over the sheen. Both layers mirror the
+  car's own reflection probe (`setReflections`), each at its own roughness.
+- **Flake**. The flakes are far smaller than a pixel; together they are the
+  sheen. But each is a small mirror, and one that happens to send the sun to
+  the eye flashes. The surface is cut into cells never smaller than a pixel
+  (two octaves blended, so nothing crawls), each with a tilt and a brightness
+  of its own; most lie nearly flat, so the glitter is dense in the sun's
+  highlight and thins out round it. Strongest within arm's reach, gone by
+  about four metres: the chase camera never sees glitter. (The cells must be
+  `floor`ed: hashed per pixel they were salt all over the car.)
+- **Orange peel**: a ripple a third of a degree steep on the coat's normal,
+  only within about two metres.
+- **Occlusion** (`carOcclusion` and the regions): the probe is drawn without
+  the car, so by itself the paint would mirror a sunlit road under the floor.
+  The underside, the door's shoulder under the mirror, the arch lips, the
+  band under the boot lid's lip, the plate's dish, the handle dishes, the
+  scoops and both sides of every shut line take less of the indirect light.
+- **Shut lines**: a 3 mm dark gap (at least one pixel wide, fainter in
+  proportion when a pixel is wider) with a little shade either side and a
+  catch-light on the rounded far edge: the direction of the fall comes from
+  the atlas, its steepness is set in the shader.
 - **Regions**: from the atlas the same shader turns into gloss black (window
-  surround, B-pillar, frit), matte black (front lip, diffuser), bright metal
-  (grille frame), red reflectors, the plate carriers and recess, the door
-  handles, the rear corner scoops (a shaded triangular recess), and darkens
-  the 3 mm shut lines (at least one pixel wide, fainter in proportion when a
-  pixel is wider). The fuel flap, on the right only, is analytic.
+  surround, B-pillar, the band under the glass's edge), the matte rubber seal
+  round each pane, matte black (front lip, diffuser), bright metal (grille
+  frame), the grille's field with its diamond relief, red reflectors, the
+  plate carriers, the parking sensors. The fuel flap, on the right only, is
+  analytic.
 - The other paints (`graphite`, `blue`, `red`, `white`, `black`) are the
   same material with other numbers: `?paint=NAME`.
 
 Every patched material has its own `customProgramCacheKey`: without it three
 handed materials each other's programs (the gloss trim rendered white).
 
+### The reflection probe, and what the game should give the car
+
+Every car material reads the probe itself (`GLSL_PROBE`, by roughness), not
+through three.js's `envMap`: given a cube render target as `envMap`, three.js
+makes one prefiltered copy at first use and never looks again (the wheels,
+which did that, mirrored the start line for the whole lap). Materials built
+outside `materials.js` use `mirrorProbe()` from it.
+
+A mirror that curves makes the picture in it small: neighbouring pixels then
+look at directions several texels apart, and a sharp read aliases (the wood's
+needles were a hatching all over the paint). So the probe is never read
+sharper than the pixel's own footprint in it (`FOOTPRINT`): crisp on the flat
+of a door, smooth round a corner, nothing crawling.
+
+What that leaves visible is the cube's own size. A texel of a 256 cube is
+0.35 degrees; a pixel of a 1280-wide picture looking at a door from five
+metres is about 0.06. So:
+
+| | cube | refresh |
+| --- | --- | --- |
+| title orbit, high | 512 (17 MB half float with its mips) | all six faces once, then one face every few frames: the car stands still |
+| title orbit, medium / low | 256 / 128 | the same |
+| the run, high / medium / low | 256, 2 faces a frame / 128, 1 face / 64, every other frame (as `TIERS` has it) | speed and motion blur hide the rest |
+
+The coat's roughness of 0.03 reads mip 0 of cubes up to about 670 texels; a
+1024 cube would need `clearcoatRoughness` 0.02 to show more than a 512 one.
+`probesize=N` in the viewer tries any size.
+
 ### The glass
 
 The glass and the lenses are the skin again, drawn after the paint at the
 same depth with premultiplied alpha, so the reflection (the probe, at
-roughness 0.0x) is not dimmed by the transparency. Behind the glass the cabin
-is a few dark blocks and two screens (`details.js`), lit only faintly, so the
-cabin is neither a black hole nor a glow.
+roughness 0.02) is not dimmed by the transparency. Windscreen and front door
+glass pass about three quarters of the light, the rear doors, quarter lights
+and rear screen 15 % (privacy glass, as on this car), the roof 6 %. Each pane
+has its black band under the edge (25 mm on the windscreen, 28 on the rear
+screen); the rear screen carries its fourteen heating lines. Behind it are
+the cabin (`details.js`: seats with head restraints and bolsters, the rear
+bench, dash and cowl, console, door cards, steering wheel, interior mirror,
+parcel shelf, all black and lit by what sun comes through), the two displays
+and the third brake light, 14 mm inside the rear screen below its band.
 
 ### The lamps and their light
 
-The lamp units are drawn by the paint's shader under the flush lens
-(`carLamp`), as parallax layers: the view ray is followed in to each layer's
-depth, so the inside moves against the lens as the camera moves.
+The lamp units are geometry behind their lenses (`lampUnits.js`), placed by
+rays at the skin so that they keep their depth whatever the mesh. All of both
+lamps of both sides is one mesh with one material (`createLampPartMaterial`):
+each vertex carries a function number (`LAMP_FN`) that decides its colour,
+metalness and roughness unlit and what it emits when `setLights` switches
+its function on. The paint discards under the lenses; the lens is the glass
+material over the same skin.
 
-- **Tail lamp**: two rows of slanted blades 8 mm in, a smooth light guide
-  14 mm in, the reversing window by the inner tip, a dark red chrome housing
-  25 mm in. Tail lights the blades, brake the guide (and the housing), the
-  indicator turns the outer guide amber, reverse lights the window.
-- **Head lamp**: a gloss black housing, a projector and a matrix module with
-  satin bezels 40 mm in, a small blue accent, and the eyebrow light guide with
-  its hook just under the lens. DRL lights the eyebrow (amber when
-  indicating), dipped beam the projector, main beam the matrix rows. The
-  emission is set for night exposure: the eyebrow at 3.5, the projector at
-  0.5 (they were 30 and 1.5 and bloomed into one white blob). The brake
-  light guide is 20 and the housing glow 0.6 (were 30 and 1.6: the whole
-  tail went red in the bloom).
+- **Head lamp**: a gloss black housing let in behind the lens's outline; the
+  eyebrow light guide with its hook just under the lens (daytime running
+  light, position light, amber when indicating); the projection module (a
+  glass dome in a satin bezel: dipped beam), the matrix module (main beam),
+  a small auxiliary reflector and the small blue accent, in a row 45 mm in.
+- **Tail lamp**: a dark red mirror of a housing as a trough from the lens's
+  edges; two rows of slanted blades (tail light), the smooth band between
+  them (brake light; the outer piece's band is also the indicator), the
+  reversing window by the inner tip.
+- **Emission** is the same by day and at night, when the exposure is 18
+  times higher. The tail light's blades are 0.4: at night only the red
+  channel clips and they stay red (at 7 they were white dashes). The brake
+  band is 9: lit under the sun, a white core in a red glow at night, as in a
+  photograph. The third brake light is 18, the eyebrow 3.5, the projector's
+  dome 0.5.
 - **Light cast** (`lamps.js`): two spot lights at 5700 K with a picture of
   the beam (`SpotLight.map`): dipped beam's cut-off with its kick-up to the
   right, main beam's spot added; shadows on the high tier. One red spot at the
-  tail lamps' height aimed 5 m back lays a long soft red on the road (tail
-  0.06, brake 0.3). Lights are switched by intensity, never `visible`.
-- The third brake light and plate lamps are emitters in `details.js`.
+  tail lamps' height aimed 5 m back lays a long soft red on the road. Lights
+  are switched by intensity, never `visible`. On the car's own materials a
+  spot light begins to count 0.35 m ahead of where it stands (`SPOT_NEAR`),
+  so the lamps do not light their own housings.
+- The third brake light, the plate lamps and the displays are lamp parts in
+  `details.js`.
 
 ### The wheels and their blur
 
-`wheel.js`: the tyre (225/45 R18 front, 245/40 R18 rear) with a tread and sidewall height field, the
-five-twin-spoke wheel from a plan measured on a rectified photograph (black
-with machined faces), and the brake. At rest the real spokes are drawn; as
-`omega` rises (0.5 to 5 rad/s) three thin shells fade in carrying the spokes'
-coverage averaged over exactly the angle turned while the shutter is open
-(two texture reads), and the real spokes fade out. Nothing strobes. The tyre
-blends its tread into its average the same way. Parts deep in the wheel see
-only 0.3 of the sky (`INNER_SKY`), so the disc does not shine white.
+`wheel.js`: the tyre (225/45 R18 front, 245/40 R18 rear) with a tread and
+sidewall height field (shoulder blocks, raised rings, panels of hatching, the
+rim protector), the five-twin-spoke wheel from a plan measured on a rectified
+photograph (black with machined faces), and the brake (plain disc with the
+pads' marks, silver-grey floating caliper, dust shield). On the medium and
+high tiers the outer sidewall carries the tyre's size twice round as raised
+characters, drawn with the plate's stroke pen into a small map of its own
+(400 x 64, one for each axle; the tread's map repeats nine times round the
+tyre and could not hold it). The machined faces are turned and lacquered:
+close by, concentric rings each tilt the metal a little under a smooth coat
+(`patchSpokes`); a ring is never narrower than two pixels and being rings
+they look the same however the wheel has turned.
+
+At rest the real spokes are drawn; as `omega` rises (0.5 to 5 rad/s) three
+thin shells fade in carrying the spokes' coverage averaged over exactly the
+angle turned while the shutter is open (two texture reads), and the real
+spokes fade out. Nothing strobes. The tyre blends its tread (and its marking)
+into its average the same way. Parts deep in the wheel see only 0.3 of their
+surroundings (`INNER_SKY`), so the disc does not shine white; the arch liners
+and the intakes' recesses likewise see a share of the sky
+(`createDarkMaterial({ sky })`: at 1 the liners glowed sky-blue round the
+tyres).
 
 ### The plates
 
-Both plates are white EU plates with the blue band, drawn on a canvas at
-start-up with condensed characters from `plate` (default `K1 DOMI`), and an
-embossed normal map. The front leans back 6 degrees under the grille; the
-rear stands upright in its recess. Each sits on a black carrier drawn by the
-paint.
+Both plates are Polish plates, 520 x 114 mm: white and reflective, black
+characters, the blue band with the ring of twelve stars and PL, a thin black
+rim, in a black frame on a black carrier. `plate.js` draws them on a canvas
+(1040 x 228, with an embossed normal map at half that) with characters of its
+own: each a few strokes on a 4 x 7 grid, one pen, corners rounded where a
+letter turns. No font is used, so the plate reads the same on every machine.
+The text is `plate` (default `K1 DOMI`); it is squeezed if it would not fit.
+The front leans back 6 degrees under the grille; the rear stands upright in
+its dish.
 
 ### The contact shadow
 
@@ -169,8 +262,8 @@ lays it flat on the road while the body rolls and pitches above it.
 
 `createCar({ ghost: true })`: the skin and arch lips with one translucent,
 rim-lit material, low-tier wheels reduced to tyre and spokes, no lights, no
-shadow, no atlas. About 92k triangles, 10 draw calls, 140 ms. `?ghost=1` in
-the viewer.
+shadow, no atlas. About 92k triangles, 10 draw calls, 150-190 ms. `?ghost=1`
+in the viewer.
 
 ## How to change it
 
@@ -182,56 +275,64 @@ the viewer.
 | where a window, lens, shut line or opening is | its outline in `features.js` |
 | atlas resolution | `ATLAS_SIZE` in `atlas.js` |
 | a paint, or add one | `PAINTS` in `materials.js` |
-| the black trims, handles, scoops, plate carriers | the region block in `createPaintMaterial` (`materials.js`) |
-| what the lamps look like inside, how bright | `carLamp` in `materials.js` |
+| flake, orange peel, the coat's strength | `carFlake`, the glint after `lights_fragment_end`, `COAT_GAIN` in `materials.js` |
+| the black trims, seals, scoops, plate carriers, dishes, what is shaded | the region block and `carOcclusion` in `createPaintMaterial` |
+| the glass's tint, bands, heating lines | `createGlassMaterial` |
+| what a lamp is built of | `lampUnits.js`; how each part looks and how bright it is lit: `carLampPart` in `materials.js` |
 | how far and how bright the lamps throw | `THROW`, the beam pictures and the tail spot in `lamps.js` |
-| stars, mirrors, pipe trims, plates, cabin | `details.js` |
-| the wheel's design, tyre, blur speeds | `WHEEL`, `DETAIL`, `FADE` in `wheel.js`; textures in `wheelTextures.js` |
+| stars, grille pins, slats, mirrors, handles, wipers, pipe trims, cabin | `details.js` |
+| the plate's layout or a character's shape | `plate.js` (`GLYPHS`) |
+| the wheel's design, tyre, blur speeds | `WHEEL`, `DETAIL`, `FADE` in `wheel.js`; textures, finishes and the size marking in `wheelTextures.js` |
 | the contact shadow | `shadow.js` |
 | what the ghost shows | the ghost branch in `index.js` |
 
 ## What each tier costs
 
 Measured in the viewer, one page at a time (headless Chromium on a 4-core
-desktop, software WebGL; build time is `car.stats.buildMs`: everything from
-`createCar()` to the returned handle, shader compilation not included):
+machine, software WebGL, other renders running beside it; build time is
+`car.stats.buildMs`: everything from `createCar()` to the returned handle,
+shader compilation not included):
 
 | tier | triangles | draw calls (at rest) | build |
 | --- | --- | --- | --- |
-| low | 49.4k | 28 (24) | ~480 ms |
-| medium | 102.6k | 30 (26) | ~620 ms |
-| high | 178.3k | 30 (26) | ~730 ms |
-| ghost | 92.5k | 10 | ~140 ms |
+| low | 49.9k | 29 (25) | ~370-450 ms |
+| medium | 112.8k | 31 (27) | ~740-920 ms |
+| high | 188.0k | 31 (27) | ~700-970 ms |
+| ghost | 92.5k | 10 | ~150-190 ms |
 
+Plus one draw call for the contact shadow. The four blur shells are hidden at
+rest and the spokes at speed, so the count on the road is the smaller one.
 The atlas bake is most of the difference between tiers; the wheels are about
-150 ms of every build (their textures are shared by the four corners).
-Plus one draw call for the contact shadow. The wheels are about 15k
-triangles each on high; the blur shells replace the spokes once the wheel
-turns, so the count stays the same at speed.
+150 ms of every build (their textures are shared by the four corners); the
+plates' canvas about 15 ms, the tyres' two markings a few. The low tier
+leaves out the cabin's blocks, the grille's pins as geometry (the paint draws
+them), the tyres' marking, the wheels' clear coat and turned faces.
 
 ## What is still not right next to the real car
 
 Most visible first:
 
+- **The mirror image is only as sharp as the probe.** With the run's 256
+  cube the flat of a door or the bonnet shows the wood as soft shapes; see
+  the table above for what the title orbit should use.
+- **The rear bumper's corner scoops** are a shaded triangular dish with a
+  black slit; the real ones are a deeper scallop with a bright lower edge.
+- **Head lamps from a metre and a half** show their modules at depth behind
+  the lens, but the modules themselves are simple (a dome in a bezel, a
+  dotted block); the real units have many more facets.
 - **Reflections from straight behind** are calm: the boot lid mirrors the sky
-  and the bumper the road, both fairly even in this world, so the paint moves
-  most visibly on the flanks and the C-pillars, less on the tail.
-- **The rear tyres** show only as a few centimetres under the bumper corners
-  from the chase camera's height (true to the car's 1.09 m rear overhang, but
-  a lower camera shows more of them).
-- **The front intakes** are black openings with a dark recess, without the
-  real car's horizontal slats.
+  and the bumper the road.
 - **At night the paint is dark** where nothing bright is near: it mirrors
-  what the probe sees (street lamps show as sharp highlights with a soft
-  metal glow round them), but the placeholder world gives it little to
-  mirror; the glossy, saturated car of the owner's night reference needs the
-  wet road and the town.
-- **By day in low sun** the silver goes warm (beige) in the game's grade; it
-  reads silver under a higher sun.
-- **Bloom** round the brake lamps is the frame pipeline's; with the lamps'
-  emission lowered it no longer swallows the tail, but at night it still
+  what the probe sees, and needs the wet road and the town to be the glossy
+  car of the owner's night reference.
+- **By day in low sun** the silver goes warm in the game's grade; it reads
+  silver under a higher sun.
+- **Bloom** round the brake lamps is the frame pipeline's; at night it still
   tints the boot lid red.
-- The rear-screen heating lines, the shark fin (this car has none) and badge
-  lettering are not modelled.
+- In the light tunnel (`stripes=1&mirror=1`) the stripes pinch a little at
+  the tail lamp's outer tip, where the shoulder, the lid's lip and the wing
+  meet; the handle dishes' edges are slightly ragged as a plain mirror.
+- The brake discs are plain (as the sheet has them); badge lettering and the
+  shark fin (this car has none) are not modelled.
 - Untested: real phones, Safari, real device frame rates. Everything above
   was judged in headless Chromium on software WebGL.

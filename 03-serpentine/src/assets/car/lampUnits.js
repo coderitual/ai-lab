@@ -110,7 +110,7 @@ function headLamp(t, cast) {
   const aux = at(0.555, 0.668, 2.04, 0.04);
   ring(t, aux, roundRect(0.019, 0.024, 0.012, 16), roundRect(0.013, 0.018, 0.011, 16), 0.012, 0.01, FN.bezel);
   t.add(new THREE.PlaneGeometry(0.026, 0.036), aux.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, -0.011)), FN.headHousing);
-  t.add(new THREE.BoxGeometry(0.045, 0.03, 0.006), at(0.78, 0.69, 1.77, 0.03), FN.accent);
+  t.add(new THREE.BoxGeometry(0.022, 0.009, 0.006), at(0.782, 0.676, 1.77, 0.03), FN.accent);
 }
 
 /** The tail lamp's edges from behind (x -> y): the upper nearly straight, the lower one diagonal to its lowest point. */

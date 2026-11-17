@@ -90,6 +90,8 @@ import { LIGHTS } from './game/config.js';
 import { createTrack } from './game/track.js';
 
 const params = parseParams();
+// the world needs a time of day (the game picks its own default); the viewer shows its asset by day unless told
+if (!params.time) params.time = 'day';
 const given = params.viewer;
 // the world mode's own parameters (see "The world" above)
 const query = new URLSearchParams(location.search);

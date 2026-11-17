@@ -25,7 +25,7 @@ const GLYPHS = {
   F: [[[4, 7], [0, 7], [0, 0]], [[0, 3.6], [3.2, 3.6]]],
   G: [[[4, 5.3], [4, 7, R], [0, 7, R], [0, 0, R], [4, 0, R], [4, 3.2], [2.2, 3.2]]],
   H: [[[0, 0], [0, 7]], [[4, 0], [4, 7]], [[0, 3.6], [4, 3.6]]],
-  I: [[[2, 0], [2, 7]]],
+  I: [[[0, 0], [0, 7]]],
   J: [[[3.6, 7], [3.6, 0, R], [0, 0, R], [0, 2]]],
   K: [[[0, 0], [0, 7]], [[4, 7], [0, 2.7]], [[1.45, 4.25], [4, 0]]],
   L: [[[0, 7], [0, 0], [4, 0]]],
@@ -44,7 +44,7 @@ const GLYPHS = {
   Y: [[[0, 7], [2, 3.3], [4, 7]], [[2, 3.3], [2, 0]]],
   Z: [[[0, 7], [4, 7], [0, 0], [4, 0]]],
   0: [['z', [0.2, 0, 1.9], [0.2, 7, 1.9], [3.8, 7, 1.9], [3.8, 0, 1.9]]],
-  1: [[[0.9, 5.3], [2.5, 7], [2.5, 0]]],
+  1: [[[0, 5.2], [4, 7], [4, 0]]],
   2: [[[0, 5.4], [0, 7, R], [4, 7, R], [4, 4.1, 1.2], [0, 0], [4, 0]]],
   3: [[[0, 5.5], [0, 7, R], [4, 7, R], [4, 3.7, S], [1.5, 3.7]], [[1.5, 3.7], [4, 3.7, S], [4, 0, R], [0, 0, R], [0, 1.5]]],
   4: [[[3, 0], [3, 7], [0, 2.2], [4, 2.2]]],
@@ -54,13 +54,14 @@ const GLYPHS = {
   8: [['z', [0.2, 3.7, S], [0.2, 7, S], [3.8, 7, S], [3.8, 3.7, S]], ['z', [0, 0, R], [0, 3.7, R], [4, 3.7, R], [4, 0, R]]],
   9: [[[0, 1.5], [0, 0, R], [4, 0, R], [4, 7, R], [0, 7, R], [0, 3.1, R], [4, 3.1]]],
   '-': [[[0.8, 3.5], [3.2, 3.5]]],
+  '/': [[[0.5, 0], [3.5, 7]]],
 };
 
 /**
  * Draws one character with its lower left corner at (x, y) (y down the canvas), `w` wide and `h` high over all,
  * with a pen `pen` thick.
  */
-function drawGlyph(g, char, x, y, w, h, pen) {
+export function drawGlyph(g, char, x, y, w, h, pen) {
   const strokes = GLYPHS[char];
   if (!strokes) return;
   const ux = (w - pen) / 4;
@@ -98,6 +99,9 @@ function drawGlyph(g, char, x, y, w, h, pen) {
     g.stroke();
   }
 }
+
+/** Characters narrower than the rest: their width as a share of a full character's (the pen's own width is the least). */
+const NARROW = { I: 0, 1: 0.5 };
 
 /** Pixels per millimetre of the plate's picture. */
 const PX = 2;
@@ -163,9 +167,10 @@ export function createPlateTextures(text) {
   // the characters: 80 mm high, 45 wide, a pen of 12.5; 8 mm apart, a space 26; squeezed if they would not fit
   const chars = [...text];
   const [cw, ch, pen, gap, space] = [45, 80, 12.5, 8, 26];
+  const wide = (c) => (c in NARROW ? Math.max(pen, cw * NARROW[c]) : cw);
   let width = 0;
   chars.forEach((c, i) => {
-    width += c === ' ' ? space - gap : cw + (i < chars.length - 1 ? gap : 0);
+    width += c === ' ' ? space - gap : wide(c) + (i < chars.length - 1 ? gap : 0);
   });
   const room = 520 - 45 - 2 * 9;
   const squeeze = Math.min(1, room / width);
@@ -175,8 +180,9 @@ export function createPlateTextures(text) {
       x += (space - gap) * squeeze;
       continue;
     }
-    drawGlyph(g, c, mm(x), mm(97), mm(cw * squeeze), mm(ch), mm(pen * Math.min(1, squeeze + 0.08)));
-    x += (cw + gap) * squeeze;
+    const thick = pen * Math.min(1, squeeze + 0.08);
+    drawGlyph(g, c, mm(x), mm(97), mm(Math.max(thick, wide(c) * squeeze)), mm(ch), mm(thick));
+    x += (wide(c) + gap) * squeeze;
   }
 
   const map = new THREE.CanvasTexture(canvas);
