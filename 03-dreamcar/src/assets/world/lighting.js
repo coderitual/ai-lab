@@ -13,10 +13,9 @@
 //     radiance L lays PI * L on the ground.
 //   - The frame pipeline multiplies by `exposure` and applies the tone curve,
 //     which leaves 0.18 at middle grey.
-// By day the flat ground gets about 2.2 from the sun (5.4 on a surface facing
-// it, times the sine of 24 degrees) and about 0.9 from the sky: 3.1 in all,
-// PI within a hair, so an 18 % grey card in the sun reads 0.18 and lands on
-// middle grey, and in open shade it is 1.8 stops down and blue.
+// By day (sky lane) the flat ground gets about 2.1 from the sun (7.5 on a surface facing it, times the sine of 16
+// degrees) and about 0.5 from the sky and the fill: some 2.6 in all, and the exposure (0.85) puts sunlit asphalt a
+// little over middle grey; in open shade the ground is a little over 2 stops down and blue.
 //
 // NIGHT is not day tinted blue. Its light really is a few hundred times
 // weaker and the exposure opens five stops (x32) to look at it. Lamps do not
@@ -96,6 +95,8 @@
  * @property {number} fog.sunLobe how tightly that is gathered round the sun (a power of the cosine: 4 is broad)
  * @property {number} fog.density share of light lost per metre at the level of the lake (y = 0)
  * @property {number} fog.heightFalloff per metre of height: how quickly the haze thins above the valleys
+ * @property {number} [fog.air] share of light lost per metre at the lake's level in the thin air above the haze (scale
+ *   height 1400 m, atmosphere.js): the aerial perspective of the far land, kilometres away
  *
  * @property {number} exposure under the open sky
  * @property {number} tunnelExposure inside the tunnel; the game eases between the two with track.sky
@@ -120,30 +121,25 @@ export function towards(bearing, elevation) {
 }
 
 /**
- * Where the sun stands, chosen on the track map (look lane, day stage; was bearing 150, 24 degrees up, which left
- * most of the lap in the mountain's and the forest's shade: the lap read as dusk). Surveyed with the land AND the
- * forest in the way (scratchpad lookday/sun2.mjs: a march from each point of the road towards the sun, shaded by
- * the ground or by trees about 22 m tall within 120 m): 73 % of the open road is in direct sun (it was 54 %).
- *   lakeside straight, start  in full sun from behind and to the left, over the lake
- *   sweeper, esses            the spruces lay their shadows across the road, bend after bend (555..765 m)
- *   viaduct                   in the ridge's shadow at its start
- *   hairpins                  in and out of the wood's shadow
- *   descent                   INTO THE SUN on its two long straights (2060..2345 m and 2685..2935 m) at 110 to
- *                             150 km/h: the road ahead glares, the sun stands just over the top of the far chase
- *                             view and flares (look.flare), dropping into it where the road levels out
- * The height is a compromise: the far chase camera sees up to about 26 degrees above level, so a sun higher than
- * that is never in its frame; the 35..45 degrees that would light the whole lap would never flare at all. At 30
- * the disc stands just over the frame on the descent and the lens still takes its glare (FramePipeline's flare
- * source follows a light up to a quarter of the view's height outside the frame).
+ * (sky lane, R0 addendum 2) The sun, the moon and the low golden-hour sun are placed against the start straight's
+ * heading (degrees, + to the LEFT of it, towards the lake), not on the map: the heading is the Track's, and
+ * createWorld hands it over through placeLights() before anything reads these directions. Until then they assume
+ * the straight runs towards +X (bearing 90).
+ *   day    3 degrees RIGHT of the heading, 16 up: straight down the road, as in D1 and A. The chase view drives
+ *          into it, its glare lies along the asphalt, shadows fall straight back and a little left, and nothing
+ *          beside the road hides the disc. The massif (far.js) stands under it, back-lit.
+ *   dusk   125 degrees left of the heading (out over the lake, behind the driver's left shoulder), 3.5 up.
+ *   moon   8 degrees left of the heading, 17 up, beside the massif's main peak.
  */
-const SUN = towards(116, 20);
+export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 3.5 }, moon: { left: 8, up: 17 } };
+const SUN = towards(90 - PLACES.day.left, PLACES.day.up);
 
 /**
  * (sky lane) The moon: low, ahead and a little left of the start straight, beside the massif, so that the massif stands
  * as a silhouette with moonlit edges, the moon itself rides in the chase view down the straight, and the car is
  * rim-lit from ahead (its lamps and the street lamps light what faces the camera).
  */
-const MOON = towards(98, 17);
+const MOON = towards(90 + PLACES.moon.left, PLACES.moon.up);
 
 /**
  * (sky lane) GOLDEN HOUR (references D4 and D2): the sun 3.5 degrees up at bearing 215, out over the lake and behind
@@ -152,12 +148,24 @@ const MOON = towards(98, 17);
  * shade, while the trees, the gantry and the buildings on the land side, ahead and to the right, stand in full
  * orange light (D4). Ahead lies the sky opposite the sun: blue overhead, rose low down, with clouds lit from below.
  */
-const DUSK_SUN = towards(215, 3.5);
+const DUSK_SUN = towards(90 + PLACES.dusk.left, PLACES.dusk.up);
+
+/**
+ * Turns the sun, the moon and the golden-hour sun to the start straight's real heading (a bearing on the map, in
+ * degrees: 0 is +Z, 90 is +X). The arrays are changed in place, so every table that holds them (look.flare too)
+ * follows. Bearing "left" of a heading is a larger bearing.
+ * @param {number} heading
+ */
+export function placeLights(heading) {
+  SUN.splice(0, 3, ...towards(heading + PLACES.day.left, PLACES.day.up));
+  DUSK_SUN.splice(0, 3, ...towards(heading + PLACES.dusk.left, PLACES.dusk.up));
+  MOON.splice(0, 3, ...towards(heading + PLACES.moon.left, PLACES.moon.up));
+}
 
 /** @type {{ day: TimeOfDay, dusk: TimeOfDay, night: TimeOfDay }} */
 export const TIMES = {
-  // A clear afternoon late in the year: the sun 24 degrees up, warm, well to one side; long shadows; haze in the
-  // valleys; a few clouds that catch the light.
+  // A clear autumn afternoon (D1): the sun 16 degrees up, straight down the start straight; long shadows; haze in
+  // the valleys and thin air over the far land; small cumulus that catch the light.
   day: {
     name: 'day',
     sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 7.5 },
@@ -182,13 +190,13 @@ export const TIMES = {
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
     ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.04 },
-    fog: { color: [0.3, 0.44, 0.7], sun: [0.16, 0.1, 0.05], sunLobe: 16, density: 0.0002, heightFalloff: 0.011 },
-    exposure: 1.0,
+    fog: { color: [0.3, 0.44, 0.7], sun: [0.16, 0.1, 0.05], sunLobe: 16, density: 0.0002, heightFalloff: 0.011, air: 0.00009 },
+    exposure: 0.85,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.18, saturation: 1.22, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.18, saturation: 1.12, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015, ao: 0.8, star: 0.02 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
@@ -216,10 +224,10 @@ export const TIMES = {
     },
     env: { intensity: 0.8 },
     ambient: { sky: [0.6, 0.7, 1.0], ground: [1.0, 0.7, 0.45], intensity: 0.025 },
-    fog: { color: [0.085, 0.085, 0.11], sun: [0.3, 0.16, 0.06], sunLobe: 6, density: 0.00025, heightFalloff: 0.011 },
+    fog: { color: [0.085, 0.085, 0.11], sun: [0.3, 0.16, 0.06], sunLobe: 6, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
     exposure: 3.2,
     tunnelExposure: 6,
-    look: { flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 }, contrast: 1.12, saturation: 1.12, tint: [1.03, 1.0, 0.95], lift: [0, 0, 0], vignette: 0.28, chroma: 0.001, grain: 0.6, bloom: 0.09, ghosts: 0.0003, glare: 0.03 },
+    look: { flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 }, contrast: 1.12, saturation: 1.12, tint: [1.03, 1.0, 0.95], lift: [0, 0, 0], vignette: 0.28, chroma: 0.001, grain: 0.6, bloom: 0.09, ghosts: 0.0003, glare: 0.03, ao: 1.0, star: 0.015, halo: 0.05 },
     lamps: { street: 1, tunnel: 1, windows: 0.7 },
     wetness: 0,
     carLights: 'low',
@@ -248,7 +256,7 @@ export const TIMES = {
     // from being holes
     ambient: { sky: [0.45, 0.6, 1.0], ground: [0.3, 0.36, 0.5], intensity: 0.009 },
     // (look lane: the haze halved, the far ranges were pale grey behind black hills; reference B's are near black)
-    fog: { color: [0.0008, 0.0011, 0.0019], sun: [0.0004, 0.0005, 0.0008], sunLobe: 4, density: 0.00042, heightFalloff: 0.011 },
+    fog: { color: [0.0008, 0.0011, 0.0019], sun: [0.0004, 0.0005, 0.0008], sunLobe: 4, density: 0.00042, heightFalloff: 0.011, air: 0.00006 },
     // four stops above day (look lane: was five; at 32 the moonlit land read as dusk and everything that faces a head
     // lamp within 30 m burnt to white; reference B is darker, its lights brighter against it)
     // (look lane, day stage: the lead found night far darker than reference B, where nothing is black but the far
@@ -256,7 +264,7 @@ export const TIMES = {
     exposure: 18,
     // the lit tunnel is two stops brighter than the moonlit road outside
     tunnelExposure: 8,
-    look: { contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], lift: [0.0006, 0.0009, 0.0018], vignette: 0.32, chroma: 0.0012, grain: 1.2, bloom: 0.15, ghosts: 0 },
+    look: { contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], lift: [0.0006, 0.0009, 0.0018], vignette: 0.32, chroma: 0.0012, grain: 1.2, bloom: 0.15, ghosts: 0, ao: 0.9, star: 0.015, halo: 0.15 },
     lamps: { street: 1, tunnel: 1, windows: 1 },
     // the night after rain (look reference B): wet asphalt, water standing in the ruts
     wetness: 0.65,

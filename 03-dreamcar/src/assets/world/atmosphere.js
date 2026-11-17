@@ -27,7 +27,8 @@ import { GLSL_TARGET } from '../../engine/glsl.js';
 export const ATMOSPHERE_PARS = /* glsl */ `
 uniform vec3 uHazeColor;   // deep haze seen away from the sun
 uniform vec3 uHazeSun;     // added looking straight at the sun
-uniform vec4 uHaze;        // density at y = 0 (1/m), its falloff with height (1/m), the sun lobe's power, unused
+uniform vec4 uHaze;        // density at y = 0 (1/m), its falloff with height (1/m), the sun lobe's power, the thin air's
+                           // density at y = 0 (1/m; its scale height is AIR_SCALE)
 uniform vec3 uHazeSunDir;  // towards the sun or the moon
 
 // What deep haze looks like in direction dir (unit).
@@ -35,12 +36,22 @@ vec3 hazeColor(vec3 dir) {
   return uHazeColor + uHazeSun * pow(0.5 + 0.5 * dot(dir, uHazeSunDir), uHaze.z);
 }
 
+// The mean of exp(-falloff * height) along a path that climbs rise metres, relative to its value at the start.
+float hazeColumn(float falloff, float rise) {
+  float k = clamp(falloff * rise, -30.0, 30.0);
+  return abs(k) > 1.0e-3 ? (1.0 - exp(-k)) / k : 1.0 - 0.5 * k;
+}
+
 // The share of the light from a point that the haze replaces on its way to an eye at height eyeY; ray = point - eye.
+// Two layers: the valley haze (thick, a few tens of metres deep) and the thin air above it (scale height AIR_SCALE),
+// which is what lifts and blues a mountain kilometres away. The sky dome takes only the first: the clear sky's own
+// gradient already is the second.
+const float AIR_SCALE = 1400.0;
 float hazeBetween(float eyeY, vec3 ray) {
-  // the mean of exp(-falloff * height) along the path, relative to its value at the eye
-  float k = clamp(uHaze.y * ray.y, -30.0, 30.0);
-  float column = abs(k) > 1.0e-3 ? (1.0 - exp(-k)) / k : 1.0 - 0.5 * k;
-  return 1.0 - exp(-uHaze.x * exp(-uHaze.y * eyeY) * length(ray) * column);
+  float len = length(ray);
+  float valley = uHaze.x * exp(-uHaze.y * eyeY) * hazeColumn(uHaze.y, ray.y);
+  float air = uHaze.w * exp(-eyeY / AIR_SCALE) * hazeColumn(1.0 / AIR_SCALE, ray.y);
+  return 1.0 - exp(-(valley + air) * len);
 }
 
 // The same for a line of sight that leaves the air: up = how steeply it climbs (the y of its unit direction).
@@ -125,7 +136,7 @@ vHazeWorld = ( modelMatrix * hazeWorld ).xyz;
       const f = time.fog;
       uniforms.uHazeColor.value.fromArray(f.color);
       uniforms.uHazeSun.value.fromArray(f.sun);
-      uniforms.uHaze.value.set(f.density, f.heightFalloff, f.sunLobe, 0);
+      uniforms.uHaze.value.set(f.density, f.heightFalloff, f.sunLobe, f.air ?? 0);
       uniforms.uHazeSunDir.value.fromArray(time.sun.dir).normalize();
     },
 
@@ -140,7 +151,8 @@ vHazeWorld = ( modelMatrix * hazeWorld ).xyz;
         uHazeColor.value.y + uHazeSun.value.y * lobe,
         uHazeColor.value.z + uHazeSun.value.z * lobe,
       );
-      fog.density = uHaze.value.x * Math.exp(-uHaze.value.y * eye.setFromMatrixPosition(camera.matrixWorld).y);
+      const eyeY = eye.setFromMatrixPosition(camera.matrixWorld).y;
+      fog.density = uHaze.value.x * Math.exp(-uHaze.value.y * eyeY) + uHaze.value.w * Math.exp(-eyeY / 1400);
     },
 
     patch(material) {

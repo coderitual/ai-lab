@@ -36,8 +36,6 @@ const RINGS = [
   { r: 5300, lo: 650, hi: 1250, cols: 640, scale: 1300, seed: 11 },
 ];
 const ROWS = 14;
-/** (sky lane) how strongly the rock's per-pixel relief shows (0: the bare grid) */
-const ROCK_RELIEF = { value: 1 };
 const DEG = Math.PI / 180;
 /**
  * (sky lane) The limestone massif: how far it is turned from the start straight's heading towards the land side
@@ -45,16 +43,21 @@ const DEG = Math.PI / 180;
  * depth, its span seen from the start (degrees), its crest's height (m), and its grid per tier.
  */
 const MASSIF = {
-  turn: 8,
-  near: 2600,
-  clear: 1200,
-  depth: 5000,
-  span: 100,
-  height: 2600,
-  peaks: 9,
-  slope: 31,
-  cols: { low: 110, medium: 260, high: 340 },
-  rows: { low: 44, medium: 110, high: 140 },
+  // the skyline from the start line: [degrees left of the heading, degrees above the eye] (D1, R0 addendum 2): the
+  // main peak 17 left at 19, a greater shoulder further left (25 and more by 40 left), 9 under the day sun (3 right)
+  // and lower beyond
+  profile: [
+    [-75, 2.5], [-40, 3.5], [-22, 4.5], [-10, 7], [-3, 9], [3, 10.5], [8, 13], [12, 15.5], [15, 18], [17, 19],
+    [20, 17], [23, 17.5], [28, 21], [34, 24], [40, 26.5], [52, 28], [70, 24], [95, 12],
+  ],
+  right: -75, // the field's ends, degrees left of the heading
+  left: 95,
+  near: 3200, // the foot's distance from the start line, at least (m)
+  clear: 900, // and its distance beyond the course's bounds
+  crest: 6400, // the crest's distance (m)
+  depth: 6200, // from the foot to the far edge
+  cols: { low: 170, medium: 420, high: 560 },
+  rows: { low: 50, medium: 110, high: 150 },
 };
 
 /**
@@ -84,38 +87,23 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
           '#include <project_vertex>',
           '#include <project_vertex>\ngl_Position.z = gl_Position.w * ( 1.0 - 1.0e-6 );',
         );
-        // (sky lane) rock: what the grid is too coarse to carry. A height of value noise in the world (beds of
-        // limestone stacked level, broken up and cut by runnels down the slope) tilts the normal per pixel, as a
-        // bump map would, and darkens the beds' joints and the runnels, so faces read as stone in sun and shade.
+        // (sky lane) rock: the form is the geometry's and the sun's (no per-pixel bump: against a low sun its
+        // derivatives broke into a stair-stepped speckle). The pixels only add a soft mottle of the stone's own
+        // tone, smooth noise with no thresholds, averaged away where a pixel covers more than its scale.
         shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', `#include <common>\n${GLSL_HASH}\n${GLSL_NOISE}\nvarying vec3 vRockWorld;\nfloat rockHeight(vec3 p, out float joint) {
-  // broken rock: crags and runnels down the fall line; no level beds (they read as contour lines at distance)
-  float runnel = abs(fbm(vec2(p.x + p.z, p.y * 0.35) / 60.0, 3) - 0.5);
-  joint = smoothstep(0.06, 0.0, runnel);
-  return 22.0 * fbm(p / 90.0, 2) - 10.0 * joint;
-}`)
+          .replace('#include <common>', `#include <common>\n${GLSL_HASH}\n${GLSL_NOISE}\nvarying vec3 vRockWorld;`)
           .replace(
-            '#include <normal_fragment_maps>',
-            `#include <normal_fragment_maps>
+            '#include <color_fragment>',
+            `#include <color_fragment>
 {
-  float joint;
-  // fades out where a pixel covers more than a few metres: finer than that, the bump only aliases into blocks
   float footprint = length(fwidth(vRockWorld));
-  float relief = uRockRelief * smoothstep(30.0, 8.0, footprint);
-  float hb = rockHeight(vRockWorld, joint) * relief;
-  vec3 sx = dFdx(-vViewPosition), sy = dFdy(-vViewPosition);
-  vec3 r1 = cross(sy, normal), r2 = cross(normal, sx);
-  float det = dot(sx, r1);
-  vec3 grad = sign(det) * (dFdx(hb) * r1 + dFdy(hb) * r2);
-  normal = normalize(abs(det) * normal - grad);
-  diffuseColor.rgb *= 1.0 - 0.15 * joint * relief;
+  float mottle = fbm(vRockWorld.xz / 140.0 + vRockWorld.y / 230.0, 2) - 0.5;
+  diffuseColor.rgb *= 1.0 + 0.35 * mottle * smoothstep(60.0, 15.0, footprint);
 }`,
-          )
-          .replace('void main() {', 'uniform float uRockRelief;\nvoid main() {');
+          );
         shader.vertexShader = shader.vertexShader
           .replace('#include <common>', '#include <common>\nvarying vec3 vRockWorld;')
           .replace('#include <project_vertex>', '#include <project_vertex>\nvRockWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
-        shader.uniforms.uRockRelief = ROCK_RELIEF;
       }),
     );
     // (sky lane) every fragment passes but still writes its depth: with the depth test switched off WebGL writes no
@@ -134,7 +122,13 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   // across the road, on the land's side
   const landSide = new THREE.Vector2(-head.y, head.x);
   if (landSide.dot(toLake) > 0) landSide.negate();
-  const massifDir = new THREE.Vector2().addScaledVector(head, Math.cos(MASSIF.turn * DEG)).addScaledVector(landSide, Math.sin(MASSIF.turn * DEG)).normalize();
+  // (sky lane, R0 addendum 2) the massif is composed as seen from the start line looking down the road: angles are
+  // measured from the straight's heading, positive towards the lake (left)
+  const lakeSide = landSide.clone().negate();
+  const leftSign = Math.sign(head.x * lakeSide.y - head.y * lakeSide.x) || 1; // +1: left is anticlockwise in (x, z)
+  const headAngle = Math.atan2(head.y, head.x);
+  const offsetCentre = (MASSIF.left + MASSIF.right) / 2;
+  const massifDir = new THREE.Vector2(Math.cos(headAngle + leftSign * offsetCentre * DEG), Math.sin(headAngle + leftSign * offsetCentre * DEG));
   const reachOut = Math.max(
     ...[b.minX, b.maxX].flatMap((x) => [b.minZ, b.maxZ].map((z) => (x - start.pos.x) * massifDir.x + (z - start.pos.z) * massifDir.y)),
   );
@@ -145,7 +139,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     const v = new THREE.Vector2(x - mid.x, z - mid.z).normalize();
     const c = new THREE.Vector2(massifCentre.x - mid.x, massifCentre.y - mid.z).normalize();
     const off = Math.acos(Math.min(1, Math.max(-1, v.dot(c))));
-    return Math.exp(-((off / (MASSIF.span * 0.6 * DEG)) ** 2));
+    return Math.exp(-((off / ((MASSIF.left - MASSIF.right) * 0.45 * DEG)) ** 2));
   };
 
   const mountains = [];
@@ -185,13 +179,17 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         pos[v * 3 + 1] = y;
         pos[v * 3 + 2] = mid.z + sa * r;
         // rock, darker in the gullies; snow above a line that wanders, more where the face is gentle
-        const snowLine = (layer === 0 ? 0.6 : 0.85) * ring.hi + 300 * (noise.fbm(i * 0.05 + layer, 2.5, 2) - 0.5);
-        const snow = smoothstep(snowLine - 120, snowLine + 120, y) * (0.55 + 0.45 * gully);
-        const rock = 0.13 + 0.07 * gully + 0.03 * noise.fbm(i * 0.3, j * 0.7, 2); // (sky lane) pale limestone
-        const green = 1 - smoothstep(200, 700, y); // forest and pasture low down
-        col[v * 3] = rock * (1 - 0.45 * green) + (0.72 - rock) * snow;
-        col[v * 3 + 1] = rock * (0.96 - 0.25 * green) + (0.75 - rock) * snow;
-        col[v * 3 + 2] = rock * (0.88 - 0.4 * green) + (0.8 - rock) * snow;
+        // (sky lane, round two) wooded hills with bare rock above a ragged tree line; snow only on the farthest
+        // ring's highest ground, and there only in the gullies (patches, not caps)
+        const treeLine = 1050 + 350 * (noise.fbm(i * 0.04 + layer * 5, 1.5, 3) - 0.5) + 250 * (gully - 0.5);
+        const wood = 1 - smoothstep(treeLine - 60, treeLine + 60, y);
+        const snow = layer === 0 ? smoothstep(0.7 * ring.hi, 0.85 * ring.hi, y) * smoothstep(0.45, 0.8, 1 - gully) * 0.8 : 0;
+        const rock = 0.15 + 0.06 * gully + 0.03 * noise.fbm(i * 0.3, j * 0.7, 2);
+        const canopy = 0.032 + 0.012 * noise.fbm(i * 0.21 + layer, j * 0.5, 2);
+        const base = [rock, rock * 0.97, rock * 0.92].map((c, k) => c * (1 - wood) + canopy * [1.0, 1.45, 0.8][k] * wood);
+        col[v * 3] = base[0] + (0.72 - base[0]) * snow;
+        col[v * 3 + 1] = base[1] + (0.75 - base[1]) * snow;
+        col[v * 3 + 2] = base[2] + (0.8 - base[2]) * snow;
       }
     }
     const index = [];
@@ -243,56 +241,61 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     const n = (cols + 1) * (rows + 1);
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
-    const base = Math.atan2(massifDir.y, massifDir.x);
     const at = (i, j) => j * (cols + 1) + i;
     const crestNoise = planeNoise(rng.int(1 << 30));
-    const peakRng = rng.fork('massif');
-    // (sky lane, after the lead's review) Real relief, not a dune: a chain of summits along the crest, each a steep
-    // cone (about 35 degrees) whose flanks are cut by gullies that run straight down from it (ridged noise in the
-    // angle round the summit and the distance from it), the arêtes between them sharp. The low sun then draws the
-    // form: lit facets on the arêtes' sunward sides, deep blue-grey in the gullies.
-    const peaks = [];
-    for (let k = 0; k < MASSIF.peaks; k++) {
-      const u = 0.12 + (0.76 * (k + peakRng.range(0.2, 0.8))) / MASSIF.peaks;
-      const w = 0.38 + peakRng.range(-0.1, 0.12);
-      const pa = base + (u - 0.5) * MASSIF.span * DEG;
-      const pr = massifNear + MASSIF.depth * w;
-      const middle = Math.exp(-(((u - 0.5) / 0.3) ** 2));
-      peaks.push({
-        x: start.pos.x + Math.cos(pa) * pr,
-        z: start.pos.z + Math.sin(pa) * pr,
-        h: MASSIF.height * (0.5 + 0.5 * middle) * peakRng.range(0.78, 1.0),
-        seed: k * 7.3,
-      });
-    }
-    const slope = Math.tan(MASSIF.slope * DEG);
+    // (sky lane, R0 addendum 2: "the whole exact screenshot") The crest is drawn to D1's skyline as seen from the
+    // start line: PROFILE gives, for an angle off the road's heading (degrees, + left), how high the crest stands
+    // (degrees above the eye). The crest lies CREST metres out (give or take); in front of it a steep face falls to
+    // the foot, cut by gullies that run straight down it (ridged noise across the face, stretched down it), with
+    // spurs between them; behind it the land falls away. The low sun behind it draws the form.
+    const span = MASSIF.left - MASSIF.right;
+    const eyeY = start.pos.y + 1.5;
+    const profile = (o) => {
+      const P = MASSIF.profile;
+      if (o <= P[0][0]) return P[0][1];
+      for (let k = 1; k < P.length; k++) {
+        if (o <= P[k][0]) {
+          const t = (o - P[k - 1][0]) / (P[k][0] - P[k - 1][0]);
+          const e = t * t * (3 - 2 * t);
+          return P[k - 1][1] + (P[k][1] - P[k - 1][1]) * e;
+        }
+      }
+      return P[P.length - 1][1];
+    };
     for (let j = 0; j <= rows; j++) {
       const v = j / rows; // 0 at the far edge, 1 at the near edge: rows are laid out far first
       const r = massifNear + MASSIF.depth * (1 - v);
       for (let i = 0; i <= cols; i++) {
         const u = i / cols;
-        const a = base + (u - 0.5) * MASSIF.span * DEG;
+        const o = MASSIF.right + u * span; // degrees left of the heading
+        const a = headAngle + leftSign * o * DEG;
         const x = start.pos.x + Math.cos(a) * r;
         const z = start.pos.z + Math.sin(a) * r;
-        let y = -80;
-        for (const pk of peaks) {
-          const dx = x - pk.x;
-          const dz = z - pk.z;
-          const d = Math.hypot(dx, dz);
-          const ang = Math.atan2(dz, dx);
-          // gullies: about one every 350 m round the summit at 1 km out, merging as they climb; deeper lower down
-          const g = crestNoise.ridged(Math.cos(ang) * 2.9 + pk.seed + d / 2600, Math.sin(ang) * 2.9 + d / 2600, 4);
-          const fine = crestNoise.ridged(x / 260 + pk.seed, z / 260, 3);
-          // the cone, its flanks bowed (steep high up, easing into the foot), the arêtes standing out of it
-          const reach = pk.h / slope;
-          const t = Math.max(0, 1 - d / (reach * 1.5));
-          const cone = pk.h * t ** 1.6 * (1.25 - 0.25 * t);
-          const cut = (0.55 + 0.45 * g) * (0.9 + 0.1 * fine);
-          y = Math.max(y, -80 + cone * (t > 0.92 ? 1 : cut + (1 - cut) * smoothstep(0.75, 0.95, t)));
+        // the crest: where it lies, and how high, with a little jag of its own so the skyline is not a curve
+        const crestR = MASSIF.crest * (1 + 0.12 * (crestNoise.fbm(o * 0.06 + 3, 0.7, 3) - 0.5));
+        const jag = 1 + 0.07 * (crestNoise.ridged(o * 0.55 + 1, 2.3, 3) - 0.5);
+        const crestH = eyeY + crestR * Math.tan(profile(o) * DEG) * jag;
+        // gullies across the face (about one per 1.5 degrees, i.e. 150 m), wandering, deeper low on the face
+        const along = (o * DEG * crestR) / 160;
+        // (warped, so they wander and fork instead of hanging like a curtain)
+        const down = (crestR - r) / 1400;
+        const warp = 1.6 * (crestNoise.fbm(along * 0.12 + 5, down * 1.3, 3) - 0.5);
+        const g = crestNoise.ridged(along * 0.5 + 7 + warp, down + 0.4 * warp, 4);
+        const fine = crestNoise.ridged(along * 1.7 + 2, (crestR - r) / 500, 3);
+        let y;
+        if (r <= crestR) {
+          const t = Math.max(0, (r - massifNear) / (crestR - massifNear)); // 0 at the foot, 1 at the crest
+          const face = t ** 1.7 * 0.82 + 0.18 * t;
+          // the gullies bite deepest mid-face and fade out at the crest, so the ridge line stays whole
+          const cut = 1 - (0.2 * (1 - g) + 0.05 * (1 - fine)) * Math.sin(Math.PI * Math.min(1, t * 1.05)) ** 0.7;
+          y = -60 + (crestH + 60) * face * cut;
+        } else {
+          const t = Math.min(1, (r - crestR) / 2600);
+          y = -60 + (crestH + 60) * (1 - 0.55 * t * t) * (0.94 + 0.06 * g);
         }
-        // foothills and the edges fade to nothing, so the field never ends in a wall
-        const edge = smoothstep(0, 0.12, u) * smoothstep(1, 0.88, u) * smoothstep(1, 0.85, v);
-        y = -80 + (y + 80) * edge;
+        // the ends of the field fade into the land, so it never ends in a wall
+        const edge = smoothstep(0, 0.06, u) * smoothstep(1, 0.94, u) * smoothstep(1, 0.92, v);
+        y = -60 + (y + 60) * edge;
         const p = at(i, j);
         pos[p * 3] = x;
         pos[p * 3 + 1] = y;
@@ -322,9 +325,9 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     // sky's share falls in the hollows.
     const heightAt = (x, z) => {
       const dx = x - start.pos.x, dz = z - start.pos.z;
-      let da = Math.atan2(dz, dx) - base;
+      let da = Math.atan2(dz, dx) - headAngle;
       da = Math.atan2(Math.sin(da), Math.cos(da));
-      const fu = (da / (MASSIF.span * DEG) + 0.5) * cols;
+      const fu = ((leftSign * da) / DEG - MASSIF.right) / span * cols;
       const fv = (1 - (Math.hypot(dx, dz) - massifNear) / MASSIF.depth) * rows;
       if (fu < 0 || fv < 0 || fu >= cols || fv >= rows) return -Infinity;
       const i = Math.floor(fu), j = Math.floor(fv), a = fu - i, c = fv - j;
@@ -363,8 +366,8 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const forest = smoothstep(treeLine + 60, treeLine - 80, y) * (1 - 0.7 * steep);
         const scree = smoothstep(0.6, 0.85, up) * (1 - forest) * smoothstep(treeLine - 50, treeLine + 250, y);
         const stain = 0.85 + 0.3 * crestNoise.fbm(x / 160, z / 260, 3);
-        const lime = [0.3 * stain, 0.295 * stain, 0.28 * stain];
-        const scr = [0.36, 0.35, 0.33];
+        const lime = [0.21 * stain, 0.207 * stain, 0.2 * stain];
+        const scr = [0.25, 0.245, 0.235];
         const green = [0.035, 0.05, 0.026];
         const c = lime.map((l, k) => l * (1 - scree) + scr[k] * scree);
         for (let k = 0; k < 3; k++) col[p * 3 + k] = c[k] * (1 - forest) + green[k] * forest;
