@@ -595,6 +595,64 @@
   color: #5fb4ff;
 }
 
+/* ---- the drift readout: over the road above the car, only while sliding; it fades out */
+
+.hud .drift {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--u) * 1);
+  padding: calc(var(--u) * 0.4) calc(var(--u) * 1.2);
+  background: var(--plate);
+  border-radius: calc(var(--u) * 1);
+  opacity: 0;
+  transition: opacity 0.8s ease-out;
+  pointer-events: none;
+}
+.hud .drift.on {
+  opacity: 1;
+  transition: opacity 0.15s ease-out;
+}
+.hud .drift .angle {
+  font-size: calc(var(--u) * 3);
+  font-weight: 800;
+  color: var(--amber);
+}
+.hud .drift .score {
+  font-size: calc(var(--u) * 2.2);
+  font-weight: 800;
+}
+.hud .view.tall .drift {
+  top: 40%;
+}
+
+/* ---- under the right thumb (touch): room for a handbrake or drift button, left of the speed */
+
+.hud .thumbs {
+  position: absolute;
+  right: calc(var(--pad) + var(--sr) + var(--u) * 25);
+  bottom: calc(var(--pad) + var(--sb));
+  display: flex;
+  gap: 10px;
+}
+.hud .thumbs .thumb {
+  width: max(64px, calc(var(--u) * 11));
+  height: max(64px, calc(var(--u) * 11));
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(10, 16, 22, 0.45);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.hud .view:not(.touch) .thumbs {
+  display: none;
+}
+
 /* ---- the buttons: small and together, at the right under the time to beat, away from the thumbs and the figures */
 
 .hud .touchcol {

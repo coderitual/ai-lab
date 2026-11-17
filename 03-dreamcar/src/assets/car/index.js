@@ -157,10 +157,11 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       glass: () => createTrimMaterial(shared, caps, { color: [0.38, 0.39, 0.4], metal: 1, rough: 0.02 }),
       body: () => createTrimMaterial(shared, caps, { color: numbers.color, metal: numbers.metal, rough: numbers.rough, coat: 1 }),
       emit: () => createLampPartMaterial(shared, caps),
-      // the cabin: black leather and plastic, lit by whatever sun comes in through the glass; under its roof it sees
+      // the cabin: black leather and plastic (0.012: at 0.028 the seats read cream in the low sun through the
+      // windscreen), lit by whatever sun comes in through the glass; under its roof it sees
       // only the slice of sky the windows let in (with the whole sky the seats shone light grey through the side
       // glass, where the daylight photographs show a dark cabin)
-      dark: () => createDarkMaterial(THREE.FrontSide, 0.028, 0.55, { direct: true, sky: 0.3 }),
+      dark: () => createDarkMaterial(THREE.FrontSide, 0.012, 0.6, { direct: true, sky: 0.3 }),
       plates: () => createPlateMaterial(shared, caps, details.plate),
     };
     for (const [name, geometry] of Object.entries(details.geometries)) {

@@ -483,6 +483,7 @@ window.__viewer = {
   lightTest: asset.lightTest ?? null,
   read,
   wheels: asset.wheels ?? null,
+  probe: asset.probe ?? null,
   /** Run and draw `n` frames, a sixtieth of a second apart. */
   frames(n = 1) {
     for (let i = 0; i < n; i++) engine.advance(1 / 60);
