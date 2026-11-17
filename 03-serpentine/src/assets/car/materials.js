@@ -557,13 +557,13 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
     // only where the sun reaches the paint at all: what three.js has just added up (shadows included) says so
     float lit = dot(reflectedLight.directSpecular, vec3(0.3333));
     lit = lit / (lit + 0.05);
-    // each flake lies within about 14 degrees of flat, and mirrors within about a degree and a half
-    vec3 na = normalize(geometryNormal + vCarToView * vec3(cFlakeA * 0.5, cFlakeA.x - cFlakeA.y));
-    vec3 nb = normalize(geometryNormal + vCarToView * vec3(cFlakeB * 0.5, cFlakeB.y - cFlakeB.x));
+    // each flake lies within about 8 degrees of flat, and mirrors within about a degree and a half
+    vec3 na = normalize(geometryNormal + vCarToView * vec3(cFlakeA * 0.28, 0.5 * (cFlakeA.x - cFlakeA.y)));
+    vec3 nb = normalize(geometryNormal + vCarToView * vec3(cFlakeB * 0.28, 0.5 * (cFlakeB.y - cFlakeB.x)));
     for (int i = 0; i < NUM_DIR_LIGHTS; i++) {
       vec3 h = normalize(directionalLights[i].direction + geometryViewDir);
       float glint = cFlakeW.x * pow(max(dot(na, h), 0.0), 1800.0) + cFlakeW.y * pow(max(dot(nb, h), 0.0), 1800.0);
-      reflectedLight.directSpecular += directionalLights[i].color * mix(vec3(1.0), paintColor, 0.5) * (lit * 16.0 * glint);
+      reflectedLight.directSpecular += directionalLights[i].color * mix(vec3(1.0), paintColor, 0.5) * (lit * 9.0 * glint);
     }
   }
 #endif`,

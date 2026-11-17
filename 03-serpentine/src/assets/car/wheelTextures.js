@@ -93,15 +93,15 @@ function sidewallHeight(along, s, outer) {
   }
   // two raised rings bound a band of fine hatching, in panels with plain ones between (where lettering would be)
   const mm = s * SIDEWALL_MM;
-  for (const ring of [45, 84]) h += 0.6 * clamp01(1.5 - Math.abs(mm - ring) / 0.9);
+  for (const ring of [45, 84]) h += 1.1 * clamp01(1.5 - Math.abs(mm - ring) / 0.9);
   if (mm > 48 && mm < 81) {
     const panel = (along / REPEAT_MM) * 2;
     const inPanel = panel - Math.floor(panel);
     const on = smooth(0.04, 0.07, inPanel) * smooth(0.7, 0.67, inPanel) * smooth(48, 51, mm) * smooth(81, 78, mm);
-    h += 0.4 * on * (0.5 + 0.5 * Math.cos(((along + mm * 0.8) / 3.6) * Math.PI * 2));
+    h += 0.7 * on * (0.5 + 0.5 * Math.cos(((along + mm * 0.8) / 3.6) * Math.PI * 2));
   }
   // fine rings above the rim protector
-  if (mm > 13 && mm < 29) h += 0.3 * (0.5 + 0.5 * Math.cos(((mm - 13) / 4) * Math.PI * 2)) * smooth(13, 14, mm) * smooth(29, 28, mm);
+  if (mm > 13 && mm < 29) h += 0.6 * (0.5 + 0.5 * Math.cos(((mm - 13) / 4) * Math.PI * 2)) * smooth(13, 14, mm) * smooth(29, 28, mm);
   return h;
 }
 
@@ -223,8 +223,8 @@ export const FINISH = {
   capRing: { color: [0.62, 0.63, 0.64], roughness: 0.34, metalness: 1 },
   bolt: { color: [0.02, 0.02, 0.021], roughness: 0.38, metalness: 0.8 },
   valve: { color: [0.022, 0.022, 0.022], roughness: 0.7, metalness: 0 },
-  disc: { color: [0.24, 0.235, 0.23], roughness: 0.5, metalness: 1 },
-  discWorn: { color: [0.19, 0.185, 0.18], roughness: 0.56, metalness: 1 },
+  disc: { color: [0.17, 0.167, 0.163], roughness: 0.5, metalness: 1 },
+  discWorn: { color: [0.14, 0.137, 0.133], roughness: 0.56, metalness: 1 },
   discEdge: { color: [0.11, 0.1, 0.095], roughness: 0.72, metalness: 0.8 },
   hat: { color: [0.05, 0.05, 0.052], roughness: 0.6, metalness: 0.5 },
   caliper: { color: [0.45, 0.45, 0.46], roughness: 0.45, metalness: 0.6 },
