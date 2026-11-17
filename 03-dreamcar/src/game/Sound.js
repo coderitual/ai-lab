@@ -76,7 +76,8 @@ const SHAPE = 3;
  */
 const GROUND = [];
 GROUND[SURFACE.ASPHALT] = { roar: 1, squeal: 1, scrub: 0, rumble: 0 };
-GROUND[SURFACE.SHOULDER] = { roar: 1.5, squeal: 0.6, scrub: 0.15, rumble: 1 };
+GROUND[SURFACE.SHOULDER] = { roar: 1.1, squeal: 0.95, scrub: 0, rumble: 0.15 }; // the paved margin beyond the edge line
+GROUND[SURFACE.KERB] = { roar: 1.2, squeal: 0.9, scrub: 0.05, rumble: 1.6 }; // the saw-tooth drums (its pitch: CAR.surfaces)
 GROUND[SURFACE.GRASS] = { roar: 1.25, squeal: 0, scrub: 0.8, rumble: 0.6 };
 GROUND[SURFACE.GRAVEL] = { roar: 1.9, squeal: 0, scrub: 1, rumble: 0.4 };
 

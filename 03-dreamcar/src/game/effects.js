@@ -84,7 +84,8 @@ export class Effects {
       const down = w.grounded && w.load > 0;
       const p = w.contact;
       const sample = w._sample;
-      const paved = w.surface === SURFACE.ASPHALT || w.surface === SURFACE.SHOULDER;
+      // the road, its paved margin and the kerbs: rubber marks and smoke; grass and gravel: dust and stones
+      const paved = w.surface === SURFACE.ASPHALT || w.surface === SURFACE.SHOULDER || w.surface === SURFACE.KERB;
 
       // ---- the mark: from the slide, eased in and out, on paved ground only
       const want = down && paved ? clamp01((w.skid - FX.markFrom) / FX.markFull) : 0;
@@ -111,7 +112,7 @@ export class Effects {
       // ---- what comes off the tyre
       const o = i * 4;
       const ground = p.y;
-      if (w.surface === SURFACE.ASPHALT && !wetRoad) {
+      if (paved && !wetRoad) {
         // smoke: only a tyre really sliding on dry asphalt (a locked wheel, a slide past the limit, a burnout),
         // judged by how fast the rubber scrubs over the road, not by the skid alone: a wheel that spins a little
         // off the line, or one an assist is holding at its limit, makes next to none
@@ -131,8 +132,8 @@ export class Effects {
             this.time, rng.range(1.0, 1.8), rng.range(0.12, 0.2), rng.range(0.45, 0.8) * big, rng.next(), ground,
           );
         }
-      } else if (w.surface !== SURFACE.ASPHALT && speed > 2) {
-        // dust off the shoulder and the verge, more when the tyre slides; stones off gravel and the shoulder
+      } else if (!paved && speed > 2) {
+        // dust off the verge, more when the tyre slides; stones off gravel
         const k = (speed / 20) * (1 + 2 * w.skid) * (w.surface === SURFACE.GRASS ? 0.4 : 1);
         this._owed[o + 1] += FX.dustRate * t.rate * Math.min(k, 2.5) * dt;
         while (this._owed[o + 1] >= 1) {

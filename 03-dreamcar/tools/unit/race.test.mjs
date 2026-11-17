@@ -263,7 +263,7 @@ test('the board: best five per time of day, sorted, kept across a new Race (a re
   const map = storage();
   runLaps('day', [40, 41, 42]);
   runLaps('day', [43, 44, 45]);
-  const raw = JSON.parse(map.get('dreamcar.best.v1'));
+  const raw = JSON.parse(map.get('dreamcar.best.v2'));
   eq(raw.length, L, 'kept against the road length');
   eq(raw.day.laps.length, RULES.boardRows, 'five rows kept of six laps');
   const ms = raw.day.laps.map((l) => l.ms);
@@ -277,7 +277,7 @@ test('the board: best five per time of day, sorted, kept across a new Race (a re
   const night = new Race(track, { racers: 1, laps: 3, time: 'night', mode: 'solo', rng: createRng(1) });
   eq(night.table.laps.length, 0, 'night empty');
   runLaps('dusk', [39]);
-  const raw2 = JSON.parse(map.get('dreamcar.best.v1'));
+  const raw2 = JSON.parse(map.get('dreamcar.best.v2'));
   eq(raw2.dusk.laps.length, 1, 'a dusk table made on first use');
   eq(raw2.day.laps.length, RULES.boardRows, 'day untouched');
 });
@@ -288,7 +288,7 @@ test('a lap with a put-back counts for the run but not for the board', () => {
   eq(race.cars[0].times.length, 3, 'three laps run');
   expect(race.cars[0].times[1].putBack, 'lap two marked');
   expect(!race.cars[0].times[0].putBack && !race.cars[0].times[2].putBack, 'the others clean (the flag is per lap)');
-  const raw = JSON.parse(map.get('dreamcar.best.v1'));
+  const raw = JSON.parse(map.get('dreamcar.best.v2'));
   eq(raw.day.laps.length, 2, 'two laps on the board');
   eq(raw.day.best3, null, 'no three-lap total from a run with a put-back');
 });
@@ -296,7 +296,7 @@ test('a lap with a put-back counts for the run but not for the board', () => {
 test('a short run (?laps=1) puts its lap on the board but makes no three-lap total', () => {
   const map = storage();
   runLaps('night', [40]);
-  const raw = JSON.parse(map.get('dreamcar.best.v1'));
+  const raw = JSON.parse(map.get('dreamcar.best.v2'));
   eq(raw.night.laps.length, 1, 'one lap');
   eq(raw.night.best3, null, 'no total');
 });
@@ -329,7 +329,7 @@ test('storage holding rubbish: ignored, the board starts empty', () => {
   for (const junk of ['{', '"x"', JSON.stringify({ length: L, day: { laps: [{ ms: -5 }, { ms: 'a' }, null], best3: 'x' } }),
     JSON.stringify({ length: 999, day: { laps: [{ ms: 90000 }] } })]) {
     const map = storage();
-    map.set('dreamcar.best.v1', junk);
+    map.set('dreamcar.best.v2', junk);
     const race = new Race(track, { racers: 1, laps: 3, time: 'day', mode: 'solo', rng: createRng(1) });
     eq(race.table.laps.length, 0, `no laps from ${junk.slice(0, 40)}`);
     eq(race.table.best3, null, 'no total');
