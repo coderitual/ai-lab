@@ -56,7 +56,7 @@ export function buildTrackside({ track, terrain, tier, b, signs }) {
     M.makeBasis(X.copy(along).multiplyScalar(sx), Y.set(0, sy, 0), Z.copy(face).multiplyScalar(sz)).setPosition(c);
     b.box(M, uv);
   };
-  const pit = { s0: track.wrap(PIT.s0 - 6), len: PIT.s1 - PIT.s0 + 12 };
+  const pit = { s0: track.wrap(track.gantry.s + PIT.s0 - 6), len: PIT.s1 - PIT.s0 + 12 };
   const inPit = (s) => track.wrap(s - pit.s0) < pit.len;
   const nearGantry = (s, room) => Math.abs(track.delta(track.gantry.s, s)) < room;
 

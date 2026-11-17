@@ -847,7 +847,7 @@ export function createWriter() {
 /**
  * One building from its lot: walls, roof, chimneys, cornice, balconies, awnings.
  * @param {ReturnType<typeof createWriter>} w
- * @param {import('./townPlan.js').Lot} lot
+ * @param {object} lot one building: its front line A..B on the map, depth, floors, roof, palette (town.js makes them)
  * @param {number} y0 the height of the pavement at its front (v = 0)
  * @param {number} low the lowest ground under it (its plinth goes down to there)
  * @param {import('../../engine/rng.js').Rng} rng

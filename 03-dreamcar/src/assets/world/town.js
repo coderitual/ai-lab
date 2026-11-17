@@ -27,7 +27,7 @@ const STEEP = 0.75;
  * The sites, on the map: origin, the direction the fronts face (towards the circuit, level unit vector), how many
  * rows up the slope, how long a row, row spacing. `hotel`: the pale building on the height.
  */
-const TOWNS = [
+export const TOWNS = [
   { name: 'east', x: 600, z: 40, face: [-1, 0], rows: 7, length: 300, spacing: 24, church: [3, 0.45], hotel: { x: 815, z: -95 } },
   { name: 'shore', x: 40, z: -585, face: [0, 1], rows: 3, length: 320, spacing: 22, church: [1, 0.6] },
 ];

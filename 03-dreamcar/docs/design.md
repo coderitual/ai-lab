@@ -122,7 +122,23 @@ The Track says where everything of a circuit goes, as data the world reads
 (`src/game/track.js`, header): kerbs, what grows behind each barrier, tyre
 walls on the outside of the fast bends, runs of trackside boards, distance
 boards before the carousel, marshal posts, the start gantry. Road furniture is
-drawn from scratch and carries no real names or words.
+drawn from scratch and carries no real names or words: the circuit is called
+Calvenna, and the boards advertise made-up firms (Varno, Torvel, Miralta,
+Brennik, Oskali, Lundar, Pellora, Arvent, Solmere) with simple abstract marks,
+in the project's own stroke letters (`src/assets/world/signs.js`).
+
+The start (`src/assets/world/dressing.js` gathers it): a steel truss on two
+lattice towers across the line, the circuit's name board on both faces, and
+under its middle five columns of four hooded lamps, the lower two red for the
+count, the upper two green for four seconds after lights out. On the land side
+behind the wall a catch fence, a pit lane and a two-storey pit building
+(garages, a glazed floor lit at dusk and at night, a roof terrace under a
+canopy carrying the name); on the lake side a covered stand. Big hoardings on
+legs behind both walls of the straight, low boards along the bends, tyre walls,
+distance boards, marshal huts, all from the Track's data and never inside the
+solid edges. Past the end of the straight a town climbs the slope beyond the
+shore bend with a church tower and a large pale hotel on the height; a hamlet
+lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
 
 ## A run
 
@@ -183,8 +199,8 @@ a few seconds it is offered).
   the ridges and the edges of the road; stars; the low beam reaching about
   65 m with a sharp cut-off rising to the right, high beam about 150 m; LED
   daytime running lamps always on; tail lamps red with a hot core; brake lamps
-  three times brighter; warm tunnel lamps; lit windows at the chalet by the
-  start. Exposure about 4 stops above day (lighting.js: 18 against 1; at 5
+  three times brighter; warm tunnel lamps; lit windows in the pit building and the
+  towns. Exposure about 4 stops above day (lighting.js: 18 against 1; at 5
   stops the moonlit land read as dusk and anything facing a head lamp within
   30 m burnt white). Lens ghosts are off at night.
 - **Night is the night after rain.** The asphalt is wet (lighting.js

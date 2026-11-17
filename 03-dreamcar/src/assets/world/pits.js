@@ -21,8 +21,8 @@ import { PIT } from './gantry.js';
 const FLOORS = { garage: 4.4, slab: 0.45, glazed: 3.3, canopy: 2.8 };
 /** A garage bay's width and its door. */
 const BAY = { w: 5.2, door: 4.2, doorH: 3.5 };
-/** The stand: signed s of its ends, metres beyond the lake-side edge, rows, row depth and rise. */
-const STAND = { s0: -66, s1: -6, beyond: 3.2, rows: 9, depth: 0.85, rise: 0.48 };
+/** The stand: s of its ends from the line (the gantry), metres beyond the lake-side edge, rows, row depth and rise. */
+export const STAND = { s0: -66, s1: -6, beyond: 3.2, rows: 9, depth: 0.85, rise: 0.48 };
 
 /**
  * @param {object} options
@@ -42,9 +42,10 @@ export function buildPits({ track, terrain, tier, b, signs }) {
    * A straight block's frame along the road on one side: o the point at s0 on the line `dist` m from the centre,
    * t along the road, n towards the road (level), lengths in metres.
    */
+  const g0 = track.gantry.s;
   const lineFrame = (s0, s1, side, dist) => {
-    const a = track.pointAt(track.wrap(s0), side * dist, new THREE.Vector3());
-    const c = track.pointAt(track.wrap(s1), side * dist, new THREE.Vector3());
+    const a = track.pointAt(track.wrap(g0 + s0), side * dist, new THREE.Vector3());
+    const c = track.pointAt(track.wrap(g0 + s1), side * dist, new THREE.Vector3());
     const t = new THREE.Vector3(c.x - a.x, 0, c.z - a.z);
     const len = t.length();
     t.divideScalar(len);
@@ -69,7 +70,7 @@ export function buildPits({ track, terrain, tier, b, signs }) {
 
   // ---- the pit building on the land side
   const side = -1;
-  const edge = Math.max(track.edgeAt(track.wrap(PIT.s0), side), track.edgeAt(track.wrap(PIT.s1), side), track.edgeAt(0, side));
+  const edge = Math.max(track.edgeAt(track.wrap(g0 + PIT.s0), side), track.edgeAt(track.wrap(g0 + PIT.s1), side), track.edgeAt(g0, side));
   const pf = lineFrame(PIT.s0, PIT.s1, side, edge + PIT.beyond);
   // seen from the road the building's +t runs to the viewer's left (the road's right side): hand -1 flips faces
   pf.hand = -1;
@@ -139,7 +140,7 @@ export function buildPits({ track, terrain, tier, b, signs }) {
   const posts = Math.round(fence.len / 4);
   const fy = (x) => {
     const p = at(fence, x, 0, 0);
-    return Math.max(terrain.heightAt(p.x, p.z), track.pointAt(0, 0).y - 0.3);
+    return Math.max(terrain.heightAt(p.x, p.z), track.pointAt(g0, 0).y - 0.3);
   };
   for (let k = 0; k <= posts; k++) {
     const x = (k * fence.len) / posts;
@@ -147,19 +148,19 @@ export function buildPits({ track, terrain, tier, b, signs }) {
     b.box(beam(at(fence, x, g, 0), at(fence, x, g + 3.0, 0), 0.09, 0.09, M), sw.fence);
     b.box(beam(at(fence, x, g + 3.0, 0), at(fence, x, g + 3.7, 0.45), 0.08, 0.08, M), sw.fence);
   }
-  const g0 = fy(0);
+  const f0 = fy(0);
   const cables = tier === 'low' ? [1.2, 2.2, 3.0] : [0.9, 1.5, 2.1, 2.6, 3.0, 3.35];
   for (const h of cables) {
     const z = h > 3.0 ? ((h - 3.0) / 0.7) * 0.45 : 0;
-    b.box(beam(at(fence, 0, g0 + h, z), at(fence, fence.len, g0 + h, z), 0.025, 0.025, M), sw.fence);
+    b.box(beam(at(fence, 0, f0 + h, z), at(fence, fence.len, f0 + h, z), 0.025, 0.025, M), sw.fence);
   }
-  b.box(beam(at(fence, 0, g0 + 3.7, 0.45), at(fence, fence.len, g0 + 3.7, 0.45), 0.06, 0.06, M), sw.fence);
+  b.box(beam(at(fence, 0, f0 + 3.7, 0.45), at(fence, fence.len, f0 + 3.7, 0.45), 0.06, 0.06, M), sw.fence);
 
   // ---- the stand on the lake side
-  const sf = lineFrame(STAND.s0, STAND.s1, 1, track.edgeAt(track.wrap((STAND.s0 + STAND.s1) / 2), 1) + STAND.beyond);
+  const sf = lineFrame(STAND.s0, STAND.s1, 1, track.edgeAt(track.wrap(g0 + (STAND.s0 + STAND.s1) / 2), 1) + STAND.beyond);
   sf.hand = 1;
   const smid = at(sf, sf.len / 2, 0, 0);
-  const sy = Math.max(terrain.heightAt(smid.x, smid.z), track.pointAt(0, 0).y - 1.2);
+  const sy = Math.max(terrain.heightAt(smid.x, smid.z), track.pointAt(g0, 0).y - 1.2);
   const run = STAND.rows * STAND.depth;
   for (let r = 0; r < STAND.rows; r++) {
     const z = -r * STAND.depth - STAND.depth / 2;

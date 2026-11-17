@@ -48,7 +48,7 @@ export function createDressing({ track, terrain, caps, tier, atmosphere, rng }) 
   const b = createBuilder();
   const start = createStart({ track, terrain, b, signs, atmosphere });
   const trackside = buildTrackside({ track, terrain, tier, b, signs });
-  const pits = buildPits({ track, terrain, tier, b, signs });
+  buildPits({ track, terrain, tier, b, signs });
   const patches = b.build(material, group);
   group.add(start.group);
   const town = createTown({ track, terrain, tier, atmosphere, rng: rng.fork('town') });

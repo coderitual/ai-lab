@@ -22,6 +22,8 @@ const GREEN = [3.0, 26, 13];
 /** An unlit lens: its tint, as a share of what the time of day's exposure shows as mid grey. */
 const LENS_RED = [0.035, 0.006, 0.005];
 const LENS_GREEN = [0.004, 0.018, 0.013];
+/** Above this exposure the lit lamps are eased down (see setTime). */
+const LIT_EXPOSURE = 4;
 /** Seconds the green shows after the lamps go out, and over how much of the end it fades. */
 const GREEN_HOLD = 4;
 const GREEN_FADE = 1;
@@ -32,16 +34,16 @@ const BOARD = { w: 16, foot: 7.15 };
 /** Start lamps: columns, lamps per column, radius, spacing (m). */
 const LAMPS = { columns: 5, rows: 4, r: 0.19, pitch: 0.5, colW: 0.56, gap: 0.16 };
 
-/** The pit building's place: signed s of its ends, metres from the land-side wall to its front, its depth. */
+/** The pit building's place: s of its ends from the line (track.gantry.s, negative before it), metres from the land-side wall to its front, its depth. */
 export const PIT = { s0: -78, s1: 22, beyond: 12, depth: 15 };
 
 /**
- * Where the start's buildings stand, as the circle the forest keeps its trees out of (forest.js reads it): the
- * pit building on the land side of the straight. Pure, from the Track.
+ * The pit building on the land side of the straight as a circle, for forest.js's old keep-out hook. Pure, from the
+ * Track. The footprints themselves are keepOut() in startPlan.js (for createWorld's keepOut).
  * @param {object} track
  */
 export function layBy(track) {
-  const s = track.wrap(PIT.s0 + (PIT.s1 - PIT.s0) / 2);
+  const s = track.wrap(track.gantry.s + PIT.s0 + (PIT.s1 - PIT.s0) / 2);
   const lat = -(track.edgeAt(s, -1) + PIT.beyond + PIT.depth / 2);
   const at = track.pointAt(s, lat, new THREE.Vector3());
   return { s, lat, x: at.x, z: at.z, yaw: 0, radius: (PIT.s1 - PIT.s0) / 2 + 8 };
@@ -185,11 +187,12 @@ export function createStart({ track, terrain, b, signs, atmosphere }) {
   let lit = 0;
   let green = 0;
   let lensScale = 1;
+  let litScale = 1;
   const paint = () => {
     const g = Math.min(1, green / GREEN_FADE);
     lampAt.forEach((l, i) => {
-      if (l.r >= 2) color.setRGB(...(l.c < lit ? RED : LENS_RED.map((v) => v * lensScale)));
-      else color.setRGB(...GREEN.map((v, k) => v * g + LENS_GREEN[k] * lensScale * (1 - g)));
+      if (l.r >= 2) color.setRGB(...(l.c < lit ? RED.map((v) => v * litScale) : LENS_RED.map((v) => v * lensScale)));
+      else color.setRGB(...GREEN.map((v, k) => v * g * litScale + LENS_GREEN[k] * lensScale * (1 - g)));
       lenses.setColorAt(i, color);
     });
     lenses.instanceColor.needsUpdate = true;
@@ -215,6 +218,9 @@ export function createStart({ track, terrain, b, signs, atmosphere }) {
     setTime(time) {
       // the unlit glass is a tint the eye sees as dark whatever the exposure
       lensScale = 1 / time.exposure;
+      // a lamp seen by an eye opened up for the dark is still the brightest thing about, but not a sun: its
+      // radiance is eased down as the exposure opens, so the bloom stays a halo round the lamps
+      litScale = Math.min(1, (LIT_EXPOSURE / time.exposure) ** 0.7);
       paint();
     },
     dispose() {

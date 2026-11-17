@@ -111,6 +111,8 @@ export function createSigns({ tier, anisotropy = 1 }) {
   g.fillStyle = '#808080';
   g.fillRect(0, 0, W, H);
   drawGantryBoard(g, GANTRY_CELL);
+  // the name board is lit from behind at dusk and at night: its letters and mark glow, dimmer than a window
+  drawGantryGlow(e, GANTRY_CELL);
   DISTANCES.forEach((label, k) => drawDistance(g, DIST_CELL(k), label));
   BOARDS.forEach((b, k) => drawBoard(g, BOARD_CELL(k), b));
   drawTyres(g, SPECIAL.tyres, null);
@@ -198,7 +200,8 @@ function writeFit(g, text, cx, cy, maxW, maxH, options = {}) {
   const h = Math.min(maxH, (maxH * maxW) / width);
   const w = write(g, text, 0, 0, h, { ...options, measure: true });
   g.lineCap = 'butt';
-  g.lineJoin = 'miter';
+  // bevelled corners: a sharp V or A keeps a clean point instead of a long mitre spike
+  g.lineJoin = 'bevel';
   write(g, text, cx - w / 2 + (options.slant ?? 0) * h * 0.5, cy + h / 2, h, options);
   return { w, h };
 }
@@ -312,6 +315,13 @@ function drawGantryBoard(g, [x, y, w, h]) {
   drawMark(g, 'lake', x + 150, y + h * 0.46, 170, '#e59a2c', '#163a4c');
   g.strokeStyle = '#efe6cf';
   writeFit(g, CIRCUIT_NAME, x + 1060, y + h * 0.45, 1560, 160, { pen: 0.25, wide: 1.3, slant: 0.14, gap: 0.24 });
+}
+
+function drawGantryGlow(e, [x, y, w, h]) {
+  e.strokeStyle = '#6b604c';
+  e.lineWidth = 1;
+  writeFit(e, CIRCUIT_NAME, x + 1060, y + h * 0.45, 1560, 160, { pen: 0.25, wide: 1.3, slant: 0.14, gap: 0.24 });
+  drawMark(e, 'lake', x + 150, y + h * 0.46, 170, '#5a3c14', '#000000');
 }
 
 function drawDistance(g, [x, y, w, h], label) {
