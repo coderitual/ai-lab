@@ -227,7 +227,7 @@ export const FX = {
   stoneRate: 10,
   /** Spray from this speed (m/s); rate at 25 m/s above it on a soaked road. */
   sprayFrom: 5,
-  sprayRate: 40,
+  sprayRate: 55,
   /** Sparks: a burst per hit (per m/s of closing speed, at most burstMax), a stream while scraping. */
   burstPer: 2.5,
   burstMax: 40,
@@ -237,7 +237,7 @@ export const FX = {
    * dipped beam (2 x 3200 cd), main beam's gain, the tail lamps' red glow and the brake lamps' gain over it. */
   lampHead: 6400,
   highGain: 2.7,
-  lampTail: 0.1,
+  lampTail: 0.25,
   brakeGain: 4,
 };
 

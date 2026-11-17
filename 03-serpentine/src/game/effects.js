@@ -161,7 +161,7 @@ export class Effects {
             KINDS.spray,
             p.x + rng.range(-0.12, 0.12), ground + 0.12, p.z + rng.range(-0.12, 0.12),
             vel.x * 0.62 + rng.range(-0.8, 0.8), rng.range(0.5, 1.6), vel.z * 0.62 + rng.range(-0.8, 0.8),
-            this.time, rng.range(0.7, 1.2), rng.range(0.18, 0.3), rng.range(1.1, 1.9) * (0.6 + 0.4 * k), rng.next(), ground,
+            this.time, rng.range(0.8, 1.4), rng.range(0.2, 0.32), rng.range(1.2, 2.0) * (0.6 + 0.4 * k), rng.next(), ground,
           );
         }
       }
