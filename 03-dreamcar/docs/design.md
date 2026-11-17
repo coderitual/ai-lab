@@ -1,4 +1,4 @@
-# Serpentine: design
+# Dreamcar: design
 
 What this demo is meant to be. The numbers here are targets; what the build
 actually does, number by number, is in [spec.md](spec.md). When the two

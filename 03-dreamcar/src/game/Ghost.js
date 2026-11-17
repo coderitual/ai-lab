@@ -7,12 +7,12 @@
 // interpolating between the two samples either side of the lap clock. As
 // with the gaps, the first lap races the best lap from the grid and the
 // others the best flying lap, so two recordings are kept per time of day, in
-// localStorage under `serpentine.ghost.v1`. A recording made on a road of
+// localStorage under `dreamcar.ghost.v1`. A recording made on a road of
 // another length is dropped, and storage that fails is ignored.
 
 import * as THREE from 'three';
 
-const STORE_KEY = 'serpentine.ghost.v1';
+const STORE_KEY = 'dreamcar.ghost.v1';
 /** Samples a second. */
 export const GHOST_RATE = 10;
 /** Numbers a sample: x, y, z, qx, qy, qz, qw. */

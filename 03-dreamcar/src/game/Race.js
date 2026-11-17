@@ -20,7 +20,7 @@
 
 import { RULES } from './config.js';
 
-const STORE_KEY = 'serpentine.best.v1';
+const STORE_KEY = 'dreamcar.best.v1';
 
 /**
  * @typedef {object} Lap
