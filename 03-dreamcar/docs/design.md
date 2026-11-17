@@ -6,24 +6,27 @@ disagree, decide which is wrong and fix that one.
 
 ## The demo in one paragraph
 
-A silver saloon, a closed mountain road, and a clock. You drive a current
+A silver saloon, a racing circuit and a clock. You drive a current
 Mercedes-Benz C-Class (the W206 saloon in AMG Line trim, modelled in code from
 photographs of one particular car, in a hot dream tune) round a five-kilometre
 circuit in the mountains by a lake: a lakeside straight, fast esses through the
-woods, a lit tunnel, a road on piers across the valley, a slow carousel, a crest,
-a plunge, a ledge, a second bridge and a long right back to the shore. Three laps against the clock, alone or
-against a friend in split screen. The same road exists three times: on a sunlit
-afternoon, at dusk after rain, and at night, when the picture is made of
-headlights, reflectors, the tunnel's lamps and the moon. It plays in a browser with a keyboard, a
-gamepad, or thumbs on a phone.
+woods, a lit tunnel, a road on piers across the valley, a slow carousel, a
+crest, a plunge, a ledge, a second bridge and a long right back to the shore.
+Three laps against the clock, alone or against a friend in split screen. The
+same circuit exists three times: on a sunlit autumn afternoon with the sun
+straight down the start straight, at golden hour, and on a wet night after
+rain, when the picture is made of lamps and their reflections in the asphalt.
+It plays in a browser with a keyboard, a gamepad, or thumbs on a phone.
 
 It is an original demo. Two things were looked at for what "good" looks like
-and never for names, tracks, interface or art: an old XNA starter-kit racing
-game (the shape of the thing: a time trial on a scenic road with a chase
-camera, a speedometer, lap times and a best-times board, heavy motion blur
-and glow) and two other racers (how a car should sit in the frame, how a
-road is lit by day, and what a wet road does with lights at night). The car is an unofficial model made out of enthusiasm for
-the real one; this project is not affiliated with its maker.
+and never for names, tracks, interface or art: an old open racing sample (the
+shape of the thing: a fast road with rails rising into the sky on columns, a
+chase camera, big readable figures, streaks of speed and glow) and a console
+racing simulator (how a car should sit in the frame, how a circuit is lit by
+a low sun, what autumn trees and a wet road look like). Five frames of the
+owner's from them are the spec for the look (below, "The reference frames");
+they stay out of the repository. The car is an unofficial model made out of
+enthusiasm for the real one; this project is not affiliated with its maker.
 
 ## What it is built round
 
@@ -32,12 +35,13 @@ the real one; this project is not affiliated with its maker.
    survive that: correct proportions, a paint that mirrors the trees going by,
    lamps that are objects with depth and not red rectangles, wheels that
    steer, spin and ride on springs, a body that rolls and squats.
-2. **Light is the subject.** Day and night are not a tint. By day: one low sun,
-   long tree shadows across the road, haze in the valleys, a sky the paint
-   reflects. By night: the car's own lamps do the work. The low beam has a
-   shape and a cut-off, the edge lines' glass beads answer it, the tunnel is a
-   pool of sodium light you can see from the valley, the tail lamps colour the
-   road behind, and the exposure opens up the way eyes do.
+2. **Light is the subject.** The times of day are not a tint. By day: one
+   low sun straight ahead, its glare on the asphalt, hard shadows, haze in the
+   valleys, a sky the paint reflects. At golden hour: level orange light on the
+   crowns and the gantry, the road in long shade. By night: the wet asphalt
+   mirrors the lamps, the car's low beam has a shape and a cut-off, the edge
+   lines' glass beads answer it, the tunnel is lit, and the exposure opens up
+   the way eyes do.
 3. **It drives like a car.** A rigid body on four sprung wheels with tyres that
    have a grip limit, an engine with a torque curve and an automatic gearbox,
    rear-wheel drive, weight transfer you can see. The assists a real car has
@@ -51,8 +55,9 @@ the real one; this project is not affiliated with its maker.
    the engine note is synthesised. Every asset can be changed by changing a
    number.
 6. **Room to grow.** Weather is the obvious next step, so the road already
-   has a wetness it does not yet use, the lighting is one table per time of
-   day, and the sky, fog and exposure all come from that table.
+   has a wetness (used today only by the night, as a look), the lighting is one
+   table per time of day, and the sky, fog, lamps, wetness and exposure all
+   come from that table.
 
 ## The car
 
@@ -63,16 +68,16 @@ The real thing, as the ruler for the model (W206 saloon):
 | length / width (body) / height | 4.751 m / 1.820 m / 1.438 m |
 | wheelbase | 2.865 m |
 | track front / rear | 1.582 m / 1.594 m |
-| tyres (AMG Line, 18 inch) | 225/45 R18 front, 245/40 R18 rear |
+| tyres (this car's 19-inch wheels) | 225/40 R19 front, 255/35 R19 rear |
 | kerb weight | about 1 650 kg |
 | engine | 2.0 l turbocharged four, 190 kW, 400 N·m, 9-speed automatic, rear-wheel drive |
 | 0–100 km/h / top speed | about 6.0 s / 250 km/h (limited) |
-| **the demo's tune** | 640 N·m, 365 kW; 0–100 km/h 3.9 s, 0–200 12.1 s, 284 km/h (limited); about 1.25 g at 100 km/h, a little downforce above that; 100–0 in 28 m |
+| **the demo's tune** | 640 N·m, 365 kW; 0–100 km/h 3.9 s, 0–200 12.1 s, 284 km/h (limited); about 1.26 g at 90 km/h, a little downforce above that; 100–0 in 28 m |
 
 The particular car: high-tech silver metallic, AMG Line (star-pattern grille
 with one horizontal blade and the large star, sport bumpers with black
 intakes, chrome twin tail-pipe trims in a black diffuser), black mirror caps,
-dark tinted rear glass, a black panoramic roof, 18-inch five-twin-spoke
+dark tinted rear glass, a black panoramic roof, 19-inch five-twin-spoke
 wheels in black with machined faces, and the two-piece tail lamps of this
 generation. What must read from the chase camera, in order: the stance and
 silhouette, the tail lamps and their light signature, the rear screen and
@@ -81,8 +86,8 @@ mirrors. From the front (title screen, staged pictures): the grille, the star,
 the head lamps with their daytime running "eyebrow", the bonnet's two power
 domes.
 
-It carries a number plate. By default the plate is a made-up one; `?plate=`
-puts another text on it.
+It carries a number plate. By default the plate is a made-up one
+(`DRIVERS` in game/config.js); `?plate=` puts another text on it.
 
 A second car, in a different paint, is the second player's.
 
@@ -97,7 +102,7 @@ default, a low concrete wall along the start straight, rock where the road is
 cut into the hill, parapets on the bridges, walls in the tunnel. Trees stand
 behind the barrier, never as it.
 
-How the ground is drawn (src/assets/world, ENV lane): the asphalt (road.js) is
+How the ground is drawn (src/assets/world): the asphalt (road.js) is
 dark, fine racing asphalt with a polished, darker racing line and rubber in
 the bends and the braking zones (corridor.js), runs of surfacing of different
 ages with joints, the paver's seams 2 m either side of the middle, a few
@@ -117,7 +122,7 @@ limestone where the edge is rock. Viaduct piers are slender eight-sided
 shafts under flared capitals; the short bridge spans a V-shaped gully across
 it with a stream's notch. Gradients up to 8 per cent; banking by rule
 from the curvature (up to 9 degrees) and per piece, up to 10 degrees on the
-sky road. The numbers by stretch (s from the line, m; speeds are the
+sky road and the first bend of the ledge. The numbers by stretch (s from the line, m; speeds are the
 autopilot's at full pace):
 
 | stretch | s | what it is |
@@ -218,9 +223,9 @@ a few seconds it is offered).
   the tail out and the stability control catches most of it.
 - **Weight.** The nose dives under braking and lifts under power; the body
   leans on the outside wheels; kerbs and the verge come through the springs.
-- **Speed is seen, not only read.** The lens widens a little, the verge
-  streaks, the camera settles lower and shakes with the surface, guide posts
-  tick past.
+- **Speed is seen, not only read.** The lens widens, the camera drops back,
+  the roadside streaks while the car stays sharp, the camera shakes with the
+  surface, and kerbs, boards and barriers go by.
 - **The camera shows the slide.** It follows where the car is going more than
   where it points, so oversteer looks like oversteer.
 
@@ -269,7 +274,6 @@ is the same picture every time. Frame D1's camera on the start straight is
 about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
 
 ## The look
-
 - Linear HDR frame, filmic tone curve, bloom from real brightness (lamps are
   hundreds of times brighter than paint), camera and object motion blur with
   the car held sharp, a slight vignette and grain. No effect that is not also
@@ -292,6 +296,17 @@ about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
   blue-grey in its own shade, gullies down its face, forest and scree on its
   lower third. Exposure for sunlit asphalt, closing by about 2.5 stops inside
   the tunnel and recovering over a second on the way out.
+- **Day has the sun in it.** Heading into the low sun it blooms into a soft
+  glare, faint lens ghosts lie across the frame (medium and high), the sky
+  stays blue up to it and the road shines towards the light.
+- **Dusk is golden hour** (references D4, D2): the sun 3.5° up, 125° left
+  of the start straight's heading, out over the lake behind the left shoulder of a car on the start
+  straight. Its orange light crosses the straight almost level, so whatever
+  stands on the lake side throws shadows 15 to 20 m long over the grid while
+  the trees, the gantry and the buildings on the land side, and the massif,
+  stand in full orange light. The sky runs from pale gold towards the sun
+  through a rose belt to blue overhead, with clouds lit from below that the
+  paint mirrors. Dry. Lamps and windows are coming on.
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
@@ -318,19 +333,53 @@ about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
   glow on the haze above it, a radio mast's red lamps and a hamlet high on
   the slope beyond (from which stretches of the new circuit it is in the frame
   has not been checked yet).
-- **Dusk is golden hour** (references D4, D2): the sun 3.5° up, 125° left
-  of the start straight's heading, out over the lake behind the left shoulder of a car on the start
-  straight. Its orange light crosses the straight almost level, so whatever
-  stands on the lake side throws shadows 15 to 20 m long over the grid while
-  the trees, the gantry and the buildings on the land side, and the massif,
-  stand in full orange light. The sky runs from pale gold towards the sun
-  through a rose belt to blue overhead, with clouds lit from below that the
-  paint mirrors. Dry. Lamps and windows are coming on.
-- **Day has the sun in it.** Heading into the low sun it blooms into a soft
-  glare, faint lens ghosts lie across the frame (medium and high), the sky
-  stays blue up to it and the road shines towards the light.
 - The paint is a metallic silver under a clear coat: a sharp mirror image of
   the real surroundings over a soft, flake-sparkling base.
+
+## The reference frames
+
+The owner chose five frames as the spec for the look ("treat those
+screenshots as spec, not suggestion"). They are kept out of the repository
+and described here in words. Every change to the light, the materials or the
+grade is judged by staging our still beside the frame it answers to, at the
+same framing, and listing what still differs (ideas.md keeps the lists).
+
+- **A**, from an old open racing sample, by day: a road three lanes wide with
+  rails, rising into the sky on columns; a sun you cannot look at, with rays
+  and a row of flare discs, in a blue sky with clouds; a hard car shadow;
+  streaks of speed with the car crisp in the middle of the frame, seen from
+  above its roof so that the road ahead shows; big readable figures for lap,
+  time, speed and gear.
+- **D1**, from a console racing simulator, by day: a deep blue sky with small
+  lit cumulus; a low sun almost exactly over the road's vanishing point,
+  about 15° up, with a wide soft glare; a huge back-lit limestone massif
+  filling the background, blue-grey in its shade with crisp ridges; sunlit
+  trees and bushes in the middle distance; dark smooth asphalt with the
+  sun's glare lying on it as a long streak; on one side a low wall of dark and
+  bright blocks with tall boards behind it, on the other mown grass and a
+  steel barrier; long sharp shadows; glints on the paint. It is to be
+  matched as a whole picture, read as a scene on our start straight.
+- **D2**, the same simulator at dusk, close to a car: glossy paint and glass
+  mirroring a rose and orange evening sky in detail; soft light; fine dark
+  asphalt; red and white kerbs, mown grass, steel barriers; the car's lamps
+  lit.
+- **D3**, the same simulator, trees and speed: full broadleaf crowns, bright
+  translucent green where the sun comes through, real limbs, dappled shade
+  on the road; everything beside the road streaked by speed while the cars
+  stay sharp; a white edge line, a grass verge, low walls with boards.
+- **D4**, the same simulator, the start at golden hour: dense, rounded maple
+  crowns of very many small leaves in gold, orange, yellow and red, glowing
+  in low warm light, with rust in their shade and dark trunks below; a gantry
+  over the road carrying columns of round start lamps; boards, a tyre wall, a
+  low concrete wall; the asphalt in shade, the car's tail lamps lit.
+
+Day answers to D1, D3 and A; golden hour to D4 and D2; the wet night to two
+further night references of the owner's (a wet street at night with lamps
+mirrored in it). Nothing is taken from any of them but the quality, the
+light, the materials, the vegetation, the composition and the sense of speed:
+no names, logos, HUD artwork or layout, track shapes, liveries or lettering.
+The car itself is checked against four daylight photographs of the owner's
+car (car.md), which also stay out of the repository.
 
 ## Left out on purpose (for now)
 
@@ -343,7 +392,7 @@ about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
 - **A cockpit view.** The cabin is modelled only as far as it shows through
   the glass.
 
-## The forest (trees lane, rework 2026-11)
+## The forest
 
 Early autumn: most broadleaves green, maples (and some limes and birches)
 turned in groups, most of them round the start; larch green-gold; spruce and

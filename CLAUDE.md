@@ -92,10 +92,12 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
 
 - Everything is generated in code: no model, texture, font or audio files,
   and nothing fetched at run time. Keep it that way.
-- It is an original demo. The owner's reference frames (kept out of the
-  repository; described in `docs/design.md`, "The look") set the look and
-  feel: a sunlit day with the sun's glare, the night after rain, and above all
-  a wet dusk. Nothing of any game's content is copied: no names, logos, HUD
+- It is an original demo: a time trial on a racing circuit in the mountains
+  by a lake. The owner's reference frames (kept out of the repository;
+  described in `docs/design.md`, "The reference frames") are the spec for the
+  look and feel: a sunlit day with the sun straight down the start straight
+  and its glare on the asphalt, golden hour at the start, and the wet night
+  after rain. Nothing of any game's content is copied: no names, logos, HUD
   artwork, track shapes or scenery. When the light, the materials or the
   grade change, stage the comparison stills again and judge them beside the
   references.
