@@ -52,7 +52,8 @@ road's mirror; the car's reflection probe is updated just before the call.
 Measured with `__serp.stats().pipeline` at 960x540 on dusk, medium: scene
 960x540 (4 samples), blur 960x540, AO 480x270 (two) + 960x540, bloom 480x270
 down to 30x17, star 240x135; 15 full-screen passes with AO, 11 without. High
-adds a sixth bloom level (15x9) and has 19 passes with AO and star.
+adds a sixth bloom level (15x9) and has 19 passes by day with AO, the star and
+the flare source.
 
 ### The scene (1)
 
