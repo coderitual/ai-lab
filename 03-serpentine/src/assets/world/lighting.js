@@ -137,7 +137,7 @@ export function towards(bearing, elevation) {
  * degrees above level on the climbs (56 degree lens, looking a little down), so a sun higher than about 25 never
  * appears in it.
  */
-const SUN = towards(-36, 22.5);
+const SUN = towards(-30, 24);
 
 /**
  * The moon: opposite the sun on the map and high. On the straight it is behind and to the right, over the wood,
@@ -154,8 +154,8 @@ export const TIMES = {
     name: 'day',
     sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 6.2 },
     sky: {
-      zenith: [0.075, 0.165, 0.42],
-      horizon: [0.3, 0.4, 0.56],
+      zenith: [0.04, 0.15, 0.5],
+      horizon: [0.23, 0.37, 0.62],
       falloff: 0.15,
       phase: 0.4,
       // (look lane: the aureole, `tight`, was 7: now a white-hot halo about four times the disc's radius, which is
@@ -169,16 +169,17 @@ export const TIMES = {
       airglow: [0, 0, 0],
       clouds: { cover: 0.44, wisps: 0.6, lit: 0.2, silver: 1.6, shade: [0.27, 0.31, 0.39], drift: [0.0011, 0.0004] },
     },
-    env: { intensity: 1 },
+    // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
+    env: { intensity: 0.72 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
-    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.1 },
-    fog: { color: [0.38, 0.47, 0.6], sun: [1.05, 0.72, 0.38], sunLobe: 5, density: 0.00036, heightFalloff: 0.011 },
-    exposure: 1,
+    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.06 },
+    fog: { color: [0.36, 0.46, 0.62], sun: [0.6, 0.42, 0.24], sunLobe: 8, density: 0.0003, heightFalloff: 0.011 },
+    exposure: 1.1,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
-    look: { contrast: 1.08, saturation: 1.06, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.22, chroma: 0.0012, grain: 0.6, bloom: 0.14, ghosts: 0.004, glare: 0.2 },
+    look: { contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.12, ghosts: 0.011, glare: 0.2 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',

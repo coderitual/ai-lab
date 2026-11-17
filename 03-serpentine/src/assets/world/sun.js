@@ -109,6 +109,16 @@ export function createSun({ renderer, tier, shadows }) {
   depth.compareFunction = THREE.LessEqualCompare;
   depth.minFilter = depth.magFilter = THREE.LinearFilter;
   shadow.map.depthTexture = depth;
+  // (look lane) Made in GL now and cleared to "nothing in the way": a pass drawn before the first shadow pass (the
+  // wet road's mirror, which never draws shadow maps) would otherwise find no depth texture on the shadow sampler's
+  // unit and the driver would skip its draws (GL_INVALID_OPERATION, sampler type mismatch).
+  if (shadows && renderer.initRenderTarget) {
+    const previous = renderer.getRenderTarget();
+    renderer.initRenderTarget(shadow.map);
+    renderer.setRenderTarget(shadow.map);
+    renderer.clear(false, true, false);
+    renderer.setRenderTarget(previous);
+  }
 
   const fill = new THREE.HemisphereLight(0xffffff, 0xffffff, 1); // its two colours carry the brightness
 
@@ -120,6 +130,8 @@ export function createSun({ renderer, tier, shadows }) {
   const fillSky = new THREE.Color();
   const fillGround = new THREE.Color();
   let standOff = 0;
+  /** @type {THREE.Camera|null} */
+  let pendingFor = null;
 
   return {
     light,
@@ -171,7 +183,18 @@ export function createSun({ renderer, tier, shadows }) {
       light.position.copy(centre).addScaledVector(dir, standOff);
       light.target.updateMatrixWorld();
       light.updateMatrixWorld();
-      renderer.shadowMap.needsUpdate = true;
+      // (look lane) not drawn here but at the first render made with this camera: a reflection probe or the
+      // road's mirror drawn in between hides the car and the land, and the map drawn with them would lack them
+      // (the car cast no shadow in the game by day)
+      pendingFor = camera;
+    },
+
+    /** Called by the scene before every render: draws the shadow map if this is the view it was moved for. */
+    beforeRender(camera) {
+      if (pendingFor !== null && camera === pendingFor) {
+        renderer.shadowMap.needsUpdate = true;
+        pendingFor = null;
+      }
     },
 
     dispose() {

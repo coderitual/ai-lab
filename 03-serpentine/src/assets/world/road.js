@@ -420,6 +420,10 @@ float rWear = 0.62 * rBig.b + 0.38 * rAgg.b - 0.25 * rTracks + 0.18 * ( rAgg.r -
 roadPaint *= smoothstep( 0.2, 0.42, rWear ) * ( 1.0 - 0.8 * rPatch );
 rCol = mix( rCol, vec3( 0.62, 0.62, 0.6 ) * ( 0.9 + 0.1 * rSpeck ), roadPaint );
 rRough = mix( rRough, 0.55, roadPaint );
+// (look lane, day) dry, sun-worn asphalt is a satin at grazing angles: heading into a low sun the road ahead goes
+// pale (reference A); the wet look below starts from the rougher surface as before
+float rDryRough = rRough;
+rRough *= mix( 0.74, 1.0, roadPaint );
 
 // ---- water (dry under the tunnel's roof, wet again towards its portals):
 roadWet = uWet * smoothstep( 0.05, 0.6, vOpen );
@@ -431,7 +435,7 @@ float rLevel = 0.93 - 0.42 * roadWet;
 roadPuddle = smoothstep( rLevel, rLevel + 0.025, rLow + rRag ) * step( 0.02, roadWet ) * ( 1.0 - 0.7 * roadPaint );
 rCol *= mix( 1.0, mix( 0.42, 0.8, roadPaint ), roadWet );
 // a wet film fills the texture: what was rough becomes a satin that smears reflections, the polished tracks glossy
-rRough = mix( rRough, 0.1 + 0.28 * rRough * rRough, roadWet );
+rRough = mix( rRough, 0.1 + 0.28 * rDryRough * rDryRough, roadWet );
 rCol = mix( rCol, rCol * 0.6, roadPuddle );
 rRough = mix( rRough, 0.03, roadPuddle );
 

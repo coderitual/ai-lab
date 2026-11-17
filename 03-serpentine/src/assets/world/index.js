@@ -103,6 +103,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   lap('sky');
   const environment = createEnvironment({ renderer, caps, sky, atmosphere });
   const sun = createSun({ renderer, tier, shadows: params.shadows });
+  // (look lane) the sun's shadow map is drawn by the view's own render, not by a probe or mirror before it
+  scene.onBeforeRender = (_renderer, _scene, camera) => sun.beforeRender(camera);
   const groundMaterial = createGroundMaterial({ caps, tier, atmosphere });
   lap('groundMaterial');
   const terrain = createTerrain({

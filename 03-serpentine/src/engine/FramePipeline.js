@@ -393,16 +393,19 @@ vec3 ghosts(vec2 uv) {
   float e = src.z;
   if (e <= 0.0) return vec3(0.0);
   vec2 f = src.xy;
-  vec3 sum = ghostShape(uv, f, -0.30, 0.080, 0.0) * vec3(0.55, 0.5, 1.0)
+  vec3 sum = ghostShape(uv, f, -0.30, 0.095, 0.0) * vec3(0.55, 0.5, 1.0)
     + ghostShape(uv, f, -0.44, 0.026, 1.0) * vec3(1.0, 0.55, 0.6) * 0.7
     + ghostShape(uv, f, -0.50, 0.012, 0.0) * vec3(1.0, 0.45, 0.4) * 0.35
     + ghostShape(uv, f, -0.64, 0.062, 1.0) * vec3(0.6, 0.55, 1.0)
-    + ghostShape(uv, f, -0.84, 0.046, 1.0) * vec3(0.55, 0.65, 1.0)
+    + ghostShape(uv, f, -0.84, 0.075, 1.0) * vec3(0.5, 0.5, 1.0)
     + ghostShape(uv, f, -1.02, 0.060, 1.0) * vec3(0.6, 0.5, 1.0)
     + ghostShape(uv, f, -1.06, 0.018, 0.0) * vec3(0.5, 0.55, 1.0) * 0.5;
-  // the glare: about as bright as the source's light over a patch a seventh of the view across, falling off slowly
-  float d = length((uv - f) * vec2(uGhosts.z, 1.0)) / 0.15;
-  vec3 veil = vec3(1.0, 0.95, 0.86) * (uGhosts.y * 25.0 / (1.0 + d * d));
+  // the glare: a white core about a fifth of the view across that washes out the sky round the source, and a
+  // weak warm tail that reaches the far side of the view without greying it
+  float d = length((uv - f) * vec2(uGhosts.z, 1.0));
+  float core = 1.0 / (1.0 + (d * d) / (0.11 * 0.11));
+  float tail = 1.0 / (1.0 + (d * d) / (0.35 * 0.35));
+  vec3 veil = uGhosts.y * (vec3(1.0, 0.97, 0.92) * 40.0 * core * core + vec3(1.0, 0.9, 0.75) * 2.0 * tail);
   return e * (sum * uGhosts.x + veil);
 }
 #endif
