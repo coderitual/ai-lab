@@ -1,6 +1,7 @@
 // From a scene and a camera to finished pixels in a rectangle of the canvas.
 //
-//   scene -> [motion blur] -> bloom pyramid -> final (-> edge smoothing) -> canvas
+//   scene -> [ambient occlusion] -> [motion blur] -> bloom pyramid (-> flare source, star) -> final
+//         (-> edge smoothing) -> canvas
 //
 // One view at a time: split screen calls render() once per rectangle and the
 // same targets serve every view. docs/engine.md walks through the passes;
@@ -30,6 +31,11 @@
 // clock (Engine.renderTime), which is the run's own time and stands still in
 // a paused or hand-stepped page.
 //
+// Ambient occlusion is worked out from depth too, at half size: how much of the hemisphere over each point the
+// surfaces within a metre or so cover, after McGuire's Scalable Ambient Obscurance. It is multiplied into the
+// scene's light before anything else reads it, except where a pixel is far brighter than lit surfaces get
+// (lamps and their mirror images): what emits light is not occluded.
+//
 // Bloom has no threshold and adds nothing. The picture is mixed with a
 // blurred copy of itself; what glows is whatever is much brighter than its
 // surroundings, in proportion to how much. The blur is a pyramid of halvings,
@@ -40,6 +46,7 @@ import { Engine } from './Engine.js';
 import { TIERS, createTarget, resizeTarget } from './caps.js';
 import { FullscreenPass, createPassMaterial } from './FullscreenPass.js';
 import { GLSL_PROBE, installLdrEncoding } from './glsl.js';
+import { parseParams } from './params.js';
 
 /**
  * The grade of the finished picture: one per time of day, in lighting.js. The tone curve itself is fixed
@@ -63,6 +70,19 @@ import { GLSL_PROBE, installLdrEncoding } from './glsl.js';
  *   at the frame's edge nearest it must be for it to count as not hidden
  * @property {number} [glare] the veil the brightest light lays over the view round itself, as the glass of a real lens
  *   scatters it (0: none; 0.1..0.3 for a sun in the picture; not drawn on the low tier)
+ * @property {number} [ao] ambient occlusion: how much of the light a point loses for the surfaces round it within
+ *   about a metre (0: off and not computed; 1: full strength; not drawn on the low tier)
+ * @property {[number, number, number]} [splitShadows] split toning: the colour the shadows lean to, as multipliers
+ *   (normalised to keep brightness; [1, 1, 1]: none). Applied after the tone curve: in full a third of the display
+ *   scale below splitBalance, fading out toward it
+ * @property {[number, number, number]} [splitHighlights] the same for the highlights, fading in over a third of the
+ *   scale above splitBalance
+ * @property {number} [splitBalance] the display brightness (0..1, sRGB-like) that neither tone touches (0.5)
+ * @property {number} [star] glints: the very brightest points (the sun on paint and glass, a bare lamp) get a small
+ *   six-pointed star, as light diffracts round a lens's aperture blades; how much of their light goes into it (0:
+ *   none; 0.02..0.1; not drawn on the low tier)
+ * @property {number} [halo] extra glow of middling size (about 2.5 % of the focal length): the halo of a lamp in
+ *   damp air, a few times the lamp's size (0: none; it takes its share from the bloom's other two lobes)
  */
 
 /**
@@ -93,13 +113,19 @@ export const NEUTRAL_LOOK = Object.freeze({
   bloom: 0,
   ghosts: 0,
   glare: 0,
+  ao: 0,
+  splitShadows: Object.freeze([1, 1, 1]),
+  splitHighlights: Object.freeze([1, 1, 1]),
+  splitBalance: 0.5,
+  halo: 0,
+  star: 0,
 });
 
 /** The frame time the shutter is a fraction of, whatever the screen's own. */
 const SHUTTER_FRAME = 1 / 60;
 
 const BLUR = {
-  /** The longest streak, as a fraction of the view's width. */
+  /** The longest streak, as a fraction of the view's width, where the tier does not say (TIERS.blurLength). */
   maxLength: 0.04,
   /** Frames further apart than this (seconds of the run) are not compared: the first one after is drawn sharp. */
   maxGap: 0.25,
@@ -115,6 +141,8 @@ const BLUR = {
 const BLOOM = {
   core: { size: 0.008, spread: 1.0, share: 0.45 },
   veil: { size: 0.075, spread: 1.25, share: 0.55 },
+  /** Look.halo's lobe: its share is Look.halo, and the three are scaled back to a total of 1. */
+  halo: { size: 0.025, spread: 0.6 },
   /**
    * Fireflies: in the first halving, a patch brighter than this (times what the exposure calls 1) counts for
    * less the brighter it is. Far above any lamp, so that a lamp's glow is in proportion to the lamp.
@@ -124,10 +152,35 @@ const BLOOM = {
   sigma: 2.2,
 };
 
+/**
+ * The star of Look.star. Only light this many times what the exposure calls white counts, and only what lies
+ * above that; the arms are this long (a share of the focal length) and turned this far from upright (radians).
+ */
+const STAR = { floor: 4, length: 0.06, turn: 0.26 };
+
 /** Edge smoothing (only where the scene is not multisampled): how much single odd pixels are softened, and the contrast below which nothing is done. */
 const FXAA = { subpixel: 0.3, threshold: 0.1, steps: 7 };
 
-const DEBUG_MODES = { scene: 0, depth: 1, velocity: 2, bloom: 3, probe: 4 };
+/**
+ * Ambient occlusion (only where the tier has `aoSamples` and the Look asks for it). The numbers are world sizes
+ * and scene-light levels, so the shadow is the same size on every screen and at every render scale.
+ */
+const AO = {
+  /** How far round a point the occluders are looked for, in metres. */
+  radius: 1.2,
+  /** ...but never further than this share of the view's height: a wall a metre from the lens would take seconds. */
+  maxScreen: 0.12,
+  /** The occlusion fades out between these distances from the camera (m): far away it would be depth noise. */
+  fade: [60, 160],
+  /** How much darker a fully enclosed point gets than the mean of its horizon cosines says (the term's gain). */
+  gain: 5,
+  /** Exposed scene light between which a pixel stops taking occlusion: lamps, lit windows, glints and their mirror images. */
+  emit: [0.9, 3],
+  /** How different two distances may be (as a share of the nearer) before the blur stops mixing their occlusion. */
+  edge: 0.06,
+};
+
+const DEBUG_MODES = { scene: 0, depth: 1, velocity: 2, bloom: 3, probe: 4, ao: 5 };
 
 // What every pass that reads the picture of one view needs. A view fills only the corner of a shared target
 // that it needs, so lookups are made in texels and held inside the view: a filtered read at the view's edge
@@ -250,6 +303,151 @@ void main() {
 }
 `;
 
+// ---- ambient occlusion: three passes at half the view's size and one that puts the result into the picture.
+//
+// The half-size grid takes its distances from one full-size texel each, (2i, 2j), in every pass, so that the
+// three passes and the upsampling agree about which surface a half-size pixel belongs to.
+const AO_COMMON_GLSL = /* glsl */ `
+uniform highp sampler2D uDepth;  // the scene's depth, full size
+uniform vec4 uTexels;            // of uDepth: 1 / the target's size (xy), the centre of the view's last texel (zw)
+uniform vec2 uView;              // the view's full size in texels
+uniform vec4 uDistance;          // window depth -> distance from the camera (as MOTION_GLSL)
+uniform ivec2 uHalf;             // the view's half-size grid: its last texel
+float distanceOf(float depth) {
+  float z = depth * 2.0 - 1.0;
+  return (z * uDistance.x + uDistance.y) / (z * uDistance.z + uDistance.w);
+}
+ivec2 fullTexel(ivec2 h) { return min(h * 2, ivec2(uTexels.zw)); }
+// depth 1 is what nothing was drawn on: the sky (it is drawn without writing depth)
+float rawDepth(ivec2 h) { return texelFetch(uDepth, fullTexel(clamp(h, ivec2(0), uHalf)), 0).r; }
+float distAt(ivec2 h) { return distanceOf(rawDepth(h)); }
+// how much the occlusion of a point at distance d counts for one at distance centre: 1 on the same surface,
+// 0 across a silhouette
+float sameSurface(float d, float centre) {
+  float r = (d - centre) / (${AO.edge.toFixed(3)} * min(d, centre));
+  return exp(-r * r);
+}
+`;
+
+// The occlusion term (1: open, 0: enclosed), after McGuire's Scalable Ambient Obscurance: points round this one
+// within a world radius, each counting by how far above this point's surface it rises (the cosine between the
+// normal and the way to it), fading out toward the radius. Normals come from the depth itself.
+const AO_FRAGMENT = /* glsl */ `
+${AO_COMMON_GLSL}
+uniform vec4 uProj;     // of the camera: P00, P11, P02, P12 (window position and distance -> view space)
+uniform vec4 uAoSize;   // radius (m), radius^2, focal length in half-size texels, the longest radius in them
+uniform vec2 uFade;     // distances (m) over which the occlusion fades out
+vec3 viewPos(ivec2 h, float d) {
+  vec2 ndc = (vec2(fullTexel(h)) + 0.5) / uView * 2.0 - 1.0;
+  return vec3((ndc + uProj.zw) * d / uProj.xy, -d);
+}
+// One-sided differences, the smaller of the two: across a silhouette the other side belongs to another surface
+// and would tilt the normal.
+vec3 sideStep(vec3 p, ivec2 h, ivec2 step) {
+  vec3 a = viewPos(h + step, distAt(h + step)) - p;
+  vec3 b = p - viewPos(h - step, distAt(h - step));
+  return abs(a.z) < abs(b.z) ? a : b;
+}
+// A fixed 4x4 pattern of sixteen values spread over 0..1: neighbouring pixels turn their sample spiral to
+// different angles, and the 4x4 blur that follows averages them. Fixed in screen space: a still is the same
+// every time.
+const int BAYER[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
+float pattern(ivec2 h) {
+  ivec2 q = h & 3;
+  return (float(BAYER[q.y * 4 + q.x]) + 0.5) / 16.0;
+}
+void main() {
+  ivec2 h = ivec2(gl_FragCoord.xy);
+  float depth = rawDepth(h);
+  float d = distanceOf(depth);
+  if (depth >= 1.0 || d >= uFade.y) { outColor = vec4(1.0); return; }
+  float rPx = min(uAoSize.x * uAoSize.z / d, uAoSize.w);
+  if (rPx < 1.5) { outColor = vec4(1.0); return; }
+
+  vec3 p = viewPos(h, d);
+  vec3 n = normalize(cross(sideStep(p, h, ivec2(1, 0)), sideStep(p, h, ivec2(0, 1))));
+  // (depth steps grow with distance: so does what counts as lying on the surface itself)
+  float bias = 0.02 + 0.002 * d;
+  float turn = pattern(h);
+  float sum = 0.0;
+  for (int i = 0; i < AO_SAMPLES; i++) {
+    float a = (float(i) + fract(turn * 7.0 + 0.5)) / float(AO_SAMPLES);
+    float angle = 6.2831853 * (a * AO_TURNS + turn);
+    ivec2 q = h + ivec2(round(a * rPx * vec2(cos(angle), sin(angle))));
+    vec3 v = viewPos(q, distAt(q)) - p;
+    float vv = dot(v, v);
+    float fall = max(1.0 - vv / uAoSize.y, 0.0);
+    sum += fall * max(dot(v, n) - bias, 0.0) * inversesqrt(vv + 1.0e-4);
+  }
+  float occlusion = clamp(sum * ${AO.gain.toFixed(3)} / float(AO_SAMPLES), 0.0, 1.0);
+  occlusion *= 1.0 - smoothstep(uFade.x, uFade.y, d);
+  outColor = vec4(1.0 - occlusion, 0.0, 0.0, 1.0);
+}
+`;
+
+// Half of the 4x4 blur, along x or along y: weights 1/2, 1, 1, 1, 1/2 take in exactly one period of the
+// pattern, so on an even surface it cancels completely; across a silhouette the distances stop the mixing.
+const AO_BLUR_FRAGMENT = /* glsl */ `
+${AO_COMMON_GLSL}
+uniform sampler2D uAo;
+uniform ivec2 uStep;
+void main() {
+  ivec2 h = ivec2(gl_FragCoord.xy);
+  float centre = distAt(h);
+  float sum = texelFetch(uAo, h, 0).r;
+  float total = 1.0;
+  for (int k = -2; k <= 2; k++) {
+    if (k == 0) continue;
+    ivec2 q = clamp(h + uStep * k, ivec2(0), uHalf);
+    float w = (k == -2 || k == 2 ? 0.5 : 1.0) * sameSurface(distAt(q), centre);
+    sum += texelFetch(uAo, q, 0).r * w;
+    total += w;
+  }
+  outColor = vec4(sum / total, 0.0, 0.0, 1.0);
+}
+`;
+
+// Into the picture, at full size: the four nearest half-size values, each by its bilinear share and by whether
+// it lies on this pixel's surface. A pixel no neighbour agrees with (a lamp post a pixel wide) is left open,
+// so thin things never print a dark outline. Pixels much brighter than any lit surface (lamps, lit windows,
+// glints, their images in the wet road) are what emits light, which no occlusion dims.
+const AO_APPLY_FRAGMENT = /* glsl */ `
+${AO_COMMON_GLSL}
+uniform sampler2D uColor;
+uniform sampler2D uAo;
+uniform float uStrength;  // Look.ao
+uniform vec2 uEmit;       // scene light (after exposure) over which a pixel stops taking occlusion
+uniform float uExposure;
+uniform bool uShow;       // ?debug=ao: write the term itself
+void main() {
+  ivec2 ix = ivec2(gl_FragCoord.xy);
+  vec3 c = fromTarget(texelFetch(uColor, ix, 0)).rgb;
+  float depth = texelFetch(uDepth, ix, 0).r;
+  float term = 1.0;
+  if (depth < 1.0) {
+    float centre = distanceOf(depth);
+    vec2 hp = (vec2(ix) + 0.5) * 0.5 - 0.5;
+    ivec2 h0 = ivec2(floor(hp));
+    vec2 f = hp - vec2(h0);
+    float sum = 0.0;
+    float total = 0.0;
+    for (int k = 0; k < 4; k++) {
+      ivec2 o = ivec2(k & 1, k >> 1);
+      ivec2 q = clamp(h0 + o, ivec2(0), uHalf);
+      vec2 b = mix(1.0 - f, f, vec2(o));
+      float w = b.x * b.y * sameSurface(distAt(q), centre) + 1.0e-5;
+      sum += texelFetch(uAo, q, 0).r * w;
+      total += w;
+    }
+    // too little agreement: open
+    float ao = total > 0.02 ? sum / total : 1.0;
+    float lit = 1.0 - smoothstep(uEmit.x, uEmit.y, luma(c) * uExposure);
+    term = 1.0 - clamp(uStrength * (1.0 - ao), 0.0, 1.0) * lit;
+  }
+  outColor = toTarget(vec4(uShow ? vec3(term) : c * term, 1.0));
+}
+`;
+
 // One halving of the bloom pyramid. Output pixel (i, j) sits on the corner between source texels 2i, 2i + 1 and
 // 2j, 2j + 1, so each of the 13 lookups is the mean of a 2x2 block; together they weigh a 6x6 block of the
 // source so that every source texel, wherever it is on the grid, adds the same total to the result. That is
@@ -326,6 +524,36 @@ void main() {
 }
 `;
 
+// The glints' star, on the second level of the pyramid (a quarter of the picture's size): each pixel gathers what
+// lies above the floor along three lines through it, so a bright point becomes six arms that fade out with
+// distance. The pyramid's own filter has already spread a glint over a few texels: the arms are soft.
+const STAR_FRAGMENT = /* glsl */ `
+uniform sampler2D uTex;
+uniform vec4 uTexels;   // of uTex: 1 / the target's size (xy), the centre of the view's last texel (zw)
+uniform float uFloor;   // scene units below which nothing counts
+uniform vec3 uArm;      // the first arm's direction (xy) and its length in texels (z)
+vec3 above(vec2 p) {
+  vec3 c = fromTarget(texture(uTex, clamp(p, vec2(0.5), uTexels.zw) * uTexels.xy)).rgb;
+  float l = luma(c);
+  return c * max(0.0, 1.0 - uFloor / max(l, 1.0e-6));
+}
+void main() {
+  vec2 p = gl_FragCoord.xy;
+  vec3 sum = vec3(0.0);
+  float c60 = 0.5, s60 = 0.8660254;
+  for (int a = 0; a < 3; a++) {
+    vec2 d = a == 0 ? uArm.xy : (a == 1 ? mat2(c60, s60, -s60, c60) * uArm.xy : mat2(c60, -s60, s60, c60) * uArm.xy);
+    for (int i = 1; i <= STAR_TAPS; i++) {
+      float t = float(i) / float(STAR_TAPS);
+      float w = (1.0 - t) * (1.0 - t);
+      vec2 o = d * (t * uArm.z);
+      sum += (above(p + o) + above(p - o)) * w;
+    }
+  }
+  outColor = toTarget(vec4(sum / float(STAR_TAPS), 1.0));
+}
+`;
+
 // Back up the pyramid: this level's own picture times its weight, plus everything smaller, enlarged with a
 // 3x3 tent.
 const UP_FRAGMENT = /* glsl */ `
@@ -380,9 +608,15 @@ uniform float uBloomMix;
 uniform vec4 uGrade;          // contrast, saturation, vignette, chromatic aberration
 uniform vec3 uTint;
 uniform vec3 uLift;
+uniform vec3 uSplitLo;        // split toning: the shadows' and the highlights' multipliers (brightness kept)
+uniform vec3 uSplitHi;
+uniform float uSplitBalance;  // the display brightness neither touches; 0: split toning off
 #ifdef LENS
 uniform sampler2D uGhostTex;  // the flare source: one pixel (FLARE_FRAGMENT)
 uniform vec3 uGhosts;         // ghosts' share each, the glare veil's strength, the view's width over its height
+uniform sampler2D uStarTex;   // the glints' star: a quarter of the picture's size
+uniform vec4 uStarTexels;     // 1 / its target's size (xy), the centre of the view's last texel in it (zw)
+uniform float uStar;          // Look.star
 #endif
 ${DITHER_GLSL}
 #ifndef SPLIT
@@ -450,6 +684,8 @@ void main() {
   if (uBloomMix > 0.0) c = mix(c, fromTarget(texture(uBloom, min(p * 0.5, uBloomTexels.zw) * uBloomTexels.xy)).rgb, uBloomMix);
 #ifdef LENS
   if (uGhosts.x + uGhosts.y > 0.0) c += ghosts(vUv);
+  // the star is light the lens moved, added like the ghosts
+  if (uStar > 0.0) c += fromTarget(texture(uStarTex, min(p * 0.25, uStarTexels.zw) * uStarTexels.xy)).rgb * uStar;
 #endif
 
   c *= uExposure * uTint;
@@ -457,6 +693,15 @@ void main() {
   c *= 1.0 - uGrade.z * smoothstep(0.35, 1.0, sqrt(corner));
   c = toneCurve(c, uGrade.x);
   c = saturateColor(c, uGrade.y);
+  if (uSplitBalance > 0.0) {
+    // On display brightness (about what the eye calls half way), so the balance point means what it says: the
+    // shadows' colour is in full a third of the scale below it, the highlights' a third above, and the balance
+    // point itself is untouched. (Fading over the whole scale instead would leave a low-key picture, which has
+    // no values near white, all but untoned.)
+    float b = pow(clamp(luma(c), 0.0, 1.0), 1.0 / 2.2);
+    c *= mix(vec3(1.0), uSplitLo, 1.0 - smoothstep(uSplitBalance - 0.33, uSplitBalance, b));
+    c *= mix(vec3(1.0), uSplitHi, smoothstep(uSplitBalance, uSplitBalance + 0.33, b));
+  }
   c += uLift * (1.0 - c) * (1.0 - c);
   vec3 s = linearToSrgb(c);
 
@@ -558,7 +803,7 @@ const PRESENT_FRAGMENT = /* glsl */ `
 ${SOURCE_GLSL}
 ${MOTION_GLSL}
 ${GLSL_PROBE}
-uniform int uMode;            // 0 scene, 1 depth, 2 velocity, 3 bloom, 4 probe
+uniform int uMode;            // 0 scene, 1 depth, 2 velocity, 3 bloom, 4 probe, 5 ambient occlusion
 uniform sampler2D uBloom;
 uniform vec4 uBloomTexels;
 uniform samplerCube uProbe;
@@ -584,6 +829,10 @@ void main() {
     c *= c;
   } else if (uMode == 3) {
     c = toneCurve(fromTarget(texture(uBloom, min(p * 0.5, uBloomTexels.zw) * uBloomTexels.xy)).rgb * uExposure, 1.0);
+  } else if (uMode == 5) {
+    // the occlusion term as it is put into the picture: white open, black enclosed (uColor holds it)
+    // (no ambient occlusion on this tier: all open)
+    c = uExposure > 0.0 ? srgbToLinear(clamp(colourAt(p), 0.0, 1.0)) : vec3(1.0);
   } else {
     // the probe unrolled: the horizon across the middle, +Z in the centre, +X a quarter to the left of it, up at the top
     float lon = (0.5 - vUv.x) * 6.2831853;
@@ -627,13 +876,22 @@ export class FramePipeline {
    * @param {THREE.WebGLRenderer} renderer one that an Engine made: the engine's clock, frame count and render
    *   scale are read from it
    * @param {import('./caps.js').Caps} caps
-   * @param {{ tier: import('./caps.js').Tier, post?: boolean }} options `post: false` shows the scene through
-   *   exposure and the tone curve only
+   * @param {{ tier: import('./caps.js').Tier, post?: boolean, overrides?: { look?: Partial<Look>, ev?: number, shutter?: number|null } }} options
+   *   `post: false` shows the scene through exposure and the tone curve only; `overrides` replace fields of every
+   *   view's Look, bias its exposure (stops) and replace its shutter, for matching a picture by hand (default: the
+   *   page's ?ao=, ?ev=, ?shutter=, …)
    */
-  constructor(renderer, caps, { tier, post = true }) {
+  constructor(renderer, caps, { tier, post = true, overrides = parseParams() }) {
     this.renderer = renderer;
     this.caps = caps;
     this.post = post;
+    /** Look fields that replace the view's own (empty: the view's Look is used as it is). */
+    this.overrides = { ...(overrides.look || {}) };
+    /** Exposure bias in stops. */
+    this.ev = overrides.ev || 0;
+    /** The shutter in place of the view's (null: the view's). */
+    this.shutter = overrides.shutter ?? null;
+    this._look = {};
     this.engine = Engine.of(renderer);
     if (!this.engine) throw new Error('FramePipeline: this renderer was not made by an Engine');
     /** Name of an intermediate buffer to show instead of the picture: scene, depth, velocity, bloom or probe. */
@@ -654,6 +912,7 @@ export class FramePipeline {
       uBlur: { value: new THREE.Vector2() },
     };
     this._grain = { value: new THREE.Vector3() };
+    this._aoHalf = { value: new THREE.Vector2() };
 
     this._frame = -1;
     this._sizeNow = { w: 0, h: 0 };
@@ -692,9 +951,11 @@ export class FramePipeline {
     // jagged edges are smoothed on the finished picture where the scene's own samples could not do it
     this.fxaa = this.samples === 0;
     this.blurTaps = T.blurTaps;
+    this.blurLength = T.blurLength ?? BLUR.maxLength;
     this.blurInline = T.blurInline && T.blurTaps > 0;
     this.lens = T.lens;
     this.levels = T.bloomLevels;
+    this.aoSamples = T.aoSamples || 0;
 
     const source = (uColor) => ({ uColor, uTexels: this._texels, uView: this._viewSize });
     const motionDefines = { BLUR_TAPS: Math.max(1, T.blurTaps) };
@@ -727,12 +988,74 @@ export class FramePipeline {
         uSunSky: { value: 1 },
       });
     }
+    // the glints' star (only where the lens is drawn), at the second level's size
+    this._starTarget = null;
+    this._star = null;
+    if (this.lens && this.levels >= 2) {
+      this._starTarget = keep(createTarget(caps));
+      this._star = pass(
+        STAR_FRAGMENT,
+        { uTex: { value: null }, uTexels: { value: new THREE.Vector4() }, uFloor: { value: 1 }, uArm: { value: new THREE.Vector3() } },
+        { STAR_TAPS: 6 },
+      );
+    }
     this._enlarge = pass(UP_FRAGMENT, {
       uSmall: { value: null },
       uBase: { value: null },
       uSmallTexels: { value: new THREE.Vector4() },
       uWeights: { value: new THREE.Vector2() },
     });
+
+    // Ambient occlusion: two half-size 8-bit targets (the term needs no more) and a full-size one for the picture
+    // with the term multiplied in, which then stands in for the scene in everything that follows.
+    this._ao = null;
+    if (this.aoSamples > 0) {
+      const small = () =>
+        keep(
+          new THREE.WebGLRenderTarget(4, 4, {
+            type: THREE.UnsignedByteType,
+            format: THREE.RGBAFormat,
+            colorSpace: THREE.NoColorSpace,
+            minFilter: THREE.NearestFilter,
+            magFilter: THREE.NearestFilter,
+            generateMipmaps: false,
+            depthBuffer: false,
+            stencilBuffer: false,
+          }),
+        );
+      const common = () => ({
+        uDepth: { value: this.sceneTarget.depthTexture },
+        uTexels: this._texels,
+        uView: this._viewSize,
+        uDistance: this._motion.uDistance,
+        uHalf: this._aoHalf,
+      });
+      this._ao = {
+        a: small(),
+        b: small(),
+        picture: keep(createTarget(caps)),
+        term: pass(
+          AO_FRAGMENT,
+          {
+            ...common(),
+            uProj: { value: new THREE.Vector4() },
+            uAoSize: { value: new THREE.Vector4() },
+            uFade: { value: new THREE.Vector2(AO.fade[0], AO.fade[1]) },
+          },
+          { AO_SAMPLES: this.aoSamples, AO_TURNS: `${T.aoTurns}.0` },
+        ),
+        blur: pass(AO_BLUR_FRAGMENT, { ...common(), uAo: { value: null }, uStep: { value: new THREE.Vector2() } }),
+        apply: pass(AO_APPLY_FRAGMENT, {
+          ...common(),
+          uColor: { value: this.sceneTarget.texture },
+          uAo: { value: null },
+          uStrength: { value: 0 },
+          uEmit: { value: new THREE.Vector2() },
+          uExposure: { value: 1 },
+          uShow: { value: false },
+        }),
+      };
+    }
 
     const finalDefines = {};
     if (this.fxaa) finalDefines.SPLIT = 1;
@@ -752,8 +1075,14 @@ export class FramePipeline {
         uGrade: { value: new THREE.Vector4(1, 1, 0, 0) },
         uTint: { value: new THREE.Vector3(1, 1, 1) },
         uLift: { value: new THREE.Vector3() },
+        uSplitLo: { value: new THREE.Vector3(1, 1, 1) },
+        uSplitHi: { value: new THREE.Vector3(1, 1, 1) },
+        uSplitBalance: { value: 0 },
         uGhostTex: { value: null },
         uGhosts: { value: new THREE.Vector3() },
+        uStarTex: { value: null },
+        uStarTexels: { value: new THREE.Vector4() },
+        uStar: { value: 0 },
         uGrain: this._grain,
       },
       finalDefines,
@@ -828,10 +1157,16 @@ export class FramePipeline {
     resizeTarget(this.sceneTarget, tw, th);
     if (this._blurTarget) resizeTarget(this._blurTarget, tw, th);
     if (this._gradeTarget) resizeTarget(this._gradeTarget, tw, th);
+    if (this._ao) {
+      resizeTarget(this._ao.picture, tw, th);
+      resizeTarget(this._ao.a, Math.ceil(tw / 2), Math.ceil(th / 2));
+      resizeTarget(this._ao.b, Math.ceil(tw / 2), Math.ceil(th / 2));
+    }
     for (let i = 0; i < this.levels; i++) {
       tw = Math.ceil(tw / 2);
       th = Math.ceil(th / 2);
       resizeTarget(this._down[i], tw, th);
+      if (i === 1 && this._starTarget) resizeTarget(this._starTarget, tw, th);
       if (i < this.levels - 1) resizeTarget(this._up[i], tw, th);
     }
   }
@@ -888,9 +1223,9 @@ export class FramePipeline {
     memory.width = rect.w;
     memory.height = rect.h;
 
-    const shutter = (view.motionBlur || 0) * memory.ratio;
+    const shutter = (this.shutter ?? view.motionBlur ?? 0) * memory.ratio;
     const u = this._motion;
-    u.uBlur.value.set(shutter, BLUR.maxLength * w);
+    u.uBlur.value.set(shutter, this.blurLength * w);
     const p = camera.projectionMatrix.elements;
     u.uDistance.value.set(p[15], -p[14], p[11], -p[10]);
     // The products are made here, in double precision: a camera that has not moved gives exactly no movement,
@@ -913,19 +1248,25 @@ export class FramePipeline {
    * The two lobes of BLOOM are shared out among the levels by where each level's blur lies on the scale of
    * sizes; the first and the last level take what lies beyond them, so the weights always add up to 1.
    */
-  _shares(count, focal) {
+  _shares(count, focal, halo) {
     const weights = this._weights;
     weights.length = count;
+    const lobes = LOBES;
+    lobes[0].share = BLOOM.core.share;
+    lobes[1].share = BLOOM.veil.share;
+    lobes[2].share = Math.max(0, halo);
+    const total = lobes[0].share + lobes[1].share + lobes[2].share;
     for (let i = 0; i < count; i++) {
       const size = Math.log2((BLOOM.sigma * 2 ** i) / focal);
       let weight = 0;
-      for (const lobe of [BLOOM.core, BLOOM.veil]) {
+      for (const lobe of lobes) {
+        if (lobe.share === 0) continue;
         const u = size - Math.log2(lobe.size);
         const above = i === count - 1 ? 1 : lobeBelow(u + 0.5, lobe.spread);
         const below = i === 0 ? 0 : lobeBelow(u - 0.5, lobe.spread);
         weight += lobe.share * (above - below);
       }
-      weights[i] = weight;
+      weights[i] = weight / total;
     }
     return weights;
   }
@@ -934,7 +1275,7 @@ export class FramePipeline {
    * The bloom pyramid of the picture in `source`.
    * @returns {THREE.WebGLRenderTarget} the finished glow, half the picture's size
    */
-  _bloom(source, w, h, view, focal) {
+  _bloom(source, w, h, exposure, focal, halo) {
     const { renderer, _down: down, _up: up } = this;
     // no level smaller than a pixel or two
     const count = Math.max(1, Math.min(this.levels, Math.floor(Math.log2(Math.min(w, h)))));
@@ -948,7 +1289,7 @@ export class FramePipeline {
       const u = pass.material.uniforms;
       u.uTex.value = from.texture;
       u.uTexels.value.set(1 / from.width, 1 / from.height, lw - 0.5, lh - 0.5);
-      if (i === 0) u.uKnee.value = BLOOM.knee / Math.max(view.exposure, 1e-6);
+      if (i === 0) u.uKnee.value = BLOOM.knee / Math.max(exposure, 1e-6);
       lw = Math.ceil(lw / 2);
       lh = Math.ceil(lh / 2);
       sizes[i] = sizes[i] || { x: 0, y: 0, w: 0, h: 0 };
@@ -960,7 +1301,7 @@ export class FramePipeline {
     }
     if (count === 1) return down[0];
 
-    const weights = this._shares(count, focal);
+    const weights = this._shares(count, focal, halo);
     const u = this._enlarge.material.uniforms;
     for (let i = count - 2; i >= 0; i--) {
       const deepest = i === count - 2;
@@ -976,6 +1317,56 @@ export class FramePipeline {
     return up[0];
   }
 
+  /** The view's Look with the overrides on top (the view's own object when there are none). */
+  _lookOf(look) {
+    const o = this.overrides;
+    let any = false;
+    for (const key in o) {
+      any = true;
+      break;
+    }
+    if (!any) return look;
+    const merged = this._look;
+    for (const key in merged) delete merged[key];
+    return Object.assign(merged, look, o);
+  }
+
+  /**
+   * Ambient occlusion: the term at half size, blurred along x and along y, then multiplied into the picture at
+   * full size (or written alone, for ?debug=ao).
+   * @returns {THREE.WebGLRenderTarget} the picture with the occlusion in it
+   */
+  _occlude(camera, w, h, strength, exposure, show) {
+    const { renderer } = this;
+    const ao = this._ao;
+    const hw = Math.ceil(w / 2);
+    const hh = Math.ceil(h / 2);
+    const half = HALF_RECT.set(0, 0, hw, hh);
+    this._aoHalf.value.set(hw - 1, hh - 1);
+    const pe = camera.projectionMatrix.elements;
+    const focal = 0.5 * hh * pe[5];
+    const t = ao.term.material.uniforms;
+    t.uProj.value.set(pe[0], pe[5], pe[8], pe[9]);
+    t.uAoSize.value.set(AO.radius, AO.radius * AO.radius, focal, AO.maxScreen * hh);
+    ao.term.render(renderer, ao.a, half);
+    const b = ao.blur.material.uniforms;
+    b.uAo.value = ao.a.texture;
+    b.uStep.value.set(1, 0);
+    ao.blur.render(renderer, ao.b, half);
+    b.uAo.value = ao.b.texture;
+    b.uStep.value.set(0, 1);
+    ao.blur.render(renderer, ao.a, half);
+    const a = ao.apply.material.uniforms;
+    a.uAo.value = ao.a.texture;
+    a.uStrength.value = strength;
+    a.uEmit.value.set(AO.emit[0], AO.emit[1]);
+    a.uExposure.value = exposure;
+    a.uShow.value = show;
+    ao.apply.render(renderer, ao.picture, RECT.set(0, 0, w, h));
+    this._passes += 4;
+    return ao.picture;
+  }
+
   /**
    * Draw one view.
    * @param {THREE.Scene} scene
@@ -985,7 +1376,8 @@ export class FramePipeline {
    */
   render(scene, camera, rect, view) {
     const { renderer, engine, sceneTarget } = this;
-    const look = view.look;
+    const look = this._lookOf(view.look);
+    const exposure = view.exposure * 2 ** this.ev;
     const debug = this.post ? DEBUG_MODES[this.debug] : DEBUG_MODES.scene;
     const w = Math.max(2, Math.round(rect.w * engine.renderScale));
     const h = Math.max(2, Math.round(rect.h * engine.renderScale));
@@ -1004,9 +1396,18 @@ export class FramePipeline {
     const region = RECT.set(0, 0, w, h);
     const shutter = this._remember(view, camera, rect, w);
 
-    // ---- motion blur
+    // ---- ambient occlusion, multiplied into the picture: everything after reads it in place of the scene
     let picture = sceneTarget;
-    if (this._blur && this.post && shutter > 0 && debug !== DEBUG_MODES.scene) {
+    const aoShown = debug === DEBUG_MODES.ao;
+    // (the debug view shows the term at full strength when the Look has none)
+    const occlusion = this._ao ? Math.max(0, look.ao || (aoShown ? 1 : 0)) : 0;
+    if (occlusion > 0 && this.post && camera.isPerspectiveCamera && (debug === undefined || aoShown)) {
+      picture = this._occlude(camera, w, h, occlusion, exposure, aoShown);
+    }
+
+    // ---- motion blur
+    if (this._blur && this.post && shutter > 0 && debug !== DEBUG_MODES.scene && !aoShown) {
+      this._blur.material.uniforms.uColor.value = picture.texture;
       this._blur.render(renderer, this._blurTarget, region);
       picture = this._blurTarget;
       this._passes++;
@@ -1020,21 +1421,24 @@ export class FramePipeline {
     const ghosts = this.lens ? look.ghosts || 0 : 0;
     const glare = this.lens ? look.glare || 0 : 0;
     const flaring = ghosts > 0 || glare > 0;
-    const glowing = this.post && debug !== DEBUG_MODES.scene && ((look.bloom || 0) > 0 || flaring || debug === DEBUG_MODES.bloom);
-    const glow = glowing ? this._bloom(picture, w, h, view, focal) : null;
+    const star = this._star ? Math.max(0, look.star || 0) : 0;
+    const glowing =
+      this.post && debug !== DEBUG_MODES.scene && ((look.bloom || 0) > 0 || flaring || star > 0 || debug === DEBUG_MODES.bloom);
+    const glow = glowing && !aoShown ? this._bloom(picture, w, h, exposure, focal, look.halo || 0) : null;
     const half = this._levels[0];
 
     // ---- one buffer as it is
     if (debug !== undefined) {
       const u = this._present.material.uniforms;
       u.uMode.value = debug;
-      u.uColor.value = sceneTarget.texture;
+      // (?debug=ao: the term was written in place of the picture)
+      u.uColor.value = aoShown && picture !== sceneTarget ? picture.texture : sceneTarget.texture;
       u.uBloom.value = glow ? glow.texture : null;
       if (glow) u.uBloomTexels.value.set(1 / glow.width, 1 / glow.height, half.w - 0.5, half.h - 0.5);
       u.uProbe.value = view.probe || null;
       u.uOrigin.value.set(rect.x, rect.y);
       u.uExact.value = exact;
-      u.uExposure.value = view.exposure;
+      u.uExposure.value = aoShown && picture === sceneTarget ? 0 : exposure;
       this._present.render(renderer, null, rect);
       this._passes++;
       return;
@@ -1046,10 +1450,16 @@ export class FramePipeline {
     u.uBloom.value = glow ? glow.texture : null;
     if (glow) u.uBloomTexels.value.set(1 / glow.width, 1 / glow.height, half.w - 0.5, half.h - 0.5);
     u.uBloomMix.value = glow ? look.bloom || 0 : 0;
-    u.uExposure.value = view.exposure;
+    u.uExposure.value = exposure;
     u.uGrade.value.set(look.contrast ?? 1, look.saturation ?? 1, look.vignette || 0, this.lens ? look.chroma || 0 : 0);
     u.uTint.value.fromArray(look.tint || ONES);
     u.uLift.value.fromArray(look.lift || ZEROS);
+    const lo = look.splitShadows || ONES;
+    const hi = look.splitHighlights || ONES;
+    const toned = lo[0] !== lo[1] || lo[1] !== lo[2] || hi[0] !== hi[1] || hi[1] !== hi[2];
+    keepBrightness(u.uSplitLo.value, lo);
+    keepBrightness(u.uSplitHi.value, hi);
+    u.uSplitBalance.value = toned ? Math.min(0.95, Math.max(0.05, look.splitBalance ?? 0.5)) : 0;
     if (flaring && glow) {
       // LOOK LANE: the flare source from the first level no more than 48 texels wide (or the smallest there is):
       // only what is some thirty times brighter than white counts
@@ -1058,7 +1468,7 @@ export class FramePipeline {
       const fu = this._flare.material.uniforms;
       fu.uTex.value = this._down[level].texture;
       fu.uSize.value.set(Math.min(64, this._levels[level].w), Math.min(64, this._levels[level].h));
-      fu.uFloor.value = 30 / Math.max(view.exposure, 1e-6);
+      fu.uFloor.value = 30 / Math.max(exposure, 1e-6);
       fu.uSun.value.set(0, 0, 0, 0);
       const fl = look.flare;
       if (fl && fl.dir) {
@@ -1082,6 +1492,20 @@ export class FramePipeline {
     } else {
       u.uGhosts.value.set(0, 0, 1);
     }
+    u.uStar.value = 0;
+    if (star > 0 && glow && this._levels.length >= 2) {
+      const level = this._levels[1];
+      const su = this._star.material.uniforms;
+      su.uTex.value = this._down[1].texture;
+      su.uTexels.value.set(1 / this._down[1].width, 1 / this._down[1].height, level.w - 0.5, level.h - 0.5);
+      su.uFloor.value = STAR.floor / Math.max(exposure, 1e-6);
+      su.uArm.value.set(Math.sin(STAR.turn), Math.cos(STAR.turn), (STAR.length * focal) / 4);
+      this._star.render(renderer, this._starTarget, level);
+      this._passes++;
+      u.uStarTex.value = this._starTarget.texture;
+      u.uStarTexels.value.set(1 / this._starTarget.width, 1 / this._starTarget.height, level.w - 0.5, level.h - 0.5);
+      u.uStar.value = star;
+    }
     // Grain changes with the run's own time (in steps of a 240th of a second), so the same moment has the same
     // grain, and its cells keep their size on a dense screen.
     this._grain.value.set((look.grain || 0) / 255, Math.max(1, Math.floor(renderer.getPixelRatio() + 0.25)), Math.round(engine.renderTime * 240) % 65536);
@@ -1103,7 +1527,7 @@ export class FramePipeline {
   /**
    * What the pipeline is made of and what the last frame used.
    * @returns {{ tier: string, hdr: boolean, samples: number, fxaa: boolean, blurTaps: number, blurInline: boolean,
-   *   bloomLevels: number, renderScale: number, passes: number, targets: Record<string, number[]|number[][]> }}
+   *   bloomLevels: number, aoSamples: number, renderScale: number, passes: number, targets: Record<string, number[]|number[][]> }}
    *   `passes`: full-screen passes of the frame drawn last, over all its views (the scene itself not counted)
    */
   stats() {
@@ -1111,6 +1535,11 @@ export class FramePipeline {
     const targets = { scene: size(this.sceneTarget), bloom: this._down.map(size) };
     if (this._blurTarget) targets.blur = size(this._blurTarget);
     if (this._gradeTarget) targets.grade = size(this._gradeTarget);
+    if (this._starTarget) targets.star = size(this._starTarget);
+    if (this._ao) {
+      targets.ao = size(this._ao.a);
+      targets.aoPicture = size(this._ao.picture);
+    }
     return {
       tier: this.tier,
       hdr: this.caps.hdr,
@@ -1119,6 +1548,7 @@ export class FramePipeline {
       blurTaps: this.blurTaps,
       blurInline: this.blurInline,
       bloomLevels: this.levels,
+      aoSamples: this.aoSamples,
       renderScale: this.engine.renderScale,
       passes: this._passes,
       targets,
@@ -1138,19 +1568,34 @@ export class FramePipeline {
 }
 
 const ONES = [1, 1, 1];
+const LOBES = [
+  { size: BLOOM.core.size, spread: BLOOM.core.spread, share: 0 },
+  { size: BLOOM.veil.size, spread: BLOOM.veil.spread, share: 0 },
+  { size: BLOOM.halo.size, spread: BLOOM.halo.spread, share: 0 },
+];
+
+/** A split-toning colour as multipliers that leave brightness alone. */
+function keepBrightness(out, rgb) {
+  const l = Math.max(1e-4, 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
+  return out.set(rgb[0] / l, rgb[1] / l, rgb[2] / l);
+}
 const FLARE_RECT = { x: 0, y: 0, w: 1, h: 1 };
 const _flareP = new THREE.Vector3();
 const ZEROS = [0, 0, 0];
-const RECT = {
-  x: 0,
-  y: 0,
-  w: 0,
-  h: 0,
-  set(x, y, w, h) {
-    this.x = x;
-    this.y = y;
-    this.w = w;
-    this.h = h;
-    return this;
-  },
-};
+function makeRect() {
+  return {
+    x: 0,
+    y: 0,
+    w: 0,
+    h: 0,
+    set(x, y, w, h) {
+      this.x = x;
+      this.y = y;
+      this.w = w;
+      this.h = h;
+      return this;
+    },
+  };
+}
+const RECT = makeRect();
+const HALF_RECT = makeRect();
