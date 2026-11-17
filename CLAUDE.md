@@ -11,14 +11,16 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
   commit as the code they describe. A number in a spec that no longer matches
   the source is a bug.
 - **Keep the pictures current.** After any visual change, regenerate the
-  screenshots and commit them (for 01 and 02: `node tools/screenshots.cjs`,
+  screenshots and commit them (for 01, 02 and 03: `node tools/screenshots.cjs`,
   with the dev server running). They are staged by the script, so they should
   look good, not merely exist: if a staged camera no longer frames its
   subject well, fix the camera in the script.
 - **Run the tests before pushing** (for 01: `playtest`, `soundtest`,
   `nettest` against `npm run preview`; see `01-breakwater-gp/docs/tools.md`.
   For 02: `playtest` against `npm run preview`; see
-  `02-backlit-swan/docs/tools.md`). Do not rebuild `dist/` while a test is
+  `02-backlit-swan/docs/tools.md`. For 03: `node tools/unit.mjs`, then
+  `playtest` and `soundtest` against `npm run preview`; see
+  `03-serpentine/docs/tools.md`). Do not rebuild `dist/` while a test is
   running against the preview.
 - **Say what was not verified.** These demos are developed in headless
   Chromium on software WebGL. Real phones, Safari, device frame rates and real
@@ -80,3 +82,59 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
   break").
 - Dev scripts in `tools/` need Playwright available to Node (not a project
   dependency).
+
+## 03-serpentine
+
+- Everything is generated in code: no model, texture, font or audio files,
+  and nothing fetched at run time. Keep it that way.
+- It is an original demo. The owner's reference frames (kept out of the
+  repository; described in `docs/design.md`, "The look") set the look and
+  feel: a sunlit day with the sun's glare, the night after rain, and above all
+  a wet dusk. Nothing of any game's content is copied: no names, logos, HUD
+  artwork, track shapes or scenery. When the light, the materials or the
+  grade change, stage the comparison stills again and judge them beside the
+  references.
+- The car is a model of a real one, made from photographs: the star is its
+  only emblem and there is no brand lettering anywhere. Its number plate text
+  is a parameter (`?plate=`).
+- Defined once, never copied: the car's dimensions
+  (`src/assets/car/spec.js`: read by the meshes, the physics, the cameras and
+  the lamps), the road and its corridor (the `Track` built by
+  `src/game/track.js` from `src/game/trackLayout.js`: read by the physics, by
+  everything the world builds along the road, and by the HUD's map), the
+  light of each time of day (`src/assets/world/lighting.js`: sky, fog, lamps,
+  wetness, the car's lamps, exposure and the grade all read its tables), and
+  the numbers of the run (`src/game/config.js`).
+- Layers: `engine/` knows nothing about cars or roads; `assets/` builds what
+  is visible and may import `engine/`, never `game/`; `game/` is the run
+  (physics, rules, cameras, HUD, sound, flow).
+- No `Math.random` and no clock in `src/` outside the engine's loop and raw
+  gesture handling: random numbers come from `rng.fork('name')`. Anything
+  that changes the state of the run belongs in the fixed step (1/120 s), not
+  in the per-picture render: tests and pictures fast-forward without drawing
+  and must find the same run, and `?manual&t=…` must be the same picture
+  every time.
+- The times of day are whatever `TIMES` in `lighting.js` holds, in that
+  order (day, dusk, night; the demo opens at dusk). Code iterates over them
+  and never assumes how many there are. Best laps, the board and the ghost are
+  kept per time of day.
+- The scene is one render call per view into the multisampled HDR target;
+  exposure, the tone curve and the sRGB curve are the last pass's (see
+  `docs/engine.md`, "Things about the frame that are easy to break"). Lamps
+  and the sky are bright in real ratios; judge colour in the finished picture.
+- The number of lights in the scene is fixed: lamps are switched by
+  intensity, not by `visible`, so that no shader is recompiled mid-run.
+- The corridor's solid edges (`edgeL`, `edgeR` of the `Track`) are what cars
+  hit. Scenery stands at or beyond them; whatever is inside them is part of
+  the course and must be exactly `track.profile()`.
+- The physics is pure JavaScript and is tested in Node (`node tools/unit.mjs`;
+  `node tools/handling.mjs` prints the car's numbers for `docs/spec.md`).
+  After changing the car, its tyres or the road, run both and update the
+  spec.
+- Every pass and every effect has a quality tier (`low`, `medium`, `high`);
+  software WebGL and unknown phones start `low`. Nothing may require float
+  render targets without the fallback `caps` chooses.
+- Dev scripts in `tools/` need Playwright available to Node (not a project
+  dependency). The whole world takes a minute or two to start and to draw on
+  software WebGL at full quality: stage stills with `?manual`, test with
+  `?q=low`.
