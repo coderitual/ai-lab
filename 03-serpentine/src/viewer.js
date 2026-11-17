@@ -10,6 +10,11 @@
 //   asset=world    the world alone, looking at the same spot
 //   asset=wheel    a front and a rear wheel alone (side=left|right, only=front|rear, steer, spin, travel, omega)
 //   ghost=1        the best-lap ghost instead of the car
+//   studio=1       the car alone in a plain studio (dark walls, a soft box overhead, a lit horizon): the world is
+//                  hidden, its sun stays. stripes=1: the same with bright horizontal bands all round, for hunting
+//                  wobbles in the reflections (assets/car/studio.js)
+//   probesize=512  edge of the car's reflection cube (default: the tier's)
+//   mirror=1       the paint as a plain mirror (for reading the surfaces with stripes=1)
 //   time=day|night   q=low|medium|high   paint=NAME   plate=TEXT   manual   post=0   dpr=N   (as in the game)
 //   lights=off|drl|low|high|brake|all    the car's lamps (default: what the time of day asks for); or a list of
 //                  setLights names, each at full strength: lights=tail,reverse,indicatorL
@@ -69,6 +74,7 @@
 
 import * as THREE from 'three';
 import { createCar } from './assets/car/index.js';
+import { createStudio } from './assets/car/studio.js';
 import { createLightTest, placeOnRoad, roadCamera } from './assets/world/dev.js';
 import { createWorld } from './assets/world/index.js';
 import { Engine } from './engine/Engine.js';
@@ -148,8 +154,19 @@ const ASSETS = {
     // its contact shadow lies on the road, and its reflection probe (probe=0: none) is redrawn whole every frame
     world.scene.add(car.shadow);
     car.poseShadow(stand.position, new THREE.Vector3(0, 1, 0), stand.rotation.y, 1);
-    const probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[tier].probeSize) : null;
+    const probe = params.probe ? new ReflectionProbe(engine.renderer, number('probesize', TIERS[tier].probeSize)) : null;
     if (probe) car.setReflections({ cube: probe.texture, sky: 1 });
+    // mirror=1: the paint as a plain mirror, to read the body's surfaces in the reflections (with stripes=1)
+    if (query.get('mirror') === '1') {
+      car.object.traverse((o) => {
+        const own = o.material?.userData.paint;
+        if (!own) return;
+        own.paintColor.value.set(0.9, 0.9, 0.9);
+        own.paintRough.value = 0.03;
+        own.paintFlop.value = 1;
+        own.paintFlake.value = 0;
+      });
+    }
     return { car, probe, box: car.box, view: { az: 150, el: 12, dist: 7.5, fov: 40 } };
   },
   world() {
@@ -210,6 +227,10 @@ const road = {
 };
 const assetName = ASSETS[given.asset] ? given.asset : 'car';
 const asset = await ASSETS[assetName]();
+// the studio stands where the asset stands (so it is not part of the scenery that it hides)
+const studio =
+  query.get('studio') === '1' || query.get('stripes') === '1' ? createStudio({ stripes: query.get('stripes') === '1', exposure: time.exposure }) : null;
+if (studio) stand.add(studio.group);
 // a parked car's head lamps, for whatever in the world answers them (the paint's glass beads)
 const beams = [];
 if (asset.car) {
@@ -260,7 +281,7 @@ const inStand = (object) => {
   for (let o = object; o; o = o.parent) if (o === stand) return true;
   return false;
 };
-const scenery = worldMeshes.filter((object) => !inStand(object));
+const scenery = worldMeshes.filter((object) => !inStand(object) && object !== asset.car?.shadow && object.parent !== asset.car?.shadow);
 // a light grey at any exposure
 const paper = encodeForTarget(0.5 / time.exposure, !caps.hdr);
 const backdrop = new THREE.Color().setRGB(paper, paper, paper);
@@ -337,7 +358,8 @@ function placeCamera() {
   camera.updateMatrixWorld();
   if (pinhole && !ortho) placePinhole();
 
-  for (const object of scenery) object.visible = !ortho;
+  for (const object of scenery) object.visible = !ortho && !studio;
+  if (studio) studio.group.visible = !ortho;
   world.scene.background = ortho ? backdrop : null;
   frame.look = ortho ? flatLook : time.look;
   const mm = ((span / engine.width) * 1000).toFixed(3);

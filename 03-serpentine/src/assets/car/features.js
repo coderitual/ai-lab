@@ -182,6 +182,27 @@ const face = (xy) => xy.map(([x, y]) => [x, y, 0]);
  *   direction above `n`, and y, z within [min, max]
  */
 
+/** The head lamp's lens (5.2), left: points on the body, clockwise seen from the front-left, from the inner point. */
+export const HEAD_LENS = [[0.5, 0.688, 2.105], [0.53, 0.713, 2.047], [0.6, 0.728, 1.975], [0.68, 0.744, 1.865], [0.75, 0.756, 1.776],
+  [0.815, 0.748, 1.722], [0.86, 0.715, 1.69], [0.84, 0.672, 1.76], [0.79, 0.63, 1.85], [0.73, 0.602, 1.925],
+  [0.66, 0.592, 1.985], [0.59, 0.602, 2.04], [0.53, 0.635, 2.085], [0.5, 0.665, 2.105]];
+/**
+ * The tail lamp's lens (6.2), left, from the inner tip along the upper edge. The sheet's lower edge sagged 15 mm
+ * below the straight diagonal the photographs show, and its inner end was a point where the lamp is blunt
+ * (car-rear34-full): straightened, and the inner end kept 25 mm high.
+ */
+export const TAIL_LENS = [[0.37, 0.866, -2.45], [0.42, 0.876, -2.435], [0.47, 0.884, -2.42], [0.52, 0.891, -2.381], [0.58, 0.898, -2.325],
+  [0.64, 0.904, -2.267], [0.7, 0.908, -2.197], [0.76, 0.91, -2.116], [0.8, 0.908, -2.06], [0.83, 0.898, -2.015],
+  [0.842, 0.878, -1.993], [0.83, 0.856, -2.015], [0.8, 0.834, -2.06], [0.76, 0.808, -2.116], [0.71, 0.778, -2.183],
+  [0.66, 0.752, -2.25], [0.61, 0.76, -2.292], [0.56, 0.777, -2.35], [0.51, 0.794, -2.389], [0.465, 0.81, -2.421],
+  [0.42, 0.828, -2.435], [0.38, 0.842, -2.447]];
+/** The grille's opening (5.1), left half, clockwise from the middle of the upper edge seen from the front. */
+export const GRILLE_HALF = [[0, 0.71, 2.2675], [0.15, 0.708, 2.262], [0.3, 0.7, 2.246], [0.4, 0.686, 2.231], [0.47, 0.66, 2.207],
+  [0.515, 0.615, 2.189], [0.535, 0.56, 2.178], [0.525, 0.515, 2.178], [0.49, 0.487, 2.186], [0.42, 0.472, 2.207],
+  [0.3, 0.465, 2.226], [0.15, 0.462, 2.242], [0, 0.462, 2.247]];
+/** The side intake's opening (5.3), left, in front view [x, y]: upper inner, lower inner, lower outer, upper outer. */
+export const INTAKE_SIDE = [[0.45, 0.455], [0.52, 0.245], [0.8, 0.225], [0.8, 0.432]];
+
 /** Every outline. Pure arithmetic: the dev tools run it in Node too. */
 export function buildFeatures() {
   /** @type {Feature[]} */
@@ -231,26 +252,14 @@ export function buildFeatures() {
   area('roofGlass', 'top', { n: 0.6, y: [1.3, 1.6] }, poly('top', top([[0, 0.5], [0, -0.5], [-1.17, -0.47], [-1.17, 0.47]]), 0.06));
 
   // ---- lamp lenses (5.2, 6.2)
-  const HEAD = [[0.5, 0.688, 2.105], [0.53, 0.713, 2.047], [0.6, 0.728, 1.975], [0.68, 0.744, 1.865], [0.75, 0.756, 1.776],
-    [0.815, 0.748, 1.722], [0.86, 0.715, 1.69], [0.84, 0.672, 1.76], [0.79, 0.63, 1.85], [0.73, 0.602, 1.925],
-    [0.66, 0.592, 1.985], [0.59, 0.602, 2.04], [0.53, 0.635, 2.085], [0.5, 0.665, 2.105]];
-  area('headLamp', 'head', { n: 0, y: [0.5, 0.85], z: [1.55, 2.4] }, smooth(P('head', HEAD), true));
-  // The sheet's lower edge sagged 15 mm below the straight diagonal the photographs show, and its inner end was a
-  // point where the lamp is blunt (car-rear34-full): straightened, and the inner end kept 25 mm high.
-  const TAIL = [[0.37, 0.866, -2.45], [0.42, 0.876, -2.435], [0.47, 0.884, -2.42], [0.52, 0.891, -2.381], [0.58, 0.898, -2.325],
-    [0.64, 0.904, -2.267], [0.7, 0.908, -2.197], [0.76, 0.91, -2.116], [0.8, 0.908, -2.06], [0.83, 0.898, -2.015],
-    [0.842, 0.878, -1.993], [0.83, 0.856, -2.015], [0.8, 0.834, -2.06], [0.76, 0.808, -2.116], [0.71, 0.778, -2.183],
-    [0.66, 0.752, -2.25], [0.61, 0.76, -2.292], [0.56, 0.777, -2.35], [0.51, 0.794, -2.389], [0.465, 0.81, -2.421],
-    [0.42, 0.828, -2.435], [0.38, 0.842, -2.447]];
-  area('tailLamp', 'tail', { n: 0, y: [0.65, 0.98], z: [-2.7, -1.85] }, smooth(P('tail', TAIL), true));
+  area('headLamp', 'head', { n: 0, y: [0.5, 0.85], z: [1.55, 2.4] }, smooth(P('head', HEAD_LENS), true));
+  area('tailLamp', 'tail', { n: 0, y: [0.65, 0.98], z: [-2.7, -1.85] }, smooth(P('tail', TAIL_LENS), true));
 
   // ---- openings (5.1, 5.3): the grille, the side intakes, the centre intake
-  const GRILLE = [[0, 0.71, 2.2675], [0.15, 0.708, 2.262], [0.3, 0.7, 2.246], [0.4, 0.686, 2.231], [0.47, 0.66, 2.207],
-    [0.515, 0.615, 2.189], [0.535, 0.56, 2.178], [0.525, 0.515, 2.178], [0.49, 0.487, 2.186], [0.42, 0.472, 2.207],
-    [0.3, 0.465, 2.226], [0.15, 0.462, 2.242], [0, 0.462, 2.247]];
+  const GRILLE = GRILLE_HALF;
   const grille = [...GRILLE, ...GRILLE.slice(1, -1).reverse().map(([x, y, z]) => [-x, y, z])];
   area('grille', 'grille', { n: 0.3, y: [0.4, 0.8], z: [1.95, 2.5] }, smooth(P('grille', grille), true));
-  area('intakeSide', 'front', { n: 0.12, y: [0.15, 0.5], z: [1.8, 2.5] }, poly('front', face([[0.45, 0.455], [0.52, 0.245], [0.8, 0.225], [0.8, 0.432]]), 0.03));
+  area('intakeSide', 'front', { n: 0.12, y: [0.15, 0.5], z: [1.8, 2.5] }, poly('front', face(INTAKE_SIDE), 0.03));
   area('intakeCentre', 'front', { n: 0.3, y: [0.15, 0.4], z: [1.95, 2.5] },
     poly('front', face([[-0.26, 0.335], [-0.42, 0.28], [-0.42, 0.245], [0.42, 0.245], [0.42, 0.28], [0.26, 0.335]]), 0.015));
 

@@ -13,130 +13,12 @@
 //    material turns into light (materials.js, LAMP_FN).
 
 import * as THREE from 'three';
-import { LAMPS, VIEWPOINTS } from './spec.js';
+import { GRILLE_HALF, INTAKE_SIDE } from './features.js';
+import { buildLampUnits } from './lampUnits.js';
 import { LAMP_FN } from './materials.js';
-
-// ---- finding the skin
-
-/**
- * Where a ray meets the sampled skin: the vertices within `radius` of the ray, nearest along it, give a plane
- * (their mean point and normal) which the ray then cuts. Good to a millimetre or two on the smooth panels.
- * @returns {{ point: THREE.Vector3, normal: THREE.Vector3 }}
- */
-export function surfaceHit(samples, origin, dir, radius = 0.05) {
-  const P = samples.position;
-  const N = samples.normal;
-  const count = P.length / 3;
-  const d = dir.clone().normalize();
-  let best = Infinity;
-  const near = [];
-  for (let j = 0; j < count; j++) {
-    const x = P[j * 3] - origin.x;
-    const y = P[j * 3 + 1] - origin.y;
-    const z = P[j * 3 + 2] - origin.z;
-    const t = x * d.x + y * d.y + z * d.z;
-    if (t <= 0) continue;
-    const ox = x - d.x * t;
-    const oy = y - d.y * t;
-    const oz = z - d.z * t;
-    const off = ox * ox + oy * oy + oz * oz;
-    // only skin that faces the ray
-    if (off > radius * radius || N[j * 3] * d.x + N[j * 3 + 1] * d.y + N[j * 3 + 2] * d.z > -0.1) continue;
-    near.push([t, j, off]);
-    best = Math.min(best, t);
-  }
-  const point = new THREE.Vector3();
-  const normal = new THREE.Vector3();
-  let weight = 0;
-  for (const [t, j, off] of near) {
-    if (t > best + radius) continue; // the first surface only, not the far side of the car
-    const w = 1 / (off + 1e-5);
-    point.x += P[j * 3] * w;
-    point.y += P[j * 3 + 1] * w;
-    point.z += P[j * 3 + 2] * w;
-    normal.x += N[j * 3] * w;
-    normal.y += N[j * 3 + 1] * w;
-    normal.z += N[j * 3 + 2] * w;
-    weight += w;
-  }
-  if (!weight) return { point: origin.clone(), normal: d.clone().negate() };
-  point.multiplyScalar(1 / weight);
-  normal.normalize();
-  const t = point.clone().sub(origin).dot(normal) / d.dot(normal);
-  return { point: origin.clone().addScaledVector(d, t), normal };
-}
-
-// ---- building triangles
-
-/** A growing list of triangles with flat or given normals and an optional per-vertex number. */
-class Tris {
-  constructor() {
-    this.p = [];
-    this.n = [];
-    this.f = [];
-    this.uv = [];
-  }
-  /** One flat triangle; turned to face `out` if given. */
-  tri(a, b, c, out = null, fn = 0) {
-    const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
-    if (out && n.dot(out) < 0) {
-      [b, c] = [c, b];
-      n.negate();
-    }
-    for (const v of [a, b, c]) {
-      this.p.push(v.x, v.y, v.z);
-      this.n.push(n.x, n.y, n.z);
-      this.f.push(fn);
-      this.uv.push(0, 0);
-    }
-  }
-  quad(a, b, c, d, out = null, fn = 0) {
-    this.tri(a, b, c, out, fn);
-    this.tri(a, c, d, out, fn);
-  }
-  /** A three.js geometry, transformed by `matrix`, its triangles added (normals smooth as it has them). */
-  add(geometry, matrix, fn = 0) {
-    const g = geometry.index ? geometry.toNonIndexed() : geometry;
-    g.applyMatrix4(matrix);
-    const P = g.attributes.position.array;
-    const N = g.attributes.normal.array;
-    const U = g.attributes.uv ? g.attributes.uv.array : null;
-    for (let i = 0; i < P.length / 3; i++) {
-      this.p.push(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]);
-      this.n.push(N[i * 3], N[i * 3 + 1], N[i * 3 + 2]);
-      this.f.push(fn);
-      this.uv.push(U ? U[i * 2] : 0, U ? U[i * 2 + 1] : 0);
-    }
-    geometry.dispose();
-    if (g !== geometry) g.dispose();
-  }
-  geometry() {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
-    g.setAttribute('lampFn', new THREE.Float32BufferAttribute(this.f, 1));
-    g.computeBoundingBox();
-    g.computeBoundingSphere();
-    return g;
-  }
-  get count() {
-    return this.p.length / 9;
-  }
-}
-
-const V = (x, y, z) => new THREE.Vector3(x, y, z);
-
-/** A frame on the surface: z along `normal`, y as near `up` as it can be. */
-function frame(origin, normal, up = V(0, 1, 0)) {
-  const z = normal.clone().normalize();
-  const x = new THREE.Vector3().crossVectors(up, z).normalize();
-  const y = new THREE.Vector3().crossVectors(z, x);
-  return new THREE.Matrix4().makeBasis(x, y, z).setPosition(origin);
-}
-
-/** Left and right: the matrix that mirrors car space across x = 0. */
-const MIRROR = new THREE.Matrix4().makeScale(-1, 1, 1);
+import { MIRROR, Tris, V, bar, createSkinCaster, frame, roundRect, surfaceHit } from './parts.js';
+import { createPlateTextures } from './plate.js';
+import { LAMPS, VIEWPOINTS } from './spec.js';
 
 /**
  * The three-pointed star in its ring, in a local frame (face in +z, one arm up): a ring with a rounded crown, and
@@ -189,29 +71,6 @@ function star(t, matrix, { radius, ring, depth, arm, segments }) {
     t.quad(m(A0.clone()), m(T0.clone()), m(T.clone()), m(A.clone()), side);
     t.quad(m(B0.clone()), m(B.clone()), m(T.clone()), m(T0.clone()), side.clone().negate());
   }
-}
-
-/** A rounded rectangle's outline (half sizes hx, hy, corner r), `n` points anticlockwise. */
-function roundRect(hx, hy, r, n, slant = 0) {
-  const shape = new THREE.Shape();
-  // slant: the lower right corner moved this far right (the trims' outer end leans)
-  const c = [V(-hx, -hy, 0), V(hx + slant, -hy, 0), V(hx, hy, 0), V(-hx, hy, 0)];
-  const corner = (i) => {
-    const p = c[i];
-    const a = c[(i + 3) % 4];
-    const b = c[(i + 1) % 4];
-    const pa = a.clone().sub(p).normalize().multiplyScalar(r).add(p);
-    const pb = b.clone().sub(p).normalize().multiplyScalar(r).add(p);
-    return [pa, p, pb];
-  };
-  const k0 = corner(0);
-  shape.moveTo(k0[2].x, k0[2].y);
-  for (let i = 1; i <= 4; i++) {
-    const [pa, p, pb] = corner(i % 4);
-    shape.lineTo(pa.x, pa.y);
-    shape.quadraticCurveTo(p.x, p.y, pb.x, pb.y);
-  }
-  return shape.getSpacedPoints(n).slice(0, n);
 }
 
 /** A tail-pipe trim (6.4): a bright frame round a flattened hexagon, matte black inside; `wall`: how far its sides run back into the bumper. */
@@ -274,131 +133,98 @@ function mirror(gloss, matte, glass, segments) {
   matte.add(arm, look);
 }
 
-/** The cabin as far as it shows through the glass (8): black, simple blocks. */
-function cabin(dark, emit) {
-  const box = (w, h, d, x, y, z, tilt = 0, fn = 0, target = dark) => {
-    const m = new THREE.Matrix4().makeRotationX(tilt).setPosition(x, y, z);
-    target.add(new THREE.BoxGeometry(w, h, d), m, fn);
-  };
-  for (const s of [1, -1]) {
-    const x = s * 0.37;
-    box(0.5, 0.12, 0.5, x, 0.5, -0.25); // cushion
-    box(0.5, 0.62, 0.12, x, 0.84, -0.58, -0.3); // back, leaning back
-    box(0.26, 0.19, 0.1, x, 1.145, -0.66, -0.15); // head restraint, top at 1.24
-    box(0.06, 0.08, 0.6, s * 0.7, 0.75, -0.2); // door card's armrest
-    box(0.06, 0.08, 0.5, s * 0.7, 0.75, -1.15);
-  }
-  box(1.3, 0.12, 0.5, 0, 0.45, -1.0); // rear bench
-  box(1.3, 0.55, 0.12, 0, 0.78, -1.35, -0.32);
-  for (const x of [-0.36, 0, 0.36]) box(0.22, 0.14, 0.08, x, 1.1, -1.27, -0.3); // tops at 1.17
-  box(1.25, 0.02, 0.35, 0, 1.03, -1.73); // parcel shelf
-  box(1.5, 0.2, 0.5, 0, 0.86, 0.6, 0.12); // dash, its top at 0.98
-  box(0.24, 0.25, 0.95, 0, 0.5, -0.1); // centre console
-  box(0.25, 0.06, 0.03, 0, 1.3, 0.22, 0, 0, dark); // interior mirror
-  // steering wheel, facing the driver
-  const wheel = new THREE.TorusGeometry(0.185, 0.017, 6, 28);
-  dark.add(wheel, new THREE.Matrix4().makeRotationX(-0.42).setPosition(VIEWPOINTS.eye.x, 0.93, 0.3));
-  dark.add(new THREE.BoxGeometry(0.05, 0.05, 0.3), new THREE.Matrix4().makeRotationX(-0.4).setPosition(VIEWPOINTS.eye.x, 0.86, 0.45));
-  // the two displays: dark glass that glows at night
-  box(0.31, 0.11, 0.01, 0.37, 0.99, 0.42, -0.1, LAMP_FN.screen, emit);
-  box(0.18, 0.27, 0.01, 0, 0.84, 0.36, -0.52, LAMP_FN.screen, emit);
+/**
+ * A rounded block: a sphere squared off (exponent `e`: 1 a ball, towards 0 a box), half sizes hx, hy, hz, leaning
+ * back by `tilt` about x.
+ */
+function blob(t, hx, hy, hz, x, y, z, tilt = 0, e = 0.45, fn = 0) {
+  const g = new THREE.SphereGeometry(1, 12, 8);
+  const P = g.attributes.position;
+  const sq = (v) => Math.sign(v) * Math.abs(v) ** e;
+  for (let i = 0; i < P.count; i++) P.setXYZ(i, sq(P.getX(i)) * hx, sq(P.getY(i)) * hy, sq(P.getZ(i)) * hz);
+  g.computeVertexNormals();
+  t.add(g, new THREE.Matrix4().makeRotationX(tilt).setPosition(x, y, z), fn);
+}
+
+/** The same rounded block, placed by a matrix. */
+function blobAt(t, hx, hy, hz, matrix, e = 0.45) {
+  const g = new THREE.SphereGeometry(1, 16, 10);
+  const P = g.attributes.position;
+  const sq = (v) => Math.sign(v) * Math.abs(v) ** e;
+  for (let i = 0; i < P.count; i++) P.setXYZ(i, sq(P.getX(i)) * hx, sq(P.getY(i)) * hy, sq(P.getZ(i)) * hz);
+  g.computeVertexNormals();
+  t.add(g, matrix);
 }
 
 /**
- * The number plates' picture: white EU plates with the blue band and its ring of stars, black condensed
- * characters, a thin black border; front above, rear below. Drawn with the browser's canvas and its system
- * fonts (no font files). Also a normal map that raises the characters and the border a little.
+ * The cabin as it shows through the glass (8): black leather and plastic in rounded shapes. Seats with their head
+ * restraints, the rear bench, the dash with its cowl and its two displays, the console, the door cards, the
+ * steering wheel, the mirror on the screen, the parcel shelf.
  */
-function plateTextures(text) {
-  const W = 1024;
-  const H = 512;
-  const canvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(W, H) : document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const g = canvas.getContext('2d');
-  g.fillStyle = '#000';
-  g.fillRect(0, 0, W, H);
-  const ph = Math.round((W * 114) / 520); // 224
-  for (const top of [0, 256]) {
-    const y0 = top + 16;
-    g.fillStyle = '#e8e8e4';
-    g.fillRect(0, y0, W, ph);
-    // band: 46 mm of the 520
-    const band = Math.round((W * 46) / 520);
-    g.fillStyle = '#123c9c';
-    g.fillRect(4, y0 + 4, band, ph - 8);
-    g.fillStyle = '#f2c500';
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      const cx = 4 + band / 2 + Math.cos(a) * band * 0.3;
-      const cy = y0 + ph * 0.32 + Math.sin(a) * band * 0.3;
-      g.beginPath();
-      for (let k = 0; k < 10; k++) {
-        const r = k % 2 ? 2.2 : 5.5;
-        const b = -Math.PI / 2 + (k * Math.PI) / 5;
-        g.lineTo(cx + Math.cos(b) * r, cy + Math.sin(b) * r);
-      }
-      g.fill();
-    }
-    // border
-    g.strokeStyle = '#111';
-    g.lineWidth = 6;
-    g.strokeRect(3, y0 + 3, W - 6, ph - 6);
-    // characters: 80 mm high in a condensed sans, squeezed to fit
-    g.fillStyle = '#111';
-    const size = Math.round(ph * 0.98);
-    g.font = `bold ${size}px "Arial Narrow", "Liberation Sans Narrow", "DejaVu Sans Condensed", "Helvetica Neue", sans-serif`;
-    g.textBaseline = 'middle';
-    g.textAlign = 'center';
-    const room = W - band - 48;
-    const wide = g.measureText(text).width;
-    const squeeze = Math.min(0.78, room / Math.max(wide, 1));
-    g.save();
-    g.translate(band + 4 + room / 2 + 20, y0 + ph * 0.54);
-    g.scale(squeeze, 1);
-    g.fillText(text, 0, 0);
-    g.restore();
+function cabin(dark, emit) {
+  for (const s of [1, -1]) {
+    const x = s * 0.37;
+    blob(dark, 0.25, 0.075, 0.26, x, 0.49, -0.2, 0.06); // cushion
+    blob(dark, 0.245, 0.33, 0.075, x, 0.85, -0.56, -0.3); // back, leaning back
+    blob(dark, 0.06, 0.3, 0.07, x + 0.21, 0.83, -0.52, -0.3, 0.7); // its side bolsters
+    blob(dark, 0.06, 0.3, 0.07, x - 0.21, 0.83, -0.52, -0.3, 0.7);
+    blob(dark, 0.125, 0.095, 0.05, x, 1.15, -0.67, -0.15, 0.6); // head restraint, top at 1.24
+    blob(dark, 0.035, 0.24, 1.05, s * 0.725, 0.74, -0.45, 0, 0.3); // door cards under the belt line
+    blob(dark, 0.05, 0.035, 0.3, s * 0.69, 0.78, -0.15, 0, 0.6); // armrests
+    blob(dark, 0.05, 0.035, 0.26, s * 0.69, 0.78, -1.1, 0, 0.6);
   }
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 8;
-  // embossing: the slope of the darkness, at half size
-  const img = g.getImageData(0, 0, W, H).data;
-  const w = W / 2;
-  const h = H / 2;
-  const height = new Float32Array(w * h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) height[y * w + x] = 1 - img[(y * 2 * W + x * 2) * 4 + 1] / 255;
+  blob(dark, 0.66, 0.075, 0.25, 0, 0.45, -1.0, 0.05); // rear bench
+  blob(dark, 0.66, 0.29, 0.075, 0, 0.78, -1.35, -0.32);
+  for (const x of [-0.36, 0, 0.36]) blob(dark, 0.11, 0.075, 0.045, x, 1.1, -1.27, -0.3, 0.6); // tops at 1.17
+  blob(dark, 0.63, 0.012, 0.18, 0, 1.03, -1.73, 0, 0.3); // parcel shelf
+  blob(dark, 0.76, 0.11, 0.27, 0, 0.86, 0.6, 0.12, 0.5); // dash, its top at 0.98
+  blob(dark, 0.2, 0.05, 0.1, 0.37, 0.985, 0.47, 0.1, 0.6); // the cowl over the driver's display
+  blob(dark, 0.125, 0.13, 0.5, 0, 0.5, -0.1, 0, 0.4); // centre console
+  blob(dark, 0.125, 0.03, 0.02, 0, 1.3, 0.22, 0, 0.6); // interior mirror
+  // steering wheel, facing the driver: rim, hub and three spokes
+  const column = new THREE.Matrix4().makeRotationX(-0.42).setPosition(VIEWPOINTS.eye.x, 0.93, 0.3);
+  dark.add(new THREE.TorusGeometry(0.185, 0.017, 8, 32), column);
+  dark.add(new THREE.CylinderGeometry(0.06, 0.07, 0.05, 16), column.clone().multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2)));
+  for (const a of [0, Math.PI, -Math.PI / 2]) {
+    dark.add(new THREE.BoxGeometry(0.13, 0.035, 0.02), column.clone().multiply(new THREE.Matrix4().makeRotationZ(a).multiply(new THREE.Matrix4().makeTranslation(0.12, 0, 0))));
   }
-  const nd = new Uint8Array(w * h * 4);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const at = (xx, yy) => height[Math.min(h - 1, Math.max(0, yy)) * w + Math.min(w - 1, Math.max(0, xx))];
-      const dx = (at(x + 1, y) - at(x - 1, y)) * 0.8;
-      const dy = (at(x, y + 1) - at(x, y - 1)) * 0.8;
-      const l = Math.hypot(dx, dy, 1);
-      const o = ((h - 1 - y) * w + x) * 4; // flipped: the canvas's rows run down, the texture's up
-      nd[o] = Math.round((-dx / l) * 127.5 + 127.5);
-      nd[o + 1] = Math.round((dy / l) * 127.5 + 127.5);
-      nd[o + 2] = Math.round((1 / l) * 127.5 + 127.5);
-      nd[o + 3] = 255;
-    }
+  dark.add(new THREE.BoxGeometry(0.05, 0.05, 0.3), new THREE.Matrix4().makeRotationX(-0.4).setPosition(VIEWPOINTS.eye.x, 0.86, 0.45));
+  // the two displays: dark glass that glows at night
+  const screen = (w, h, x, y, z, tilt) => emit.add(new THREE.BoxGeometry(w, h, 0.01), new THREE.Matrix4().makeRotationX(tilt).setPosition(x, y, z), LAMP_FN.screen);
+  screen(0.31, 0.11, 0.37, 0.99, 0.42, -0.1);
+  screen(0.18, 0.27, 0, 0.84, 0.36, -0.52);
+}
+
+/** One of the grille's small stars (5.1): three arms 12 mm across rising to a point 3 mm proud, six facets. */
+function pin(t, matrix, out) {
+  const apex = V(0, 0, 0.003).applyMatrix4(matrix);
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 2 + (i * Math.PI) / 3;
+    const r = i % 2 ? 0.0019 : 0.0062;
+    pts.push(V(Math.cos(a) * r, Math.sin(a) * r, 0).applyMatrix4(matrix));
   }
-  const normalMap = new THREE.DataTexture(nd, w, h, THREE.RGBAFormat);
-  normalMap.generateMipmaps = true;
-  normalMap.minFilter = THREE.LinearMipmapLinearFilter;
-  normalMap.magFilter = THREE.LinearFilter;
-  normalMap.needsUpdate = true;
-  return { map, normalMap, rows: { front: [1 - (16 + ph) / H, 1 - 16 / H], rear: [1 - (272 + ph) / H, 1 - 272 / H] } };
+  for (let i = 0; i < 6; i++) t.tri(apex, pts[i], pts[(i + 1) % 6], out);
+}
+
+/** Is (x, y) inside a closed polygon of [x, y, ...] points? */
+function insidePolygon(poly, x, y) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }
 
 /**
  * Every detail, merged by material.
  * @param {object} samples the sampled skin (body.js sampleSkin)
- * @param {{ tier: string, plate: string }} options
+ * @param {{ tier: string, plate: string, skin: object, lay: object }} options the skin and the layout it was sampled with
  * @returns {{ geometries: Record<string, THREE.BufferGeometry>, plate: { map: THREE.Texture, normalMap: THREE.Texture } | null, stats: object }}
  */
-export function buildDetails(samples, { tier, plate }) {
+export function buildDetails(samples, { tier, plate, skin, lay }) {
   const fine = tier === 'high' ? 1 : tier === 'medium' ? 0.75 : 0.5;
   const chrome = new Tris();
   const gloss = new Tris();
@@ -410,7 +236,98 @@ export function buildDetails(samples, { tier, plate }) {
   const emit = new Tris();
   const dark = new Tris();
   const plates = new Tris();
+  // painted like the body, but not part of its skin: the door handles' grips
+  const body = new Tris();
   const hit = (o, d) => surfaceHit(samples, o, d);
+  // exact rays at the skin of the left half, by part of the car
+  const castNose = createSkinCaster(skin, lay, samples, (x, y, z) => z > 1.55 && y > 0.15 && y < 0.9);
+  const castTail = createSkinCaster(skin, lay, samples, (x, y, z) => z < -1.85 && y > 0.6 && y < 1.0 && x > 0.25);
+  const castScreen = createSkinCaster(skin, lay, samples, (x, y, z) => z > 0.45 && z < 1.05 && y > 0.9);
+  const castDoor = createSkinCaster(skin, lay, samples, (x, y, z) => z > -1.5 && z < 0.2 && y > 0.7 && y < 1.0 && x > 0.6);
+
+  // ---- the lamp units behind their lenses
+  buildLampUnits(emit, { head: castNose, tail: castTail });
+
+  // ---- the grille's field of small stars (5.1), as real points of bright metal: they catch the light one by one
+  if (!low) {
+    const outline = [...GRILLE_HALF, ...GRILLE_HALF.slice(1, -1).reverse().map(([x, y]) => [-x, y])];
+    const lean = V(0, -0.087, 1).normalize();
+    const left = new Tris();
+    for (let r = 0; r < 11; r++) {
+      const y = 0.475 + r * 0.022;
+      for (let k = 0; k <= 16; k++) {
+        const x = k * 0.034 + (r % 2) * 0.017;
+        const m = 0.009;
+        if (![[m, 0], [-m, 0], [0, m], [0, -m]].every(([dx, dy]) => insidePolygon(outline, x + dx, y + dy))) continue;
+        // none on the big star's disc, none against the louvre
+        if (Math.hypot(x, y - 0.573) < 0.108 || (Math.abs(y - 0.578) < 0.019 && x > 0.1 && x < 0.5)) continue;
+        const at = castNose(V(x, y, 3), V(0, 0, -1)).point.addScaledVector(lean, 0.0005);
+        pin(x === 0 ? chrome : left, frame(at, lean), lean);
+      }
+    }
+    chrome.addMirrored(left);
+  }
+
+  // ---- the front apron's intakes (5.3): two slats and the air curtain's blade each side, one slat in the middle
+  {
+    const left = { matte: new Tris(), gloss: new Tris() };
+    const skinZ = (x, y) => castNose(V(x, y, 3), V(0, 0, -1)).point.z;
+    const slat = (y, x0, x1, back, to) => {
+      const pts = [];
+      for (let i = 0; i <= 6; i++) {
+        const x = x0 + ((x1 - x0) * i) / 6;
+        pts.push(V(x, y, skinZ(x, y) - back));
+      }
+      // a blade 12 mm high leaning back, 35 mm deep
+      bar(to, pts, V(0, 0.25, 1).normalize(), 0.006, 0.035, 0);
+    };
+    const [ui, li] = INTAKE_SIDE;
+    const innerX = (y) => ui[0] + ((li[0] - ui[0]) * (ui[1] - y)) / (ui[1] - li[1]);
+    for (const y of [0.3, 0.368]) slat(y, innerX(y) - 0.015, 0.79, 0.028, left.matte);
+    slat(0.29, 0.0, 0.415, 0.022, left.matte);
+    // the air curtain: an upright gloss black blade against the outer edge, standing clear of the slot behind it
+    const blade = [0.236, 0.3, 0.36, 0.424].map((y) => V(0.775, y, skinZ(0.775, y) - 0.012));
+    bar(left.gloss, blade, V(0.35, 0, 1).normalize(), 0.0125, 0.03, 0);
+    matte.addMirrored(left.matte);
+    gloss.addMirrored(left.gloss);
+  }
+
+  // ---- door handles (2.8): a painted grip standing off its recess, a bright insert along its lower half
+  {
+    const left = { body: new Tris(), chrome: new Tris() };
+    for (const [z, y] of [[-0.147, 0.857], [-1.18, 0.867]]) {
+      const h = castDoor(V(1.5, y, z), V(-1, 0, 0));
+      const m = new THREE.Matrix4().setPosition(h.point.x + 0.006, y, z);
+      blobAt(left.body, 0.013, 0.0145, 0.1175, m, 0.5);
+      blobAt(left.chrome, 0.0125, 0.0036, 0.104, m.clone().multiply(new THREE.Matrix4().makeTranslation(0.0012, -0.0068, 0)), 0.5);
+    }
+    body.addMirrored(left.body);
+    chrome.addMirrored(left.chrome);
+  }
+
+  // ---- the wipers, parked along the foot of the windscreen: a blade and its arm each side
+  {
+    const left = new Tris();
+    const footZ = (x) => 0.84 + (0.713 - 0.84) * (x / 0.695) ** 2;
+    const on = (x, dz) => {
+      const h = castScreen(V(x, 2, footZ(x) - dz), V(0, -1, 0));
+      return { point: h.point.addScaledVector(h.normal, 0.014), normal: h.normal };
+    };
+    const pts = [];
+    let normal = V(0, 1, 0);
+    for (let i = 0; i <= 6; i++) {
+      const x = 0.07 + (0.55 * i) / 6;
+      const h = on(x, 0.05 + 0.012 * Math.sin((i / 6) * Math.PI));
+      pts.push(h.point);
+      normal = h.normal;
+    }
+    bar(left, pts, normal, 0.006, 0.012, 0);
+    // the arm: from the middle of the blade down to its pivot under the bonnet's edge
+    const from = pts[3].clone().addScaledVector(normal, 0.006);
+    const to = V(0.52, from.y - 0.055, footZ(0.52) + 0.05);
+    bar(left, [from, from.clone().lerp(to, 0.5), to], normal, 0.007, 0.008, 0);
+    matte.addMirrored(left);
+  }
 
   // ---- the stars (5.1, 5.3, 6.3)
   const grilleLean = V(0, -0.087, 1).normalize();
@@ -518,24 +435,22 @@ export function buildDetails(samples, { tier, plate }) {
   // ---- the cabin
   cabin(low ? new Tris() : dark, emit);
 
-  // ---- number plates (5.3, 6.3): front leaning back 6 degrees under the grille, rear upright in its recess
-  let plateTex = null;
-  if (typeof document !== 'undefined' || typeof OffscreenCanvas !== 'undefined') {
-    plateTex = plateTextures(plate);
-    const face = (rows, matrix) => {
-      const geo = new THREE.PlaneGeometry(0.52, 0.114);
-      const uv = geo.attributes.uv;
-      for (let i = 0; i < uv.count; i++) uv.setY(i, rows[0] + (rows[1] - rows[0]) * uv.getY(i));
-      plates.add(geo, matrix);
+  // ---- number plates (5.3, 6.3): front leaning back 6 degrees under the grille, rear upright in its recess; each
+  // on a black frame that shows a centimetre all round
+  const plateTex = createPlateTextures(plate);
+  if (plateTex) {
+    const face = (matrix, fw, fh) => {
+      plates.add(new THREE.PlaneGeometry(0.52, 0.114), matrix);
+      matte.add(new THREE.BoxGeometry(fw, fh, 0.008), matrix.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, -0.0055)));
     };
     const lean = V(0, Math.sin((6 * Math.PI) / 180), Math.cos((6 * Math.PI) / 180));
     const fp = hit(V(0, 0.392, 3), V(0, 0, -1));
-    face(plateTex.rows.front, frame(fp.point.clone().addScaledVector(lean, 0.008), lean));
+    face(frame(fp.point.clone().addScaledVector(lean, 0.012), lean), 0.53, 0.125);
     const rp = hit(V(0, 0.771, -3.5), V(0, 0, 1));
-    face(plateTex.rows.rear, frame(rp.point.clone().add(V(0, 0, -0.006)), V(0, 0, -1)));
+    face(frame(rp.point.clone().add(V(0, 0, -0.012)), V(0, 0, -1)), 0.54, 0.135);
   }
 
-  const geometries = low ? { chrome, gloss, matte, emit, plates } : { chrome, gloss, matte, glass, emit, dark, plates };
+  const geometries = low ? { chrome, gloss, matte, body, emit, plates } : { chrome, gloss, matte, body, glass, emit, dark, plates };
   const out = {};
   let triangles = 0;
   for (const [name, tris] of Object.entries(geometries)) {
