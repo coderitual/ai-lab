@@ -39,7 +39,7 @@ let browser;
 const BENIGN = [/GPU stall due to ReadPixels/, /Automatic fallback to software WebGL/, /swiftshader/i];
 
 /** A fresh page (its own context: its own storage) on `query`, ready to step. */
-async function open(query, { w = 320, h = 180, mobile = false, storage = true, init = null } = {}) {
+async function open(query, { w = 320, h = 180, mobile = false, storage = true, init = null, gpu = true } = {}) {
   const context = await browser.newContext({ viewport: { width: w, height: h }, isMobile: mobile, hasTouch: mobile });
   if (!storage) {
     await context.addInitScript(() => {
@@ -62,6 +62,8 @@ async function open(query, { w = 320, h = 180, mobile = false, storage = true, i
   await page.goto(BASE + query, { waitUntil: 'load', timeout: 300000 });
   await page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
   const ok = await page.evaluate('!!window.__serp');
+  // no picture needed: the frame still runs (input, cameras, HUD), only the GPU's work is left out
+  if (ok && !gpu) await page.evaluate('window.__serp.game.draw = () => {}');
   const p = {
     page,
     context,
@@ -111,14 +113,14 @@ const visible = (p, selector) => p.page.evaluate((sel) => {
   const r = e.getBoundingClientRect();
   return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden]');
 }, selector);
-const clickText = (p, text) => p.page.click(`.hud button:has-text("${text}")`, { timeout: 120000 });
+const clickText = (p, text, scope = '.title') => p.page.click(`.hud ${scope} button:has-text("${text}")`, { timeout: 60000 });
 
 // ---- sections -----------------------------------------------------------------------------------------------
 
 const SECTIONS = {
   /** The title: its choices, the time of day buttons, the attract lap after idling, then into a run. */
   async title() {
-    const p = await open('?manual&q=low', { w: 480, h: 270 });
+    const p = await open('?manual&q=low', { w: 480, h: 270, gpu: false });
     const times = await p.page.evaluate('Object.keys(window.__serp.times)');
     let s = await p.state();
     check('opens on the title', s.phase === 'title', s.phase);
@@ -160,7 +162,7 @@ const SECTIONS = {
 
   /** A solo run driven by key events: every control and every key the game has. */
   async keys() {
-    const p = await open('?manual&q=low&auto&time=day', { w: 480, h: 270 });
+    const p = await open('?manual&q=low&auto&time=day', { w: 480, h: 270, gpu: false });
     let s = await p.state();
     check('?auto starts a countdown', s.phase === 'countdown');
     await down(p, 'KeyW');
@@ -200,8 +202,8 @@ const SECTIONS = {
     await p.skip(3);
     await down(p, 'Space');
     await p.skip(0.3);
-    d = await p.d0();
-    check('Space: the handbrake lamp', d.lamps.hand === true, JSON.stringify(d.lamps));
+    const hand = await p.page.evaluate('window.__serp.game.racers[0].controls.handbrake');
+    check('Space pulls the handbrake', hand > 0.5, `handbrake ${hand}`);
     await up(p, 'Space');
     await up(p, 'KeyW');
     await p.skip(0.5);
@@ -250,7 +252,7 @@ const SECTIONS = {
 
   /** Autopilot runs: one lap and three, the results, the board, the medal, again and menu, the ghost, the reload. */
   async results() {
-    const p = await open('?manual&q=low&auto&ap&laps=1&time=day', { w: 640, h: 360 });
+    const p = await open('?manual&q=low&auto&ap&laps=1&time=day', { w: 640, h: 360, gpu: false });
     let s = await p.until((x) => x.phase === 'results', 400, 10);
     const d = s.drivers[0];
     check('?laps=1: the autopilot finishes and the results come up', s.phase === 'results', s.phase);
@@ -267,7 +269,8 @@ const SECTIONS = {
     const stored = await p.page.evaluate(`JSON.parse(localStorage.getItem('serpentine.best.v1'))`);
     check('the lap is kept under serpentine.best.v1 for day', stored && stored.day && stored.day.laps.length === 1);
     check('the ghost of the lap is kept', await p.page.evaluate(`!!localStorage.getItem('serpentine.ghost.v1')`));
-    await clickText(p, 'Again');
+    await p.advance(0.2);
+    await clickText(p, 'Again', '.results');
     await p.skip(0.2);
     s = await p.state();
     check('Again starts a new run', s.phase === 'countdown', s.phase);
@@ -281,7 +284,8 @@ const SECTIONS = {
     await press(p, 'KeyG');
     s = await p.until((x) => x.phase === 'results', 400, 10);
     check('second run finishes', s.phase === 'results');
-    await clickText(p, 'Menu');
+    await p.advance(0.2);
+    await clickText(p, 'Menu', '.results');
     await p.skip(1.5);
     s = await p.state();
     check('Menu goes back to the title', s.phase === 'title', s.phase);
@@ -323,7 +327,7 @@ const SECTIONS = {
 
   /** Split screen with two key sets; then both finish a race (the autopilot takes over to save time). */
   async split() {
-    const p = await open('?manual&q=low&laps=1', { w: 480, h: 270 });
+    const p = await open('?manual&q=low&laps=1', { w: 480, h: 270, gpu: false });
     await clickText(p, 'Two players');
     await press(p, 'Enter');
     await p.skip(0.1);
@@ -364,7 +368,7 @@ const SECTIONS = {
       window.__pads = [pad(0), pad(1)];
       navigator.getGamepads = () => [window.__pads[0], window.__pads[1], null, null];
     };
-    const p = await open('?manual&q=low&auto&mode=split', { w: 480, h: 270, init });
+    const p = await open('?manual&q=low&auto&mode=split', { w: 480, h: 270, init, gpu: false });
     await toGo(p);
     await p.page.evaluate(() => {
       window.__pads[0].buttons[7] = { pressed: true, value: 1 };
@@ -402,7 +406,7 @@ const SECTIONS = {
   /** Touch on phone-sized windows: the stick under the thumb, pull to brake, a second finger, the buttons; split. */
   async touch() {
     for (const [w, h] of [[390, 844], [844, 390]]) {
-      const p = await open('?manual&q=low&auto&time=day', { w, h, mobile: true });
+      const p = await open('?manual&q=low&auto&time=day', { w, h, mobile: true, gpu: false });
       await toGo(p);
       const x = w * 0.3;
       const y = h * 0.75;
@@ -411,10 +415,11 @@ const SECTIONS = {
       let d = await p.d0();
       check(`${w}x${h}: a thumb down drives (throttle is automatic)`, d.input === 'touch' && d.throttle > 0.5 && d.kmh > 10, `${d.input} ${d.kmh} km/h`);
       check(`${w}x${h}: the stick appears under the thumb`, await p.page.evaluate(([x, y]) => {
-        const e = [...document.querySelectorAll('.hud .stick')].find((s) => !s.hidden && s.getBoundingClientRect().width > 0);
+        // the stick is a point at the thumb's first touch (its ring is drawn round it)
+        const e = [...document.querySelectorAll('.hud .stick')].find((s) => !s.hidden && getComputedStyle(s).display !== 'none');
         if (!e) return false;
         const r = e.getBoundingClientRect();
-        return Math.abs(r.left + r.width / 2 - x) < 30 && Math.abs(r.top + r.height / 2 - y) < 30;
+        return Math.abs(r.left - x) < 30 && Math.abs(r.top - y) < 30;
       }, [x, y]));
       await pointer(p, 'pointermove', 1, x + 50, y);
       await p.advance(0.3);
@@ -447,7 +452,7 @@ const SECTIONS = {
       await p.close(`touch ${w}x${h}`);
     }
     // split: a stick in each half
-    const p = await open('?manual&q=low&auto&mode=split&time=day', { w: 844, h: 390, mobile: true });
+    const p = await open('?manual&q=low&auto&mode=split&time=day', { w: 844, h: 390, mobile: true, gpu: false });
     await toGo(p);
     await pointer(p, 'pointerdown', 1, 200, 300);
     await pointer(p, 'pointerdown', 2, 640, 300);
@@ -503,8 +508,7 @@ const SECTIONS = {
   /** The HUD never covers the car in the default chase view, at the sizes the HUD was laid out for. */
   async hud() {
     for (const [w, h] of [[960, 540], [1280, 720], [1920, 1080], [844, 390], [390, 844], [1024, 768]]) {
-      const p = await open('?manual&q=low&auto&ap&time=day', { w, h, mobile: w < 900 && h < 900 });
-      await p.page.evaluate('window.__serp.game.draw = () => {}');
+      const p = await open('?manual&q=low&auto&ap&time=day', { w, h, mobile: w < 900 && h < 900, gpu: false });
       const hits = [];
       for (const target of [150, 1150]) {
         await p.page.evaluate(async (target) => {

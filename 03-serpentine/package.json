@@ -9,8 +9,8 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
-    "test": "node tools/unit.mjs && node tools/playtest.cjs http://localhost:4190/",
-    "screenshots": "node tools/screenshots.cjs"
+    "test": "node tools/unit.mjs && node tools/playtest.cjs http://localhost:4190/ && node tools/soundtest.cjs http://localhost:5190/",
+    "test:unit": "node tools/unit.mjs"
   },
   "dependencies": {
     "three": "0.187.0"
