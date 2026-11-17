@@ -180,11 +180,12 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     const r = plantRng.next();
     return BROAD[r < 0.38 ? 0 : r < (edge ? 0.68 : 0.78) ? 1 : 2];
   }
-  function addTree(x, y, z, species, { road, turned, inside }) {
+  function addTree(x, y, z, species, { road, turned, inside, young = 1 }) {
     const data = SPECIES_DATA[SPECIES[species]];
     const variants = VARIANTS_OF[species];
     const variant = variants[plantRng.int(variants.length)];
-    const [lo, hi] = data.height;
+    const lo = data.height[0] * young;
+    const hi = data.height[1] * young;
     const u = plantRng.next();
     const h = road ? lo + (hi - lo) * (0.3 + 0.7 * u) : lo + (hi - lo) * Math.sqrt(u);
     // does this one turn, and how far along is it
@@ -219,6 +220,25 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         addTree(point.x, y - 0.15, point.z, pickSpecies(wood.mix, y, r === 0), { road: true, turned: wood.turned, inside: row.inside });
       }
     });
+  }
+  // the undergrowth at the wood's edge, in front of and between the first trunks: hazel shrubs and young trees
+  const HAZEL = SPECIES.indexOf('hazel');
+  for (const side of [1, -1]) {
+    let hint = -1;
+    for (let s = plantRng.range(0, 2); s < track.length; s += plantRng.range(1.6, 3.2)) {
+      const wood = woodAt(track, noise, s, side);
+      if (!wood) continue;
+      if (glimpse(s, side) > 1.0) continue;
+      track.pointAt(s, side * (wood.from + plantRng.range(0, 3.5)), point);
+      if (blocked(point.x, point.z, 0, hint)) continue;
+      hint = spot.index;
+      if (!free(point.x, point.z, 1.5)) continue;
+      const y = terrain.heightAt(point.x, point.z);
+      if (y < lakeLevel + 0.5) continue;
+      const sapling = plantRng.next() < 0.22;
+      const species = sapling ? pickSpecies(wood.mix, y, true) : HAZEL;
+      addTree(point.x, y - 0.1, point.z, species, { road: true, turned: wood.turned, inside: 0, young: sapling ? 0.3 : 1 });
+    }
   }
   const roadTrees = trees.length;
 
@@ -464,19 +484,23 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         sphere.radius = spheres[i * 4 + 3];
         if (caster && Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR) write(casterMeshes[0], i, 1);
         if (!seenCell || !frustum.intersectsSphere(sphere)) continue;
-        const d = flat ? redD - blend - 1 : sphere.center.distanceTo(eye);
-        if (d < fullD) {
-          const a = blend ? Math.min(1, (fullD - d) / blend) : 1;
+        // (small things, the undergrowth and young trees, go to the simpler levels sooner)
+        const small = trees[i].h < 6;
+        const fD = small ? fullD * 0.55 : fullD;
+        const rD = small ? redD * 0.6 : redD;
+        const d = flat ? rD - blend - 1 : sphere.center.distanceTo(eye);
+        if (d < fD) {
+          const a = blend ? Math.min(1, (fD - d) / blend) : 1;
           write(fullMeshes[v], i, a);
           fullList.push(i);
           if (a < 1) write(reducedMeshes[v], i, 1 - a);
-        } else if (d < redD) {
-          const a = blend ? Math.min(1, (redD - d) / blend) : 1;
+        } else if (d < rD) {
+          const a = blend ? Math.min(1, (rD - d) / blend) : 1;
           write(reducedMeshes[v], i, a);
           if (a < 1) write(farMesh, i, 1 - a);
         } else {
           // each tree has its own distance at which it goes (the road's rows keep longest), fading over the last part
-          const cut = T.far * (trees[i].road ? 1 : 0.35 + 0.65 * (1 - trees[i].rank) ** 0.7);
+          const cut = trees[i].h < 6 ? T.far * 0.3 : T.far * (trees[i].road ? 1 : 0.35 + 0.65 * (1 - trees[i].rank) ** 0.7);
           if (d > cut) continue;
           write(farMesh, i, coverage ? Math.min(1, (cut - d) / (0.15 * cut)) : 1);
         }

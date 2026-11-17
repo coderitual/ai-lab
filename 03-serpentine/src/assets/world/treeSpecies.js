@@ -15,7 +15,7 @@
 import { BARK, TILE } from './forestTextures.js';
 
 /** The species, in the order the forest stores them. */
-export const SPECIES = ['spruce', 'fir', 'larch', 'birch', 'maple', 'lime'];
+export const SPECIES = ['spruce', 'fir', 'larch', 'birch', 'maple', 'lime', 'hazel'];
 
 /**
  * Per species: the height range of grown trees (m); `green` the linear multiplier of the atlas colour in summer
@@ -27,9 +27,10 @@ export const SPECIES_DATA = {
   spruce: { height: [15, 30], green: [0.36, 0.5, 0.42], autumn: [], turns: 0, value: [0.8, 1.12], hue: 0.15, lean: 0.05, through: 0.3 },
   fir: { height: [13, 25], green: [0.3, 0.46, 0.36], autumn: [], turns: 0, value: [0.82, 1.1], hue: 0.1, lean: 0.04, through: 0.25 },
   larch: { height: [14, 26], green: [0.4, 0.66, 0.3], autumn: [[0.95, 0.78, 0.3]], turns: 0.35, value: [0.85, 1.15], hue: 0.3, lean: 0.07, through: 0.75 },
-  birch: { height: [10, 19], green: [0.42, 0.66, 0.16], autumn: [[1.0, 0.86, 0.22], [0.92, 0.74, 0.16]], turns: 0.55, value: [0.88, 1.15], hue: 0.4, lean: 0.13, through: 0.9 },
-  maple: { height: [9, 16], green: [0.34, 0.6, 0.12], autumn: [[1.1, 0.42, 0.06], [1.05, 0.62, 0.08], [0.95, 0.2, 0.06], [1.05, 0.8, 0.14]], turns: 1, value: [0.85, 1.12], hue: 0.35, lean: 0.08, through: 1.0 },
-  lime: { height: [12, 21], green: [0.36, 0.62, 0.14], autumn: [[1.05, 0.82, 0.16], [1.0, 0.64, 0.1]], turns: 0.45, value: [0.85, 1.12], hue: 0.3, lean: 0.06, through: 0.95 },
+  birch: { height: [10, 19], green: [0.42, 0.66, 0.16], autumn: [[1.0, 0.86, 0.22], [0.92, 0.74, 0.16]], turns: 0.4, value: [0.88, 1.15], hue: 0.4, lean: 0.13, through: 0.9 },
+  maple: { height: [9, 16], green: [0.34, 0.6, 0.12], autumn: [[1.25, 0.46, 0.05], [1.2, 0.68, 0.07], [1.05, 0.22, 0.05], [1.15, 0.86, 0.12]], turns: 1, value: [0.85, 1.12], hue: 0.35, lean: 0.08, through: 1.0 },
+  hazel: { height: [2.4, 4.6], green: [0.3, 0.56, 0.12], autumn: [[0.95, 0.78, 0.18]], turns: 0.3, value: [0.8, 1.1], hue: 0.35, lean: 0.12, through: 0.9 },
+  lime: { height: [12, 21], green: [0.36, 0.62, 0.14], autumn: [[1.05, 0.82, 0.16], [1.0, 0.64, 0.1]], turns: 0.3, value: [0.85, 1.12], hue: 0.3, lean: 0.06, through: 0.95 },
 };
 
 /**
@@ -209,6 +210,35 @@ export const VARIANTS = [
       clusters: 9,
       clump: 1.3,
       leaf: [0.8, 1.1],
+      hang: false,
+    },
+  },
+  {
+    name: 'hazel-a',
+    species: 'hazel',
+    kind: 'broadleaf',
+    frame: 'wide',
+    tile: TILE.LIME,
+    bark: BARK.BROADLEAF,
+    // the undergrowth at the wood's edge: a shrub of many stems from the ground, leafy to the ground
+    P: {
+      H: 4,
+      trunkR: 0.07,
+      bend: 0.2,
+      fork: 0.03,
+      crown: { cy: 0.5, ry: 0.56, rx: 2.3 },
+      levels: 2,
+      forks: [6, 3],
+      leader: [0, 0.3],
+      spread: [0.62, 0.7],
+      ratio: [5.5, 0.55],
+      side: 1,
+      up: [0, 0.3, 0.05],
+      gnarl: 0.22,
+      shoots: [0, 3],
+      clusters: 8,
+      clump: 0.55,
+      leaf: [0.6, 0.9],
       hang: false,
     },
   },

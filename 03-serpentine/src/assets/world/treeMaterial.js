@@ -117,7 +117,7 @@ void RE_Direct_Tree( const in IncidentLight directLight, const in vec3 geometryP
   if ( treeThrough > 0.0 ) {
     float nl = dot( treeCrown, directLight.direction );
     // a crown is not a wall: light gets a little way round it and into it
-    float wrap = clamp( ( nl + 0.6 ) / 1.6, 0.0, 1.0 ) - 0.625 * clamp( nl, 0.0, 1.0 );
+    float wrap = clamp( ( nl + 0.7 ) / 1.7, 0.0, 1.0 ) - 0.59 * clamp( nl, 0.0, 1.0 );
     // and the eye that looks towards the light sees it through the leaves, most where the crown is thin
     float behind = pow( clamp( dot( geometryViewDir, - directLight.direction ), 0.0, 1.0 ), 3.0 );
     float rim = 1.0 - abs( dot( treeCrown, geometryViewDir ) );
@@ -139,7 +139,8 @@ if ( treeThrough > 0.0 ) {
   }
   #endif
   #ifdef USE_ENVMAP
-  reflectedLight.indirectDiffuse += getIBLIrradiance( - geometryViewDir ) * treeBack * ( ( 0.25 + 0.75 * glowRim * glowRim ) * treeThrough * 0.55 * RECIPROCAL_PI );
+  // the sky behind the crown, and the sky above it, seen through the leaves
+  reflectedLight.indirectDiffuse += ( getIBLIrradiance( - geometryViewDir ) * ( 0.3 + 0.7 * glowRim * glowRim ) + 0.35 * getIBLIrradiance( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz ) ) * treeBack * ( treeThrough * 1.0 * RECIPROCAL_PI );
   #endif
 }
 reflectedLight.directSpecular *= treeGloss;

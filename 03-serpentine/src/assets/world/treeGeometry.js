@@ -617,9 +617,9 @@ function broadleafMesh(variant, sk, rng, full, barkSize, through) {
       for (let k = 0; k < cards; k++) {
         if (P.hang) {
           const h = norm(turn([dir[0], 0, dir[2]], [0, 1, 0], k * 1.05 + r.range(-0.3, 0.3)));
-          const a = mad(mid, h, -big * 0.42);
-          const e = mad(mid, h, big * 0.42);
-          curtain(b, { a, c: e, drop: big * 0.95, tile: variant.tile, normalAt, ao: [aoAt(a), aoAt(mad(a, [0, -1, 0], big))], hue: [hue, hue], through, sway: [limb.sway0, limb.sway1], phase: limb.phase, flutter: 1 });
+          const a = mad(mid, h, -big * 0.5);
+          const e = mad(mid, h, big * 0.5);
+          curtain(b, { a, c: e, drop: big * 0.55, tile: variant.tile, normalAt, ao: [aoAt(a), aoAt(mad(a, [0, -1, 0], big))], hue: [hue, hue], through, sway: [limb.sway0, limb.sway1], phase: limb.phase, flutter: 1 });
         } else {
           const across = turn(square(dir), dir, k * 1.05 + r.range(-0.4, 0.4));
           const end = mad(base, dir, big);
