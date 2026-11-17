@@ -264,7 +264,7 @@ the day's sun still stands down it.
   number instead of a covariance matrix).
 - **The glare lobe.** A second, anisotropic specular lobe stretched along the
   line of sight lays the low sun's glare along the road as a long streak
-  (`ASPHALT_SHEEN`), broken up by the stones.
+  (`ASPHALT_SHEEN`: along 0.45, across 0.06), broken up by the stones. Dry asphalt keeps 0.3 of the standard material's own isotropic lobe, so that the streak is the sheen's; under water or paint it keeps all of it.
 - **The racing line and the history.** A polished darker band where cars run,
   rubber in the bends and the braking zones; runs of surfacing with joints,
   seams 2 m either side of the middle, patches, sealed cracks, expansion
@@ -319,7 +319,7 @@ of the pixel, grain of the run's own clock.
 ## The staging camera
 
 `setPhoto` in `src/game/Game.js`, `_photo` in `src/game/Cameras.js`.
-`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` places every view's
+`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, which also set the moment of the autopilot's run and the time of day) places every view's
 camera `back` m behind, `right` m right of and `up` m above the car's origin
 in the car's level frame (its heading only, not its pitch or roll), turned
 `yaw` degrees left of the heading and `pitch` degrees up, with a lens of

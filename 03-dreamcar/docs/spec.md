@@ -46,7 +46,7 @@ run of `tools/handling.mjs`.
 | `carousel` | The carousel | 2582 to 2915 | 150 m climb at 6 %, then right R 55 through 190°, banked 8° | 90 to 229 |
 | `crest` | The crest | 2915 to 3115 | 200 m straight over the top | 108 to 161 |
 | `plunge` | The plunge | 3115 to 3394 | right R 400 through 40°, banked 5°, 8 % down into the compression | 161 to 215 |
-| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 10°, rock left), right R 350 20° (6°, rock right) | 216 to 257 |
+| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 10°; low walls both sides, the valley open inside, a wooded bank outside), right R 350 20° (6°, rock on the inside) | 216 to 257 |
 | `gully` | Gully bridge | 3778 to 4115 (337 m) | straight on piers, ground 26 m under the middle, 8 % down | 257 to 282 |
 | `sweepback` | The long right | 4115 to 4686 | 100 m straight, then right R 300 through 90°, banked 9° | 234 to 283 |
 
@@ -62,7 +62,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 
 | | |
 | --- | --- |
-| barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it), a rail on the rest of the land side; cut rock at the cuttings, the carousel and the ledge; walls in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
+| barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; walls in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
 | structures | the tunnel's bore 349 m, ceiling 6.4 m over the road (`TUNNEL`); two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
 | tyre walls | 8 runs, on the outside of the fast bends |
@@ -242,6 +242,7 @@ unit per view:
 - bottom right: the speed in large figures (km/h or mph), a rev arc, the
   gear, the ABS / TC / ESC lamps;
 - bottom left: a small map (can be hidden);
+- over the road above the car, only while it slides: a drift readout (the angle and a running score; `Hud.setDrift`), and on touch screens a place under the right thumb for round thumb buttons (`Hud.addThumbButton`). Both exist in the HUD; nothing in `Game.js` calls them yet, so neither shows (checked in the source at this head);
 - touch screens: four small buttons together (camera, high beam, put back,
   pause);
 - the best-laps board on the title, the pause sheet and the results only.
@@ -278,6 +279,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,hud]` | the staging camera |
+| `?photo=d1`, `d3`, `d4` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -293,13 +295,13 @@ and the moon are placed against the start straight's heading by
 | | day | dusk (golden hour) | night |
 | --- | --- | --- | --- |
 | sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 3.5° up; colour [1, 0.6, 0.3], 3.4 | the moon 8° left, 17° up; 0.08 |
-| exposure (tunnel) | 0.85 (5.6) | 3.2 (6) | 18 (8) |
+| exposure (tunnel) | 0.72 (5.6) | 3.2 (6) | 18 (8) |
 | wetness | 0 | 0 | 0.65 |
 | street lamps / tunnel / windows | 0 / 1 / 0 | 1 / 1 / 0.7 | 1 / 1 / 1 |
 | car lamps | running lights | low beam | low beam |
 | clouds cover | 0.4 | 0.38 | 0.3 |
 | bloom / glare / ghosts | 0.05 / 0.015 / 0.0003 | 0.09 / 0.03 / 0.0003 | 0.15 / 0 / 0 |
-| contrast / saturation | 1.18 / 1.12 | 1.12 / 1.12 | 1.12 / 0.94 |
+| contrast / saturation | 1.18 / 1.04 | 1.12 / 1.12 | 1.12 / 0.94 |
 
 N, or the title's choice, fades to black and back (0.25 s each way) to switch.
 

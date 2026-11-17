@@ -96,7 +96,7 @@ node tools/screenshots.cjs                # if anything visible changed; look at
 | `advance(seconds, fps = 60)` | play that long, drawing every frame |
 | `state()` | a plain JSON picture of the run: phase, mode, time of day, clock, lamps; per driver lap, `s`, `lat`, distance, speed, gear, rpm, pedals, laps and splits, sector, gaps, position, medal, camera, lamps, assists, the put-back offer |
 | `stats()` | frame time, draw calls, triangles, programs, textures, buffer size, HUD writes, pixel ratio, render scale, the pipeline's targets, tier, `hdr`, GPU string |
-| `photo({ back, right, up, yaw, pitch, fov, hud })` | the staging camera (techniques.md); `photo(null)` ends it |
+| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`); `photo(null)` ends it |
 | `set(path, value)` | change a number of lighting.js or config.js and show it: `set('times.night.exposure', 20)`, `set('camera.chase.distance', 6)` |
 
 `window.__ready` is true once the first frame has been drawn.

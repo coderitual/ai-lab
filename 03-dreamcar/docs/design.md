@@ -108,7 +108,7 @@ dark, fine racing asphalt with a polished, darker racing line and rubber in
 the bends and the braking zones (corridor.js), runs of surfacing of different
 ages with joints, the paver's seams 2 m either side of the middle, a few
 patches and sealed cracks, tyre marks before the carousel (roadHistory.js);
-its markings are a solid white line inside each edge (0.2 m), the start line
+its markings are a solid white line inside each edge (0.28 m), the start line
 and twelve grid boxes from `track.grid`, nothing else. A second, anisotropic
 specular lobe stretched along the line of sight lays the low sun's glare on it
 as a long streak (`ASPHALT_SHEEN`). The kerbs (kerbs.js) are red and white
@@ -276,6 +276,10 @@ bottom (as given, whatever the picture's shape); the HUD is hidden unless
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. Frame D1's camera on the start straight is
 about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
+The reference frames' cameras are kept as named places (`PHOTOS` in
+`src/game/config.js`): `?photo=d1`, `d3` and `d4` (or `photo('d1')`) set the
+pose and also bring the moment of the autopilot's run and the time of day the
+frame belongs to, unless the address gives `t` or `time` itself.
 
 ## The look
 
