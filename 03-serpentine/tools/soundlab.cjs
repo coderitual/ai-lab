@@ -74,7 +74,7 @@ function fft(re, im) {
  * @returns {{ amp: Float64Array, power: Float64Array, df: number }} `amp[k]`: the amplitude a steady sine at that
  *   frequency would have; `power[k]`: mean square per bin, so that summing a band gives that band's mean square
  */
-function spectrum(sig, rate, t0, t1, pad = 2) {
+function spectrum(sig, rate, t0, t1, pad = 2, window = 'hann') {
   const a = index(sig, rate, t0);
   const b = index(sig, rate, t1);
   const n = Math.max(8, b - a);
@@ -84,7 +84,9 @@ function spectrum(sig, rate, t0, t1, pad = 2) {
   const im = new Float64Array(size);
   let sum = 0, sum2 = 0;
   for (let i = 0; i < n && a + i < sig.length; i++) {
-    const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
+    const x = (2 * Math.PI * i) / (n - 1);
+    // Hann by default; 'bh': 4-term Blackman-Harris, whose side lobes stay under -92 dB, for looking far down
+    const w = window === 'bh' ? 0.35875 - 0.48829 * Math.cos(x) + 0.14128 * Math.cos(2 * x) - 0.01168 * Math.cos(3 * x) : 0.5 - 0.5 * Math.cos(x);
     re[i] = sig[a + i] * w;
     sum += w;
     sum2 += w * w;

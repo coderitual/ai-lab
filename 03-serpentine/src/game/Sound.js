@@ -28,18 +28,18 @@ export const SPLIT_PAN = 0.7;
 
 /** Linear gains of the parts into a car's bus, and of the cues into the master. Tuned by tools/soundtest.cjs. */
 const MIX = {
-  engine: 0.5,
+  engine: 0.45,
   breath: 0.16,
   whistle: 0.12,
   wind: 0.55,
   road: 1.1,
-  squeal: 1.5,
+  squeal: 6.8,
   scrub: 0.5,
   rumble: 0.3,
   scrape: 0.9,
-  thump: 0.2,
+  thump: 0.4,
   pop: 0.16,
-  impact: 0.75,
+  impact: 1,
   cue: 0.17,
   /** Each of two cars is turned down a little, so that the pair is only slightly louder than one alone. */
   pair: 0.78,
@@ -82,12 +82,13 @@ GROUND[SURFACE.GRAVEL] = { roar: 1.9, squeal: 0, scrub: 1, rumble: 0.4 };
  * What a body sounds like sliding along each kind of edge (EDGE in track.js: rail, rock, wall, parapet, trees):
  * two resonances and a grind under them. Steel rings; rock and concrete grind.
  */
+const band = (type, freq, q, level = 1) => ({ type, freq, q, out: 0, level });
 const EDGES = [
-  { ring: [2350, 9], ring2: [3900, 12], grind: [900, 0.7], grit: 0.5 },
-  { ring: [1300, 2.5], ring2: [2600, 3], grind: [500, 0.6], grit: 1 },
-  { ring: [1700, 3], ring2: [3100, 4], grind: [650, 0.6], grit: 0.8 },
-  { ring: [1700, 3], ring2: [3100, 4], grind: [650, 0.6], grit: 0.8 },
-  { ring: [800, 1.5], ring2: [1900, 2], grind: [350, 0.6], grit: 1 },
+  /* rail */ [band('bandpass', 2350, 9), band('bandpass', 3900, 12, 0.6), band('bandpass', 900, 0.7, 0.5)],
+  /* rock */ [band('lowpass', 700, 0.9), band('bandpass', 380, 1, 0.6), band('bandpass', 1500, 1.5, 0.25)],
+  /* wall */ [band('lowpass', 1000, 1), band('bandpass', 1700, 3, 0.4), band('bandpass', 650, 0.6, 0.6)],
+  /* parapet */ [band('lowpass', 1000, 1), band('bandpass', 1700, 3, 0.4), band('bandpass', 650, 0.6, 0.6)],
+  /* trees */ [band('lowpass', 600, 0.7), band('bandpass', 1900, 2, 0.3), band('bandpass', 350, 0.6, 0.6)],
 ];
 
 /** A sliding tyre: the squeal and a partial above it into gain 0, the rougher band into gain 1. */
@@ -247,12 +248,15 @@ class CarVoice {
     this.rough = new Aim(rough.gain, 0.02);
     const shaper = make(ctx.createWaveShaper());
     shaper.curve = sound.curve;
+    // tanh adds harmonics without end: worked out at four times the rate, what would fold back is filtered away first
+    shaper.oversample = '4x';
     const highpass = filter('highpass', 30, 0.7); // below this nothing is heard, and it only eats headroom
     const lowpass = filter('lowpass', 300, 0.7);
     this.cutoff = new Aim(lowpass.frequency, 300);
-    const body = filter('peaking', 185 * own, 1.1);
-    body.gain.value = 4;
-    const formant = filter('peaking', 860 * own, 1);
+    // the rasp: a resonance high in the pipes that only a working engine at speed drives (the top end's hard edge)
+    const body = filter('peaking', 1350 * own, 1.1);
+    this.rasp = new Aim(body.gain, -4);
+    const formant = filter('peaking', 650 * own, 0.9);
     this.formant = new Aim(formant.gain, -6);
     const engine = gain(0);
     this.engine = new Aim(engine.gain, 0);
@@ -375,11 +379,13 @@ class CarVoice {
     this.freqRough.to(f4, t, 0.03);
     const push = load ** 0.7;
     const low = (1 - rpmN) ** 4; // 1 at idle, gone by 3000 rpm: where single firings are heard
-    this.drive.to(lerp(0.26, 0.6, push) * (1 + 0.35 * low), t, 0.04);
-    this.rough.to(0.02 + 0.12 * load ** 1.3, t, 0.04);
-    this.cutoff.to(320 + 1900 * rpmN * (0.35 + 0.65 * load) + 500 * load + 120 * low, t, 0.04);
-    this.formant.to(-6 + 13 * load, t, 0.04);
-    this.engine.to(mix.engine * (0.62 + 0.38 * load) * (0.55 + 0.45 * rpmN ** 0.9) * (1 + 0.15 * tunnel), t, 0.05);
+    this.drive.to(lerp(0.26, 0.6, push) * (1 + 0.35 * low) * (0.8 + 0.45 * rpmN), t, 0.04);
+    this.rough.to((0.02 + 0.12 * load ** 1.3) * (1 - 0.5 * rpmN), t, 0.04);
+    // brightness climbs faster than pitch (the note only spans a few semitones per gear), and opens with load
+    this.cutoff.to(300 + 3500 * rpmN ** 2 * (0.35 + 0.65 * load) + 380 * load + 120 * low, t, 0.04);
+    this.formant.to(-6 + 14 * load, t, 0.04);
+    this.rasp.to(-4 + 11 * load * rpmN ** 1.5, t, 0.04);
+    this.engine.to(mix.engine * (0.79 + 0.21 * load) * (0.55 + 0.45 * rpmN ** 0.9) * (1 + 0.15 * tunnel), t, 0.05);
     this.wobble.to(mix.wobble * (240 + 560 * low), t, 0.1);
     this.breathBand.to(700 + 1100 * rpmN + 500 * load, t, 0.05);
     this.breath.to(mix.breath * ((0.3 + 0.7 * load ** 1.3) * (0.5 + 0.5 * rpmN) + 1.6 * low), t, 0.05);
@@ -395,8 +401,10 @@ class CarVoice {
     g.scrub += (to.scrub * offroad - g.scrub) * k;
     g.rumble += (to.rumble * offroad - g.rumble) * k;
     if (surface !== SURFACE.ASPHALT) g.wavelength = CAR.surfaces[surface].wavelength;
+    // the air round the body and the hiss of the tread; the tread is heard from town speeds on
     this.windBand.to((280 + 13 * speed) * (1 - 0.2 * tunnel), t, 0.08);
-    this.wind.to(mix.wind * (speed / 50) ** 2 * (1 - 0.3 * tunnel), t, 0.08);
+    const v = speed / 50;
+    this.wind.to(mix.wind * (v * v + 0.05 * v) * (1 - 0.3 * tunnel), t, 0.08);
     this.roadBand.to(130 + 5.5 * speed, t, 0.08);
     this.road.to(mix.road * (speed / 40) ** 1.3 * g.roar * (1 + 0.35 * tunnel), t, 0.08);
 
@@ -406,7 +414,8 @@ class CarVoice {
     const along = skidNow * longShare;
     this.skid += (across - this.skid) * ease(across > this.skid ? 0.03 : 0.25);
     this.along += (along - this.along) * ease(along > this.along ? 0.03 : 0.2);
-    const sing = smoothstep(0, 0.35, this.skid) * g.squeal;
+    // heard well before the limit (a wheel's skid is about 0.25 there) and still growing well past it
+    const sing = smoothstep(0, 0.3, this.skid) * (0.75 + 0.25 * smoothstep(0.2, 0.9, this.skid)) * g.squeal;
     const howl = smoothstep(0, 0.4, this.along) * g.squeal;
     const scrub = g.scrub * (0.3 * smoothstep(1, 20, speed) + smoothstep(0, 0.4, this.skid + this.along));
     const sliding = sing + howl + scrub > 0.002;
@@ -418,7 +427,7 @@ class CarVoice {
       const pitch = (1070 - 330 * smoothstep(0.05, 0.9, this.skid)) * (1 + 0.04 * this.index);
       p.freqs[0].to(pitch, t, 0.06);
       p.freqs[1].to(pitch * 1.47, t, 0.06);
-      p.gains[0].to(mix.squeal * sing ** 1.3, t, 0.03);
+      p.gains[0].to(mix.squeal * sing, t, 0.03);
       p.freqs[2].to(lerp(700, 1500, g.scrub), t, 0.08);
       p.qs[2].to(lerp(3, 0.5, g.scrub), t, 0.08);
       p.gains[1].to(mix.scrub * (0.8 * howl ** 1.2 + scrub), t, 0.03);
@@ -443,13 +452,16 @@ class CarVoice {
     const scrapeNow = finite(car.scrape, 0, 1, 0);
     this.scrape += (scrapeNow - this.scrape) * ease(scrapeNow > this.scrape ? 0.02 : 0.12);
     const rubbing = this.scrape > 0.004;
+    const edgeKind = EDGES[car.edge] ? car.edge : 0;
+    // along something else now: the old sound fades as the new one starts
+    if (rubbing && this.scraping && this.scraping.edge !== edgeKind && scrapeNow > 0.004) {
+      this.scraping.stop(t);
+      this.scraping = null;
+    }
     if (rubbing && !this.scraping) {
-      const edge = EDGES[car.edge] || EDGES[0];
-      this.scraping = new Passing(audio, this.bus.input, [
-        { type: 'bandpass', freq: edge.ring[0] * this.own, q: edge.ring[1], out: 0 },
-        { type: 'bandpass', freq: edge.ring2[0] * this.own, q: edge.ring2[1], out: 0, level: 0.6 },
-        { type: 'bandpass', freq: edge.grind[0], q: edge.grind[1], out: 0, level: edge.grit },
-      ], 1, t);
+      const bands = EDGES[edgeKind].map((b) => ({ ...b, freq: b.freq * this.own }));
+      this.scraping = new Passing(audio, this.bus.input, bands, 1, t);
+      this.scraping.edge = edgeKind;
     }
     this.scraping = this._keep(this.scraping, rubbing, dt, t);
     if (this.scraping) this.scraping.gains[0].to(mix.scrape * this.scrape ** 0.8, t, 0.02);
@@ -457,7 +469,7 @@ class CarVoice {
     // ---- where it sits
     this.level.to(level, t, 0.05);
     if (this.panAim) this.panAim.to(this.pan, t, 0.08);
-    this.send.to(0.55 * tunnel, t, 0.08);
+    this.send.to(0.38 * tunnel, t, 0.08);
   }
 
   /** Keep a passing voice while it is wanted, and let it go when it has been quiet for a while. */
@@ -511,8 +523,8 @@ class CarVoice {
     const k = clamp01(strength);
     const mix = this.sound.mix;
     const dest = this.bus.input;
-    this.audio.tone(dest, { freq: 78, to: 46, dur: 0.075, gain: mix.thump * k, attack: 0.004 });
-    this.audio.noise(dest, { type: 'bandpass', freq: 140, q: 1.2, dur: 0.045, gain: mix.thump * 1.6 * k, attack: 0.004 });
+    this.audio.tone(dest, { freq: 120, to: 60, dur: 0.08, gain: mix.thump * 1.5 * k, attack: 0.008 });
+    this.audio.noise(dest, { type: 'bandpass', freq: 140, q: 1.2, dur: 0.045, gain: mix.thump * 1.6 * k, attack: 0.007 });
   }
 
   /** The throttle shutting on an engine that was working: the turbo sighs, and from high revs the exhaust pops. */
@@ -689,7 +701,7 @@ export class Sound {
         chime(audio, spot, NOTE.count, { dur: 0.17, gain: g * 0.8 });
         break;
       case 'go': // an octave up, and it rings
-        chime(audio, spot, NOTE.go, { dur: 0.6, gain: g, hold: 0.12 });
+        chime(audio, spot, NOTE.go, { dur: 0.95, gain: g, hold: 0.15 });
         break;
       case 'sector': {
         // an answer in two notes: up a fourth when ahead of the best lap, down a fourth when behind
@@ -707,7 +719,7 @@ export class Sound {
         chime(audio, spot, NOTE.c6, { when: 0.36, dur: 0.9, gain: g * 0.5 });
         break;
       case 'ui':
-        audio.tone(spot, { freq: NOTE.tick, dur: 0.035, gain: g * 0.45, attack: 0.003 });
+        audio.tone(spot, { freq: NOTE.tick, dur: 0.05, gain: g * 0.9, attack: 0.003 });
         break;
       default:
         break;
