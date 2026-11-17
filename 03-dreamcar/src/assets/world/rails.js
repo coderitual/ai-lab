@@ -54,9 +54,9 @@ const BEAM_LOW = [
   [0.075, 1.1],
 ];
 /** Metres between the beam's cross-sections on a straight and in a bend, by tier. */
-const SECTION = { low: [8, 3], medium: [4, 2], high: [4, 2] };
+const SECTION = { low: [12, 4], medium: [4, 2], high: [4, 2] };
 /** Posts: spacing (m) by tier, and where they stand behind the beam. */
-const POST_SPACING = { low: 4, medium: 2, high: 2 };
+const POST_SPACING = { low: 6, medium: 2, high: 2 };
 const POST_OUT = 0.16;
 /** A reflector on every this many posts. */
 const REFLECTOR_EVERY = 1e9; // (a circuit's barrier carries none)

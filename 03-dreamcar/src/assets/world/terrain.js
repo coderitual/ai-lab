@@ -50,9 +50,9 @@ const MARGIN = 260;
 /** Beyond this distance from the solid edge the road no longer shapes the ground (m). */
 const NEAR_REACH = 170;
 /** Columns of the band beyond the cliff's top, metres from it. */
-const BAND_OUT = [2, 5, 9, 14, 20, 27];
+const BAND_OUT_BY_TIER = { low: [4, 12, 27], medium: [2, 5, 9, 14, 20, 27], high: [2, 5, 9, 14, 20, 27] };
 /** The far land: its cell and how far it reaches from the middle of the course (m). */
-const FAR_CELL = 100;
+const FAR_CELL_BY_TIER = { low: 140, medium: 100, high: 100 };
 const FAR_REACH = 4800;
 /** Where the start straight is seen from (x from, x to along z = 0) and the slope (tan 6 deg) the hills keep under. */
 const STRAIGHT_VIEW = { x0: -450, x1: 250, slope: 0.1 };
@@ -86,6 +86,8 @@ const STRAIGHT_VIEW = { x0: -450, x1: 250, slope: 0.1 };
  * @returns {Terrain}
  */
 export function createTerrain({ track, tier, rng, material, lights }) {
+  const BAND_OUT = BAND_OUT_BY_TIER[tier] ?? BAND_OUT_BY_TIER.medium;
+  const FAR_CELL = FAR_CELL_BY_TIER[tier] ?? FAR_CELL_BY_TIER.medium;
   const started = performance.now();
   const n = track.count;
   const ds = track.ds;

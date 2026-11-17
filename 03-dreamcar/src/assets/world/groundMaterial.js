@@ -106,6 +106,16 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
       .replace('#include <normal_fragment_maps>', GROUND_NORMAL);
   });
   withBake(material);
+  // (env lane) light through the blades: mown grass seen against a low sun glows a vivid green (frame D1). After the
+  // bake has unrolled the light loop, every direct light adds what the grass lets through towards the eye.
+  extend(material, 'ground-translucency', (shader) => {
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <lights_pars_begin>', `#include <lights_pars_begin>\n${GRASS_THROUGH}`)
+      .replaceAll(
+        'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
+        'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );\nreflectedLight.directDiffuse += grassThrough( directLight, geometryNormal, geometryViewDir );',
+      );
+  });
   atmosphere.patch(material);
   return {
     material,
@@ -132,6 +142,7 @@ varying vec4 vVerge;  // the band beside the road: m beyond the margin, s, m bey
 varying vec3 vGroundPos;
 varying vec3 vGroundNormal;
 float groundRoughness;
+vec3 groundThrough;  // what the grass here lets through (0 where it is not grass)
 vec3 groundBump;   // world-space tilt of the normal from the detail
 
 // the detail texture on the ground: from above where it is level, from the side on steep faces
@@ -140,6 +151,16 @@ vec4 groundSample( sampler2D tex, vec3 p, vec3 n, float scale ) {
   vec2 side = ( abs( n.x ) > abs( n.z ) ? p.zy : p.xy ) / scale;
   float w = smoothstep( 0.55, 0.8, n.y );
   return mix( texture2D( tex, side ), texture2D( tex, top ), w );
+}
+`;
+
+/** GLSL (after lights_pars_begin): forward scattering through grass blades lit from behind. */
+const GRASS_THROUGH = /* glsl */ `
+vec3 grassThrough( IncidentLight L, vec3 N, vec3 V ) {
+  float toward = max( dot( V, -L.direction ), 0.0 );
+  float grazing = 1.0 - max( dot( N, V ), 0.0 );
+  float lit = max( dot( N, L.direction ), 0.0 ) * 0.6 + 0.4 * step( 0.0, dot( N, L.direction ) + 0.2 );
+  return L.color * groundThrough * pow( toward, 3.0 ) * ( 0.4 + 0.6 * grazing ) * lit;
 }
 `;
 
@@ -232,6 +253,8 @@ if ( gVerge > 0.0 ) {
   }
 }
 vec3 gAlbedo = gGrass;
+// blades let through a bright yellow-green, the mown verge most
+groundThrough = vec3( 0.18, 0.42, 0.05 ) * ( 0.6 + 0.8 * gVerge ) * ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * gFade;
 gAlbedo = mix( gAlbedo, vec3( 0.03, 0.045, 0.02 ) * ( 0.7 + 0.6 * gDet.r ), gScrub * 0.85 );
 gAlbedo = mix( gAlbedo, gForestCol, gForest );
 gAlbedo = mix( gAlbedo, gScreeCol, gScree );
