@@ -869,6 +869,17 @@ const SECTIONS = {
     const a2 = await read(p2);
     check('the same address gives the same camera', JSON.stringify(a2) === JSON.stringify(a), `${JSON.stringify(a2)}`);
     await p2.close('photo again');
+    // a named place: it brings its moment and its time of day (read from the page's PHOTOS table)
+    const p3 = await open('?manual&q=low&photo=d4', { w: 640, h: 360, gpu: false });
+    const preset = await p3.page.evaluate('window.__dreamcar.game.photo');
+    const st = await p3.state();
+    const named = await p3.page.evaluate(() => {
+      const c = window.__dreamcar.game.views[0].camera;
+      return { fov: c.fov, hud: !document.querySelector('.hud').hidden };
+    });
+    check('?photo=d4: the named camera, its time of day and its moment (the countdown)', !!preset && Math.abs(named.fov - preset.fov) < 0.01 && !named.hud
+      && st.time === preset.time && st.phase === 'countdown' && st.lamps > 0, `${st.time}, ${st.phase}, ${st.lamps} lamps, fov ${named.fov}`);
+    await p3.close('photo d4');
   },
 
   /** The same run is the same run: twice by keys, and by the autopilot at 30, 60 and 144 frames a second. */
