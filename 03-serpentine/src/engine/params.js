@@ -7,7 +7,7 @@
 //   ?auto          skip the title and start a solo run
 //   ?ap            an autopilot drives the local cars
 //   ?mode=solo|split
-//   ?time=day|night
+//   ?time=day|dusk|night   any time of day lighting.js has (the game checks the name)
 //   ?laps=3
 //   ?cam=chase|far|bonnet|bumper
 //   ?q=low|medium|high   force a quality tier (default: chosen by a capability probe)
@@ -18,6 +18,7 @@
 //   ?post=0        the scene straight to the screen (exposure and tone curve only)
 //   ?shadows=0     no shadow maps
 //   ?probe=0       no live reflections on the cars
+//   ?fx=0          no skid marks, smoke, spray or sparks
 //   ?plate=TEXT &plate2=TEXT   what the number plates say
 //   ?paint=NAME    the first car's paint
 //   ?wet=0.6       road wetness, 0..1 (a preview of weather to come; not in the interface)
@@ -32,7 +33,6 @@
 //   ?s=120         track distance to stand at
 
 export const TIER_NAMES = ['low', 'medium', 'high'];
-const TIME_NAMES = ['day', 'night'];
 const MODES = ['solo', 'split'];
 const CAMERAS = ['chase', 'far', 'bonnet', 'bumper'];
 const LIGHT_PRESETS = ['off', 'drl', 'low', 'high', 'brake', 'all'];
@@ -56,7 +56,7 @@ const ORTHO_VIEWS = ['side', 'front', 'rear', 'top'];
  * @property {boolean} auto
  * @property {boolean} autopilot
  * @property {'solo'|'split'} mode
- * @property {'day'|'night'} time
+ * @property {string|null} time a time of day's name as given (null: the game's default)
  * @property {number|null} laps
  * @property {'chase'|'far'|'bonnet'|'bumper'} camera
  * @property {'low'|'medium'|'high'|null} quality
@@ -119,7 +119,7 @@ export function parseParams(search = typeof location !== 'undefined' ? location.
     auto: q.has('auto'),
     autopilot: q.has('ap'),
     mode: oneOf('mode', MODES) || 'solo',
-    time: oneOf('time', TIME_NAMES) || 'day',
+    time: word('time'),
     laps: laps !== undefined && laps >= 1 ? Math.floor(laps) : null,
     camera: oneOf('cam', CAMERAS) || 'chase',
     quality: oneOf('q', TIER_NAMES),
@@ -130,6 +130,7 @@ export function parseParams(search = typeof location !== 'undefined' ? location.
     post: q.get('post') !== '0',
     shadows: q.get('shadows') !== '0',
     probe: q.get('probe') !== '0',
+    fx: q.get('fx') !== '0',
     plate: plate('plate'),
     plate2: plate('plate2'),
     paint: word('paint'),

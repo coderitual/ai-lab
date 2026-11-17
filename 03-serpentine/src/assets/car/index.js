@@ -18,7 +18,7 @@ import { createLampLights } from './lamps.js';
 import {
   PAINTS,
   createDarkMaterial,
-  createEmitterMaterial,
+  createLampPartMaterial,
   createGhostMaterial,
   createGlassMaterial,
   createPaintMaterial,
@@ -27,7 +27,7 @@ import {
   createTrimMaterial,
 } from './materials.js';
 import { createContactShadow } from './shadow.js';
-import { createSkin } from './skin.js';
+import { RAIL, createSkin } from './skin.js';
 import { DIMS, STATIONS, WHEELS } from './spec.js';
 import { createWheel } from './wheel.js';
 
@@ -56,7 +56,7 @@ function coarseIndex(samples, arch) {
 /**
  * @param {{ paint?: string, plate?: string, tier?: 'low'|'medium'|'high', caps?: object, ghost?: boolean }} [options]
  */
-export function createCar({ paint = 'silver', plate = 'AI LAB03', tier = 'high', caps, ghost = false } = {}) {
+export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', caps, ghost = false } = {}) {
   const t0 = performance.now();
   const object = new THREE.Group();
   object.name = ghost ? 'ghost car' : 'car';
@@ -112,14 +112,19 @@ export function createCar({ paint = 'silver', plate = 'AI LAB03', tier = 'high',
     const { u, v } = lay;
     const extremes = (channel, i, k) => atlas.extremes(channel, u.coords[i], u.coords[i + 1], v.coords[k], v.coords[k + 1]);
     shared = createShared(textures);
-    const paintMaterial = keep(createPaintMaterial(shared, caps, paint));
+    const paintMaterial = keep(createPaintMaterial(shared, caps, paint, {
+      shoulderV: v.atlas[RAIL.shoulder],
+      extentV: lay.extent[1],
+      // the grille's small stars are geometry (details.js) except on the low tier, where the paint draws them
+      pins: tier === 'low',
+    }));
     // the grille's field is drawn by the paint (its pins and relief), so its quads stay in; the intakes are holes
     const grilleQuad = (i, k) => {
       const j = (i * rows + k) * 3;
       return P[j + 1] > 0.45 && P[j + 1] < 0.72 && Math.abs(P[j]) < 0.56 && P[j + 2] > 1.9;
     };
     const body = skinMesh(
-      (i, k) => extremes(GLASS, i, k)[1] > -0.012 && (extremes(OPENING, i, k)[1] > 0 || grilleQuad(i, k)),
+      (i, k) => extremes(GLASS, i, k)[1] > -0.012 && extremes(LENS, i, k)[1] > -0.002 && (extremes(OPENING, i, k)[1] > 0 || grilleQuad(i, k)),
       paintMaterial,
     );
     body.castShadow = body.receiveShadow = true;
@@ -135,7 +140,7 @@ export function createCar({ paint = 'silver', plate = 'AI LAB03', tier = 'high',
       { ...attributes, position: new THREE.BufferAttribute(recessed, 3) },
       skinIndex(samples, (i, k) => extremes(OPENING, i, k)[0] < 0.005),
     );
-    object.add(new THREE.Mesh(keep(recess), keep(createDarkMaterial(THREE.FrontSide, 0.02, 0.6))));
+    object.add(new THREE.Mesh(keep(recess), keep(createDarkMaterial(THREE.FrontSide, 0.02, 0.6, { mesh: true }))));
     const lip = new THREE.Mesh(archGeometry.lip, paintMaterial);
     lip.castShadow = lip.receiveShadow = true;
     object.add(lip, new THREE.Mesh(archGeometry.liner, keep(createDarkMaterial(THREE.DoubleSide, 0.012))));
@@ -143,20 +148,24 @@ export function createCar({ paint = 'silver', plate = 'AI LAB03', tier = 'high',
     disposables.push(shadow);
     lights = createLampLights(object, keep, tier);
     // the solid details, one mesh per material
-    const details = buildDetails(samples, { tier, plate });
+    const details = buildDetails(samples, { tier, plate, skin, lay });
+    const numbers = PAINTS[paint] || PAINTS.silver;
     const trim = {
       chrome: () => createTrimMaterial(shared, caps, { color: [0.83, 0.84, 0.86], metal: 1, rough: 0.08 }),
       gloss: () => createTrimMaterial(shared, caps, { color: [0.01, 0.01, 0.012], metal: 0, rough: 0.06, coat: 1 }),
       matte: () => createTrimMaterial(shared, caps, { color: [0.02, 0.02, 0.022], metal: 0, rough: 0.65 }),
-      glass: () => createTrimMaterial(shared, caps, { color: [0.62, 0.63, 0.64], metal: 1, rough: 0.02 }),
-      emit: () => createEmitterMaterial(shared, caps),
-      dark: () => createDarkMaterial(THREE.FrontSide, 0.018, 0.75),
+      glass: () => createTrimMaterial(shared, caps, { color: [0.38, 0.39, 0.4], metal: 1, rough: 0.02 }),
+      body: () => createTrimMaterial(shared, caps, { color: numbers.color, metal: numbers.metal, rough: numbers.rough, coat: 1 }),
+      emit: () => createLampPartMaterial(shared, caps),
+      // the cabin: black leather and plastic, lit by whatever sun comes in through the glass
+      dark: () => createDarkMaterial(THREE.FrontSide, 0.028, 0.55, { direct: true }),
       plates: () => createPlateMaterial(shared, caps, details.plate),
     };
     for (const [name, geometry] of Object.entries(details.geometries)) {
       const mesh = new THREE.Mesh(keep(geometry), keep(trim[name]()));
       mesh.name = `car ${name}`;
       mesh.castShadow = name !== 'dark' && name !== 'emit';
+      mesh.receiveShadow = name === 'dark' || name === 'body';
       object.add(mesh);
     }
     if (details.plate) {

@@ -11,9 +11,9 @@ Mercedes-Benz C-Class (the W206 saloon in AMG Line trim, modelled in code from
 photographs of one particular car) round a three-kilometre pass: a lakeside
 straight, esses through spruce forest, a lit tunnel, a viaduct, three
 hairpins, a summit and a fast descent. Three laps against the clock, alone or
-against a friend in split screen. The same road exists twice: on a low-sun
-afternoon and at night, when the picture is made of headlights, reflectors,
-the tunnel's lamps and the moon. It plays in a browser with a keyboard, a
+against a friend in split screen. The same road exists three times: on a sunlit
+afternoon, at dusk after rain, and at night, when the picture is made of
+headlights, reflectors, the tunnel's lamps and the moon. It plays in a browser with a keyboard, a
 gamepad, or thumbs on a phone.
 
 It is an original demo. Two things were looked at for what "good" looks like
@@ -94,7 +94,7 @@ the tunnel. Nothing can be driven off the mountain.
 
 | stretch | what it is for |
 | --- | --- |
-| Lakeside straight, start and finish | speed, the gantry, the only street lamps outside the tunnel |
+| Lakeside straight, start and finish | speed, the gantry, and the town: a street front with lit windows on one side, palms and the lake on the other |
 | The sweeper and the esses, climbing through spruce | rhythm; tree shadows by day, a corridor of trunks in the beams by night |
 | The tunnel, about 250 m, gently curved | light: the exposure closes down by day and the lamps slide over the paint |
 | The viaduct | the view, the wind, the sky in the paint |
@@ -190,6 +190,12 @@ a few seconds it is offered).
   glow on the haze above it, a radio mast's red lamps and a hamlet high on
   the slope beyond; it is in the frame from the descent and the hook (the
   summit's hills and the viaduct's heading hide it from the rest of the lap).
+- **Dusk, the hour the demo opens in.** The sun is down; the sky runs from a
+  dusty rose band on the horizon through mauve to slate violet overhead, and
+  everything is lit by it: soft, cool, low in contrast. The road is wet and
+  carries that sky, the roofs' silhouettes and every lamp as long streaks.
+  Windows, street lamps and signals are on and glow gently. Nothing is
+  exaggerated: it should pass for a photograph of a wet evening.
 - **Day has the sun in it.** Heading into the low sun the picture is washed
   by its glare, lens ghosts lie across the frame, and the road goes pale
   towards the light.

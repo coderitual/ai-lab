@@ -152,7 +152,7 @@ only 0.3 of the sky (`INNER_SKY`), so the disc does not shine white.
 ### The plates
 
 Both plates are white EU plates with the blue band, drawn on a canvas at
-start-up with condensed characters from `plate` (default `AI LAB03`), and an
+start-up with condensed characters from `plate` (default `K1 DOMI`), and an
 embossed normal map. The front leans back 6 degrees under the grille; the
 rear stands upright in its recess. Each sits on a black carrier drawn by the
 paint.

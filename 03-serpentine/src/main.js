@@ -32,6 +32,8 @@ try {
   window.__serp = {
     game,
     engine,
+    /** lighting.js's times of day (a test can add one at run time: the game takes whatever is there). */
+    times: TIMES,
     /** Play `seconds` of the run at `fps` frames a second, drawing every frame. Works with or without ?manual. */
     advance(seconds, fps = 60) {
       const frames = Math.round(seconds * fps);
