@@ -280,7 +280,7 @@ beside D1 and A, golden hour beside D4 and D2, night beside B):
 | | day | dusk (golden hour) | night |
 | --- | --- | --- | --- |
 | `contrast` | 1.18 | 1.12 | 1.12 |
-| `saturation` | 1.12 | 1.12 | 0.94 |
+| `saturation` | 1.04 | 1.12 | 0.94 |
 | `tint` | [1.0, 0.99, 0.965] | [1.03, 1.0, 0.95] | [0.95, 0.985, 1.05] |
 | `lift` | [0.0004, 0.0006, 0.001] | none | [0.0006, 0.0009, 0.0018] |
 | `vignette` | 0.28 | 0.28 | 0.32 |

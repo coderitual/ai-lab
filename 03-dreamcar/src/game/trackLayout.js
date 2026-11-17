@@ -50,6 +50,11 @@ export const SIDES = {
   // the lakeside straight: a low concrete wall each side; the water beyond the left one, the town beyond the right
   shore: { kind: 'wall', edge: [4, 5], slope: -0.02, far: -0.12, verge: 'grass', wood: null },
   town: { kind: 'wall', edge: [5, 6], slope: 0.01, far: 0.08, verge: 'grass', wood: 'broadleaf' },
+  // the land side of the straight away from the pit lane: bright mown grass to a steel rail, nothing tall (frame D1)
+  paddock: { kind: 'rail', edge: [6, 8], slope: 0.01, far: 0.08, verge: 'grass', wood: null },
+  // beyond the pit exit: mown grass to a steel rail and, close behind it, the maples that wall the start (the
+  // run-up to the line stays open paddock so that the massif and the sun stand clear over the straight)
+  grove: { kind: 'rail', edge: [5, 6], slope: 0.01, far: 0.08, verge: 'grass', wood: 'broadleaf' },
   // mown grass to a steel rail, woods behind it: low down broadleaf, higher up conifers
   lowUp: { kind: 'rail', edge: [3, 5], slope: 0.04, far: 0.3, verge: 'grass', wood: 'broadleaf' },
   lowDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.25, verge: 'grass', wood: 'broadleaf' },
@@ -62,6 +67,10 @@ export const SIDES = {
   highRun: { kind: 'rail', edge: [7, 10], slope: -0.02, far: -0.3, verge: 'grass', wood: 'conifer' },
   // the open top: run-off and a rail, the ground falling away, nothing growing that would hide the view
   open: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'grass', wood: null },
+  // the ledge's first bend: a low wall with boards on both sides; on the inside the ground falls away to the valley
+  // and the view is open, on the outside a wooded bank rises close behind the wall (broadleaves, back-lit by day)
+  balcony: { kind: 'wall', edge: [3, 4], slope: -0.03, far: -0.35, verge: 'grass', wood: null },
+  bank: { kind: 'wall', edge: [3.5, 5], slope: 0.07, far: 0.45, verge: 'grass', wood: 'broadleaf' },
   // the road cut into the hill: a narrow verge, then the rock face
   rock: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null },
   // structures: paved right up to the wall or the parapet
@@ -108,7 +117,9 @@ const SECTION_NAMES = {
 /** @type {Segment[]} */
 const SEGMENTS = [
   // Lakeside straight: the line, then 250 m to the first bend (its other 450 m are the last piece of the lap).
-  { id: 'grid', sec: 'straight', len: 250, g: 0, L: 'shore', R: 'town' },
+  // (the land side is the pit wall only along the pit lane, about 110 m before the line to 40 m after it)
+  { id: 'grid', sec: 'straight', len: 40, g: 0, L: 'shore', R: 'town' },
+  { id: 'gridRun', sec: 'straight', len: 210, g: 0, L: 'shore', R: 'grove' },
 
   // Shore bend: a fast banked right away from the water, starting to climb.
   { id: 'sweep', sec: 'sweep', r: -220, deg: 80, ease: 110, bank: 9, g: 3, L: 'lowRun', R: 'lowUp', runoff: 'L' },
@@ -137,8 +148,9 @@ const SEGMENTS = [
   // The plunge: 8 per cent down into a compression.
   { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'highDown', R: 'highUp' },
 
-  // The ledge: fast downhill sweepers, rock on one side and a rail and the drop on the other.
-  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 10, g: -7.5, gk: [[0.3, -7.5]], L: 'rock', R: 'midRun', runoff: 'R' },
+  // The ledge: fast downhill sweepers along the hillside. The first, a left, has the valley open on its inside over
+  // a low wall and a wooded bank on its outside; the second, a right, runs under rock with a rail and the drop outside.
+  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 10, g: -7.5, gk: [[0.3, -7.5]], L: 'balcony', R: 'bank', runoff: 'R' },
   { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: -7.5, L: 'midRun', R: 'rock', runoff: 'L' },
 
   // Gully bridge: straight across a gully on piers.
@@ -148,7 +160,8 @@ const SEGMENTS = [
   { id: 'approach', sec: 'sweepback', len: 100, ease: 60, g: -7.8, L: 'lowDown', R: 'lowUp' },
   { id: 'back', sec: 'sweepback', r: -300, deg: 90, ease: 140, bank: 9, g: 0, gk: [[0.78, -6.5]], L: 'lowRun', R: 'lowUp', runoff: 'L' },
 
-  { id: 'finish', sec: 'straight', len: 450, ease: 140, g: 0, L: 'shore', R: 'town' },
+  { id: 'finish', sec: 'straight', len: 340, ease: 140, g: 0, L: 'shore', R: 'paddock' },
+  { id: 'pitIn', sec: 'straight', len: 110, g: 0, L: 'shore', R: 'town' },
 ];
 
 /** Length of one piece of the plan (m). @param {Segment} seg */
@@ -172,7 +185,7 @@ export const LAYOUT = {
     ['ledge1', 0.1],
   ],
   /** Street lamps stand along these pieces, alternating sides; tunnel lamps hang in rows along every tunnel. */
-  streetLamps: { pieces: ['finish', 'grid'], spacing: 30, height: 9 },
+  streetLamps: { pieces: ['finish', 'pitIn', 'grid', 'gridRun'], spacing: 30, height: 9 },
   tunnelLamps: { spacing: 12, drop: 0.55, inset: 0.45 },
   /** Kerbs: on the inside of every bend tighter than `inside` metres from entry to exit, and on the outside at the exit of every bend tighter than `outside`. */
   kerbs: { inside: 800, outside: 500, exit: 0.4, width: SHOULDER },

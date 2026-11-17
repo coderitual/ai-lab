@@ -93,11 +93,12 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
       }
       // the steel rail: an eight-sided tube
       const tube = [];
-      for (let a = 0; a <= 8; a++) tube.push([Math.cos((a / 8) * 2 * Math.PI) * RAIL.radius, Math.sin((a / 8) * 2 * Math.PI) * RAIL.radius]);
+      const sides = tier === 'low' ? 4 : 8;
+      for (let a = 0; a <= sides; a++) tube.push([Math.cos((a / sides) * 2 * Math.PI) * RAIL.radius, Math.sin((a / sides) * 2 * Math.PI) * RAIL.radius]);
       railParts.push(
         stripGeometry(sections.map((s) => tube.map(([dl, dh]) => at(s, side, track.edgeAt(s, side) + RAIL.out + dl, RAIL.h + dh)))),
       );
-      along(track, s0 + 0.5, s1 - 0.5, 2, (s) => {
+      along(track, s0 + 0.5, s1 - 0.5, tier === 'low' ? 4 : 2, (s) => {
         levelFrame(track, s, frame);
         const [x, y, z] = at(s, side, track.edgeAt(s, side) + RAIL.out, 0.88);
         railPosts.push(upright(new THREE.Vector3(x, y, z), frame.yaw));

@@ -68,7 +68,7 @@ const EDGE_LINE = 0.2;
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /** The glare lobe (ASPHALT_SHEEN): its GGX alpha along the line of sight and across it, and its weight. */
-const SHEEN = { along: 0.32, across: 0.13, gain: 0.4 };
+const SHEEN = { along: 0.42, across: 0.15, gain: 0.55 };
 /** Head lamp brightness (THROW in assets/car/index.js: candela-like units at the beam's peak, per lamp). */
 const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;
@@ -613,7 +613,7 @@ rAge = clamp( rAge + ( rBig2.r - 0.5 ) * 0.22, 0.0, 1.0 );
 rAge = mix( rAge, ftTone * 0.5, ftFresh );
 float rWorn = mix( 0.3, 1.0, rAge );
 // new: binder over everything, black. Old: the binder weathered grey and worn off the stones' tops.
-vec3 rCol = mix( vec3( 0.032, 0.032, 0.034 ), vec3( 0.088, 0.086, 0.082 ), rAge );
+vec3 rCol = mix( vec3( 0.028, 0.028, 0.03 ), vec3( 0.074, 0.072, 0.07 ), rAge );
 rCol *= 1.0 + ( rAgg.r - 0.5 ) * mix( 0.45, 1.5, rAge );
 rCol *= ( 0.86 + 0.28 * rBig.r ) * ( 0.92 + 0.16 * rBig2.r ) * ( 0.92 + 0.16 * rMottle );
 rCol *= 1.0 - 0.2 * rTracks * rWorn;
@@ -698,7 +698,7 @@ float rCarried = uWet * vCodeB.z * ( 0.25 + 0.75 * min( rTracks, 1.0 ) ) * ( 0.5
 float rBank = ( vCodeB.w - 0.5 ) * 2.0;
 float hCrown = 6.5 * ( 1.0 - smoothstep( 0.5, 3.9, rA ) );
 float hBank = 3.5 + 6.0 * rBank * rLat / uHalf;
-float hDips = ( 0.5 - 0.6 * texture2D( uBig, vec2( rLat, rS * 0.4 ) / 9.0 ).a - 0.4 * rBig.a ) * 13.0;
+float hDips = ( 0.5 - 0.6 * texture2D( uBig, vec2( rLat, rS * 0.4 ) / 9.0 ).a - 0.4 * rBig.a ) * 8.0;
 float hMacro = mix( hBank, hCrown, 1.0 - smoothstep( 0.08, 0.4, abs( rBank ) ) ) + hDips + ( rMottle - 0.5 ) * 1.6;
 hMacro -= ( 2.0 + 2.5 * rBig.b ) * min( rTracks, 1.2 ) * rWorn;
 // held back along the pavement's edge by the edge line and the verge

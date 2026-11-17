@@ -281,9 +281,9 @@ about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
   asphalt, shadows fall straight back and a little left. A deep blue sky, pale
   and bright at the horizon, with small lit cumulus (grey-blue bases, silver
   rims near the sun); a compact sun with a soft aureole; dry asphalt. Sunlit
-  level ground gets about 2.1 from the sun against about 0.5 of sky and fill
+  level ground gets about 2.1 from the sun against about 0.6 of sky and fill
   in the shade (some 2 to 2.5 stops at this height, the shade blue);
-  exposure 0.85. Haze in two layers: the valley haze (hundreds of metres)
+  exposure 0.72. Haze in two layers: the valley haze (hundreds of metres)
   and a thin air with a 1.4 km scale height that lifts and blues the far
   land kilometres away, warmer towards the sun. A limestone massif (far.js)
   fills the background, composed as D1 seen from the start line: its main
