@@ -13,10 +13,12 @@
 //
 // Everything is sized from one unit per view (--u, set when the view is laid
 // out): the instruments scale with the view, so a half of a split screen or an
-// upright phone gets the same instrument at its own size. The look is a car's
-// digital cluster: thin strokes, tabular figures, one cool accent (ice blue),
-// amber for behind, green for ahead, red only for the limiter and warnings;
-// a dark ground only in the corners that carry readouts.
+// upright phone gets the same instrument at its own size. The look is bold and
+// sparse, to be read in sunlight at arm's length: heavy tabular figures on
+// small dark plates, one cool accent (ice blue), amber for behind, green for
+// ahead, red only for the limiter and warnings. Four corners carry readouts;
+// the middle of the picture, where the car is, carries none. The best-laps
+// board is on the title, the pause sheet and the results, not on the run.
 //
 // Buttons only report actions (onAction(name, driver)); the game decides.
 // Words come from text.js.
@@ -97,6 +99,7 @@ function button(parent, label, onClick, className = '') {
 
 /** Small line icons for the touch buttons and the high-beam lamp (24-unit boxes, stroked). */
 const ICONS = {
+  gear: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
   camera: '<rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3"/>',
   lights: '<path d="M11 6c-4 0-7 2.5-7 6s3 6 7 6z"/><path d="M14 8h7M14 12h7M14 16h7"/>',
   reset: '<path d="M5 12a7 7 0 1 0 2-5"/><path d="M4 4v4h4"/>',
@@ -110,16 +113,16 @@ function iconButton(parent, name, label, onClick) {
   return b;
 }
 
-// ------------------------------------------------------------------ the rev counter
+// ------------------------------------------------------------------ the rev arc
 
-/** The dial's scale: 0 to SCALE_K thousand rpm (the limiter and a little more), red over the last 500 rpm before the limiter. */
+/** The arc's scale: 0 to SCALE_K thousand rpm (the limiter and a little more), red over the last 500 rpm before the limiter. */
 const LIMITER = CAR.engine.limiter;
 const SCALE_K = Math.ceil(LIMITER / 1000 + 0.25);
 const RED_FROM = LIMITER - 500;
-/** The arc: 260 degrees, open at the bottom; angles in SVG's frame (0 = right, clockwise). */
-const A0 = 140;
-const SWEEP = 260;
-const R = 84;
+/** The arc: the upper part of a circle round the speed, from lower left over the top to lower right (SVG degrees). */
+const A0 = 165;
+const SWEEP = 210;
+const R = 92;
 const polar = (deg, r) => {
   const a = (deg * Math.PI) / 180;
   return [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
@@ -131,28 +134,23 @@ const arcPath = (from, to, r) => {
 };
 const angleOf = (rpm) => A0 + (SWEEP * Math.min(rpm, SCALE_K * 1000)) / (SCALE_K * 1000);
 
-function dialSvg() {
+function arcSvg() {
   const parts = [];
   parts.push(`<path class="track" d="${arcPath(A0, A0 + SWEEP, R)}"/>`);
-  parts.push(`<path class="red" d="${arcPath(angleOf(RED_FROM), A0 + SWEEP, R + 8)}"/>`);
-  for (let k = 0; k <= SCALE_K * 2; k++) {
-    const deg = angleOf(k * 500);
-    const major = k % 2 === 0;
-    const [x0, y0] = polar(deg, major ? 68 : 73);
-    const [x1, y1] = polar(deg, 78);
-    const hot = k * 500 >= RED_FROM ? ' hot' : '';
-    parts.push(`<line class="${major ? 'major' : 'minor'}${hot}" x1="${x0.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${x1.toFixed(2)}" y2="${y1.toFixed(2)}"/>`);
-    if (major) {
-      const [tx, ty] = polar(deg, 55);
-      parts.push(`<text class="num${hot}" x="${tx.toFixed(2)}" y="${(ty + 5.5).toFixed(2)}">${k / 2}</text>`);
-    }
-  }
+  parts.push(`<path class="red" d="${arcPath(angleOf(RED_FROM), A0 + SWEEP, R)}"/>`);
   parts.push(`<path class="fill" pathLength="1000" stroke-dasharray="0 1000" d="${arcPath(A0, A0 + SWEEP, R)}"/>`);
-  parts.push('<g class="hand" transform="rotate(140 100 100)"><line x1="166" y1="100" x2="195" y2="100"/></g>');
-  parts.push('<text class="gear" x="100" y="122">N</text>');
-  parts.push(`<text class="unit" x="100" y="160">${TEXT.rpm}</text>`);
+  // a tick every thousand, cut through the bar
+  for (let k = 1; k < SCALE_K; k++) {
+    const deg = angleOf(k * 1000);
+    const [x0, y0] = polar(deg, R - 9);
+    const [x1, y1] = polar(deg, R + 9);
+    parts.push(`<line class="cut" x1="${x0.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${x1.toFixed(2)}" y2="${y1.toFixed(2)}"/>`);
+  }
   return parts.join('');
 }
+
+/** km/h to the units shown. */
+const UNITS = { kmh: 1, mph: 1 / 1.609344 };
 
 // ------------------------------------------------------------------ one view
 
@@ -169,17 +167,14 @@ export class ViewHud {
     this.cell = new Cell(el);
     this._zone = '';
     this.split = false;
-    this.wide = true;
-    make('div', 'scrim tl', el);
-    make('div', 'scrim br', el);
+    this.units = 'kmh';
 
-    // top left: the lap, large; the lap clock with the live gap beside it; the best lap
-    const lapBlock = make('div', 'lapblock', el);
+    // top left: the lap and the lap clock, on one plate; the best lap under it
+    const lapBlock = make('div', 'lapblock plate', el);
     const lapLine = make('div', 'lapline', lapBlock);
+    this.lapWord = cell('span', 'lapword', lapLine, TEXT.lap);
     this.lapNum = cell('span', 'lapnum', lapLine, '1');
-    const lapSide = make('div', 'lapside', lapLine);
-    this.lapOf = cell('span', 'lapof', lapSide, '/ 3');
-    this.lapWord = cell('span', 'lapword', lapSide, TEXT.lap);
+    this.lapOf = cell('span', 'lapof', lapLine, '/3');
     const clockLine = make('div', 'clockline', lapBlock);
     this.clock = cell('span', 'clock', clockLine, '0:00.0');
     this.live = cell('span', 'live', clockLine);
@@ -188,28 +183,18 @@ export class ViewHud {
     make('span', 'label', bestLine, TEXT.best);
     this.best = cell('span', 'besttime', bestLine, formatMs(null));
 
-    // top right: the board (solo, wide), one line of it (solo, narrow), or the place and the gap (split)
-    this.board = cell('div', 'board', el);
-    this.boardHead = cell('div', 'head', this.board.el);
-    this.boardRows = [];
-    for (let i = 0; i < 5; i++) {
-      const row = cell('div', 'row', this.board.el);
-      this.boardRows.push({ row, rank: cell('span', 'rank', row.el), time: cell('span', 'time', row.el), tag: cell('span', 'tag', row.el) });
-    }
-    this._boardKey = '';
-    this._boardSeen = null;
-    this._newUntil = -1;
-    this._newMs = null;
-    this._rows = [];
-    this._clock = 0;
-    this.next = cell('div', 'next', el);
+    // top right: the next time to beat (solo), or the place and the gap (split)
+    this.next = cell('div', 'next plate', el);
     this.nextLabel = cell('span', 'label', this.next.el, TEXT.toBeat);
     this.nextTime = cell('span', 'time', this.next.el);
     this.nextTag = cell('span', 'tag', this.next.el);
-    this.pos = cell('div', 'pos', el);
+    this.pos = cell('div', 'pos plate', el);
     this.posPlace = cell('span', 'place', this.pos.el);
     this.posGap = cell('span', 'gap', this.pos.el);
     this.pos.show(false);
+    this._rowsKey = '';
+    this._rows = [];
+    this._clock = 0;
 
     // top middle: the countdown lamps, the line's gap, the lap banner
     this.lamps = cell('div', 'lamps', el);
@@ -226,7 +211,7 @@ export class ViewHud {
     this.banner.show(false);
     this._bannerUntil = -1;
 
-    // the middle: wrong way, the reset offer, the first-time hint
+    // the upper middle, above the car: wrong way, the reset offer, the first-time hint
     this.warn = cell('div', 'warn', el, TEXT.wrongWay);
     this.warn.show(false);
     this.offer = cell('div', 'offer', el);
@@ -236,16 +221,23 @@ export class ViewHud {
     this.hint = cell('div', 'hint', el);
     this.hint.show(false);
 
-    // bottom left: the map
+    // bottom left: the map (it can be hidden)
     this.map = cell('div', 'map', el);
     this._dots = [];
 
-    // bottom right: speed and lamps, the rev counter with the gear
+    // bottom right: the speed in big figures under the rev arc, the gear beside it, the assists' lamps under it
     const cluster = make('div', 'cluster', el);
+    this.clusterEl = cluster;
+    const arc = make('svg:svg', 'arc', cluster);
+    arc.setAttribute('viewBox', '0 0 200 134');
+    arc.innerHTML = arcSvg();
+    this.arc = new Cell(arc);
+    this.fill = new Cell(arc.querySelector('.fill'));
     const readout = make('div', 'readout', cluster);
+    this.gear = cell('div', 'gear', readout, 'N');
     this.speed = cell('div', 'speed', readout, '0');
-    make('div', 'kmh', readout, TEXT.kmh);
-    const tells = make('div', 'tells', readout);
+    this.unit = cell('div', 'unit', readout, TEXT.kmh);
+    const tells = make('div', 'tells', cluster);
     this.tell = {
       abs: cell('span', 'tell amber', tells, TEXT.lamps.abs),
       tc: cell('span', 'tell amber', tells, TEXT.lamps.tc),
@@ -254,15 +246,8 @@ export class ViewHud {
       high: cell('span', 'tell blue beam', tells),
     };
     this.tell.high.el.innerHTML = `<svg viewBox="0 0 24 24" role="img" aria-label="${TEXT.lamps.high}">${ICONS.lights}</svg>`;
-    const dial = make('svg:svg', 'dial', cluster);
-    dial.setAttribute('viewBox', '0 0 200 200');
-    dial.innerHTML = dialSvg();
-    this.dial = new Cell(dial);
-    this.fill = new Cell(dial.querySelector('.fill'));
-    this.hand = new Cell(dial.querySelector('.hand'));
-    this.gear = new Cell(dial.querySelector('.gear'));
 
-    // touch: camera, lights, reset, pause (on a desk only pause shows, small)
+    // the buttons: camera, lights, reset, pause, small and together (at a desk only pause shows)
     this.touchCol = cell('div', 'touchcol', el);
     iconButton(this.touchCol.el, 'camera', TEXT.buttons.camera, () => act('camera', index));
     iconButton(this.touchCol.el, 'lights', TEXT.buttons.lights, () => act('high', index));
@@ -293,13 +278,11 @@ export class ViewHud {
     s.width = `${zone.width * 100}%`;
     s.height = `${zone.height * 100}%`;
     const tall = h > w * 1.2;
-    // 0.6 of a hundredth of a 16:9 picture's width (the instruments are a corner of the picture, not its
-    // subject: the cluster stays inside a fifth of the width and clear of the car); an upright picture is read
-    // from further away and gets a little more
-    const u = tall ? w / 66 : (Math.min(w, (h * 16) / 9) / 100) * 0.6;
-    s.setProperty('--u', `${Math.max(3.4, Math.min(u, 12)).toFixed(2)}px`);
-    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460);
-    this.wide = w >= 700;
+    // 0.72 of a hundredth of a 16:9 picture's width: the figures are big enough for a phone at arm's length
+    // and stay in the corners, clear of the car in the middle; an upright picture gets a little more
+    const u = tall ? w / 62 : (Math.min(w, (h * 16) / 9) / 100) * 0.72;
+    s.setProperty('--u', `${Math.max(3.6, Math.min(u, 10)).toFixed(2)}px`);
+    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330);
   }
 
   setVisible(on) {
@@ -313,12 +296,21 @@ export class ViewHud {
     this.cell.flag('split', split).flag('touch', touch);
   }
 
+  /** km/h or mph; whether the map shows. */
+  setPrefs(units, map) {
+    if (units !== this.units) {
+      this.units = units;
+      this.unit.text(units === 'mph' ? TEXT.mph : TEXT.kmh);
+    }
+    this.map.show(map);
+  }
+
   // ---- timing
 
   setLap(lap, laps, finished) {
     const final = !finished && lap === laps && laps > 1;
     this.lapNum.text(Math.min(lap, laps));
-    this.lapOf.text(`/ ${laps}`);
+    this.lapOf.text(`/${laps}`);
     this.lapWord.text(finished ? TEXT.finished : final ? TEXT.finalLap : TEXT.lap).flag('final', final);
   }
 
@@ -372,74 +364,45 @@ export class ViewHud {
       this._bannerUntil = -1;
       this.banner.show(false);
     }
+    // the banner and the line's gap share the top middle: the banner waits under the gap
+    this.cell.flag('flashing', this._flashUntil >= 0);
   }
 
   /** Forget the moments of a run (a new run, back to the title). */
   clearMoments() {
-    this._flashUntil = this._bannerUntil = this._newUntil = -1;
+    this._flashUntil = this._bannerUntil = -1;
     this.flash.show(false);
     this.banner.show(false);
-    this._boardSeen = null;
     this._clock = 0;
   }
 
-  // ---- the board, its one line, the place
+  // ---- the next time to beat, the place
 
   /**
-   * The best-times board of this time of day: five rows from the device's laps with the medal targets among them.
+   * The next time to beat on this time of day's board (the device's laps with the medal targets among them): the
+   * slowest row still faster than this run's best lap (with no lap yet, the slowest row), as one line.
    * @param {{ laps: Array<{ ms: number }> }} table @param {Record<string, number>} medals @param {string} time
-   * @param {number|null} mine this run's best lap (for the one-line form)
+   * @param {number|null} mine this run's best lap
    */
   setBoard(table, medals, time, mine) {
     const solo = !this.split;
-    this.board.show(solo && this.wide);
-    this.next.show(solo && !this.wide);
+    this.next.show(solo);
     this.pos.show(!solo);
     if (!solo) return;
-    const laps = table.laps;
     let key = time;
-    for (const l of laps) key += ',' + l.ms;
-    if (key !== this._boardKey) {
-      // a lap that was not on the board a moment ago lights its row
-      const seen = this._boardSeen;
-      if (seen && this._boardKey.split(',')[0] === time) {
-        const fresh = laps.find((l) => !seen.includes(l.ms));
-        if (fresh) {
-          this._newMs = fresh.ms;
-          this._newUntil = this._clock + 4;
-        }
-      }
-      this._boardSeen = laps.map((l) => l.ms);
-      this._boardKey = key;
+    for (const l of table.laps) key += ',' + l.ms;
+    if (key !== this._rowsKey) {
+      this._rowsKey = key;
       this._rows = rowsOf(table, medals);
     }
     const rows = this._rows;
-    const newOn = this._newUntil >= 0 && this._clock < this._newUntil;
-    const own = laps.length ? laps[0].ms : null;
-    if (this.wide) {
-      this.boardHead.text(TEXT.boardTitle(time));
-      for (let i = 0; i < 5; i++) {
-        const r = rows[i];
-        const v = this.boardRows[i];
-        v.row.show(!!r);
-        if (!r) continue;
-        const mineRow = !r.medal && r.ms === own;
-        v.rank.text(r.medal ? '' : String(r.place));
-        v.time.text(formatMs(r.ms));
-        v.tag.text(r.medal ? TEXT.medal[r.medal] : mineRow ? TEXT.you : '');
-        v.row.flag('medal', !!r.medal).flag('gold', r.medal === 'gold').flag('silver', r.medal === 'silver').flag('bronze', r.medal === 'bronze');
-        v.row.flag('own', mineRow).flag('new', newOn && !r.medal && r.ms === this._newMs);
-      }
-      return;
-    }
-    // the one line: the slowest row still faster than this run's best (or, with no lap yet, the last row)
     let target = null;
     if (mine === null) target = rows[rows.length - 1];
     else for (const r of rows) if (r.ms < mine) target = r;
     this.next.flag('cleared', !target);
     this.nextLabel.text(target ? TEXT.toBeat : TEXT.allBeaten);
     this.nextTime.text(target ? formatMs(target.ms) : '');
-    this.nextTag.text(target ? (target.medal ? TEXT.medal[target.medal] : TEXT.you) : '');
+    this.nextTag.text(target ? (target.medal ? TEXT.medal[target.medal] : TEXT.you) : '').attr('data-medal', target?.medal || '');
   }
 
   /** Split screen: the place, and the gap to the other car at the last line (ms, + = behind) or null. */
@@ -452,15 +415,14 @@ export class ViewHud {
   // ---- driving
 
   setSpeed(kmh) {
-    this.speed.text(Math.round(Math.abs(kmh)));
+    this.speed.text(Math.round(Math.abs(kmh) * UNITS[this.units]));
   }
 
-  /** The rev counter: the fill and the hand at `rpm`, the gear inside; red at the limiter. */
+  /** The rev arc filled to `rpm`, red at the limiter; the gear beside the speed. */
   setRev(rpm, gear) {
-    const f = Math.min(1, Math.round((Math.max(0, rpm) / (SCALE_K * 1000)) * 400) / 400);
+    const f = Math.min(1, Math.round((Math.max(0, rpm) / (SCALE_K * 1000)) * 200) / 200);
     this.fill.attr('stroke-dasharray', `${Math.round(f * 1000)} 1000`);
-    this.hand.attr('transform', `rotate(${(A0 + SWEEP * f).toFixed(1)} 100 100)`);
-    this.dial.flag('limit', rpm >= LIMITER - 150);
+    this.arc.flag('limit', rpm >= LIMITER - 150).flag('high', rpm >= RED_FROM - 300);
     this.gear.text(TEXT.gear(gear));
   }
 
@@ -503,7 +465,7 @@ export class ViewHud {
     this._dots = [];
     for (let i = 0; i < cars; i++) {
       const c = make('svg:circle', i === this.index ? 'dot own' : 'dot', svg);
-      c.setAttribute('r', i === this.index ? '5' : '4');
+      c.setAttribute('r', i === this.index ? '7' : '5.5');
       this._dots.push(new Cell(c));
     }
     // the view's own car on top
@@ -552,6 +514,38 @@ function rowsOf(table, medals) {
   return rows.slice(0, 5);
 }
 
+/** The board as HTML: a head and five rows, the device's best marked, a new lap (`mark`) lit. */
+function boardHtml(table, medals, time, mark = null) {
+  const own = table.laps.length ? table.laps[0].ms : null;
+  let html = `<div class="head">${TEXT.boardTitle(TEXT.timeName(time))}</div>`;
+  for (const row of rowsOf(table, medals)) {
+    const isMark = !row.medal && row.ms === mark;
+    const cls = `row${row.medal ? ' medal ' + row.medal : ''}${isMark ? ' new' : ''}${!row.medal && row.ms === own ? ' own' : ''}`;
+    html +=
+      `<div class="${cls}"><span class="rank">${row.medal ? '' : row.place}</span><span class="time">${formatMs(row.ms)}</span>` +
+      `<span class="tag">${row.medal ? TEXT.medal[row.medal] : isMark || row.ms === own ? TEXT.you : ''}</span></div>`;
+  }
+  return html;
+}
+
+// ------------------------------------------------------------------ the options
+
+/** A row of the options: a label and a segmented choice. Returns the buttons by value. */
+function choiceRow(parent, label, values, names, onPick) {
+  const row = make('div', 'optrow', parent);
+  make('span', 'optlabel', row, label);
+  const group = make('div', 'segment', row);
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', label);
+  const cells = new Map();
+  values.forEach((v, i) => {
+    const b = button(group, names[i], () => onPick(v), 'toggle');
+    b.dataset.value = v;
+    cells.set(v, new Cell(b));
+  });
+  return { row, group, cells };
+}
+
 // ------------------------------------------------------------------ the page
 
 export class Hud {
@@ -570,24 +564,25 @@ export class Hud {
     this.veil = cell('div', 'veil', root);
     this.veil.show(false);
 
-    // the title: over the orbiting car, at the lower left
+    // the title: the menu beside the car on a wide screen, under it on an upright one
     this.title = cell('div', 'panel title', root);
     const t = this.title.el;
     make('h1', 'name', t, TEXT.name);
     make('p', 'tagline', t, TEXT.tagline);
     const choose = make('div', 'buttons', t);
-    button(choose, TEXT.drive, () => this.act('start'), 'primary');
+    this.driveButton = button(choose, TEXT.drive, () => this.act('start'), 'primary');
     this.splitButton = new Cell(button(choose, TEXT.twoPlayers, () => this.act(this._mode === 'split' ? 'solo' : 'split'), 'toggle'));
-    this.soundButton = new Cell(button(choose, TEXT.soundOn, () => this.act('mute'), 'toggle'));
     // the time of day: one button per time lighting.js has, the one showing pressed (made in setState)
-    this.timeChoice = make('div', 'timechoice', t);
+    this.timeChoice = make('div', 'segment timechoice', t);
     this.timeChoice.setAttribute('role', 'group');
     this.timeChoice.setAttribute('aria-label', TEXT.timeOfDay);
     /** @type {Map<string, Cell>} */
     this.timeButtons = new Map();
-    this.titleBest = cell('div', 'titlebest', t);
+    button(make('div', 'buttons small', t), TEXT.options, () => this.openOptions(), 'opt-open');
+    this.titleBoard = cell('div', 'boardlist titleboard', t);
     this.legend = cell('dl', 'legend', t);
     this._legendKey = '';
+    this._boardKey = '';
 
     // pause
     this.pause = cell('div', 'panel center pause', root);
@@ -595,10 +590,24 @@ export class Hud {
     const prow = make('div', 'buttons column', this.pause.el);
     this.resumeButton = button(prow, TEXT.resume, () => this.act('pause'), 'primary');
     button(prow, TEXT.restart, () => this.act('again'));
-    this.pauseTime = new Cell(button(prow, TEXT.night, () => this.act('time'), 'toggle'));
-    this.pauseSound = new Cell(button(prow, TEXT.soundOn, () => this.act('mute'), 'toggle'));
+    button(prow, TEXT.options, () => this.openOptions(), 'opt-open');
     button(prow, TEXT.menu, () => this.act('leave'));
+    this.pauseBoard = cell('div', 'boardlist', this.pause.el);
     this.pause.show(false);
+
+    // the options: quality, sound, time of day, units, map; the same sheet from the title and from pause
+    this.options = cell('div', 'panel center options', root);
+    make('h2', '', this.options.el, TEXT.options);
+    const o = this.options.el;
+    this.optQuality = choiceRow(o, TEXT.quality, ['auto', 'low', 'medium', 'high'], TEXT.qualities, (v) => this.act(`quality:${v}`));
+    this.qualityNote = cell('div', 'optnote', o);
+    this.optSound = choiceRow(o, TEXT.sound, ['on', 'off'], [TEXT.on, TEXT.off], (v) => this.act(v === 'on' ? 'sound:on' : 'sound:off'));
+    this.optTime = choiceRow(o, TEXT.timeOfDay, [], [], () => {});
+    this.optUnits = choiceRow(o, TEXT.units, ['kmh', 'mph'], [TEXT.kmh, TEXT.mph], (v) => this.act(`units:${v}`));
+    this.optMap = choiceRow(o, TEXT.map, ['on', 'off'], [TEXT.shown, TEXT.hidden], (v) => this.act(`map:${v}`));
+    this.closeButton = button(make('div', 'buttons', o), TEXT.done, () => this.closeOptions(), 'primary');
+    this.options.show(false);
+    this.optionsOpen = false;
 
     // results: beside the car
     this.results = cell('div', 'panel results', root);
@@ -610,6 +619,7 @@ export class Hud {
     this.results.show(false);
 
     this._state = '';
+    this._s = null;
     this._mode = 'solo';
     this._results = '';
   }
@@ -626,49 +636,135 @@ export class Hud {
     this._state = '';
   }
 
+  /** Open the options sheet over the title or the pause sheet. */
+  openOptions() {
+    this.optionsOpen = true;
+    this._state = '';
+    if (this._s) this.setState(this._s);
+    const on = this.options.el.querySelector('button.on') || this.closeButton;
+    if (!this._touch) on.focus({ preventScroll: true });
+  }
+
+  closeOptions() {
+    this.optionsOpen = false;
+    this._state = '';
+    if (this._s) this.setState(this._s);
+    if (!this._touch) (this._s && this._s.phase === 'title' ? this.driveButton : this.resumeButton).focus({ preventScroll: true });
+  }
+
+  /** The panel that has the keys and the pad now, or null. */
+  _activePanel() {
+    if (this.optionsOpen && !this.options.el.hidden) return this.options.el;
+    for (const p of [this.pause, this.results, this.title]) if (!p.el.hidden) return p.el;
+    return null;
+  }
+
+  /**
+   * A pad's (or the arrows') move through the open panel: dir 'up' | 'down' | 'left' | 'right'. Returns whether
+   * a panel took it.
+   */
+  navigate(dir) {
+    const panel = this._activePanel();
+    if (!panel) return false;
+    const list = [...panel.querySelectorAll('button')].filter((b) => b.offsetParent !== null);
+    if (!list.length) return false;
+    const now = document.activeElement;
+    const i = list.indexOf(now);
+    if (i < 0) {
+      list[0].focus({ preventScroll: true });
+      return true;
+    }
+    // up and down move between rows (the nearest button above or below), left and right along them
+    const r = now.getBoundingClientRect();
+    let best = null;
+    let bestD = Infinity;
+    for (const b of list) {
+      if (b === now) continue;
+      const q = b.getBoundingClientRect();
+      const dx = q.left + q.width / 2 - (r.left + r.width / 2);
+      const dy = q.top + q.height / 2 - (r.top + r.height / 2);
+      const ok = dir === 'up' ? dy < -4 : dir === 'down' ? dy > 4 : dir === 'left' ? dx < -4 && Math.abs(dy) < r.height : dx > 4 && Math.abs(dy) < r.height;
+      if (!ok) continue;
+      const d = dir === 'up' || dir === 'down' ? Math.abs(dy) * 4 + Math.abs(dx) : Math.abs(dx);
+      if (d < bestD) {
+        bestD = d;
+        best = b;
+      }
+    }
+    (best || now).focus({ preventScroll: true });
+    return true;
+  }
+
+  /** The pad's A on a focused button of the open panel: press it. Returns whether it did. */
+  pressFocused() {
+    const panel = this._activePanel();
+    const now = document.activeElement;
+    if (!panel || !(now instanceof HTMLButtonElement) || !panel.contains(now)) return false;
+    now.click();
+    return true;
+  }
+
   /**
    * Which panels show, and the words on their toggles.
-   * @param {{ phase: string, paused: boolean, mode: string, time: string, times: string[], muted: boolean, device: string, attract: boolean }} s
+   * @param {{ phase: string, paused: boolean, mode: string, time: string, times: string[], muted: boolean, device: string,
+   *   attract: boolean, quality: string, tier: string, qualityFixed: boolean, units: string, map: boolean, canSound: boolean }} s
    */
   setState(s) {
     const times = s.times || [s.time];
-    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}`;
+    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${this.optionsOpen}`;
+    this._s = s;
     if (key === this._state) return;
     const [wasPhase, wasPaused] = this._state.split('|');
     this._state = key;
     this._mode = s.mode;
     writes++;
     const title = s.phase === 'title';
-    this.title.show(title);
-    this.pause.show(s.paused && !title);
+    const touch = s.device === 'touch';
+    this._touch = touch;
+    // the options close by themselves when there is nothing left to come back to
+    if (this.optionsOpen && !title && !s.paused) this.optionsOpen = false;
+    const opts = this.optionsOpen;
+    this.title.show(title && !opts).flag('attract', s.attract);
+    this.pause.show(s.paused && !title && !opts);
+    this.options.show(opts);
     this.results.show(s.phase === 'results' && !s.paused).flag('split', s.mode === 'split');
     this.root.classList.toggle('attract', s.attract);
     this.splitButton.text(s.mode === 'split' ? TEXT.onePlayer : TEXT.twoPlayers);
-    for (const name of times) {
-      if (this.timeButtons.has(name)) continue;
-      const b = button(this.timeChoice, TEXT.timeName(name), () => this.act(`time:${name}`), 'toggle');
-      this.timeButtons.set(name, new Cell(b));
+    // the time of day, on the title and in the options: in lighting.js's order, only the times it has now
+    for (const [group, map] of [
+      [this.timeChoice, this.timeButtons],
+      [this.optTime.group, this.optTime.cells],
+    ]) {
+      for (const name of times) {
+        if (map.has(name)) continue;
+        const b = button(group, TEXT.timeName(name), () => this.act(`time:${name}`), 'toggle');
+        map.set(name, new Cell(b));
+      }
+      for (const name of times) group.appendChild(map.get(name).el);
+      for (const [name, b] of map) b.show(times.includes(name)).flag('on', name === s.time).attr('aria-pressed', name === s.time);
     }
-    // in lighting.js's order, only the times it has now
-    for (const name of times) this.timeChoice.appendChild(this.timeButtons.get(name).el);
-    for (const [name, b] of this.timeButtons) b.show(times.includes(name)).flag('on', name === s.time).attr('aria-pressed', name === s.time);
-    // the pause panel's button names the time it goes to next
-    const next = times[(times.indexOf(s.time) + 1) % times.length];
-    this.pauseTime.text(TEXT.timeName(next));
-    this.soundButton.text(s.muted ? TEXT.soundOff : TEXT.soundOn).flag('off', s.muted);
-    this.pauseSound.text(s.muted ? TEXT.soundOff : TEXT.soundOn).flag('off', s.muted);
-    const touch = s.device === 'touch';
+    const pick = (row, value) => {
+      for (const [v, b] of row.cells) b.flag('on', v === value).attr('aria-pressed', v === value);
+    };
+    pick(this.optQuality, s.quality);
+    pick(this.optSound, s.muted ? 'off' : 'on');
+    pick(this.optUnits, s.units);
+    pick(this.optMap, s.map ? 'on' : 'off');
+    this.optSound.row.hidden = !s.canSound;
+    this.qualityNote.text(s.qualityFixed ? TEXT.qualityFixed(s.tier) : TEXT.qualityNow(s.tier));
     for (const v of this.views) {
       v.setVisible(!title);
       v.setMode(s.mode === 'split', touch);
+      v.setPrefs(s.units, s.map);
       v.cell.flag('done', s.phase === 'results');
       if (title || (s.phase === 'countdown' && wasPhase !== 'countdown')) v.clearMoments();
     }
     this._legend(s.mode === 'split' && !touch ? 'split' : s.device);
+    this.title.flag('touch', touch);
     // a panel that has just opened takes the focus on its first button, so that the keys can work it
     const active = document.activeElement;
     const free = !active || active === document.body;
-    if (!touch && free && s.paused && wasPaused !== 'true') this.resumeButton.focus({ preventScroll: true });
+    if (!touch && free && s.paused && wasPaused !== 'true' && !opts) this.resumeButton.focus({ preventScroll: true });
     else if (!touch && free && s.phase === 'results' && wasPhase !== 'results') this.againButton.focus({ preventScroll: true });
     // and gives it back when it closes, so that Enter and Space drive again
     if (!s.paused && !title && s.phase !== 'results' && active instanceof HTMLElement && this.root.contains(active)) active.blur();
@@ -686,10 +782,16 @@ export class Hud {
     writes++;
   }
 
-  /** The title's line about this time of day's best lap and its medal. */
-  setTitleBest(table, time, medal) {
-    const best = table.laps.length ? table.laps[0].ms : null;
-    this.titleBest.text(`${TEXT.boardTitle(time)}   ${best === null ? '—' : formatMs(best)}${medal ? '  ·  ' + TEXT.medal[medal] : ''}`);
+  /** The best-laps board of the time of day showing, on the title and on the pause sheet. */
+  setBoard(table, medals, time) {
+    let key = time;
+    for (const l of table.laps) key += ',' + l.ms;
+    if (key === this._boardKey) return;
+    this._boardKey = key;
+    const html = boardHtml(table, medals, time);
+    this.titleBoard.el.innerHTML = html;
+    this.pauseBoard.el.innerHTML = html;
+    writes += 2;
   }
 
   /**
@@ -728,16 +830,7 @@ export class Hud {
     }
     html += `<div class="cols">${cols}</div>`;
     // the board: five rows with the targets among them, the new lap marked
-    const own = r.table.laps.length ? r.table.laps[0].ms : null;
-    html += `<div class="boardlist"><div class="head">${TEXT.boardTitle(r.time)}</div>`;
-    for (const row of rowsOf(r.table, r.medals)) {
-      const mark = !row.medal && row.ms === r.mark;
-      const cls = `row${row.medal ? ' medal ' + row.medal : ''}${mark ? ' new' : ''}${!row.medal && row.ms === own ? ' own' : ''}`;
-      html +=
-        `<div class="${cls}"><span class="rank">${row.medal ? '' : row.place}</span><span class="time">${formatMs(row.ms)}</span>` +
-        `<span class="tag">${row.medal ? TEXT.medal[row.medal] : mark ? TEXT.you : ''}</span></div>`;
-    }
-    html += '</div>';
+    html += `<div class="boardlist">${boardHtml(r.table, r.medals, r.time, r.mark)}</div>`;
     if (html !== this._results) {
       this.resultsBody.innerHTML = this._results = html;
       writes++;

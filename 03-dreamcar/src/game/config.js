@@ -12,12 +12,13 @@ import { HALF_WIDTH } from './trackLayout.js';
 export const RULES = {
   laps: 3,
   /**
-   * The start. The race clock begins at -(sweep + settle + lamps before go + hold): the camera sweeps for `sweep`
-   * s and settles for `settle` s, the five lamps come on one every `lampStep` s, then a hold drawn from
-   * rng.fork('start') between `holdMin` and `holdMax` s, then all go out: go (clock 0).
+   * The start. The race clock begins at -(sweep + settle + lamps before go + hold): `sweep` + `settle` s before
+   * the first lamp, the five lamps come on one every `lampStep` s, then a hold drawn from rng.fork('start')
+   * between `holdMin` and `holdMax` s, then all go out: go (clock 0). The camera's dive (CAMERA.sweep) runs from
+   * the clock's start until the last lamp lights, so it comes down while the lamps come on and is still before go.
    */
-  sweep: 2.5,
-  settle: 0.5,
+  sweep: 1.2,
+  settle: 0,
   lampStep: 0.7,
   lamps: 5,
   holdMin: 0.5,
@@ -50,6 +51,12 @@ export const RULES = {
   attractIdle: 25,
 };
 
+/**
+ * The time of day the page opens at when the URL does not say (?time=): a name lighting.js's TIMES has, or null
+ * for the first time of day TIMES holds (the lead's choice: the demo opens on its first, the day).
+ */
+export const DEFAULT_TIME = null;
+
 /** The HUD's moments (s of the race clock) and when its warnings and hints show. */
 export const HUD = {
   /** The gap at a line stays this long; the lap's banner this long. */
@@ -71,10 +78,18 @@ export const DRIVERS = [
 export const VIEW = {
   near: 0.25,
   far: 5000,
-  /** Shutter, as a fraction of a sixtieth of a second, standing still and at `blurSpeed` m/s (and above). */
-  motionBlurSlow: 0.3,
-  motionBlur: 0.5,
-  blurSpeed: 40,
+  /**
+   * Shutter, as a fraction of a sixtieth of a second, standing still and at `blurSpeed` m/s (and above), eased
+   * between: the streaks grow faster than the speed, so at 80 km/h the roadside is nearly crisp and at 250 it
+   * streaks (the engine clamps a streak per tier: 4 / 6 / 7.5 per cent of the view's width).
+   */
+  motionBlurSlow: 0.12,
+  motionBlur: 0.9,
+  blurSpeed: 70,
+  /** While the camera dives at the start the shutter is cut to this share (the camera's own motion would smear all). */
+  diveShutter: 0.25,
+  /** How split screen shares the window: 'auto' (side by side on a wide window, stacked on a tall one), 'wide', 'tall'. */
+  split: 'auto',
   /** Day and night are switched behind a fade to black and back, each half this long (s). */
   fade: 0.25,
 };
@@ -85,98 +100,165 @@ export const VIEW = {
  */
 export const CAMERA = {
   chase: {
-    distance: 5.7,
-    height: 1.5,
-    /** What it looks at: a point this far ahead of the car and this high. */
-    lookAhead: 8,
-    lookHeight: 0.45,
-    fov: 50,
-    /** ...widening to this as the speed signal rises from `slowSpeed` to `fastSpeed` (m/s), eased over `feelTime` s. */
-    fovFast: 58,
-    slowSpeed: 16.7,
-    fastSpeed: 49,
-    feelTime: 0.4,
-    /** At speed it also settles this much lower and drops back this much further. */
-    drop: 0.15,
-    pullBack: 0.4,
+    /** How far behind the car's origin it stands (m), at rest; it drops back `pullBack` more as the speed signal rises. */
+    distance: 5.4,
+    pullBack: 1.5,
+    /**
+     * The composition on a level straight: the horizon `horizon` of the way down the picture and the middle of the
+     * car (`middle`: [height, z] in car space, m) `carAt` of the way down. The camera's height follows from them.
+     */
+    horizon: 0.37,
+    carAt: 0.6,
+    /**
+     * On the grid the camera sits lower by `gridLow` and looks `gridUp` degrees above level, so the start lamps
+     * are in the picture while they count; from go it eases back into the chase view over `gridOut` s.
+     */
+    gridLow: 0.5,
+    gridUp: 4,
+    gridOut: 1.6,
+    /** At least this much sky (degrees) between the horizon and the picture's top edge, on every shape of screen. */
+    skyAbove: 22,
+    middle: [0.62, -0.4],
+    /** The lens, top to bottom on a 16:9 picture: `fov` at `slowSpeed` and below, `fovFast` at `fastSpeed` (m/s) and above. */
+    fov: 58,
+    fovFast: 72,
+    slowSpeed: 19.4,
+    fastSpeed: 75,
+    /** The speed signal's time constant (s): long enough that a gear change does not pump the lens. */
+    feelTime: 0.6,
     /** How much of the angle between where the car points and where it is going the camera takes up. */
-    slide: 0.65,
-    /** How quickly it swings round behind the car. */
-    yawRate: 4.6,
+    slide: 0.6,
+    /** How quickly it swings round behind the car: slowly, so it swings late into a bend and shows the flank. */
+    yawRate: 3.4,
     /**
      * Looking into the bend: the road's turn over the next `bendReach` m (more at speed) times `bendRoad`, plus the
      * yaw rate (rad/s) times `bendYawRate`, at most `bendMax` rad, followed at `bendRate`; the camera itself moves
      * `inside` m per radian of it towards the inside.
      */
-    bendReach: 22,
-    bendRoad: 0.3,
+    bendReach: 30,
+    bendRoad: 0.32,
     bendYawRate: 0.08,
-    bendMax: 0.25,
-    bendRate: 2.5,
+    bendMax: 0.22,
+    bendRate: 2.2,
     inside: 1.5,
     /** ...and rises this much per radian of it, to see over the inside of a tight bend. */
-    bendLift: 1.2,
+    bendLift: 1.0,
     /** Height: followed at `heightRate` (never more than `heightSlack` m behind), the grade lazily at `gradeRate`. */
-    heightRate: 5,
-    heightSlack: 0.5,
-    gradeRate: 1.6,
-    /** How much of the climb behind the car lowers the camera (1: it keeps its height over the road behind it). */
-    uphill: 0.8,
-    /** The distance spring: this far back per g of acceleration (closer under braking), its frequency and damping. */
-    pullPerG: 0.35,
-    pullOmega: 6,
-    pullDamping: 0.6,
-    /** Roll of the picture: a share of the body's roll, a little against the yaw rate, followed at `rollRate`. */
-    rollShare: 0.3,
-    rollYawRate: 0.012,
+    heightRate: 4,
+    heightSlack: 0.6,
+    gradeRate: 1.4,
+    /** How much of the grade the composition tilts with (1: all of it). */
+    uphill: 1,
+    /** The distance spring: this far back per g of acceleration (closer under braking), its frequency and damping;
+     * the acceleration it is driven by is low-passed over `accelTime` s. */
+    pullPerG: 0.3,
+    pullOmega: 5,
+    pullDamping: 0.8,
+    accelTime: 0.35,
+    /**
+     * Roll of the picture: `bankShare` of the road's banking taken up at `bankRate`, `rollShare` of the body's own
+     * lean on top of it, a little against the yaw rate; followed at `rollRate`, at most `rollMax` rad.
+     */
+    bankShare: 0.4,
+    bankRate: 2,
+    rollShare: 0.25,
+    rollYawRate: 0.01,
     rollRate: 4,
-    /** On a picture narrower than 4:3 (a phone held upright, a side-by-side half) it backs off and lifts by up to: */
-    narrowBack: 1.45,
-    narrowLift: 2.3,
-    narrowAhead: 1.3,
-    narrowLook: 1.5,
+    rollMax: 0.12,
+    /** On a picture narrower than 4:3 (a phone held upright, a side-by-side half) it backs off by up to this and
+     * composes higher: more road ahead over the car. */
+    narrowBack: 1.25,
+    narrowHorizon: 0.3,
+    narrowCarAt: 0.62,
     /** ...and on one wider than 16:9 (a stacked half): */
-    wideBack: 1.1,
-    wideLift: 1.15,
+    wideBack: 1.05,
   },
-  far: { distance: 9.2, height: 2.5, lookAhead: 12, lookHeight: 1.2 },
+  far: { distance: 9.5, pullBack: 1.8, horizon: 0.36, carAt: 0.6, fov: 54, fovFast: 66 },
   /**
    * Fixed to the body at the car's own viewpoints (VIEWPOINTS in assets/car/spec.js): the lens (widening with speed),
    * how far below level it looks (rise per metre), and how firmly it follows the body's pitch and roll.
    */
-  bonnet: { fov: 56, fovFast: 62, lookDown: -0.04, narrowUp: 0.12, firm: 30 },
-  bumper: { fov: 62, fovFast: 68, lookDown: -0.01, narrowUp: 0.12 },
-  /** Shake, in radians of turn: the road at speed, more on the verge, and the knocks (strength in m/s for the full). */
-  shake: { road: 0.0012, verge: 0.006, roadHz: 9, impact: 0.02, impactMove: 0.1, impactHz: 14, impactFull: 12, decay: 0.6, kick: 0.3 },
+  bonnet: { fov: 62, fovFast: 74, lookDown: -0.04, narrowUp: 0.12, firm: 30 },
+  bumper: { fov: 66, fovFast: 78, lookDown: -0.01, narrowUp: 0.12 },
   /**
-   * The title's slow circle round the parked car (rate in rad/s, slower by `linger` over the three-quarter views),
-   * its radius drifting between `near` and `far` and its height between `low` and `high`.
+   * Shake, in radians of turn: the road's, from `fromSpeed` (m/s) to full at the chase's `fastSpeed`; the verge's
+   * and the kerbs' (per share of the wheels on them) at any speed; the knocks (strength in m/s for the full).
    */
-  orbit: { near: 5.0, far: 5.5, low: 1.1, high: 1.4, driftRate: 0.23, rate: 0.16, linger: 0.55, lookHeight: 0.5, fov: 40, narrowBack: 1.5 },
-  /** The orbit behind the results: blended in from the chase view over `blend` s while the car rolls home. */
-  results: { near: 6.2, far: 7.2, low: 1.2, high: 1.6, driftRate: 0.2, rate: 0.36, linger: 0.4, lookHeight: 0.7, fov: 44, narrowBack: 1.4, blend: 1.5 },
+  shake: { road: 0.0016, fromSpeed: 55.6, verge: 0.006, kerb: 0.004, kerbHz: 22, roadHz: 11, impact: 0.02, impactMove: 0.1, impactHz: 14, impactFull: 12, decay: 0.6, kick: 0.3 },
   /**
-   * The start sweep, on the race clock (RULES.sweep): through these points in car space (x towards the middle of
-   * the road), then into the chase view, looking from the car's middle out to the chase camera's point ahead.
+   * The title's hero picture: a three-quarter view (`quarter` rad round from straight behind or, mirrored, from
+   * straight ahead) from low down, `distance` m out and `height` m up, swinging `swing` rad to and fro over
+   * `period` s and bobbing `bob` m. Of the four three-quarter views it holds the one whose look runs `sunBeside`
+   * rad beside the brightest part of the sky, front views preferred by `frontBias`. The car is framed clear of
+   * the menu: on a picture at least `uprightBelow` wide for its height, `across` of the picture's width off the
+   * middle away from the menu and `down` of the way down; on a narrower one in the middle, `tallDown` of the way
+   * down (the menu under it). `times` may override any of these per time of day (and fix `angle`).
+   */
+  orbit: {
+    quarter: 0.72,
+    frontBias: 1.2,
+    sunBeside: 1.75,
+    distance: 8.6,
+    height: 0.85,
+    bob: 0.08,
+    swing: 0.22,
+    period: 36,
+    lookHeight: 0.62,
+    lookZ: 0,
+    fov: 34,
+    narrowBack: 1.0,
+    uprightBelow: 1.15,
+    across: 0.2,
+    down: 0.56,
+    tallDown: 0.3,
+    times: { day: { sunBeside: 2.1 }, dusk: { sunBeside: 0.9 } },
+  },
+  /** The orbit behind the results: blended in from the chase view over `blend` s while the car rolls home; framed
+   * clear of the results panel the same way as the title (the panel is on the right). */
+  results: {
+    near: 6.4,
+    far: 7.2,
+    low: 1.0,
+    high: 1.4,
+    driftRate: 0.2,
+    rate: 0.3,
+    linger: 0.4,
+    lookHeight: 0.62,
+    fov: 40,
+    narrowBack: 1.35,
+    blend: 1.5,
+    uprightBelow: 1.15,
+    across: 0.16,
+    down: 0.55,
+    tallDown: 0.28,
+  },
+  /**
+   * The start, on the race clock: a dive from `from` (car space: x towards the middle of the road, y up, z ahead;
+   * m) bowing `bow` m further out on the way, onto the car's tail and into the chase view; it begins when the
+   * clock does and ends as the last start lamp lights (Game.js). The look moves from a point `lookHeight` up and
+   * `lookZ` ahead of the car's origin to the chase camera's.
    */
   sweep: {
-    path: [
-      [3.2, 0.55, 5.6],
-      [5.2, 0.8, 2.2],
-      [5.4, 1.05, -2.0],
-      [3.0, 1.35, -5.6],
-    ],
+    from: [9, 16, -34],
+    bow: 3,
     lookHeight: 0.6,
-    lookZ: 0.3,
+    lookZ: 0.6,
     fov: 44,
   },
   /** Keeping clear: of a solid edge, of the ground, of the tunnel's roof (and this far beyond the portals). */
   clear: { wall: 0.6, ground: 0.45, roof: 1.2, portal: 3 },
   /** Lens limits: pictures narrower than `narrow` or wider than `wide` keep that shape's width of view. */
-  lens: { narrow: 4 / 3, wide: 16 / 9, max: 84 },
+  lens: { narrow: 4 / 3, wide: 16 / 9, max: 96 },
   /** The camera modes C steps through. */
   modes: ['chase', 'far', 'bonnet', 'bumper'],
 };
+
+/**
+ * Exposure compensation (stops) on the title's hero picture and the results' orbit, so that the car itself is
+ * correctly exposed whatever the time of day: `default`, or a time of day's own value. Eased in and out over
+ * `ease` s through the same exposure the game drives.
+ */
+export const SHOWCASE = { default: 0.5, day: 0.3, dusk: 0.9, night: 0.6, ease: 0.6 };
 
 /**
  * How the eye follows the light: time constants (s) of the exposure closing down (towards brighter light: fast)

@@ -4,7 +4,7 @@
 
 export const TEXT = {
   name: 'Dreamcar',
-  tagline: 'A time trial over a mountain pass, three laps against the clock.',
+  tagline: 'A time trial on a mountain circuit by a lake: three laps against the clock.',
   loading: 'Loading',
   noWebgl: 'This device could not start WebGL 2. Try a recent version of Safari or Chrome.',
 
@@ -24,6 +24,20 @@ export const TEXT = {
   paused: 'Paused',
   results: 'Results',
   timeOfDay: 'Time of day',
+  options: 'Options',
+  done: 'Done',
+  quality: 'Quality',
+  qualities: ['Auto', 'Low', 'Medium', 'High'],
+  qualityNow: (tier) => `Now drawing at ${tier}. A change reloads the page.`,
+  qualityFixed: (tier) => `Set to ${tier} by the address (?q=). A change is kept for later visits.`,
+  sound: 'Sound',
+  on: 'On',
+  off: 'Off',
+  units: 'Speed in',
+  mph: 'mph',
+  map: 'Map',
+  shown: 'Shown',
+  hidden: 'Hidden',
 
   lap: 'Lap',
   finalLap: 'Final lap',

@@ -16,7 +16,7 @@
 //
 // Steering, pedals and the held look back are read by the drivers in the
 // fixed step (read). Everything else is a moment: an action ('camera',
-// 'reset', 'pause', 'time', 'high', 'ghost', 'mute', 'start') delivered to onAction as
+// 'reset', 'pause', 'time', 'high', 'ghost', 'mute', 'start', 'press', 'nav:up' ...) delivered to onAction as
 // it happens, with the driver it belongs to (-1: nobody in particular). The
 // engine knows nothing about cars: these are only names.
 
@@ -67,7 +67,11 @@ const PAD_ACTIONS = [
   [1, 'reset'], // B
   [9, 'pause'], // Start
   [8, 'time'], // Back / View
-  [0, 'start'], // A (also the handbrake; as an action it only starts or restarts a run)
+  [0, 'press'], // A (also the handbrake; as an action it presses the focused button of a menu, or starts a run)
+  [12, 'nav:up'], // the d-pad moves through a menu's buttons
+  [13, 'nav:down'],
+  [14, 'nav:left'],
+  [15, 'nav:right'],
 ];
 
 export class Input {

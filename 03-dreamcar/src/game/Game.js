@@ -31,7 +31,7 @@ import { TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
 import { createRng } from '../engine/rng.js';
 import { CameraRig } from './Cameras.js';
-import { CAMERA, DRIVERS, EXPOSURE, FX, HUD, LIGHTS, PROBE, RULES, VIEW } from './config.js';
+import { CAMERA, DEFAULT_TIME, DRIVERS, EXPOSURE, FX, HUD, LIGHTS, PROBE, RULES, SHOWCASE, VIEW } from './config.js';
 import { AutoDriver, PlayerDriver } from './drivers.js';
 import { Effects } from './effects.js';
 import { Ghost } from './Ghost.js';
@@ -77,6 +77,27 @@ const soundModules = import.meta.glob(['./Sound.js', '../engine/Audio.js'], { ea
 const SHARP_LIFT = 0.1;
 /** Set once a first-time player has got going, so the hint does not come back. */
 const HINT_KEY = 'dreamcar.hinted.v1';
+/** The player's choices kept on this device: the quality (auto, low, medium, high), the speed's units, the map. */
+const QUALITY_KEY = 'dreamcar.quality';
+const UNITS_KEY = 'dreamcar.units';
+const MAP_KEY = 'dreamcar.map';
+const QUALITIES = ['auto', 'low', 'medium', 'high'];
+
+/** Read a kept choice (null when there is none or no storage). */
+function kept(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function keep(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // no storage: the choice lasts this page only
+  }
+}
 /** The car at rest, held on its brakes (the title, the grid). */
 const HELD = { steer: 0, throttle: 0, brake: 0, handbrake: 1 };
 
@@ -101,15 +122,22 @@ export class Game {
     this.engine = engine;
     this.caps = probeCaps(engine.renderer, { ldr: params.ldr });
     /** @type {import('../engine/caps.js').Tier} */
-    this.tier = params.quality ?? this.caps.tier;
+    // ?q= wins; then the quality chosen in the options (dreamcar.quality); 'auto' is what the probe chose
+    const stored = kept(QUALITY_KEY);
+    /** The options' choice: 'auto' | 'low' | 'medium' | 'high'. */
+    this.qualityChoice = QUALITIES.includes(stored) ? stored : 'auto';
+    this.tier = params.quality ?? (this.qualityChoice !== 'auto' ? this.qualityChoice : this.caps.tier);
+    /** km/h or mph, and whether the map shows (the options; kept on the device). */
+    this.units = kept(UNITS_KEY) === 'mph' ? 'mph' : 'kmh';
+    this.mapShown = kept(MAP_KEY) !== 'off';
     engine.setMaxPixelRatio(TIERS[this.tier].pixelRatio);
     this.rng = createRng(params.seed);
 
     this.pipeline = new FramePipeline(engine.renderer, this.caps, { tier: this.tier, post: params.post });
     this.pipeline.debug = params.debug;
     this.track = createTrack();
-    // the times of day are whatever lighting.js has, in its order; the demo opens on the first of them (day)
-    params = { ...params, time: params.time && TIMES[params.time] ? params.time : Object.keys(TIMES)[0] };
+    // the times of day are whatever lighting.js has, in its order; the demo opens at DEFAULT_TIME (config.js: null, the first)
+    params = { ...params, time: params.time && TIMES[params.time] ? params.time : DEFAULT_TIME && TIMES[DEFAULT_TIME] ? DEFAULT_TIME : Object.keys(TIMES)[0] };
     this.params = params;
     this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params });
     if (this.world.time.name !== params.time) this.world.setTime(params.time);
@@ -170,6 +198,8 @@ export class Game {
     this.ghostCar = null;
     /** Per driver: the camera mode they chose. */
     this.cameraModes = [params.camera, params.camera];
+    /** The staging camera's pose, or null (setPhoto). */
+    this.photo = null;
     /** Drivers whose car is to be put back in the next step. */
     this._resets = new Set();
     /** The day-night fade: { t, to, switched } or null. */
@@ -312,6 +342,8 @@ export class Game {
         zone: { left: 0, top: 0, width: 1, height: 1 },
         frame: { exposure: 1, look: world.time.look, motionBlur: VIEW.motionBlur, cut: true, sharp, probe: probe?.texture },
         exposure: this._exposureFor(racer.vehicle),
+        /** 0..1: how much of the showcase's exposure compensation is in (eased in the fixed step). */
+        showcase: this.phase === 'title' ? 1 : 0,
         /** The probe the paint reads now; `still` says which of the two it is. */
         probe,
         probes: probe ? [probe] : [],
@@ -319,7 +351,13 @@ export class Game {
       };
     });
     this.layout();
-    for (const view of this.views) view.rig.snap(view.racer.vehicle);
+    for (const view of this.views) {
+      view.rig.sun = world.time.sun?.dir;
+      view.rig.time = world.time.name;
+      view.rig.photo = this.photo || null;
+      view.rig.snap(view.racer.vehicle);
+      view.exposure = this._viewExposure(view);
+    }
     // nothing has moved yet: the boxes start where they are
     this.render(0, 1);
     for (const racer of this.racers) racer.sharp.prevMatrix.copy(racer.sharp.matrix);
@@ -345,7 +383,7 @@ export class Game {
     const W = engine.bufferWidth;
     const H = engine.bufferHeight;
     const two = views.length > 1;
-    const sideBySide = engine.aspect >= 1;
+    const sideBySide = VIEW.split === 'wide' || (VIEW.split !== 'tall' && engine.aspect >= 1);
     views.forEach((view, i) => {
       // whole device pixels, and the two halves share every one of them
       if (!two) view.rect = { x: 0, y: 0, w: W, h: H };
@@ -390,6 +428,22 @@ export class Game {
     });
   }
 
+  /**
+   * The staging camera for comparison stills: every view's camera at `o` ({ back, right, up, yaw, pitch, fov }:
+   * metres behind, right of and above its car's origin in the car's level frame, degrees left of its heading and
+   * up, the lens top to bottom), the HUD hidden unless `o.hud`; null gives the views back to their rigs.
+   * @param {{ back?: number, right?: number, up?: number, yaw?: number, pitch?: number, fov?: number, hud?: boolean }|null} o
+   */
+  setPhoto(o) {
+    this.photo = o ? { ...o } : null;
+    for (const view of this.views) {
+      view.rig.photo = this.photo;
+      view.frame.cut = true;
+    }
+    if (this.params.ui) this.hud.root.hidden = !!this.photo && !this.photo.hud;
+    if (this.engine.manual && !this._rendering) this.engine.advance(0);
+  }
+
   /** Back to the title: the cars parked on the grid, the camera circling. */
   leave() {
     this.engine.paused = false;
@@ -422,6 +476,42 @@ export class Game {
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
+    // the options
+    if (name.startsWith('quality:')) {
+      const q = name.slice(8);
+      if (QUALITIES.includes(q) && q !== this.qualityChoice) {
+        this.qualityChoice = q;
+        keep(QUALITY_KEY, q);
+        // a tier is chosen once, when the page is built: the page is built again with the new one
+        if (!this.params.noreload && typeof location !== 'undefined') location.reload();
+      }
+      return;
+    }
+    if (name.startsWith('units:')) {
+      this.units = name.slice(6) === 'mph' ? 'mph' : 'kmh';
+      keep(UNITS_KEY, this.units);
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
+    if (name.startsWith('map:')) {
+      this.mapShown = name.slice(4) !== 'off';
+      keep(MAP_KEY, this.mapShown ? 'on' : 'off');
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
+    if (name === 'sound:on' || name === 'sound:off') {
+      if (this.muted !== (name === 'sound:off')) this.action('mute', driver);
+      return;
+    }
+    // a pad in a menu: the d-pad moves through the open panel's buttons, A presses the one it is on
+    if (name.startsWith('nav:')) {
+      if (this.phase === 'title' || paused || this.phase === 'results' || this.hud.optionsOpen) this.hud.navigate(name.slice(4));
+      return;
+    }
+    if (name === 'press') {
+      if (!this.hud.pressFocused()) this.action('start', driver);
+      return;
+    }
     switch (name) {
       case 'start':
         if (this.phase === 'title') this.start();
@@ -438,7 +528,9 @@ export class Game {
         if (this.phase === 'title' && name !== this.mode) this.setup(name);
         break;
       case 'pause':
-        if (racing) this.engine.paused = !paused;
+        // Escape or Start on the options sheet goes back to where it was opened from
+        if (this.hud.optionsOpen) this.hud.closeOptions();
+        else if (racing) this.engine.paused = !paused;
         break;
       case 'camera':
         if (racing && !paused) {
@@ -486,7 +578,9 @@ export class Game {
     this.world.setTime(name);
     if (this.race) this.race.setTime(name);
     for (const view of this.views) {
-      view.exposure = this._exposureFor(view.racer.vehicle);
+      view.rig.sun = this.world.time.sun?.dir;
+      view.rig.time = name;
+      view.exposure = this._viewExposure(view);
       view.frame.cut = true;
     }
   }
@@ -515,7 +609,18 @@ export class Game {
     this.world.refresh();
     this.effects.refresh();
     this.layout();
-    for (const view of this.views) view.exposure = this._exposureFor(view.racer.vehicle);
+    for (const view of this.views) view.exposure = this._viewExposure(view);
+  }
+
+  /** Where a view's exposure settles: the car's light, and the showcase's compensation as far as it is in. */
+  _viewExposure(view) {
+    return this._exposureFor(view.racer.vehicle) * 2 ** (this._showcaseEv() * view.showcase);
+  }
+
+  /** The exposure compensation (stops) of the hero picture and the results at this time of day. */
+  _showcaseEv() {
+    const v = SHOWCASE[this.world.time.name];
+    return typeof v === 'number' ? v : SHOWCASE.default;
   }
 
   /** What the exposure settles at where this car is: the open sky's, the tunnel's, or between at the portals. */
@@ -618,11 +723,18 @@ export class Game {
       if (this.phase !== 'title' && racer.driver === racer.player) view.rig.lookBack = !!this.input.read(lookRead, racer.scheme, i).lookBack;
       else view.rig.lookBack = false;
       // the rig reads this step's knocks, the start sweep off the race clock, and whether its car has taken the flag
-      const sweep = race && race.clock < 0 ? clamp01((race.clock + race.lead) / RULES.sweep) : 1;
+      // the camera's dive: from the clock's start until the last start lamp lights
+      const diveEnd = race ? race.firstLamp + RULES.lampStep * (RULES.lamps - 1) : 0;
+      const sweep = race && race.clock < diveEnd ? clamp01((race.clock + race.lead) / (diveEnd + race.lead)) : 1;
       const finished = !!race && this.phase !== 'title' && race.cars[racer.index].finished;
-      view.rig.update(dt, racer.vehicle, this.track, { impacts: racer.impacts, sweep, finished });
+      // the grid's look up at the lamps: while the clock is under zero, easing out over CAMERA.chase.gridOut after go
+      const grid = race && this.phase !== 'title' ? 1 - clamp01(race.clock / CAMERA.chase.gridOut) : 0;
+      view.rig.update(dt, racer.vehicle, this.track, { impacts: racer.impacts, sweep, finished, sun: time.sun?.dir, time: time.name, grid });
+      // the title's hero picture and the results' orbit: the car exposed for, eased in and out (SHOWCASE)
+      const show = this.phase === 'title' && !this.attract ? 1 : finished ? 1 : 0;
+      view.showcase = damp(view.showcase, show, 1 / SHOWCASE.ease, dt);
       // eyes take a moment to follow the light: closing down quickly, opening up slowly (eased in stops)
-      const target = this._exposureFor(racer.vehicle);
+      const target = this._viewExposure(view);
       const tau = target < view.exposure ? EXPOSURE.close : EXPOSURE.open;
       view.exposure = Math.exp(damp(Math.log(view.exposure), Math.log(target), 1 / tau, dt));
     });
@@ -848,7 +960,8 @@ export class Game {
       const speed = Math.abs(view.racer.vehicle.speed);
       view.frame.exposure = view.exposure * fade;
       view.frame.look = time.look;
-      view.frame.motionBlur = lerp(VIEW.motionBlurSlow, VIEW.motionBlur, clamp01(speed / VIEW.blurSpeed));
+      // the shutter opens with speed; while the camera itself dives at the start it is held short
+      view.frame.motionBlur = lerp(VIEW.motionBlurSlow, VIEW.motionBlur, clamp01(speed / VIEW.blurSpeed) ** 1.5) * lerp(VIEW.diveShutter, 1, view.rig.settled);
       view.frame.cut = view.frame.cut || view.rig.cut;
     }
 
@@ -897,15 +1010,19 @@ export class Game {
       time: this.world.time.name,
       times: Object.keys(TIMES),
       muted: this.muted,
+      canSound: !!this.sound,
       device,
       attract: this.attract,
+      quality: this.qualityChoice,
+      tier: this.tier,
+      qualityFixed: !!this.params.quality,
+      units: this.units,
+      map: this.mapShown,
     });
     hud.setFade(1 - this._fadeLevel);
-    if (this.phase === 'title') {
-      const table = this._boardTable();
-      hud.setTitleBest(table, this.world.time.name, medalOf(table.laps.length ? table.laps[0].ms : null));
-      return;
-    }
+    // the board: on the title and the pause sheet (and in the results), never over the run
+    if (this.phase === 'title' || this.engine.paused) hud.setBoard(this._boardTable(), RULES.medals, this.world.time.name);
+    if (this.phase === 'title') return;
     const rect = this._touchDirty ? this.container.getBoundingClientRect() : null;
     const split = this.racers.length > 1;
     const map = this._map;
@@ -1073,6 +1190,36 @@ export class Game {
         };
       }),
     };
+  }
+
+  /**
+   * Where car `i` is drawn in its view, as a rectangle of the page in CSS pixels (its box's corners projected),
+   * for tests that check nothing of the HUD covers it.
+   */
+  carRect(i = 0) {
+    const view = this.views[i];
+    if (!view) return null;
+    const { car } = view.racer;
+    const b = car.box;
+    const v = new THREE.Vector3();
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let k = 0; k < 8; k++) {
+      v.set(b.center.x + (k & 1 ? 1 : -1) * b.half.x, b.center.y + (k & 2 ? 1 : -1) * b.half.y, b.center.z + (k & 4 ? 1 : -1) * b.half.z);
+      v.applyMatrix4(car.object.matrixWorld).project(view.camera);
+      x0 = Math.min(x0, v.x);
+      x1 = Math.max(x1, v.x);
+      y0 = Math.min(y0, v.y);
+      y1 = Math.max(y1, v.y);
+    }
+    const W = this.engine.width;
+    const H = this.engine.height;
+    const z = view.zone;
+    const px = (x) => (z.left + ((x + 1) / 2) * z.width) * W;
+    const py = (y) => (z.top + ((1 - y) / 2) * z.height) * H;
+    return { left: px(x0), right: px(x1), top: py(y1), bottom: py(y0) };
   }
 
   /** Numbers about the run and the last frame drawn (counted over all its passes). */

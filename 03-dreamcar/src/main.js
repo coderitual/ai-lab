@@ -44,6 +44,12 @@ try {
     stats: () => game.stats(),
     /** A plain JSON picture of the run: phase, mode, time of day, and per driver lap, place, speed, lamps, ... */
     state: () => game.state(),
+    /**
+     * The staging camera: { back, right, up, yaw, pitch, fov } (metres behind, right of and above the car's origin
+     * in its level frame; degrees left of its heading and up; the lens top to bottom), the HUD hidden unless
+     * { hud: true }; null ends it. Also ?photo=back,right,up,yaw,pitch,fov in the address.
+     */
+    photo: (o) => game.setPhoto(o),
     /** Change a number of the light or of the run by its path, and show the result. */
     set(path, value) {
       const keys = String(path).split('.');
@@ -56,6 +62,16 @@ try {
     },
   };
 
+  // ?photo=back,right,up,yaw,pitch,fov[,hud]: the staging camera from the first frame (see photo above)
+  const photo = new URLSearchParams(location.search).get('photo');
+  if (photo) {
+    const n = photo.split(',').map(parseFloat);
+    const keys = ['back', 'right', 'up', 'yaw', 'pitch', 'fov'];
+    const o = {};
+    keys.forEach((k, i) => Number.isFinite(n[i]) && (o[k] = n[i]));
+    if (/,hud$/.test(photo)) o.hud = true;
+    game.setPhoto(o);
+  }
   // ?t=5: let the run go on for a while before anyone looks; either way, the first complete frame
   skip(params.preAdvance);
   engine.start();
