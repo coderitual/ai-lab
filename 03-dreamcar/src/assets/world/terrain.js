@@ -40,7 +40,7 @@ const SURFACE_GRAVEL = 3;
 const BORE_HEIGHT = 7.2;
 
 /** Grid cell (m) per tier. */
-const CELL = { low: 11, medium: 6, high: 5 };
+const CELL = { low: 14, medium: 6, high: 5 };
 /** Band rows: one every this many Track samples, per tier. */
 export const ROW_STEP = { low: 3, medium: 1, high: 1 };
 /** The land-shape field's cell (m). */

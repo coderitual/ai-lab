@@ -591,7 +591,7 @@ for ( int slot = 1; slot <= ROAD_SLOTS; slot ++ ) {
     float tooth = param * ( abs( fract( q.y / 0.24 ) - 0.5 ) * 0.1 - 0.025 );
     float gap = roadCover( q.x - tooth, 0.013, aaS ) * plate;
     ftMetal = max( ftMetal, plate * step( 0.5, param ) );
-    ftMetalTone = mix( ftMetalTone, 0.62, plate );
+    ftMetalTone = mix( ftMetalTone, 0.22, plate );
     ftTar = max( ftTar, plate * ( 1.0 - step( 0.5, param ) ) );
     ftHole = max( ftHole, gap * step( 0.5, param ) );
     ftHeight += plate * 1.0 - gap * 9.0;
