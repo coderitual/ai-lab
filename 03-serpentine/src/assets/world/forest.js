@@ -50,8 +50,8 @@ const CELL = 64;
 
 /** Linear albedo (before the texture, which is pale: about 0.5 on average) per species, and its spread. */
 const TINT = {
-  spruce: [0.085, 0.15, 0.12],
-  fir: [0.08, 0.15, 0.085],
+  spruce: [0.07, 0.12, 0.11],
+  fir: [0.065, 0.125, 0.08],
   larch: [0.34, 0.21, 0.06],
   birch: [0.3, 0.25, 0.06],
 };
