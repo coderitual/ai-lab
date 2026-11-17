@@ -194,8 +194,8 @@ void main() {
     // zenith is still cloud is in the body or the base; one whose neighbour is clear sky is a lit top. The same
     // test towards the sun gives the sunlit flank, and the thin rim with the sun behind it shines silver.
     vec2 toLight = normalize(uSunDir.xz + 1.0e-5);
-    // after sunset the light comes from under the clouds: the bright side is the underside
-    vec2 toTop = -normalize(p + 1.0e-5) * (0.6 + 0.25 * length(p)) * (uSunDir.y < 0.0 ? -1.0 : 1.0);
+    // with the sun low or set the light comes from under the clouds: the bright side is the underside
+    vec2 toTop = -normalize(p + 1.0e-5) * (0.6 + 0.25 * length(p)) * (uSunDir.y < 0.1 ? -1.0 : 1.0);
     float behind = 0.6 * cumulus(p + toLight * 0.06) + 0.4 * cumulus(p + toLight * 0.15);
     float over = 0.65 * cumulus(p + toTop * 0.07) + 0.35 * cumulus(p + toTop * 0.18);
     float thick = cover.y / 0.94;

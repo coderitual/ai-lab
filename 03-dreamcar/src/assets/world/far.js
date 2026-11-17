@@ -92,20 +92,23 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   // broken rock: crags and runnels down the fall line; no level beds (they read as contour lines at distance)
   float runnel = abs(fbm(vec2(p.x + p.z, p.y * 0.35) / 60.0, 3) - 0.5);
   joint = smoothstep(0.06, 0.0, runnel);
-  return 22.0 * fbm(p / 70.0, 3) - 10.0 * joint;
+  return 22.0 * fbm(p / 90.0, 2) - 10.0 * joint;
 }`)
           .replace(
             '#include <normal_fragment_maps>',
             `#include <normal_fragment_maps>
 {
   float joint;
-  float hb = rockHeight(vRockWorld, joint) * uRockRelief;
+  // fades out where a pixel covers more than a few metres: finer than that, the bump only aliases into blocks
+  float footprint = length(fwidth(vRockWorld));
+  float relief = uRockRelief * smoothstep(30.0, 8.0, footprint);
+  float hb = rockHeight(vRockWorld, joint) * relief;
   vec3 sx = dFdx(-vViewPosition), sy = dFdy(-vViewPosition);
   vec3 r1 = cross(sy, normal), r2 = cross(normal, sx);
   float det = dot(sx, r1);
   vec3 grad = sign(det) * (dFdx(hb) * r1 + dFdy(hb) * r2);
   normal = normalize(abs(det) * normal - grad);
-  diffuseColor.rgb *= 1.0 - 0.15 * joint * uRockRelief;
+  diffuseColor.rgb *= 1.0 - 0.15 * joint * relief;
 }`,
           )
           .replace('void main() {', 'uniform float uRockRelief;\nvoid main() {');
