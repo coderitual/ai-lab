@@ -42,6 +42,7 @@ import { createSky } from './sky.js';
 import { SHADOW, createSun } from './sun.js';
 import { createRoad } from './road.js';
 import { createRockFaces } from './rock.js';
+import { keepOut as startKeepOut } from './startPlan.js';
 import { createStructures } from './structures.js';
 import { createStuds } from './studs.js';
 import { ROW_STEP, createTerrain } from './terrain.js';
@@ -127,7 +128,10 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   lap('lake');
   // (the trees' alpha becomes coverage where the scene target is multisampled: the pipeline's rule, caps.js)
   const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
-  const forest = createForest({ renderer, track, terrain, tier, coverage, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high, keepOut });
+  // no tree where the pit building, the stand and the towns stand (startPlan.js), nor where the caller says
+  const built = startKeepOut(track);
+  const noTrees = keepOut ? (x, z) => built(x, z) || keepOut(x, z) : built;
+  const forest = createForest({ renderer, track, terrain, tier, coverage, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high, keepOut: noTrees });
   // the trees' shadow-only proxies live on a layer only the sun's shadow camera sees
   sun.light.shadow.camera.layers.enable(CASTER_LAYER);
   lap('forest');
