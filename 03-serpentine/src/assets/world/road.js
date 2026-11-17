@@ -471,7 +471,7 @@ if ( uMirrorOn > 0.5 && vRoadEye > 0.5 ) {
     // Smeared, the rougher the more, and up the picture only: a wet road draws each light out into a streak from
     // the point that mirrors it towards the viewer (the nearer road sees it at a glancing angle off the far side of
     // its bumps). Sharp in a puddle; a share of the picture's height, whatever the target's size.
-    float mLen = mix( 0.003, 0.11, smoothstep( 0.03, 0.5, roadRoughness ) );
+    float mLen = mix( 0.003, 0.07, smoothstep( 0.03, 0.5, roadRoughness ) );
     vec2 mStep = vec2( 0.06 * mLen * uMirrorTexel.x / uMirrorTexel.y, mLen );
     vec3 mCol = texture2D( uMirrorTex, muv ).rgb * 0.22;
     mCol += texture2D( uMirrorTex, muv + mStep * vec2( 1.0, 0.06 ) ).rgb * 0.17;

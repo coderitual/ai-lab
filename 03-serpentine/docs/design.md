@@ -168,12 +168,28 @@ a few seconds it is offered).
   65 m with a sharp cut-off rising to the right, high beam about 150 m; LED
   daytime running lamps always on; tail lamps red with a hot core; brake lamps
   three times brighter; warm tunnel lamps; lit windows at the chalet by the
-  start. Exposure about 5 stops above day.
-- **Night is the night after rain.** The asphalt is wet: dark, glossy, with
-  water standing in the wheel tracks, and it mirrors what stands on it: the
-  tail lamps as long red smears, the car, the lamps, the head lamps' pool.
-  Lit studs along the centre line and the edges draw every bend from far
-  away, and a town by the lake glitters below with its glow on the sky.
+  start. Exposure about 4 stops above day (lighting.js: 18 against 1; at 5
+  stops the moonlit land read as dusk and anything facing a head lamp within
+  30 m burnt white). Lens ghosts are off at night.
+- **Night is the night after rain.** The asphalt is wet (lighting.js
+  `wetness`: day 0, night 0.65; `?wet=` overrides): dark, glossy, with
+  broken puddles in the wheel tracks and low spots, dry under the tunnel's
+  roof. On the medium and high tiers it mirrors what stands on it through a
+  planar reflection drawn per view about the road's plane under the view's
+  car (engine/PlanarMirror.js; a third of the view's height on medium, half
+  on high; nothing on low, which keeps the speculars): the tail lamps, the
+  car, the lamps, the studs and posts, the tree line and the sky, each light
+  drawn out into a streak towards the viewer. The head lamps lay a cool pool
+  on the road ahead through the asphalt's own backscatter (road.js), while
+  their beam keeps light off what is close and high.
+- Lit studs (studs.js) on the centre line and both edge lines through every
+  bend and the tunnel (amber centre, white edges, red seen the wrong way)
+  answer the head lamps and glow faintly on their own at night: the next bend
+  reads from 150 m. A town of about 330 lamps (high tier) lies on the lake's
+  far shore and the slope behind it, mirrored in the lake, with a soft warm
+  glow on the haze above it, a radio mast's red lamps and a hamlet high on
+  the slope beyond; it is in the frame from the descent and the hook (the
+  summit's hills and the viaduct's heading hide it from the rest of the lap).
 - **Day has the sun in it.** Heading into the low sun the picture is washed
   by its glare, lens ghosts lie across the frame, and the road goes pale
   towards the light.

@@ -304,7 +304,7 @@ void main() {
           if (put(place, x, z, 6, lampColour(), lightRng.range(0.7, 1.2), 'street')) {
             // a window or two beside it, warm
             for (let w = 0; w < 3; w++) {
-              if (lightRng.next() > 0.55 * share) continue;
+              if (lightRng.next() > 0.4 * share) continue;
               put(place, x + lightRng.range(-14, 14), z + lightRng.range(-14, 14), lightRng.range(3, 9), lightRng.next() < 0.8 ? [1, 0.7, 0.42] : COOL, lightRng.range(0.2, 0.45), 'window');
             }
           }
@@ -504,10 +504,10 @@ void main() {
       shared.uMistColor.value.set(s * (0.75 + 0.25 * time.sun.color[0]), s * (0.8 + 0.2 * time.sun.color[1]), s * (0.85 + 0.15 * time.sun.color[2]));
       shared.uMistOpacity.value = night ? 0.15 : 0.65;
       const lamps = time.lamps.windows;
-      lightPoints.material.uniforms.uRadiance.value = 0.35 * lamps;
+      lightPoints.material.uniforms.uRadiance.value = 0.6 * lamps;
       lightPoints.visible = lamps > 0;
       if (lakePoints) {
-        lakePoints.material.uniforms.uRadiance.value = 0.35 * lamps;
+        lakePoints.material.uniforms.uRadiance.value = 0.6 * lamps;
         lakePoints.visible = lamps > 0;
       }
       // the town's light on the haze over it: a soft warm band (reference B's is a dull red-brown)

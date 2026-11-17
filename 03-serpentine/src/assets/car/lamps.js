@@ -13,10 +13,11 @@ import * as THREE from 'three';
 import { LAMPS, STATIONS } from './spec.js';
 
 /** What the lamps throw: head lamps in candela-like units at the low beam's hot spot, the tail glow likewise. */
-// (look lane: head 3200 -> 1600. At the night's exposure (lighting.js, 32) a lamp of 3200 burnt everything that faces
+// (look lane: head 3200 -> 1600, tail 0.06 -> 0.04, brake 0.3 -> 0.15 (the red pool behind a braking car outshone its
+// reflection on the wet road). Head: At the night's exposure (lighting.js, 32) a lamp of 3200 burnt everything that faces
 // it within 30 m to white; the road, lit at a glancing angle, keeps its pool through the asphalt's own backscatter in
 // world/road.js. LAMP_LOW in world/road.js and world/retro.js is this number.)
-const THROW = { head: 1600, tail: 0.06, brake: 0.3 };
+const THROW = { head: 1600, tail: 0.04, brake: 0.15 };
 /** Half the angle the beam picture covers. */
 const BEAM_ANGLE = 0.5;
 /** Main beam's hot spot against dipped beam's (110 000 cd against 30 000 cd a lamp, modelling sheet 9). */
