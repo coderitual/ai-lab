@@ -24,6 +24,7 @@ import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE, GLSL_PROBE, targetDefines } from '../../engine/glsl.js';
 import { RANGE } from './atlas.js';
 import { ARCHES, INTAKE_SIDE } from './features.js';
+import { DIMS, STATIONS } from './spec.js';
 
 /** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
 export const PAINTS = {
@@ -82,6 +83,35 @@ vCarNormal = normal;
 vCarToView = normalMatrix;
 `;
 
+const GLSL_SANE = /* glsl */ `
+// A texel of the probe that is not a number (or overflowed half float) must not reach the picture: the bloom
+// would spread it over the whole screen (and on this renderer it came out black). What the probe saw there is
+// lost; the sky stands in for it.
+vec3 carSane(vec3 c, vec3 instead) {
+  return (any(isnan(c)) || any(isinf(c)) || max(c.r, max(c.g, c.b)) > 6.0e4) ? instead : c;
+}
+`;
+
+/**
+ * Where the probe stands in car space: the middle of the car's box (index.js `box.center`, which the game's probe
+ * is placed at). The probe knows directions only, so the ground near the car, seen from the middle of the car, fills
+ * half its cube: mirrored without correction a white line a metre behind the bumper covers the whole boot lid
+ * (at night the lid and bumper were a flat white panel). `carGround` turns a reflected ray of the body that meets
+ * the road within 20 m into the direction from the probe to that point (a parallax correction for one plane).
+ */
+const PROBE_AT = [0, DIMS.height / 2, (STATIONS.nose + STATIONS.tail) / 2];
+const GLSL_GROUND = /* glsl */ `
+vec3 carGround(vec3 rWorld) {
+  vec3 rCar = normalize(transpose(vCarToView) * (viewMatrix * vec4(rWorld, 0.0)).xyz);
+  if (rCar.y > -0.02) return rWorld;
+  float t = -vCarPos.y / rCar.y;
+  vec3 hit = vCarPos + rCar * t;
+  vec3 fixedCar = normalize(hit - vec3(${PROBE_AT.map((v) => v.toFixed(4)).join(', ')}));
+  vec3 fixedWorld = inverseTransformDirection(vCarToView * fixedCar, viewMatrix);
+  return normalize(mix(fixedWorld, rWorld, smoothstep(8.0, 20.0, t)));
+}
+`;
+
 const FRAGMENT_PARS = /* glsl */ `
 uniform sampler2D carAtlas0;
 uniform sampler2D carAtlas1;
@@ -99,6 +129,8 @@ varying mat3 vCarToView;
 ${GLSL_HASH}
 ${GLSL_NOISE}
 ${GLSL_PROBE}
+${GLSL_SANE}
+${GLSL_GROUND}
 vec4 carAtlas(sampler2D t) { return (texture2D(t, vSkinUv) * 255.0 - 127.5) / 127.5 * carRange; }
 /** How much of the pixel is inside (distance < 0), antialiased by the distance's own footprint. */
 float carCover(float d) { return clamp(0.5 - d / max(fwidth(d), 1e-5), 0.0, 1.0); }
@@ -134,7 +166,8 @@ const FOOTPRINT = 'sqrt(0.39 * max(length(dFdx(r)), length(dFdy(r))))';
  * as it is. With both scaled, the silver paint, whose colour is nearly all reflection, went black under the tunnel's
  * sodium lamps and matt dark grey at night; now the lamp rows slide over it.
  */
-const REFLECTIONS = (coat, base = !coat, gain = 1) => /* glsl */ `
+
+const REFLECTIONS = (coat, base = !coat, gain = 1, ground = true) => /* glsl */ `
 #include <lights_fragment_maps>
 #if defined( RE_IndirectSpecular )
   ${
@@ -143,7 +176,8 @@ const REFLECTIONS = (coat, base = !coat, gain = 1) => /* glsl */ `
   #ifdef USE_CLEARCOAT
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryClearcoatNormal), viewMatrix);
-    clearcoatRadiance = mix(clearcoatRadiance * carSky, probeSample(carProbe, r, max(material.clearcoatRoughness, ${FOOTPRINT})), carProbeOn);
+    ${ground ? 'r = carGround(r);' : ''}
+    clearcoatRadiance = mix(clearcoatRadiance * carSky, carSane(probeSample(carProbe, r, max(material.clearcoatRoughness, ${FOOTPRINT})), clearcoatRadiance * carSky), carProbeOn);
   }
   #else
   clearcoatRadiance *= carSky;
@@ -156,7 +190,8 @@ const REFLECTIONS = (coat, base = !coat, gain = 1) => /* glsl */ `
       ? `
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryNormal), viewMatrix);
-    radiance = mix(radiance * carSky, probeSample(carProbe, r, max(material.roughness, ${FOOTPRINT})), carProbeOn);
+    ${ground ? 'r = carGround(r);' : ''}
+    radiance = mix(radiance * carSky, carSane(probeSample(carProbe, r, max(material.roughness, ${FOOTPRINT})), radiance * carSky), carProbeOn);
   }`
       : `
   radiance *= carSky;`
@@ -234,8 +269,8 @@ export function mirrorProbe(shader, uniforms, { coat = false, seen = 1 } = {}) {
     if (!shader.fragmentShader.includes(chunk)) throw new Error(`car material: no ${chunk}`);
   }
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', `#include <common>\nuniform samplerCube carProbe;\nuniform float carProbeOn;\nuniform float carSky;\n${GLSL_PROBE}`)
-    .replace('#include <lights_fragment_maps>', REFLECTIONS(coat, true) + (seen < 1 ? inner : ''));
+    .replace('#include <common>', `#include <common>\nuniform samplerCube carProbe;\nuniform float carProbeOn;\nuniform float carSky;\n${GLSL_PROBE}\n${GLSL_SANE}`)
+    .replace('#include <lights_fragment_maps>', REFLECTIONS(coat, true, 1, false) + (seen < 1 ? inner : ''));
 }
 
 /** The paint, and everything else opaque on the skin. */

@@ -179,6 +179,9 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   car is in the upper third and the menu is a sheet under it. The menu: Drive,
   one or two players, the time of day, Options, the best-laps board of the
   time of day showing (and the keys, on a tall desk screen).
+- **The time of day it opens at** is one constant, `DEFAULT_TIME` in
+  game/config.js: null, which means the first time lighting.js's `TIMES`
+  holds (the day); `?time=` in the address overrides it.
 - **Options** (on the title and the pause sheet): quality (auto, low, medium,
   high; kept under `dreamcar.quality`, applied by reloading the page; `?q=` in
   the address wins; auto is what the capability probe chose), sound, time of
