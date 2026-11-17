@@ -158,7 +158,9 @@ export const TIMES = {
       horizon: [0.3, 0.4, 0.56],
       falloff: 0.15,
       phase: 0.4,
-      glow: { color: [1.0, 0.87, 0.68], wide: [0.75, 0.74], tight: [7, 0.975] },
+      // (look lane: the aureole, `tight`, was 7: now a white-hot halo about four times the disc's radius, which is
+      // what the bloom and the glare of the frame spread over the top of the picture)
+      glow: { color: [1.0, 0.9, 0.74], wide: [0.9, 0.74], tight: [40, 0.965] },
       disc: { size: 0.4, radiance: 3000, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
       // grass, rock and forest of albedo 0.11 under the 3.1 the sun and sky lay on them
       ground: [0.105, 0.112, 0.09],
@@ -175,7 +177,8 @@ export const TIMES = {
     exposure: 1,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
-    look: { contrast: 1.08, saturation: 1.06, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.22, chroma: 0.0012, grain: 0.6, bloom: 0.1, ghosts: 0.03 },
+    // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
+    look: { contrast: 1.08, saturation: 1.06, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.22, chroma: 0.0012, grain: 0.6, bloom: 0.14, ghosts: 0.004, glare: 0.2 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
