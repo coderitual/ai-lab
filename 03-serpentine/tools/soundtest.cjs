@@ -165,9 +165,13 @@ function report(label, d) {
     });
     const spread = (key) => Math.max(...rows.map((x) => x[key])) - Math.min(...rows.map((x) => x[key]));
     console.log('  harmonics against the first, wide open:  ' + rows.map((x) => `${x.rpm}: ${f0(x.h2)}/${f0(x.h3)}/${f0(x.h4)}/${f0(x.h6)}`).join('  '));
-    check('engine: the timbre changes across the rev range (the harmonics climb through a body that stays put)',
-      spread('h2') > 2.5 && spread('h4') > 4 && rows[1].order > rows[rows.length - 1].order * 1.5,
-      `2nd harmonic moves ${f1(spread('h2'))} dB against the 1st, the 4th ${f1(spread('h4'))} dB, the 6th ${f1(spread('h6'))} dB; the sound's centre is at harmonic ${f1(rows[1].order)} at ${rows[1].rpm} rpm and ${f1(rows[rows.length - 1].order)} at ${rows[rows.length - 1].rpm}`);
+    // the note spans only a few semitones in each gear, so brightness has to climb faster than pitch (design A3):
+    // from the middle of the range to the top the sound's centre, counted in harmonics, must go up, not down
+    const mid = rows.find((x) => x.rpm === 2200);
+    const topRow = rows[rows.length - 1];
+    check('engine: the timbre changes across the rev range, and brightness climbs faster than the pitch',
+      spread('h2') > 2.5 && spread('h4') > 4 && topRow.order >= mid.order,
+      `2nd harmonic moves ${f1(spread('h2'))} dB against the 1st, the 4th ${f1(spread('h4'))} dB, the 6th ${f1(spread('h6'))} dB; the sound's centre is at harmonic ${f1(mid.order)} at ${mid.rpm} rpm and ${f1(topRow.order)} at ${topRow.rpm}`);
     const first = rows.filter((x) => x.rpm >= 1300);
     check('engine: a deep note, not a buzz: the firing frequency leads, the next harmonics follow within 14 dB', first.every((x) => x.h2 < -2 && x.h2 > -14 && x.h3 > -20),
       `from 1300 rpm the 2nd is ${f0(Math.min(...first.map((x) => x.h2)))} to ${f0(Math.max(...first.map((x) => x.h2)))} dB, the 3rd ${f0(Math.min(...first.map((x) => x.h3)))} to ${f0(Math.max(...first.map((x) => x.h3)))} dB`);
@@ -190,6 +194,8 @@ function report(label, d) {
     const tonal = { breath: 0, whistle: 0, wind: 0, road: 0, wobble: 0 };
     const a = await render({ duration: speeds.length * CELL, cars: [{ keys: stairs(speeds.map((rpm) => still({ rpm, throttle: 1 })), CELL) }] }, { mix: tonal });
     const b = await render({ duration: speeds.length * CELL, cars: [{ keys: stairs(speeds.map((rpm) => still({ rpm: rpm * 1.02, throttle: 1 })), CELL) }] }, { mix: tonal });
+    const STRAY_DB = 80;
+    let strayTop = -Infinity;
     let strays = 0;
     let falling = 0;
     let counted = 0;
@@ -198,11 +204,13 @@ function report(label, d) {
     let above = -Infinity;
     speeds.forEach((rpm, i) => {
       const [t0, t1] = step(i, CELL, 0.7);
-      const sa = lab.spectrum(a.mono, rate, t0, t1);
-      const sb = lab.spectrum(b.mono, rate, t0, t1);
+      // a Hann window's own side lobes reach -72 dB within a dozen bins of a strong partial: look with one that does not
+      const sa = lab.spectrum(a.mono, rate, t0, t1, 2, 'bh');
+      const sb = lab.spectrum(b.mono, rate, t0, t1, 2, 'bh');
       const pa = lab.partials(sa, { f0: 15, f1: 23900, count: 400, floor: 0 });
       const pb = lab.partials(sb, { f0: 15, f1: 23900, count: 400, floor: 0 });
       const floor = pa[0].a * 10 ** (-80 / 20);
+      const loudFloor = pa[0].a * 10 ** (-STRAY_DB / 20);
       const grid = rpm / 120;
       for (const p of pa) {
         if (p.a < floor) break;
@@ -210,17 +218,20 @@ function report(label, d) {
         top = Math.max(top, p.f);
         const off = Math.abs(p.f / grid - Math.round(p.f / grid)) * grid;
         if (off > 1 + 0.001 * p.f) {
+          strayTop = Math.max(strayTop, dB(p.a / pa[0].a));
+          if (process.env.STRAYS && dB(p.a / pa[0].a) > -72) console.log(`    stray ${f1(p.f)} Hz at ${rpm} rpm (grid ${f1(grid)}): ${f0(dB(p.a / pa[0].a))} dB`);
+          if (p.a < loudFloor) continue;
           strays++;
           worst = `${f1(p.f)} Hz at ${rpm} rpm (${f0(dB(p.a / pa[0].a))} dB)`;
         }
         // the same partial at 2 % more revs must be 2 % higher: one that falls, or stays, is a folded one
-        if (!pb.some((q) => Math.abs(q.f / p.f - 1.02) < 0.002 + 1 / p.f && q.a > p.a * 0.3)) falling++;
+        if (p.a >= loudFloor && !pb.some((q) => Math.abs(q.f / p.f - 1.02) < 0.002 + 1 / p.f && q.a > p.a * 0.3)) falling++;
       }
       above = Math.max(above, dB(lab.band(sa, 12000, 24000)) - dB(lab.band(sa, 15, 24000)));
     });
-    check('engine: every partial down to -80 dB is a multiple of a quarter of the firing frequency', strays === 0 && counted > 60,
-      `${counted} partials at ${speeds.join(', ')} rpm wide open, the highest at ${f0(top)} Hz; ${strays} off the grid${worst ? ', e.g. ' + worst : ''}`);
-    check('engine: every partial rises when the revs rise (none is folded back from the top of the band)', falling === 0, `${falling} of ${counted} did not`);
+    check(`engine: every partial down to -${STRAY_DB} dB is a multiple of a quarter of the firing frequency`, strays === 0 && counted > 60,
+      `${counted} partials down to -80 dB at ${speeds.join(', ')} rpm wide open, the highest at ${f0(top)} Hz; ${strays} off the grid above -${STRAY_DB} dB${worst ? ', e.g. ' + worst : ''}; the strongest off the grid at all ${f0(strayTop)} dB`);
+    check('engine: every partial rises when the revs rise (none is folded back from the top of the band)', falling === 0, `${falling} of those above -${STRAY_DB} dB did not`);
     check('engine: the tone itself has nothing above 12 kHz', above < -80, `${f0(above)} dB of it at most`);
   }
 
@@ -306,10 +317,12 @@ function report(label, d) {
     for (let i = 2; i < hits.length; i++) if (!(loud[i] > loud[i - 1] + 3 && bright[i] > bright[i - 1])) grows = false;
     check('contact: a thud is louder and brighter the faster the meeting; below 0.6 m/s there is none', grows && loud[4] > -22,
       hits.map((h, i) => `${h} m/s: ${loud[i] < -90 ? 'nothing' : `${f0(loud[i])} dBFS, centre ${f0(bright[i])} Hz`}`).join(' | '));
-    const one = dB(lab.rms(added, withHits.rate, 4.6, 4.9));
+    // 9 m/s is ((9 / 7) ** 0.7) = +1.5 dB over 7 m/s, a little brighter; doubled it would be about 3 dB more again
+    const seven = dB(lab.rms(added, withHits.rate, 4.6, 4.9));
     const two = dB(lab.rms(added, withHits.rate, 6.4, 6.7));
-    const single = dB(lab.rms(added, withHits.rate, 3.4, 3.7));
-    check('contact: two reports of one hit 50 ms apart make one thud', two < single + 3 + 2.5 && two > single, `7 m/s alone ${f0(single)} dBFS, 9 m/s twice ${f0(two)} dBFS, 15 m/s alone ${f0(one)} dBFS`);
+    const fifteen = dB(lab.rms(added, withHits.rate, 5.8, 6.1));
+    check('contact: two reports of one hit 50 ms apart make one thud', two < seven + 1.5 + 1.5 && two > seven && two < fifteen,
+      `7 m/s alone ${f1(seven)} dBFS, 9 m/s reported twice ${f1(two)} dBFS, 15 m/s alone ${f1(fifteen)} dBFS`);
     const quiet = describe(withHits.mono, withHits.rate, 7, 7.45);
     const rail = describe(withHits.mono, withHits.rate, 8, 8.9);
     const rock = describe(withHits.mono, withHits.rate, 10.7, 11.5);
@@ -359,36 +372,43 @@ function report(label, d) {
     check('a gear change up under power is an event: the drive is cut for a moment', ups.length >= 3 && dips.every((x) => x.dip > 2.5 && x.dip < 10 && x.back > -6),
       dips.map((x) => `${x.from}>${x.to}: -${f1(x.dip)} dB, then ${f1(x.back)} dB of where it was`).join(' | '));
     const lift = keys.find((k, i) => i > 60 && k[1].throttle < 0.05 && keys[i - 6][1].throttle > 0.9)[0];
-    const on = describe(run.mono, run.rate, lift - 0.5, lift - 0.05);
-    const off = describe(run.mono, run.rate, lift + 0.45, lift + 0.9);
-    check('lifting off: quieter and smoother at once', on.rms - off.rms > 5 && off.centroid < on.centroid,
+    // the car's own voice: at speed the wind and the road rightly come forward when the engine drops back
+    const dry = await render('run', { mix: { wind: 0, road: 0 } });
+    const on = describe(dry.mono, dry.rate, lift - 0.5, lift - 0.05);
+    const off = describe(dry.mono, dry.rate, lift + 0.45, lift + 0.9);
+    check('lifting off: quieter and smoother at once (the car without wind and road)', on.rms - off.rms > 5 && off.centroid < on.centroid,
       `at ${f1(lift)} s: ${f1(on.rms)} -> ${f1(off.rms)} dBFS, centre ${f0(on.centroid)} -> ${f0(off.centroid)} Hz`);
   }
   {
     // pops: under the firing frequency of a fast-turning engine there is nothing else, so that is where to look
     const scene = (rpm) => ({ duration: 5, cars: [{ keys: [[0, still({ rpm, throttle: 1 })], [2, still({ rpm, throttle: 1 })], [2.02, still({ rpm, throttle: 0 })], [5, still({ rpm: rpm * 0.8, throttle: 0 })]] }] });
-    const count = (r) => {
+    // what the pops add: the same render with the pops turned down to nothing is the same sample for sample otherwise
+    const count = (r, r0) => {
       const levels = [];
-      for (let t = 1.2; t < 3.4; t += 0.005) levels.push({ t, v: dB(lab.band(lab.spectrum(r.mono, r.rate, t, t + 0.03, 1), 45, 125)) });
-      const quiet = levels.filter((x) => x.t > 2.9).map((x) => x.v).sort((p, q) => p - q);
-      const floor = quiet[Math.floor(quiet.length / 2)];
+      for (let t = 2.0; t < 3.4; t += 0.005) {
+        let e = 0;
+        const i0 = Math.round(t * r.rate);
+        const n = Math.round(0.02 * r.rate);
+        for (let i = i0; i < i0 + n; i++) e += (r.mono[i] - r0.mono[i]) ** 2;
+        levels.push({ t, v: dB(Math.sqrt(e / n)) });
+      }
       const bursts = [];
       let inside = false;
       for (const x of levels) {
-        if (x.t < 2.03) continue;
-        if (!inside && x.v > floor + 10) {
+        if (!inside && x.v > -50) {
           bursts.push(x.t);
           inside = true;
-        } else if (inside && x.v < floor + 5) inside = false;
+        } else if (inside && x.v < -62) inside = false;
       }
       return bursts;
     };
     const high = remember('liftoff_5600', await render(scene(5600)));
     const low = await render(scene(2600));
-    const bursts = count(high);
+    const bursts = count(high, await render(scene(5600), { mix: { pop: 0 } }));
+    const lowBursts = count(low, await render(scene(2600), { mix: { pop: 0 } }));
     check('lifting off at high revs: a pop or two, soon after', bursts.length >= 1 && bursts.length <= 2 && bursts[0] - 2.02 < 0.25,
       `${bursts.length} at ${bursts.map((t) => `${f0((t - 2.02) * 1000)} ms`).join(' and ')} after the throttle shut at 5600 rpm; peak then ${f1(dB(lab.peak(high.mono, high.rate, 2.05, 2.6)))} dBFS against ${f1(dB(lab.peak(high.mono, high.rate, 1.5, 2)))} under power`);
-    check('lifting off at low revs: no pop', count(low).length === 0, `${count(low).length} at 2600 rpm`);
+    check('lifting off at low revs: no pop', lowBursts.length === 0, `${lowBursts.length} at 2600 rpm`);
   }
   remember('liftoff', await render('liftoff'));
 
@@ -430,12 +450,16 @@ function report(label, d) {
     check('every signal is heard at its moment, at its pitch', missing.length === 0 && counts.length === 5,
       `${rows.length} notes of ${log.filter((e) => e.cue && e.cue !== 'shift').length} signals, each at least ${f0(Math.min(...rows.map((x) => x.over)))} dB over what was there, within ${f1(Math.max(...rows.map((x) => Math.abs(x.late))))} ms${missing.length ? '; MISSING ' + missing.map((x) => x.label).join(', ') : ''}`);
     const ringing = (t, f) => dB(lab.tone(sig, rate, t + 0.3, t + 0.4, f));
-    check('go is an octave above the count and rings on', Math.abs(NOTES.go[0] / NOTES.count[0] - 2) < 0.001 && ringing(go.t, NOTES.go[0]) > -50 && ringing(counts[4].t, NOTES.count[0]) < -70,
-      `0.3 s on: go ${f0(ringing(go.t, NOTES.go[0]))} dBFS, a count ${f0(ringing(counts[4].t, NOTES.count[0]))} dBFS`);
-    check('the sector signal rises when ahead and falls when behind', NOTES.ahead[1] > NOTES.ahead[0] && NOTES.behind[1] < NOTES.behind[0]
-      && lab.tone(sig, rate, sectors[0].t + 0.11, sectors[0].t + 0.2, NOTES.ahead[1]) > 10 * lab.tone(sig, rate, sectors[0].t + 0.11, sectors[0].t + 0.2, NOTES.behind[1])
-      && lab.tone(sig, rate, sectors[1].t + 0.11, sectors[1].t + 0.2, NOTES.behind[1]) > 10 * lab.tone(sig, rate, sectors[1].t + 0.11, sectors[1].t + 0.2, NOTES.ahead[1]),
-      `ahead ${f0(NOTES.ahead[0])} -> ${f0(NOTES.ahead[1])} Hz, behind ${f0(NOTES.behind[0])} -> ${f0(NOTES.behind[1])} Hz`);
+    // a count's own level is the engine's 25th harmonic at idle (625 Hz) once it has gone; so judge each by its fall
+    const fall = (t, f) => ringing(t, f) - dB(lab.tone(sig, rate, t + 0.004, t + 0.034, f));
+    check('go is an octave above the count and rings on', Math.abs(NOTES.go[0] / NOTES.count[0] - 2) < 0.001 && fall(go.t, NOTES.go[0]) > -22 && fall(counts[4].t, NOTES.count[0]) < -30,
+      `0.3 s on: go ${f0(fall(go.t, NOTES.go[0]))} dB under its start, a count ${f0(fall(counts[4].t, NOTES.count[0]))} dB`);
+    const strongest = (t0) => lab.partials(lab.spectrum(sig, rate, t0, t0 + 0.09), { f0: 400, f1: 1400, count: 1, floor: 0 })[0].f;
+    const sa = [strongest(sectors[0].t + 0.005), strongest(sectors[0].t + 0.13)];
+    const sb = [strongest(sectors[1].t + 0.005), strongest(sectors[1].t + 0.13)];
+    const near = (f, g) => Math.abs(f / g - 1) < 0.02;
+    check('the sector signal rises when ahead and falls when behind', near(sa[0], NOTES.ahead[0]) && near(sa[1], NOTES.ahead[1]) && near(sb[0], NOTES.behind[0]) && near(sb[1], NOTES.behind[1]),
+      `strongest note ahead ${f0(sa[0])} -> ${f0(sa[1])} Hz, behind ${f0(sb[0])} -> ${f0(sb[1])} Hz`);
     const shift = log.find((e) => e.cue === 'shift');
     const thump = dB(lab.band(lab.spectrum(sig, rate, shift.t, shift.t + 0.06, 1), 55, 220)) - dB(lab.band(lab.spectrum(sig, rate, shift.t - 0.2, shift.t - 0.14, 1), 55, 220));
     check('the shift signal is a low thump', thump > 8, `55-220 Hz up ${f0(thump)} dB for 60 ms`);
@@ -498,13 +522,18 @@ function report(label, d) {
     const second = -lean(0.8, 1.9, 3700 / 30);
     check('split screen: each car is at least 6 dB stronger on its own side', first > 6 && second > 6,
       `pan ${PAN}: the first car's ${f1(2600 / 30)} Hz is ${f1(first)} dB stronger on the left, the second's ${f1(3700 / 30)} Hz ${f1(second)} dB stronger on the right`);
-    const balance = (t0, t1) => dB(lab.rms(r.left, r.rate, t0, t1)) - dB(lab.rms(r.right, r.rate, t0, t1));
-    const hitL = balance(2, 2.12) - balance(1.7, 1.95);
-    const hitR = balance(3, 3.12) - balance(2.7, 2.95);
+    const quiet = await render({ duration: 6, cars: [{ keys: [[0, a], [6, a]] }, { keys: [[0, b], [6, b]] }] });
+    const addedSide = (ch, t0, t1) => {
+      let e = 0;
+      for (let i = Math.round(t0 * r.rate); i < Math.round(t1 * r.rate); i++) e += (r[ch][i] - quiet[ch][i]) ** 2;
+      return e;
+    };
+    const hitL = 10 * Math.log10(addedSide('left', 2, 2.15) / addedSide('right', 2, 2.15));
+    const hitR = 10 * Math.log10(addedSide('left', 3, 3.15) / addedSide('right', 3, 3.15));
     const cueL = lean(4.11, 4.25, NOTES.ahead[1]);
     const cueR = -lean(5.12, 5.3, NOTES.lap[1]);
     check('split screen: a thud and a signal are heard on the side of the driver they belong to', hitL > 3 && hitR < -3 && cueL > 6 && cueR > 6,
-      `thuds move the balance ${f1(hitL)} dB left and ${f1(-hitR)} dB right; signals lean ${f1(cueL)} dB left and ${f1(cueR)} dB right`);
+      `thuds are ${f1(hitL)} dB stronger left and ${f1(-hitR)} dB stronger right; signals lean ${f1(cueL)} dB left and ${f1(cueR)} dB right`);
     const pair = dB(lab.rms(r.mono, r.rate, 0.8, 1.9));
     const one = await render({ duration: 2, cars: [{ keys: [[0, { ...a, pan: 0 }], [2, { ...a, pan: 0 }]] }], events: [{ t: 1, cue: 'go' }] });
     let apart = 0;
