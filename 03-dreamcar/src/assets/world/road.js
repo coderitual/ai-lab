@@ -68,7 +68,8 @@ const EDGE_LINE = 0.2;
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /** The glare lobe (ASPHALT_SHEEN): its GGX alpha along the line of sight and across it, and its weight. */
-const SHEEN = { along: 0.42, across: 0.15, gain: 0.55 };
+/** And how much of MeshStandardMaterial's own (isotropic) lobe dry asphalt keeps: the streak is the sheen's. */
+const SHEEN = { along: 0.45, across: 0.06, gain: 0.5, keep: 0.3 };
 /** Head lamp brightness (THROW in assets/car/index.js: candela-like units at the beam's peak, per lamp). */
 const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;
@@ -248,7 +249,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
       .replace('#include <lights_pars_begin>', `#include <lights_pars_begin>\n${ASPHALT_SHEEN}`)
       .replaceAll(
         'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
-        'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );\nreflectedLight.directSpecular += roadSheen( directLight, geometryNormal, geometryViewDir );',
+        '{ vec3 isoBefore = reflectedLight.directSpecular;\nRE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );\nreflectedLight.directSpecular = isoBefore + ( reflectedLight.directSpecular - isoBefore ) * roadIsoKeep + roadSheen( directLight, geometryNormal, geometryViewDir ); }',
       );
   });
   atmosphere.patch(material);
@@ -430,6 +431,7 @@ varying vec4 vRoadAlong;  // the road's direction; w: how readily water stands h
 varying vec4 vCodeB;      // the racing line, rubber on it, water carried in, banking
 float roadRoughness;
 float roadSheenGain;     // how much of the stretched glare lobe this pixel shows
+float roadIsoKeep;       // how much of the material's own lobe it keeps (all of it under water)
 float roadMetal;
 float roadPaint;
 float roadFade;
@@ -725,6 +727,7 @@ diffuseColor.rgb *= rCol;
 // rubbered line is glossier, water has its own mirror, paint and dust are matt
 roadSheenGain = ${SHEEN.gain.toFixed(2)} * ( 1.0 - roadWater ) * ( 1.0 - 0.6 * roadPaint ) * ( 1.0 - 0.7 * roadGravel ) * ( 1.0 + 0.5 * rRubber );
 roadSheenGain *= mix( 1.0, 0.25 + 1.5 * smoothstep( 0.35, 0.75, rAgg.g ), rNear );
+roadIsoKeep = mix( ${SHEEN.keep.toFixed(2)}, 1.0, max( roadWater, roadPaint * 0.5 ) );
 // the stones' tilts that a pixel averages away come back as roughness (see roadTextures.js)
 float rRoughDry = pow( clamp( rAlpha2 + rVariance * roadTiltGain * roadTiltGain, 0.0004, 1.0 ), 0.25 );
 roadRoughness = mix( rRoughDry, roadWaterRough, roadWater );
