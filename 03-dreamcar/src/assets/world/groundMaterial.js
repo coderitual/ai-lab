@@ -215,6 +215,7 @@ vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 // (env lane) the verge: mown grass in stripes along the road, a strip of worn earth and loose stones along the
 // kerbs' outer edge, longer grass at the foot of the barrier
 float gVerge = ( 1.0 - step( 0.5, vVerge.w ) ) * ( 1.0 - smoothstep( 0.0, 1.5, vVerge.z ) );
+float gWoodBehind = gVerge > 0.0 ? clamp( vVerge.w / 0.4, 0.0, 1.0 ) : 0.0;
 if ( gVerge > 0.0 ) {
   float vd = vVerge.x;
   float vAa = 0.6 * ( abs( dFdx( vd ) ) + abs( dFdy( vd ) ) ) + 1.0e-3;
@@ -224,7 +225,9 @@ if ( gVerge > 0.0 ) {
   stripe = mix( stripe, 0.5, smoothstep( 0.3, 1.0, vAa / 1.6 ) );
   vec3 mown = mix( vec3( 0.06, 0.13, 0.025 ), vec3( 0.09, 0.18, 0.035 ), stripe ) * ( 0.8 + 0.4 * gDet.r ) * ( 0.85 + 0.3 * gMid.r );
   // worn earth: ragged, wider where cars have run wide
-  float rag = 0.55 + 0.5 * ( gDet.b - 0.5 ) + 0.6 * ( gLarge.b - 0.5 ) + 0.4 * ( gDet2.r - 0.5 );
+  // a narrow verge (a wall close by, frame D3) is mostly rough grass and earth; a wide run-off is mown (D1)
+  float vWidth = vd - vVerge.z;
+  float rag = mix( 1.7, 0.55, smoothstep( 4.5, 6.0, vWidth ) ) + 0.5 * ( gDet.b - 0.5 ) + 0.6 * ( gLarge.b - 0.5 ) + 0.4 * ( gDet2.r - 0.5 );
   float earth = 1.0 - smoothstep( rag - 0.15, rag + 0.15, vd );
   vec3 earthCol = mix( vec3( 0.16, 0.135, 0.1 ), vec3( 0.24, 0.215, 0.18 ), gDet.b ) * ( 0.75 + 0.4 * gDet2.g );
   // a few stones thrown out onto the grass beyond it
@@ -232,7 +235,13 @@ if ( gVerge > 0.0 ) {
   // long grass at the barrier's foot
   float rough = smoothstep( -1.2, -0.3, vVerge.z );
   vec3 vergeCol = mix( mown, gGrass * 1.1, rough );
+  // rough tufts in the earth strip: clumps of darker, longer grass
+  float tufts = smoothstep( 0.55, 0.75, gDet.r ) * earth * ( 1.0 - smoothstep( 4.5, 6.0, vWidth ) );
   vergeCol = mix( vergeCol, earthCol, max( earth, stones * 0.8 ) );
+  vergeCol = mix( vergeCol, gGrass * 0.9, tufts );
+  // fallen leaves drifted against the barrier's foot under woods (frame D4)
+  float leaves = gWoodBehind * smoothstep( -2.2, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
+  vergeCol = mix( vergeCol, mix( vec3( 0.2, 0.075, 0.02 ), vec3( 0.09, 0.04, 0.015 ), gDet.b ), leaves );
   gGrass = mix( gGrass, vergeCol, gVerge );
   gScree *= 1.0 - gVerge;
   gForest *= 1.0 - gVerge;

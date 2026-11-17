@@ -64,7 +64,7 @@ import { BIG_TILE, ROUGH_GAIN, VARIANCE_GAIN, roadTextures } from './roadTexture
 import { WET_UNIFORMS, extend, withBake } from './shading.js';
 
 /** The edge line: its width (m), its outer edge on the pavement's edge. */
-const EDGE_LINE = 0.2;
+const EDGE_LINE = 0.28;
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /** The glare lobe (ASPHALT_SHEEN): its GGX alpha along the line of sight and across it, and its weight. */
