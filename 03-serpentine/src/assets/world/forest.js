@@ -37,9 +37,9 @@ const EDGE_TREES = 4;
 
 /** Per tier: near detail out to (m), the far cards out to (m), share of the general forest kept, atlas size. */
 const TIER = {
-  low: { near: 55, far: 480, keep: 0.45, atlas: 512 },
-  medium: { near: 80, far: 800, keep: 0.8, atlas: 1024 },
-  high: { near: 100, far: 1100, keep: 1, atlas: 1024 },
+  low: { near: 42, far: 480, keep: 0.45, atlas: 512, casters: 1.0 },
+  medium: { near: 75, far: 800, keep: 0.8, atlas: 1024, casters: 1.15 },
+  high: { near: 85, far: 1100, keep: 1, atlas: 1024, casters: 1.15 },
 };
 /** Width of the band over which near and far dissolve into each other (m). */
 const BLEND = 8;
@@ -381,7 +381,8 @@ export function createForest({ track, terrain, tier, rng, atmosphere, shadow }) 
   const projView = new THREE.Matrix4();
   const sphere = new THREE.Sphere();
   const eye = new THREE.Vector3();
-  const shadowR = shadow.reach * 1.5;
+  // trees cast into the sun's shadow square round the car (the square's half side times this; its corners are left)
+  const shadowR = shadow.reach * T.casters;
   const counts = { near: 0, far: 0, nearTriangles: 0, farTriangles: 0 };
   const nearTris = SPECIES.map((name) => nearMeshes[SPECIES.indexOf(name)].geometry.index.count / 3);
   const farTris = SPECIES.map((name) => farMeshes[SPECIES.indexOf(name)].geometry.index.count / 3);
