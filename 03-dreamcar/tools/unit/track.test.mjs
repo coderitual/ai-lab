@@ -711,7 +711,8 @@ test('a circuit: woods behind the barrier, tyre walls, boards, distance boards, 
   const carousel = pieces.carousel.s0;
   for (const d of track.distanceBoards) between(track.delta(d.s, carousel), Number(d.label) - 1, Number(d.label) + 40, `distance board ${d.label}`);
   expect(track.marshals.length >= 8, `${track.marshals.length} marshal posts`);
-  expect(track.gantry.s === 0 && track.gantry.latL > hw && track.gantry.latR < -hw, 'the gantry does not span the road at the line');
+  // (a little beyond the line: the lamps hang where the grid can see them)
+  expect(track.gantry.s > 0 && track.gantry.s <= 15 && track.gantry.latL > hw && track.gantry.latR < -hw, 'the gantry does not span the road just beyond the line');
 });
 
 test('frameAt() matches the samples, wraps, and has no seam at the line', () => {

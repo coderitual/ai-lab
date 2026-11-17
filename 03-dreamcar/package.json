@@ -3,14 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "displayName": "Dreamcar",
-  "description": "A time trial over a mountain pass in a silver saloon, by day, at dusk after rain and at night, built with three.js. Solo or two-player split screen; keyboard, gamepad or touch.",
+  "description": "A time trial on a racing circuit in the mountains by a lake, in a silver saloon: a sunlit day, golden hour and the wet night, built with three.js. Solo or two-player split screen; keyboard, gamepad or touch.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
     "test": "node tools/unit.mjs && node tools/playtest.cjs && node tools/soundtest.cjs",
-    "test:unit": "node tools/unit.mjs"
+    "test:unit": "node tools/unit.mjs",
+    "screenshots": "node tools/screenshots.cjs"
   },
   "dependencies": {
     "three": "0.187.0"

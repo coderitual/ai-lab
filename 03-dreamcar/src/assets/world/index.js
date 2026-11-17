@@ -138,7 +138,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   // (the trees' alpha becomes coverage where the scene target is multisampled: the pipeline's rule, caps.js)
   const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
   // no tree where the pit building, the stand and the towns stand (startPlan.js), nor where the caller says
-  const built = startKeepOut(track);
+  const built = startKeepOut(track, terrain.heightAt);
   const noTrees = keepOut ? (x, z) => built(x, z) || keepOut(x, z) : built;
   const forest = createForest({ renderer, track, terrain, tier, coverage, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high, keepOut: noTrees });
   // the trees' shadow-only proxies live on a layer only the sun's shadow camera sees

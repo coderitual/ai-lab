@@ -94,10 +94,9 @@ vec3 carSane(vec3 c, vec3 instead) {
 
 /**
  * Where the probe stands in car space: the middle of the car's box (index.js `box.center`, which the game's probe
- * is placed at). The probe knows directions only, so the ground near the car, seen from the middle of the car, fills
- * half its cube: mirrored without correction a white line a metre behind the bumper covers the whole boot lid
- * (at night the lid and bumper were a flat white panel). `carGround` turns a reflected ray of the body that meets
- * the road within 20 m into the direction from the probe to that point (a parallax correction for one plane).
+ * is placed at). The probe knows directions only, so the road near the car, seen from the middle of the car, fills
+ * half its cube at the wrong size and place. `carGround` turns a reflected ray of the body that meets the road
+ * within 20 m into the direction from the probe to that point (a parallax correction for one plane, the road's).
  */
 const PROBE_AT = [0, DIMS.height / 2, (STATIONS.nose + STATIONS.tail) / 2];
 const GLSL_GROUND = /* glsl */ `

@@ -68,6 +68,66 @@ export const HUD = {
   hintDistance: 25,
 };
 
+/**
+ * Assist levels: how much the car helps (the options sheet chooses one; `default` is what a new player and a phone
+ * get). `Vehicle.setAssists(ASSISTS.levels[id])` applies one; the hands (PlayerDriver) read it from the car.
+ *
+ * For the car: `abs`, `tc`, `esc` switch the three controls; `hold` (0 or 1) the slide help, an arcade car's
+ * hidden hand: with it a slide can be asked for (handbrake, a lift or a dab of the brake while cornering hard, power
+ * in a low gear), holds on the throttle at up to `slip` rad for as long as the driver steers into the bend, comes
+ * back when the steering is let go, and is caught beyond that angle; `liftKick`, `brakeKick`, `handKick`: how much
+ * of `slip` each way of asking lets the tail out by itself (0..1); `tcSlip`: the wheelspin (slip ratio) the traction control
+ * allows; `spin`: what it adds in a slide, per unit of the tangent of the slide's angle (about 1 lets the rear
+ * tyres push the car along as hard as they hold it across).
+ * For the hands: `catch`, per device, the share of the opposite lock that is put on for the driver in a slide
+ * (the front wheels turned to where the car is going: 1 = all of it, so letting go of the steering ends the slide).
+ */
+export const ASSISTS = {
+  default: 'full',
+  levels: {
+    full: { name: 'Full', abs: true, tc: true, esc: true, hold: 1, slip: 0.27, liftKick: 0.45, brakeKick: 0.6, handKick: 1, tcSlip: 0.12, spin: 1.1, catch: { keys: 1, thumb: 1, pad: 1 } },
+    sport: { name: 'Sport', abs: true, tc: true, esc: true, hold: 1, slip: 0.7, liftKick: 0.6, brakeKick: 0.75, handKick: 1, tcSlip: 0.2, spin: 1.2, catch: { keys: 1, thumb: 1, pad: 1 } },
+    off: { name: 'Off', abs: true, tc: false, esc: false, hold: 0, slip: 0, liftKick: 0, brakeKick: 0, handKick: 0, tcSlip: null, spin: 0, catch: { keys: 0, thumb: 0, pad: 0 } },
+  },
+};
+
+/**
+ * The hands (PlayerDriver): how each device's steering and pedals become the car's, each device as if it were the
+ * only one. Times in seconds; a pair is [standing still, at `fastSpeed` m/s and above].
+ */
+export const HANDS = {
+  fastSpeed: 60,
+  /** s after the handbrake is let go before the opposite lock is given again (the turn it made is wanted). */
+  handTime: 0.25,
+  /**
+   * In a slide the steering is measured from where the car is going: a full input turns the front wheels this far
+   * (rad) into the bend from there, which is where their grip peaks.
+   */
+  slideLock: 0.15,
+  keys: {
+    /**
+     * A steering key winds the wheel to the lock for the speed in `on` s and lets it run back in `off` s; pressed
+     * against the way the wheel is turned it works `reverse` times as fast; the hands follow with `lag` s.
+     */
+    on: [0.13, 0.24],
+    off: [0.1, 0.16],
+    reverse: 2.5,
+    lag: 0.04,
+    /**
+     * A pedal key gives `tap` of the pedal within `rise` s and the rest over `hold` s more if it is held; let go, the
+     * pedal is up in `off` s. So a tap is a dab and a hold is the floor.
+     */
+    throttle: { tap: 0.6, rise: 0.05, hold: 0.25, off: 0.06 },
+    brake: { tap: 0.5, rise: 0.05, hold: 0.25, off: 0.07 },
+    /** In a slide the help has caught, steering against it turns the wheels this share of the lock for the speed beyond where the car is going. */
+    counter: 0.5,
+  },
+  /** A stick: the power added to its curve (finer near the centre), its smoothing (s), and `counter` as for keys. */
+  pad: { expo: [0, 0.5], lag: [0.02, 0.09], counter: 0.6 },
+  /** A thumb on the glass: the same. */
+  thumb: { expo: [0, 0.4], lag: [0.03, 0.1], counter: 0.5 },
+};
+
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */
 export const DRIVERS = [
   { paint: 'silver', plate: 'K1 DOMI', keys: 'wasd', bias: 2.2 },
@@ -261,13 +321,13 @@ export const CAMERA = {
  * pose relative to the car (see Game.setPhoto) and the moment of the autopilot's run it belongs to (`t`, seconds
  * from the start of a run at RULES.autopilotPace; `time`, the time of day), used when the address does not give
  * them. D1: the run-up to the line, low behind and right of the car, yawed left; D3: the ledge's first bend, low
- * behind and left, looking down it; D4: the grid during the countdown at golden hour, low on the lake side behind
+ * behind and left, looking down it; D4: the grid at golden hour just after the lights go out (the lamps show green), low on the lake side behind
  * the car, looking forward and right at the land side with the gantry's lamps in the picture.
  */
 export const PHOTOS = {
-  d1: { back: 5, right: 3.4, up: 1.1, yaw: 16, pitch: -1, fov: 46, t: 100, time: 'day' },
-  d3: { back: 6, right: -2.5, up: 1.0, yaw: 6, pitch: 2, fov: 46, t: 77, time: 'day' },
-  d4: { back: 7, right: -3.5, up: 0.5, yaw: -20, pitch: 4, fov: 40, t: 4.2, time: 'dusk' },
+  d1: { back: 6.5, right: 3.2, up: 0.9, yaw: 17, pitch: 3.5, fov: 46, t: 100, time: 'day' },
+  d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
+  d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
 };
 
 /**

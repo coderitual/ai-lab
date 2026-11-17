@@ -140,8 +140,10 @@ where that point was. The streak is the difference times the shutter:
 
     streak = (now - then) / 2 * viewSize * shutter / (time between the frames) * (1/60)
 
-clamped to `blurLength` of the view's width (TIERS: 4 % low, 6 % medium,
-7.5 % high) and averaged along with up to `blurTaps` samples (6 / 10 / 16),
+clamped to `blurLength` of the view's width (TIERS: 4 % low, 7.5 % medium,
+9 % high; 1.45 times that in the picture's corners, `BLUR_EDGE`, so that the
+roadside streaks more than the middle of the frame) and averaged along with
+up to `blurTaps` samples (6 / 12 / 18),
 jittered by interleaved gradient noise. A shorter streak gets fewer taps, about
 one per two pixels. The shutter is a time (`ViewFrame.motionBlur` is a
 fraction of 1/60 s), not a share of the frame, so a 30 Hz phone and a 144 Hz
@@ -167,8 +169,9 @@ kerbs and grass streak about 5 to 8 % of the frame width at the lower corners,
 the cars stay razor sharp. Here, at 124 km/h on the descent (t = 95, high),
 the game's shutter of 0.47 gives streaks of 2 to 3 %; with `?shutter=0.9` the
 rock face and the verge streak about as in D1, the car stays sharp and its
-outline clean. The clamp was 4 % on every tier before; it is now 7.5 % on high
-so that such a shutter is not cut short.
+outline clean. The clamp was 4 % on every tier before; it is now 7.5 % on
+medium and 9 % on high, and 1.45 times that in the picture's corners, so that
+such a shutter is not cut short where the roadside goes by.
 
 ### Bloom (6, 9)
 
@@ -279,9 +282,9 @@ beside D1 and A, golden hour beside D4 and D2, night beside B):
 
 | | day | dusk (golden hour) | night |
 | --- | --- | --- | --- |
-| `contrast` | 1.18 | 1.12 | 1.12 |
-| `saturation` | 1.04 | 1.12 | 0.94 |
-| `tint` | [1.0, 0.99, 0.965] | [1.03, 1.0, 0.95] | [0.95, 0.985, 1.05] |
+| `contrast` | 1.06 | 1.12 | 1.12 |
+| `saturation` | 1.14 | 1.08 | 0.94 |
+| `tint` | [1.0, 0.99, 0.965] | [0.97, 1.0, 1.02] | [0.95, 0.985, 1.05] |
 | `lift` | [0.0004, 0.0006, 0.001] | none | [0.0006, 0.0009, 0.0018] |
 | `vignette` | 0.28 | 0.28 | 0.32 |
 | `chroma` | 0.0012 | 0.001 | 0.0012 |

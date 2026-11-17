@@ -73,12 +73,12 @@ vec2 cloudPlane(vec3 d) {
 float cumulus(vec2 p) {
   // (sky lane) heaps, not shreds: where the broad patches allow a cloud, the round billows decide its body and
   // the fine detail only frays its rim; the body is dense well inside the edge
-  float patches = cloudTex(p * 0.3 + uCloudDrift, 0.3).a;
-  float billow = cloudTex(p * 0.9 + uCloudDrift * 2.0, 0.9).r;
-  float detail = cloudTex(p * 3.2 + uCloudDrift * 4.0, 3.2).g;
+  float patches = cloudTex(p * 0.16 + uCloudDrift, 0.16).a;
+  float billow = cloudTex(p * 0.48 + uCloudDrift * 2.0, 0.48).r;
+  float detail = cloudTex(p * 1.8 + uCloudDrift * 4.0, 1.8).g;
   float shape = 0.52 * patches + 0.4 * billow + 0.08 * detail;
   float edge = 0.8 - 0.5 * uCloud.x;
-  float body = smoothstep(edge, edge + 0.07, shape);
+  float body = smoothstep(edge, edge + 0.12, shape);
   return body * body * (3.0 - 2.0 * body);
 }
 
@@ -196,8 +196,8 @@ void main() {
     vec2 toLight = normalize(uSunDir.xz + 1.0e-5);
     // with the sun low or set the light comes from under the clouds: the bright side is the underside
     vec2 toTop = -normalize(p + 1.0e-5) * (0.6 + 0.25 * length(p)) * (uSunDir.y < 0.1 ? -1.0 : 1.0);
-    float behind = 0.6 * cumulus(p + toLight * 0.06) + 0.4 * cumulus(p + toLight * 0.15);
-    float over = 0.65 * cumulus(p + toTop * 0.07) + 0.35 * cumulus(p + toTop * 0.18);
+    float behind = 0.6 * cumulus(p + toLight * 0.11) + 0.4 * cumulus(p + toLight * 0.28);
+    float over = 0.65 * cumulus(p + toTop * 0.13) + 0.35 * cumulus(p + toTop * 0.33);
     float thick = cover.y / 0.94;
     float sunlit = exp(-2.2 * behind) * 0.55 + exp(-2.6 * over) * 0.45;
     // the silver lining: forward scattering through the thin edge, strongest round the sun

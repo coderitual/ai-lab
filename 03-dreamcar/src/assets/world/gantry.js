@@ -28,9 +28,9 @@ const LIT_EXPOSURE = 4;
 const GREEN_HOLD = 4;
 const GREEN_FADE = 1;
 /** The truss: heights of its bottom and top chords over the line, its depth along the road (m). */
-const TRUSS = { bottom: 7.4, top: 8.9, depth: 1.1 };
+const TRUSS = { bottom: 6.3, top: 7.7, depth: 1.1 };
 /** The name board: its size (8 : 1, as the atlas cell) and the height of its foot. */
-const BOARD = { w: 16, foot: 7.15 };
+const BOARD = { w: 16, foot: 5.75 };
 /** Start lamps: columns, lamps per column, radius, spacing (m). */
 const LAMPS = { columns: 5, rows: 4, r: 0.19, pitch: 0.5, colW: 0.56, gap: 0.16 };
 
@@ -144,7 +144,8 @@ export function createStart({ track, terrain, b, signs, atmosphere }) {
   // ---- the start lamps: five columns hanging under the middle of the truss
   const cols = LAMPS.columns;
   const pitch = LAMPS.colW + LAMPS.gap;
-  const colTop = TRUSS.bottom - 0.12;
+  // the columns hang from under the name board (frame D4: the board across the top, the lamps below it)
+  const colTop = BOARD.foot - 0.1;
   const colH = LAMPS.rows * LAMPS.pitch + 0.2;
   const lensAt = -0.17 - 0.005; // the lenses' plane, along the road (towards the grid)
   block(mid, colTop + 0.06, -0.05, cols * pitch + 0.3, 0.12, 0.3, sw.frame);
