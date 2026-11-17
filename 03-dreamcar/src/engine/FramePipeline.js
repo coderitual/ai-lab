@@ -199,6 +199,7 @@ uniform mat4 uReproject[5];      // clip space now -> clip space a frame ago: of
 uniform mat4 uToBox[4];          // clip space now -> the box's own space, scaled so that inside is |x|, |y|, |z| < w
 uniform int uBoxes;
 uniform vec2 uBlur;              // exposure time / time between the two frames, the longest streak in texels
+#define BLUR_EDGE 1.45            // ...times this in the picture's corners (see streakOf)
 
 float depthAt(vec2 p) { return texture(uDepth, min(p, uTexels.zw) * uTexels.xy).r; }
 vec4 clipAt(vec2 p, float depth) { return vec4(p / uView * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0); }
@@ -223,7 +224,10 @@ vec2 streakOf(vec4 clip, int box) {
   vec4 then = uReproject[box] * clip;
   if (then.w < 1.0e-5) return vec2(0.0); // it was behind the camera
   vec2 v = (clip.xy - then.xy / then.w) * 0.5 * uView * uBlur.x;
-  return v * min(1.0, uBlur.y / max(length(v), 1.0e-6));
+  // the longest streak allowed grows towards the picture's corners (to BLUR_EDGE times the tier's length): the eye
+  // reads speed at the edges of the frame, where the roadside goes by, and wants the middle, where it looks, calm
+  float longest = uBlur.y * mix(1.0, BLUR_EDGE, smoothstep(0.35, 1.0, length(clip.xy) * 0.7071));
+  return v * min(1.0, longest / max(length(v), 1.0e-6));
 }
 
 // The movement of the pixel at p: its streak, and the depth and the box it was taken from.

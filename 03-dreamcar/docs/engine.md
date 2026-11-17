@@ -140,8 +140,10 @@ where that point was. The streak is the difference times the shutter:
 
     streak = (now - then) / 2 * viewSize * shutter / (time between the frames) * (1/60)
 
-clamped to `blurLength` of the view's width (TIERS: 4 % low, 6 % medium,
-7.5 % high) and averaged along with up to `blurTaps` samples (6 / 10 / 16),
+clamped to `blurLength` of the view's width (TIERS: 4 % low, 7.5 % medium,
+9 % high; 1.45 times that in the picture's corners, `BLUR_EDGE`, so that the
+roadside streaks more than the middle of the frame) and averaged along with
+up to `blurTaps` samples (6 / 12 / 18),
 jittered by interleaved gradient noise. A shorter streak gets fewer taps, about
 one per two pixels. The shutter is a time (`ViewFrame.motionBlur` is a
 fraction of 1/60 s), not a share of the frame, so a 30 Hz phone and a 144 Hz
@@ -167,8 +169,9 @@ kerbs and grass streak about 5 to 8 % of the frame width at the lower corners,
 the cars stay razor sharp. Here, at 124 km/h on the descent (t = 95, high),
 the game's shutter of 0.47 gives streaks of 2 to 3 %; with `?shutter=0.9` the
 rock face and the verge streak about as in D1, the car stays sharp and its
-outline clean. The clamp was 4 % on every tier before; it is now 7.5 % on high
-so that such a shutter is not cut short.
+outline clean. The clamp was 4 % on every tier before; it is now 7.5 % on
+medium and 9 % on high, and 1.45 times that in the picture's corners, so that
+such a shutter is not cut short where the roadside goes by.
 
 ### Bloom (6, 9)
 

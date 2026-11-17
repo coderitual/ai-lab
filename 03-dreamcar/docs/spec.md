@@ -227,8 +227,9 @@ least 44 px.
 | staging | `__dreamcar.photo({...})` or `?photo=`: see tools.md |
 
 Motion blur: the shutter is 0.12 of a sixtieth of a second standing still and
-0.9 at 70 m/s (252 km/h) and above; the streak is clamped per tier at 4, 6
-or 7.5 % of the view's width; the cars are held sharp.
+0.9 at 70 m/s (252 km/h) and above; the streak is clamped per tier at 4, 7.5
+or 9 % of the view's width (1.45 times that in the picture's corners); the
+cars are held sharp.
 
 ## The HUD
 
@@ -315,7 +316,7 @@ pass with their sizes. In short:
 | --- | --- | --- | --- |
 | pixel ratio cap | 1.5 | 2 | 2 |
 | scene MSAA | none (FXAA on the finished picture) | 4 | 4 |
-| motion blur | inside the last pass, 6 taps, streak ≤ 4 % | own pass, 10 taps, ≤ 6 % | 16 taps, ≤ 7.5 % |
+| motion blur | inside the last pass, 6 taps, streak ≤ 4 % | own pass, 12 taps, ≤ 7.5 % | 18 taps, ≤ 9 % |
 | bloom levels | 4 | 5 | 6 |
 | lens (flare source, ghosts, glare, star) | no | yes | yes |
 | ambient occlusion | no | 8 samples, half size | 14 samples |
