@@ -25,11 +25,11 @@
 // On the multisampled tiers neighbouring levels cross-fade by coverage over a
 // band of a few metres; on low they swap at a distance, hidden in the rows.
 //
-// DRAW CALLS: one InstancedMesh per variant and level (8 + 8 + 1, plus 8
-// shadow-only proxies), written per view. The wet road's mirror and the car's
+// DRAW CALLS: one InstancedMesh per variant and level (8 + 8 + 1, plus one
+// of shadow-only impostor cards), written per view. The wet road's mirror and the car's
 // reflection probe see the reduced trees and the impostors only (each mesh
-// checks in onBeforeRender which camera draws it). Shadows: the reduced
-// shapes of the trees round the car, in the sun's shadow pass only (a layer
+// checks in onBeforeRender which camera draws it). Shadows: impostor cards
+// of the trees round the car turned to the sun, in its shadow pass only (a layer
 // no view camera sees), on medium and high.
 //
 // Wind: update()'s clock moves every level the same way (treeMaterial.js).
@@ -40,7 +40,7 @@ import { layBy } from './gantry.js';
 import { bakeImpostors } from './impostors.js';
 import { planeNoise, smoothstep } from './shading.js';
 import { growTrees } from './treeGeometry.js';
-import { createTreeUniforms, impostorMaterial, treeDepthMaterial, treeMaterial } from './treeMaterial.js';
+import { createTreeUniforms, impostorDepthMaterial, impostorMaterial, treeDepthMaterial, treeMaterial } from './treeMaterial.js';
 import { SPECIES, SPECIES_DATA, VARIANTS, VARIANTS_OF } from './treeSpecies.js';
 
 /** The Track's edge kind TREES (game/track.js EDGE.TREES; assets/ does not import game/). */
@@ -56,8 +56,8 @@ export const CASTER_LAYER = 3;
  */
 const TIER = {
   low: { full: 0, reduced: 60, far: 650, keep: 0.5, tile: 256, bark: 128, cell: 64, casters: false },
-  medium: { full: 38, reduced: 120, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 128, casters: true },
-  high: { full: 60, reduced: 170, far: 1200, keep: 1, tile: 512, bark: 256, cell: 128, casters: true },
+  medium: { full: 42, reduced: 105, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 128, casters: true },
+  high: { full: 65, reduced: 160, far: 1200, keep: 1, tile: 512, bark: 256, cell: 128, casters: true },
 };
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
 const BLEND = 8;
@@ -65,6 +65,8 @@ const BLEND = 8;
 const LATTICE = 6.5;
 /** The cells prepareView culls by (m). */
 const CELL = 64;
+/** How far round the car trees cast their shadow at most (m). */
+const CAST_REACH = 160;
 
 /**
  * How much of the wood has turned at track distance `s`, 0..1: most of it round the start, groups here and there.
@@ -337,6 +339,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const material = treeMaterial({ foliage: foliage.texture, bark: bark.map, barkNormal: bark.normal, atmosphere, uniforms, coverage, wind: true });
   const farMaterial = impostorMaterial({ atlas, atmosphere, uniforms, coverage });
   const depthMaterial = treeDepthMaterial(uniforms, true, foliage.texture);
+  const casterMaterial = impostorDepthMaterial(atlas);
 
   const group = new THREE.Group();
   group.name = 'forest';
@@ -376,18 +379,19 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   card.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0]), 3));
   card.setIndex([0, 1, 2, 0, 2, 3]);
   const farMesh = pool(card, farMaterial, count, 'forest-impostors', { aImp: 2 });
+  // the shadow-only proxies: impostor cards, which under the sun's camera turn to the light and cast the crown's
+  // silhouette seen from there
+  const casterMeshes = [];
+  if (T.casters) {
+    const mesh = pool(card, farMaterial, count, 'forest-casters', { aImp: 2 });
+    mesh.onBeforeRender = () => {};
+    mesh.layers.set(CASTER_LAYER);
+    mesh.castShadow = true;
+    mesh.receiveShadow = false;
+    mesh.customDepthMaterial = casterMaterial;
+    casterMeshes.push(mesh);
+  }
   card.dispose();
-  const casterMeshes = T.casters
-    ? models.map((m, v) => {
-        const mesh = pool(m.reduced, material, perVariant[v], `forest-caster-${VARIANTS[v].name}`);
-        mesh.onBeforeRender = null;
-        mesh.layers.set(CASTER_LAYER);
-        mesh.castShadow = true;
-        mesh.receiveShadow = false;
-        mesh.customDepthMaterial = depthMaterial;
-        return mesh;
-      })
-    : [];
   const through = VARIANTS.map((v) => SPECIES_DATA[v.species].through);
 
   // ---------------------------------------------------------------- per view
@@ -395,7 +399,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const projView = new THREE.Matrix4();
   const sphere = new THREE.Sphere();
   const eye = new THREE.Vector3();
-  const shadowR = shadow.reach * 1.1;
+  // trees cast round the car: the shade on the road ahead and beside it is what is seen (the shadow square reaches
+  // further, but what falls there is mostly the forest's own floor)
+  const shadowR = Math.min(shadow.reach * 1.1, CAST_REACH);
   const counts = { full: 0, reduced: 0, impostors: 0, casters: 0, triangles: 0, casterTriangles: 0 };
   const fullTris = models.map((m) => m.triangles[0]);
   const reducedTris = models.map((m) => m.triangles[1]);
@@ -456,7 +462,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         const v = trees[i].variant;
         sphere.center.set(spheres[i * 4], spheres[i * 4 + 1], spheres[i * 4 + 2]);
         sphere.radius = spheres[i * 4 + 3];
-        if (caster && Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR) write(casterMeshes[v], i, 1);
+        if (caster && Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR) write(casterMeshes[0], i, 1);
         if (!seenCell || !frustum.intersectsSphere(sphere)) continue;
         const d = flat ? redD - blend - 1 : sphere.center.distanceTo(eye);
         if (d < fullD) {
@@ -497,10 +503,10 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     });
     counts.impostors = farMesh.userData.main;
     counts.triangles += farMesh.userData.main * 2;
-    casterMeshes.forEach((m, v) => {
+    for (const m of casterMeshes) {
       counts.casters += m.count;
-      counts.casterTriangles += m.count * reducedTris[v];
-    });
+      counts.casterTriangles += m.count * 2;
+    }
     counts.drawCalls = group.children.filter((m) => m.visible).length;
   }
 
@@ -572,6 +578,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       material.dispose();
       farMaterial.dispose();
       depthMaterial.dispose();
+      casterMaterial.dispose();
       foliage.texture.dispose();
       bark.map.dispose();
       bark.normal.dispose();

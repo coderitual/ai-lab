@@ -217,7 +217,7 @@ export function treeMaterial({ foliage, bark, barkNormal, atmosphere, uniforms, 
   treeBark = step( 0.75, vShade.y );
   vec4 tex;
   if ( treeBark > 0.5 ) {
-    tex = vec4( texture2D( uBark, vMapUv ).rgb * ( 1.0 - 0.4 * uWet ), 1.0 );
+    tex = vec4( texture2D( uBark, vMapUv ).rgb * ( 0.72 - 0.3 * uWet ), 1.0 );
     treeBump = texture2D( uBarkN, vMapUv ).xyz * 2.0 - 1.0;
     treeGloss = 0.7;
   } else {
@@ -255,28 +255,8 @@ vec3 nonPerturbedNormal = normal;`,
   return atmosphere.patch(material);
 }
 
-/**
- * The material of the impostor cards: a card per far tree, upright in the tree's own frame and turned to the eye,
- * showing the atlas pictures taken nearest to the direction it is seen from.
- * @param {object} o
- * @param {import('./impostors.js').ImpostorAtlas} o.atlas
- * @param {import('./atmosphere.js').Atmosphere} o.atmosphere @param {TreeUniforms} o.uniforms @param {boolean} o.coverage
- */
-export function impostorMaterial({ atlas, atmosphere, uniforms, coverage }) {
-  const material = withBake(new THREE.MeshStandardMaterial({ alphaToCoverage: coverage, side: THREE.DoubleSide, flatShading: true, roughness: 0.7, metalness: 0 }));
-  material.name = 'tree-impostor';
-  material.defines.IMP_VARIANTS = atlas.variants;
-  material.defines.IMP_ROWS = atlas.rows;
-  material.defines.IMP_ELEV = atlas.elevation.toFixed(4);
-  const own = {
-    uImpColor: { value: atlas.color },
-    uImpNormal: { value: atlas.normal },
-    uImpA: { value: atlas.cells },
-    uImpB: { value: atlas.runs },
-    uImpC: { value: atlas.boxes },
-    uImpInset: { value: atlas.inset },
-  };
-  const PARS = /* glsl */ `
+/** The impostors' declarations (both stages). */
+const IMP_PARS = /* glsl */ `
 uniform vec4 uImpA[ IMP_VARIANTS ];   // per variant: the uv of its band's first cell (xy), the size of a cell (zw)
 uniform vec4 uImpB[ IMP_VARIANTS ];   // cells in an atlas row, its first cell's number, pictures in the level ring and in the raised one
 uniform vec4 uImpC[ IMP_VARIANTS ];   // the frame of its pictures in the tree's own metres: half width, bottom, top
@@ -286,15 +266,9 @@ varying vec3 vImpMix;    // how far between them (level ring, raised ring), and 
 varying vec3 vImpX;      // the tree's own x and y axes in view space: its normals are turned with them
 varying vec3 vImpY;
 `;
-  extend(material, `tree-imp-${coverage ? 'c' : 'd'}`, (shader) => {
-    Object.assign(shader.uniforms, uniforms, own);
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nattribute vec4 aTint;\nattribute vec2 aPlace;\nattribute vec4 aImp;\nvarying vec4 vTint;\n${PARS}`)
-      .replace(
-        '#include <begin_vertex>',
-        /* glsl */ `vec3 transformed;
-vTint = aTint;
-{
+
+/** Turns the card to the eye (or, under an orthographic camera such as the sun's, to the light) and picks its pictures. */
+const IMP_CARD = /* glsl */ `{
   // the tree's frame in the world (the mesh may stand in a parent of its own)
   mat4 wm = modelMatrix * instanceMatrix;
   mat3 im = mat3( wm );
@@ -324,11 +298,42 @@ vTint = aTint;
   vImpCell = vec4( position.x * 0.5 + 0.5, 1.0 - position.y, aImp.x, aImp.y );
   vImpX = mat3( viewMatrix ) * ax;
   vImpY = mat3( viewMatrix ) * ay;
-}`,
+}`;
+
+/**
+ * The material of the impostor cards: a card per far tree, upright in the tree's own frame and turned to the eye,
+ * showing the atlas pictures taken nearest to the direction it is seen from.
+ * @param {object} o
+ * @param {import('./impostors.js').ImpostorAtlas} o.atlas
+ * @param {import('./atmosphere.js').Atmosphere} o.atmosphere @param {TreeUniforms} o.uniforms @param {boolean} o.coverage
+ */
+export function impostorMaterial({ atlas, atmosphere, uniforms, coverage }) {
+  const material = withBake(new THREE.MeshStandardMaterial({ alphaToCoverage: coverage, side: THREE.DoubleSide, flatShading: true, roughness: 0.7, metalness: 0 }));
+  material.name = 'tree-impostor';
+  material.defines.IMP_VARIANTS = atlas.variants;
+  material.defines.IMP_ROWS = atlas.rows;
+  material.defines.IMP_ELEV = atlas.elevation.toFixed(4);
+  const own = {
+    uImpColor: { value: atlas.color },
+    uImpNormal: { value: atlas.normal },
+    uImpA: { value: atlas.cells },
+    uImpB: { value: atlas.runs },
+    uImpC: { value: atlas.boxes },
+    uImpInset: { value: atlas.inset },
+  };
+  extend(material, `tree-imp-${coverage ? 'c' : 'd'}`, (shader) => {
+    Object.assign(shader.uniforms, uniforms, own);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\nattribute vec4 aTint;\nattribute vec2 aPlace;\nattribute vec4 aImp;\nvarying vec4 vTint;\n${IMP_PARS}`)
+      .replace(
+        '#include <begin_vertex>',
+        /* glsl */ `vec3 transformed;
+vTint = aTint;
+${IMP_CARD}`,
       )
       .replace('#include <project_vertex>', `vBake *= mix( 1.0 - 0.8 * aPlace.x, 1.0, smoothstep( 1.5, 9.0, transformed.y ) );\n#include <project_vertex>`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform sampler2D uImpColor;\nuniform sampler2D uImpNormal;\nuniform vec2 uImpInset;\n${PARS}\n${TREE_PARS}`)
+      .replace('#include <common>', `#include <common>\nuniform sampler2D uImpColor;\nuniform sampler2D uImpNormal;\nuniform vec2 uImpInset;\n${IMP_PARS}\n${TREE_PARS}`)
       .replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${TREE_LIGHT}`)
       .replace(
         '#include <map_fragment>',
@@ -412,6 +417,42 @@ export function treeDepthMaterial(uniforms, wind, foliage) {
       .replace('#include <map_fragment>', '#include <map_fragment>\nif ( vBarkDepth > 0.75 ) diffuseColor.a = 1.0;');
   };
   material.customProgramCacheKey = () => `tree-depth-${wind ? 'w' : 's'}`;
+  return material;
+}
+
+/**
+ * The impostor cards in a shadow map: under the sun's orthographic camera each card turns to the light and casts the
+ * crown's silhouette as seen from there (the raised pictures, holes and all): the shade of a whole tree for two
+ * triangles.
+ * @param {import('./impostors.js').ImpostorAtlas} atlas
+ */
+export function impostorDepthMaterial(atlas) {
+  const material = new THREE.MeshDepthMaterial({ side: THREE.DoubleSide });
+  material.name = 'tree-impostor-depth';
+  material.defines = { IMP_VARIANTS: atlas.variants, IMP_ROWS: atlas.rows, IMP_ELEV: atlas.elevation.toFixed(4) };
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, { uImpColor: { value: atlas.color }, uImpA: { value: atlas.cells }, uImpB: { value: atlas.runs }, uImpC: { value: atlas.boxes }, uImpInset: { value: atlas.inset } });
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\nattribute vec4 aImp;\n${IMP_PARS}`)
+      .replace('#include <begin_vertex>', `vec3 transformed;\n${IMP_CARD}`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nuniform sampler2D uImpColor;\nuniform vec2 uImpInset;\n${IMP_PARS}`)
+      .replace(
+        '#include <map_fragment>',
+        /* glsl */ `{
+  int iv = int( vImpCell.z + 0.5 );
+  vec4 cells = uImpA[ iv ];
+  float perRow = uImpB[ iv ].x;
+  vec2 inCell = mix( uImpInset, 1.0 - uImpInset, clamp( vImpCell.xy, 0.0, 1.0 ) ) * cells.zw;
+  #define IMP_UV( n ) ( cells.xy + vec2( mod( n, perRow ), floor( ( n ) / perRow ) ) * cells.zw + inCell )
+  bool raised = vImpMix.z > 0.5;
+  float a = texture2D( uImpColor, IMP_UV( raised ? vImpIdx.z : vImpIdx.x ) ).a;
+  float b = texture2D( uImpColor, IMP_UV( raised ? vImpIdx.w : vImpIdx.y ) ).a;
+  if ( mix( a, b, raised ? vImpMix.y : vImpMix.x ) < 0.45 ) discard;
+}`,
+      );
+  };
+  material.customProgramCacheKey = () => 'tree-impostor-depth';
   return material;
 }
 

@@ -47,7 +47,7 @@ varying vec2 vUv;
 varying vec3 vN;
 void main() {
   bool bark = vShade.y > 0.75;
-  vec4 c = bark ? vec4( texture2D( uBark, vUv ).rgb, 1.0 ) : texture2D( uFoliage, vUv );
+  vec4 c = bark ? vec4( texture2D( uBark, vUv ).rgb * 0.72, 1.0 ) : texture2D( uFoliage, vUv );
   if ( c.a < 0.5 ) discard;
   // a dead twig keeps its own, greyer colour
   if ( ! bark && vShade.y > 0.25 ) c.rgb *= 0.55;
