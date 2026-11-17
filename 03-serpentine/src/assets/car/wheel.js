@@ -25,8 +25,10 @@
 // (one mesh, a palette texture picks each vertex's finish), the shells.
 
 import * as THREE from 'three';
+import { targetDefines } from '../../engine/glsl.js';
+import { mirrorProbe, probeUniforms } from './materials.js';
 import { TYRES } from './spec.js';
-import { TYRE_TREAD_V, FINISH, createCoverTexture, createPalette, createTyreTextures, paletteU } from './wheelTextures.js';
+import { TYRE_MARK as MARK, TYRE_REPEAT, TYRE_TREAD_V, FINISH, createCoverTexture, createPalette, createTyreMarkTexture, createTyreTextures, paletteU } from './wheelTextures.js';
 
 /**
  * The wheel, as numbers (metres). [D] published, [M] measured on car-rear34-closeup.jpg (the rim's outer edge is
@@ -102,9 +104,9 @@ const FADE = { shellIn: [0.5, 2.5], spokesOut: [2.5, 5], tread: [0.5, 6] };
 
 /** Per tier: segments round the wheel, stations along a bar, and what is left out. */
 const DETAIL = {
-  low: { tyreSegments: 28, tyreWall: 4, tyreTread: 2, segments: 28, stations: [0.076, 0.15, 0.232], arc: 1, ring: 3, bevel: false, bolts: false, valve: false, physical: false, tyreTexture: [128, 256], cover: [240, 64], shellSegments: 24 },
-  medium: { tyreSegments: 48, tyreWall: 9, tyreTread: 4, segments: 48, stations: [0.076, 0.11, 0.15, 0.19, 0.218, 0.232], arc: 2, ring: 5, bevel: true, bolts: true, valve: false, physical: true, tyreTexture: [256, 512], cover: [480, 128], shellSegments: 40 },
-  high: { tyreSegments: 72, tyreWall: 13, tyreTread: 5, segments: 64, stations: [0.076, 0.1, 0.125, 0.15, 0.175, 0.2, 0.218, 0.232], arc: 3, ring: 7, bevel: true, bolts: true, valve: true, physical: true, tyreTexture: [256, 512], cover: [480, 128], shellSegments: 48 },
+  low: { tyreSegments: 28, tyreWall: 4, tyreTread: 2, segments: 28, stations: [0.076, 0.15, 0.232], arc: 1, ring: 3, bevel: false, bolts: false, valve: false, physical: false, mark: false, tyreTexture: [128, 256], cover: [240, 64], shellSegments: 24 },
+  medium: { tyreSegments: 48, tyreWall: 9, tyreTread: 4, segments: 48, stations: [0.076, 0.11, 0.15, 0.19, 0.218, 0.232], arc: 2, ring: 5, bevel: true, bolts: true, valve: false, physical: true, mark: true, tyreTexture: [256, 512], cover: [480, 128], shellSegments: 40 },
+  high: { tyreSegments: 72, tyreWall: 13, tyreTread: 5, segments: 64, stations: [0.076, 0.1, 0.125, 0.15, 0.175, 0.2, 0.218, 0.232], arc: 3, ring: 7, bevel: true, bolts: true, valve: true, physical: true, mark: true, tyreTexture: [256, 512], cover: [480, 128], shellSegments: 48 },
 };
 
 const TAU = Math.PI * 2;
@@ -1059,17 +1061,70 @@ function splice(source, find, replacement) {
  * The tyre's material reads its normal map twice: as it is, and averaged round the tyre, and blends the two by
  * `uSpun`. The height in the map's alpha darkens the grooves. (`this` is the material.)
  */
-function patchTyre(shader) {
+function patchTyre(shader, marked = false) {
   Object.assign(shader.uniforms, this.userData.uniforms);
-  shader.fragmentShader = splice(shader.fragmentShader, '#include <normalmap_pars_fragment>', '#include <normalmap_pars_fragment>\nuniform sampler2D uSpunMap;\nuniform float uSpun;');
+  shader.fragmentShader = splice(
+    shader.fragmentShader,
+    '#include <normalmap_pars_fragment>',
+    '#include <normalmap_pars_fragment>\nuniform sampler2D uSpunMap;\nuniform float uSpun;\nuniform sampler2D uMarkMap;',
+  );
+  // The size marking: raised characters on the outer wall, twice round the tyre. The tread's map repeats nine
+  // times round, so the marking is a small map of its own, laid where the wall is plain (MARK).
+  const mark = marked
+    ? /* glsl */ `
+	{
+		// (u runs against the reading direction on the outer wall)
+		vec2 markAt = vec2( 1.0 - ( fract( vNormalMapUv.x / ${(TYRE_REPEAT / 2).toFixed(1)} ) * ${(TYRE_REPEAT / 2).toFixed(1)} - ${MARK.u.toFixed(4)} ) / ${MARK.du.toFixed(4)},
+			( ${MARK.v.toFixed(4)} - vNormalMapUv.y ) / ${MARK.dv.toFixed(4)} );
+		if ( markAt.x > 0.0 && markAt.x < 1.0 && markAt.y > 0.0 && markAt.y < 1.0 ) {
+			vec4 markTexel = texture2D( uMarkMap, markAt );
+			mapN = normalize( mapN + vec3( 0.5 - markTexel.x, 0.5 - markTexel.y, 0.0 ) * ( 5.0 * ( 1.0 - uSpun ) ) );
+			diffuseColor.rgb *= 1.0 + 0.35 * markTexel.a * ( 1.0 - uSpun );
+		}
+	}`
+    : '';
   const maps = splice(
     THREE.ShaderChunk.normal_fragment_maps,
     'vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;',
     /* glsl */ `vec4 tyreTexel = mix( texture2D( normalMap, vNormalMapUv ), texture2D( uSpunMap, vNormalMapUv ), uSpun );
 	vec3 mapN = tyreTexel.xyz * 2.0 - 1.0;
-	diffuseColor.rgb *= mix( 0.3, 1.0, smoothstep( 0.12, 0.47, tyreTexel.a ) );`,
+	diffuseColor.rgb *= mix( 0.3, 1.0, smoothstep( 0.12, 0.47, tyreTexel.a ) );${mark}`,
   );
   shader.fragmentShader = splice(shader.fragmentShader, '#include <normal_fragment_maps>', maps);
+}
+function patchTyreMarked(shader) {
+  patchTyre.call(this, shader, true);
+}
+
+/**
+ * The bright faces are turned on a lathe and lacquered: the tool leaves fine concentric grooves, each a ring that
+ * tilts the metal a little towards or away from the axle, under a smooth coat. Close by they show as hairlines
+ * and break the mirror image up along the radius; from a few metres they are gone. A ring is never narrower than
+ * two pixels, so nothing shimmers, and being rings they look the same however the wheel has turned.
+ */
+function patchSpokes(shader) {
+  shader.vertexShader = splice(shader.vertexShader, '#include <common>', '#include <common>\nvarying vec3 vWheelPos;\nvarying vec3 vWheelRadial;');
+  shader.vertexShader = splice(
+    shader.vertexShader,
+    '#include <begin_vertex>',
+    '#include <begin_vertex>\nvWheelPos = position;\nvWheelRadial = normalMatrix * vec3( 0.0, position.yz / max( length( position.yz ), 1e-5 ) );',
+  );
+  shader.fragmentShader = splice(shader.fragmentShader, '#include <common>', '#include <common>\nvarying vec3 vWheelPos;\nvarying vec3 vWheelRadial;');
+  shader.fragmentShader = splice(
+    shader.fragmentShader,
+    '#include <normal_fragment_maps>',
+    /* glsl */ `#include <normal_fragment_maps>
+	if ( metalnessFactor > 0.9 && abs( roughnessFactor - ${FINISH.machined.roughness.toFixed(3)} ) < 0.03 ) {
+		float turnedFoot = length( fwidth( vWheelPos ) );
+		float turnedFade = 1.0 - smoothstep( 0.0007, 0.0026, turnedFoot );
+		if ( turnedFade > 0.0 ) {
+			float turnedR = length( vWheelPos.yz );
+			float turnedRing = floor( turnedR / max( 0.00045, 2.0 * turnedFoot ) );
+			float turnedTilt = fract( sin( turnedRing * 12.9898 ) * 43758.5453 ) - 0.5;
+			normal = normalize( normal + normalize( vWheelRadial ) * ( 0.42 * turnedTilt * turnedFade ) );
+		}
+	}`,
+  );
 }
 
 const linear = (finish) => `vec3( ${finish.color.map((c) => c.toFixed(4)).join(', ')} )`;
@@ -1161,7 +1216,13 @@ function buildTextures(tier, caps) {
   const tyre = createTyreTextures(detail.tyreTexture[0], detail.tyreTexture[1], Math.min(4, caps?.maxAnisotropy ?? 1));
   const palette = createPalette();
   const cover = createCoverTexture(classifyFace, { width: detail.cover[0], height: detail.cover[1], radius: SHELL.radius, capRadius: WHEEL.cap });
-  return { tyreNormal: tyre.normal, tyreSpun: tyre.spun, tyreColor: tyre.color, tyreRough: tyre.rough, paletteColor: palette.color, paletteOrm: palette.orm, cover };
+  // the size markings (medium and high): two small maps, a few milliseconds
+  const size = (tyre) => `${Math.round(tyre.width * 1000)}/${Math.round(tyre.aspect * 100)} R${Math.round(tyre.rim / 0.0254)}`;
+  const markFront = detail.mark ? createTyreMarkTexture(size(TYRES.front)) : null;
+  const markRear = detail.mark ? createTyreMarkTexture(size(TYRES.rear)) : null;
+  return {
+    tyreNormal: tyre.normal, tyreSpun: tyre.spun, tyreColor: tyre.color, tyreRough: tyre.rough, paletteColor: palette.color, paletteOrm: palette.orm, cover, markFront, markRear,
+  };
 }
 
 function buildGeometry(tier, front) {
@@ -1205,8 +1266,11 @@ export function createWheel({ front, left, tier = 'high', caps = null }) {
   const tyreMaterial = detail.physical
     ? new THREE.MeshPhysicalMaterial({ ...tyreOptions, sheen: 0.3, sheenRoughness: 0.5, sheenColor: new THREE.Color(0.05, 0.05, 0.052), specularIntensity: 0.6 })
     : new THREE.MeshStandardMaterial(tyreOptions);
-  tyreMaterial.userData.uniforms = { uSpunMap: { value: textures.tyreSpun }, uSpun: { value: 0 } };
-  tyreMaterial.onBeforeCompile = patchTyre;
+  tyreMaterial.userData.uniforms = {
+    uSpunMap: { value: textures.tyreSpun },
+    uSpun: { value: 0 },
+    uMarkMap: { value: front ? textures.markFront : textures.markRear },
+  };
 
   // Always in the blended pass, at full opacity while the car stands: switching a material between the two
   // passes while the run is on would compile a second shader for it.
@@ -1222,7 +1286,23 @@ export function createWheel({ front, left, tier = 'high', caps = null }) {
     uBlur: { value: 0 },
     uRipple: { value: 1 },
   };
-  shellMaterial.onBeforeCompile = patchShell;
+
+  // every material mirrors the car's own reflection probe, as the body does (materials.js); the parts deep in the
+  // wheel see only a share of it
+  const reflections = probeUniforms();
+  const compile = (material, name, own, options) => {
+    material.defines = { ...(material.defines || {}), ...(caps ? targetDefines(caps) : {}) };
+    material.customProgramCacheKey = () => `wheel ${name} ${tierName}`;
+    material.onBeforeCompile = (shader) => {
+      if (own) own.call(material, shader);
+      mirrorProbe(shader, reflections, options);
+    };
+  };
+  const marked = !!textures.markFront;
+  compile(tyreMaterial, marked ? 'tyre marked' : 'tyre', marked ? patchTyreMarked : patchTyre);
+  compile(spokeMaterial, 'spokes', detail.physical ? patchSpokes : null, { coat: detail.physical });
+  compile(fixedMaterial, 'fixed', null, { seen: INNER_SKY });
+  compile(shellMaterial, 'shell', patchShell);
 
   // ---- the corner: rides up and down > steers > (what stays | what spins)
   const object = new THREE.Group();
@@ -1276,11 +1356,9 @@ export function createWheel({ front, left, tier = 'high', caps = null }) {
     },
 
     setReflections({ cube, sky }) {
-      for (const material of materials) {
-        material.envMap = cube;
-        // with no probe of its own the wheel mirrors the open sky: fade that where there is none overhead
-        material.envMapIntensity = (cube ? 1 : 0.1 + 0.9 * sky) * (material === fixedMaterial ? INNER_SKY : 1);
-      }
+      reflections.carProbe.value = cube || null;
+      reflections.carProbeOn.value = cube ? 1 : 0;
+      reflections.carSky.value = sky;
     },
 
     dispose() {

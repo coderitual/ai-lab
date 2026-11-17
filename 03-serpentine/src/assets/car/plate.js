@@ -54,13 +54,14 @@ const GLYPHS = {
   8: [['z', [0.2, 3.7, S], [0.2, 7, S], [3.8, 7, S], [3.8, 3.7, S]], ['z', [0, 0, R], [0, 3.7, R], [4, 3.7, R], [4, 0, R]]],
   9: [[[0, 1.5], [0, 0, R], [4, 0, R], [4, 7, R], [0, 7, R], [0, 3.1, R], [4, 3.1]]],
   '-': [[[0.8, 3.5], [3.2, 3.5]]],
+  '/': [[[0.5, 0], [3.5, 7]]],
 };
 
 /**
  * Draws one character with its lower left corner at (x, y) (y down the canvas), `w` wide and `h` high over all,
  * with a pen `pen` thick.
  */
-function drawGlyph(g, char, x, y, w, h, pen) {
+export function drawGlyph(g, char, x, y, w, h, pen) {
   const strokes = GLYPHS[char];
   if (!strokes) return;
   const ux = (w - pen) / 4;

@@ -18,6 +18,7 @@
 
 import * as THREE from 'three';
 import { valueField } from '../../engine/noise.js';
+import { drawGlyph } from './plate.js';
 
 /** Where the tread lies in the tyre's v coordinate: the sidewalls take a quarter each. */
 export const TYRE_TREAD_V = [0.25, 0.75];
@@ -213,6 +214,80 @@ export function createTyreTextures(width, height, anisotropy = 1) {
 }
 
 /**
+ * Where the size marking lies on the outer sidewall, in the tyre's own texture coordinates: `u` from the start of a
+ * half turn (in repeats of the tread's map) and `du` its length; `v` its edge nearer the bead and `dv` its height.
+ * It stands in the plain band between the fine rings and the first raised ring (29 to 45 mm from the bead).
+ */
+const MARK_MM = [100, 16];
+export const TYRE_MARK = {
+  u: 0.3,
+  du: MARK_MM[0] / REPEAT_MM,
+  v: 1 - (29 / SIDEWALL_MM) * (1 - TYRE_TREAD_V[1]),
+  dv: (MARK_MM[1] / SIDEWALL_MM) * (1 - TYRE_TREAD_V[1]),
+};
+
+/**
+ * The tyre's size as raised characters ("225/45 R18": a fact about the tyre, not a name), drawn with the plate's
+ * own stroke glyphs. Red and green hold the slope of the raised characters (0.5 = flat), alpha where they stand.
+ * @param {string} text
+ * @returns {THREE.DataTexture | null} null where there is no canvas (Node)
+ */
+export function createTyreMarkTexture(text) {
+  if (typeof OffscreenCanvas === 'undefined' && typeof document === 'undefined') return null;
+  const [W, H] = [400, 64];
+  const canvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(W, H) : document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const g = canvas.getContext('2d', { willReadFrequently: true });
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, W, H);
+  g.strokeStyle = '#fff';
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  // characters 12 mm high and 6.6 wide, a pen of 1.7 mm, 2.2 mm apart: centred in the 100 x 16 mm field
+  const px = W / MARK_MM[0];
+  const [cw, ch, pen, gap, space] = [6.6, 12, 1.7, 2.2, 4];
+  const chars = [...text];
+  const width = chars.reduce((sum, c) => sum + (c === ' ' ? space : cw + gap), -gap);
+  let x = (MARK_MM[0] - width) / 2;
+  for (const c of chars) {
+    if (c !== ' ') drawGlyph(g, c, x * px, (H + ch * px) / 2, cw * px, ch * px, pen * px);
+    x += c === ' ' ? space : cw + gap;
+  }
+  const img = g.getImageData(0, 0, W, H).data;
+  // rounded shoulders: the height is the picture, softened over a texel or two
+  const raw = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) raw[i] = img[i * 4] / 255;
+  const at = (xx, yy) => raw[Math.min(H - 1, Math.max(0, yy)) * W + Math.min(W - 1, Math.max(0, xx))];
+  const height = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let xx = 0; xx < W; xx++) {
+      height[y * W + xx] = (4 * at(xx, y) + 2 * (at(xx - 1, y) + at(xx + 1, y) + at(xx, y - 1) + at(xx, y + 1)) + at(xx - 1, y - 1) + at(xx + 1, y - 1) + at(xx - 1, y + 1) + at(xx + 1, y + 1)) / 16;
+    }
+  }
+  const soft = (xx, yy) => height[Math.min(H - 1, Math.max(0, yy)) * W + Math.min(W - 1, Math.max(0, xx))];
+  const data = new Uint8Array(W * H * 4);
+  for (let y = 0; y < H; y++) {
+    for (let xx = 0; xx < W; xx++) {
+      const dx = soft(xx + 1, y) - soft(xx - 1, y);
+      // the canvas's rows run down, the texture's up
+      const dy = soft(xx, y - 1) - soft(xx, y + 1);
+      const o = ((H - 1 - y) * W + xx) * 4;
+      data[o] = Math.round(clamp01(0.5 - 0.5 * dx) * 255);
+      data[o + 1] = Math.round(clamp01(0.5 - 0.5 * dy) * 255);
+      data[o + 2] = 0;
+      data[o + 3] = Math.round(soft(xx, y) * 255);
+    }
+  }
+  const texture = new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.UnsignedByteType);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
  * The finishes of the wheel and its brake, as rows of the palette: linear colour, roughness, metalness. A vertex
  * picks one with paletteU().
  */
@@ -223,8 +298,8 @@ export const FINISH = {
   capRing: { color: [0.62, 0.63, 0.64], roughness: 0.34, metalness: 1 },
   bolt: { color: [0.02, 0.02, 0.021], roughness: 0.38, metalness: 0.8 },
   valve: { color: [0.022, 0.022, 0.022], roughness: 0.7, metalness: 0 },
-  disc: { color: [0.17, 0.167, 0.163], roughness: 0.5, metalness: 1 },
-  discWorn: { color: [0.14, 0.137, 0.133], roughness: 0.56, metalness: 1 },
+  disc: { color: [0.2, 0.197, 0.193], roughness: 0.45, metalness: 1 },
+  discWorn: { color: [0.13, 0.127, 0.123], roughness: 0.56, metalness: 1 },
   discEdge: { color: [0.11, 0.1, 0.095], roughness: 0.72, metalness: 0.8 },
   hat: { color: [0.05, 0.05, 0.052], roughness: 0.6, metalness: 0.5 },
   caliper: { color: [0.45, 0.45, 0.46], roughness: 0.45, metalness: 0.6 },
