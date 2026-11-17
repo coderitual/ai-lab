@@ -169,7 +169,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   const world = {
     scene,
     time: null,
-    probeHidden: [sky.stars],
+    probeHidden: [sky.stars, ...structures.probeHidden],
     /** The wet road's planar reflection (null on the low tier): its target, camera, last cost (`ms`). */
     mirror,
     atmosphere,

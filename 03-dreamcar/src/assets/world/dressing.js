@@ -49,13 +49,18 @@ export function createDressing({ track, terrain, caps, tier, atmosphere, rng }) 
   const start = createStart({ track, terrain, b, signs, atmosphere });
   const trackside = buildTrackside({ track, terrain, tier, b, signs });
   buildPits({ track, terrain, tier, b, signs });
-  const patches = b.build(material, group);
-  group.add(start.group);
+  // the patches in a group of their own: the cars' reflection probes leave them out (six faces of boards and
+  // buildings on a blurred paint reflection cost more than they show); the start lamps stay in
+  const merged = new THREE.Group();
+  merged.name = 'dressing-patches';
+  const patches = b.build(material, merged);
+  group.add(merged, start.group);
   const town = createTown({ track, terrain, tier, atmosphere, rng: rng.fork('town') });
   if (town) group.add(town.group);
 
   return {
     group,
+    probeHidden: town ? [merged, town.group] : [merged],
     stats: { patches, triangles: b.triangles, boards: trackside.boards, town: town?.stats },
     setStartLights: (n) => start.setStartLights(n),
     update(dt) {

@@ -54,6 +54,8 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng }
 
   return {
     group,
+    /** What the cars' reflection probes leave out. */
+    probeHidden: dressing.probeHidden,
     stats: { ms, lamps: lamps.stats, rails: rails.stats, posts: posts.stats, viaducts: viaducts.stats, dressing: dressing.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {
