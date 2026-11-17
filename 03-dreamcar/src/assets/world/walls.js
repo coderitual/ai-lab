@@ -1,10 +1,12 @@
 // The low concrete walls: wherever the Track's solid edge is a WALL outside a
-// tunnel (the start straight), precast blocks about a metre high whose face
+// tunnel (the start straight), precast blocks 0.93 m high (the hoardings behind
+// show over them) whose face
 // stands exactly at the edge distance (where the physics stops a car).
 //
 // One profile swept along each run (face, a chamfered top, the back), its
 // texture coordinates metres of road and metres up the face. Painted in
-// blocks of our own colours, white and a deep teal by turns, each block a
+// blocks of our own colours, graphite and a bright teal by turns (frame D1's
+// wall is dark with bright blocks), each block a
 // precast unit with a dark joint; weathered: dirt sprayed up from the road
 // along the foot, rain streaks down from the top, black rubber where cars
 // have touched it, the paint worn to the concrete on the arrises.
@@ -16,16 +18,16 @@ import { extend } from './shading.js';
 /** The wall seen end on, the road to the left: [out from the edge, up from the ground at the edge] (m). */
 const PROFILE = [
   [0, -0.3],
-  [0, 0.92],
-  [0, 0.92],
-  [0.04, 0.98],
-  [0.04, 0.98],
-  [0.3, 0.98],
-  [0.3, 0.98],
+  [0, 0.88],
+  [0, 0.88],
+  [0.04, 0.93],
+  [0.04, 0.93],
+  [0.3, 0.93],
+  [0.3, 0.93],
   [0.32, -0.3],
 ];
 /** Length of one precast block (m). */
-const BLOCK = 4;
+const BLOCK = 3;
 /** Metres between cross-sections on a straight and in a bend. */
 const STEP = { straight: 6, bend: 2 };
 
@@ -106,12 +108,12 @@ float wY = vWall.y;
 float wBlock = floor( wS / ${BLOCK.toFixed(1)} );
 float wAa = fwidth( wS ) + 1.0e-3;
 float wJoint = 1.0 - smoothstep( 0.012, 0.012 + wAa, abs( fract( wS / ${BLOCK.toFixed(1)} + 0.5 ) - 0.5 ) * ${BLOCK.toFixed(1)} );
-// our colours: white and a deep teal by turns
-vec3 wPaint = mod( wBlock, 2.0 ) < 0.5 ? vec3( 0.66, 0.66, 0.63 ) : vec3( 0.025, 0.16, 0.19 );
+// our colours: graphite and a bright teal by turns
+vec3 wPaint = mod( wBlock, 2.0 ) < 0.5 ? vec3( 0.022, 0.026, 0.03 ) : vec3( 0.04, 0.4, 0.42 );
 vec3 wConcrete = vec3( 0.36, 0.35, 0.32 );
 float wN = wallNoise( vec2( wS * 1.3, wY * 6.0 ) ) * 0.6 + wallNoise( vec2( wS * 5.1, wY * 19.0 ) ) * 0.4;
 // worn to the concrete on the chamfered arris and at random
-float wWorn = max( smoothstep( 0.93, 0.98, wY ) * smoothstep( 0.4, 0.7, wN ), smoothstep( 0.78, 0.92, wN ) * 0.6 );
+float wWorn = max( smoothstep( 0.88, 0.95, wY ) * smoothstep( 0.4, 0.7, wN ), smoothstep( 0.78, 0.92, wN ) * 0.6 );
 vec3 wCol = mix( wPaint, wConcrete, wWorn );
 // rain streaks from the top, road dirt sprayed up the foot, rubber at a wheel's height
 float wRain = smoothstep( 0.55, 0.85, wallNoise( vec2( wS * 3.0, wY * 0.6 ) ) ) * smoothstep( 0.2, 0.9, wY ) * 0.35;

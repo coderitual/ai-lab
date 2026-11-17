@@ -68,7 +68,7 @@ const EDGE_LINE = 0.15;
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /** The glare lobe (ASPHALT_SHEEN): its GGX alpha along the line of sight and across it, and its weight. */
-const SHEEN = { along: 0.5, across: 0.28, gain: 0.55 };
+const SHEEN = { along: 0.32, across: 0.13, gain: 0.4 };
 /** Head lamp brightness (THROW in assets/car/index.js: candela-like units at the beam's peak, per lamp). */
 const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;

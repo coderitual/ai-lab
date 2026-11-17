@@ -201,7 +201,7 @@ if ( gVerge > 0.0 ) {
   float pass = abs( fract( vd / 3.2 ) * 2.0 - 1.0 );
   float stripe = clamp( ( pass - 0.5 ) / max( vAa / 1.6, 1.0e-3 ) + 0.5, 0.0, 1.0 );
   stripe = mix( stripe, 0.5, smoothstep( 0.3, 1.0, vAa / 1.6 ) );
-  vec3 mown = mix( vec3( 0.05, 0.085, 0.022 ), vec3( 0.075, 0.115, 0.03 ), stripe ) * ( 0.8 + 0.4 * gDet.r ) * ( 0.85 + 0.3 * gMid.r );
+  vec3 mown = mix( vec3( 0.06, 0.13, 0.025 ), vec3( 0.09, 0.18, 0.035 ), stripe ) * ( 0.8 + 0.4 * gDet.r ) * ( 0.85 + 0.3 * gMid.r );
   // worn earth: ragged, wider where cars have run wide
   float rag = 0.55 + 0.5 * ( gDet.b - 0.5 ) + 0.6 * ( gLarge.b - 0.5 ) + 0.4 * ( gDet2.r - 0.5 );
   float earth = 1.0 - smoothstep( rag - 0.15, rag + 0.15, vd );

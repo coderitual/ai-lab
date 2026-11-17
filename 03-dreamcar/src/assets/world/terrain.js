@@ -125,7 +125,9 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   const cliffL = cliffOf(rockL, track.farSlopeL);
   const cliffR = cliffOf(rockR, track.farSlopeR);
   /** The cliff's foot starts this far beyond the edge, and climbs this far out per metre up. */
-  const FOOT = 0.8;
+  /** Bridges shorter than this (m) span a gully across them rather than a valley along them. */
+const GULLY_LENGTH = 450;
+const FOOT = 0.8;
   const LEAN = 0.3;
 
   // tunnels and bridges, per sample: how much ground stands over the bore, how deep the ravine is
@@ -139,9 +141,14 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   }
   for (const b of track.bridges) {
     const drop = b.drop ?? 30;
+    // (env lane) a short deck spans a gully that runs ACROSS it: a V along the road, deepest in the middle, with a
+    // stream's notch at the bottom; a long one a broad valley
+    const gully = b.s1 - b.s0 < GULLY_LENGTH;
     for (let i = Math.ceil(b.s0 / ds); i <= Math.floor(b.s1 / ds); i++) {
       const u = (i * ds - b.s0) / (b.s1 - b.s0);
-      ravine[i % n] = Math.max(1.5, drop * Math.pow(Math.max(0, Math.sin(Math.PI * u)), 0.6));
+      const v = Math.max(0, Math.sin(Math.PI * u));
+      const notch = gully ? 2.5 * Math.exp(-Math.pow(((u - 0.5) * (b.s1 - b.s0)) / 5, 2)) : 0;
+      ravine[i % n] = Math.max(1.5, drop * Math.pow(v, gully ? 1.4 : 0.6) + notch);
     }
   }
   const zoneOf = (s) => {
@@ -319,7 +326,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     // which are cut open)
     const zone = zoneOf(s);
     if (zone === 1) y = Math.max(y, read(track.py, s) + BORE_HEIGHT + read(cover, s) - 0.35 * Math.max(0, d - 4));
-    else if (zone === 2) y = Math.min(y, read(track.py, s) - read(ravine, s) - 0.1 * Math.abs(lat));
+    else if (zone === 2) y = Math.min(y, read(track.py, s) - read(ravine, s) - 0.02 * Math.abs(lat));
     return y;
   }
   // Where another stretch of road lies beside this one (the hairpins' legs), the ground between them is shared:

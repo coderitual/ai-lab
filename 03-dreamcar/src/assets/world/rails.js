@@ -63,6 +63,11 @@ const REFLECTOR_EVERY = 1e9; // (a circuit's barrier carries none)
 /** The terminals: metres over which a free end goes down into the ground, and how far it turns away. */
 const RAMP = 7;
 const FLARE = 0.5;
+/** Where trackside panels stand behind the barrier, its top beam is the only one (their bottom edge clears it). */
+const SINGLE_TOP = 0.76;
+/** Where a tyre wall stands at the edge (1.2 m deep), the barrier stands this far behind the edge, eased in over RAMP_TYRE m. */
+const TYRE_BEHIND = 1.35;
+const RAMP_TYRE = 4;
 
 /**
  * @param {object} options
@@ -88,6 +93,17 @@ export function createRails({ track, tier, atmosphere }) {
   const n = track.count;
   let metres = 0;
 
+  /** 0..1: how much of a range list stands at s on one side, eased over `ease` metres at its ends. */
+  const coverOf = (ranges, s, side, ease) => {
+    let v = 0;
+    for (const r of ranges ?? []) {
+      if (r.side !== side) continue;
+      const len = track.wrap(r.s1 - r.s0);
+      const d = track.wrap(s - r.s0);
+      if (d <= len + ease) v = Math.max(v, Math.min(1, Math.min(d + ease, len + ease - d) / ease));
+    }
+    return Math.max(0, Math.min(1, v));
+  };
   for (const side of [1, -1]) {
     const kinds = side > 0 ? track.kindL : track.kindR;
     for (const run of runsOf(track, (i) => kinds[i] === EDGE.RAIL)) {
@@ -110,7 +126,7 @@ export function createRails({ track, tier, atmosphere }) {
         const edge = track.edgeAt(s, side);
         track.pointAt(s, side * edge, base);
         const t = into * into;
-        const o = out + FLARE * t;
+        const o = out + FLARE * t + TYRE_BEHIND * coverOf(track.tyreWalls, s, side, RAMP_TYRE);
         return [base.x + frame.flat.x * side * o, base.y + up - 0.78 * t, base.z + frame.flat.z * side * o];
       };
 
@@ -126,7 +142,9 @@ export function createRails({ track, tier, atmosphere }) {
         while (s < previous - track.length / 2) s += track.length; // unwrapped, for the terminals and the texture
         previous = s;
         const into = terminal(s);
-        rows.push((tier === 'low' ? BEAM_LOW : BEAM).map(([out, up]) => [...place(s, out, up, into), s, up]));
+        // under trackside panels only the lower beam: the upper one folds down onto it (same vertices, no area)
+        const single = coverOf(track.boards, s, side, 2) > 0.5;
+        rows.push((tier === 'low' ? BEAM_LOW : BEAM).map(([out, up]) => (single && up > SINGLE_TOP ? [...place(s, 0.075, SINGLE_TOP, into), s, SINGLE_TOP] : [...place(s, out, up, into), s, up])));
       }
       beams.push(stripGeometry(rows));
 
@@ -144,7 +162,9 @@ export function createRails({ track, tier, atmosphere }) {
           if (into > 0.6) return;
           const [x, y, z] = place(su, POST_OUT, 0, into);
           levelFrame(track, su, frame);
-          posts.push(upright(new THREE.Vector3(x, y - 0.45, z), frame.yaw));
+          // a post under a single beam is cut down to it
+          const single = coverOf(track.boards, su, side, 2) > 0.5;
+          posts.push(upright(new THREE.Vector3(x, y - 0.45, z), frame.yaw, 1, single ? 0.78 : 1, 1));
           if (k % REFLECTOR_EVERY === 3 && into === 0) {
             const [rx, ry, rz] = place(su, 0.04, 0.8, 0);
             reflectors.push(upright(new THREE.Vector3(rx, ry, rz), frame.yaw));

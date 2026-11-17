@@ -35,7 +35,7 @@ the real one; this project is not affiliated with its maker.
 2. **Light is the subject.** Day and night are not a tint. By day: one low sun,
    long tree shadows across the road, haze in the valleys, a sky the paint
    reflects. By night: the car's own lamps do the work. The low beam has a
-   shape and a cut-off, roadside posts and chevrons answer it, the tunnel is a
+   shape and a cut-off, the edge lines' glass beads answer it, the tunnel is a
    pool of sodium light you can see from the valley, the tail lamps colour the
    road behind, and the exposure opens up the way eyes do.
 3. **It drives like a car.** A rigid body on four sprung wheels with tyres that
@@ -95,7 +95,27 @@ white kerb in the bends and a paved margin elsewhere, then mown grass 3 to 10 m
 wide (widest on the outside of the fast bends) to a barrier: a steel rail by
 default, a low concrete wall along the start straight, rock where the road is
 cut into the hill, parapets on the bridges, walls in the tunnel. Trees stand
-behind the barrier, never as it. Gradients up to 8 per cent; banking by rule
+behind the barrier, never as it.
+
+How the ground is drawn (src/assets/world, ENV lane): the asphalt (road.js) is
+dark, fine racing asphalt with a polished, darker racing line and rubber in
+the bends and the braking zones (corridor.js), runs of surfacing of different
+ages with joints, the paver's seams 2 m either side of the middle, a few
+patches and sealed cracks, tyre marks before the carousel (roadHistory.js);
+its markings are a solid white line inside each edge (0.15 m), the start line
+and twelve grid boxes from `track.grid`, nothing else. A second, anisotropic
+specular lobe stretched along the line of sight lays the low sun's glare on it
+as a long streak (`ASPHALT_SHEEN`). The kerbs (kerbs.js) are red and white
+painted concrete, one colour per tooth, on `track.kerbs`, exactly on
+`track.profile()` (on low, rows at every second tooth top). Beyond the margin
+the terrain's band carries the verge: mown stripes 1.6 m wide, a ragged strip
+of worn earth along the kerbs, longer grass at the barrier. Barriers: two
+stacked W-beams on posts (one beam where trackside panels stand behind it;
+set back behind tyre walls), low concrete walls 0.93 m high on the straight
+(walls.js, precast blocks painted white and teal), cut faces of bedded
+limestone where the edge is rock. Viaduct piers are slender eight-sided
+shafts under flared capitals; the short bridge spans a V-shaped gully across
+it with a stream's notch. Gradients up to 8 per cent; banking by rule
 from the curvature (up to 9 degrees) and per piece, up to 10 degrees on the
 sky road. The numbers by stretch (s from the line, m; speeds are the
 autopilot's at full pace):
@@ -194,14 +214,12 @@ a few seconds it is offered).
   planar reflection drawn per view about the road's plane under the view's
   car (engine/PlanarMirror.js; a third of the view's height on medium, half
   on high; nothing on low, which keeps the speculars): the tail lamps, the
-  car, the lamps, the studs and posts, the tree line and the sky, each light
+  car, the lamps, the tree line and the sky, each light
   drawn out into a streak towards the viewer. The head lamps lay a cool pool
   on the road ahead through the asphalt's own backscatter (road.js), while
   their beam keeps light off what is close and high.
-- Lit studs (studs.js) on the centre line and both edge lines through every
-  bend and the tunnel (amber centre, white edges, red seen the wrong way)
-  answer the head lamps and glow faintly on their own at night: the next bend
-  reads from 150 m. A town of about 330 lamps (high tier) lies on the lake's
+- A circuit has no studs and no guide posts (studs.js and posts.js place
+  none). A town of about 330 lamps (high tier) lies on the lake's
   far shore and the slope behind it, mirrored in the lake, with a soft warm
   glow on the haze above it, a radio mast's red lamps and a hamlet high on
   the slope beyond (from which stretches of the new circuit it is in the frame
