@@ -268,7 +268,7 @@ Read once by `src/engine/params.js`.
 | `?q=low\|medium\|high` | the quality tier (wins over the stored choice) |
 | `?dpr=` | the device pixel ratio |
 | `?plate=`, `?plate2=` | the number plates (capitals, digits, spaces, hyphens; 9 at most) |
-| `?paint=` | the first car's paint |
+| `?paint=` | the first car's paint: silver (default), graphite (the second car's), blue, red, white, black |
 | `?wet=0..1` | the road's wetness instead of the time of day's |
 | `?mute` | no sound |
 | `?ui=0` | no HUD |

@@ -16,6 +16,9 @@ comparison stills and strike what is done.
   pale slopes: the far rings and the terrain's low hills in haze, where D1
   has sunlit trees and bushes in front of a back-lit massif. The massif's
   foot is hidden behind snowy beige hills of the terrain.
+- **The ground beside the sky road** reads from above as a pale, rippled
+  bare slope (`docs/images/sky-road.jpg`), not the wooded valley under the
+  columns of frame A.
 - **Rock faces** beside the road are bedded limestone but repeat; the far
   mountains are a smooth mottle since their per-pixel relief was removed
   (it made speckle at golden hour).
@@ -49,6 +52,10 @@ comparison stills and strike what is done.
 - **A red pool behind a braking car** is still strong (the tail lamps'
   specular on the rough wet asphalt), and the bloom round the brake lamps
   tints the boot lid red.
+- **A thin dotted red line** runs straight down the picture from the car's
+  tail on the wet road in the chase view at speed (`docs/images/night.jpg`):
+  the tail lamps' reflection drawn as a row of samples rather than a smooth
+  streak.
 - **Trackside boards have no lamps of their own**; at night they are dark.
 - **The car's paint is dark** where nothing bright is near it.
 - **The tunnel's exit** at night and by day (the bloom of the portal) has not
