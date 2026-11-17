@@ -1104,7 +1104,7 @@
   .hud .title .buttons.small {
     margin-top: -2px;
   }
-  .hud .title .titleboard .row:nth-child(n + 4) {
+  .hud .title .titleboard .row:nth-child(n + 4):not(.own) {
     display: none;
   }
   .hud .title .legend {
@@ -1147,7 +1147,7 @@
   .hud .title .name {
     font-size: 30px;
   }
-  .hud .title .titleboard .row:nth-child(n + 4) {
+  .hud .title .titleboard .row:nth-child(n + 4):not(.own) {
     display: none;
   }
   .hud .results {

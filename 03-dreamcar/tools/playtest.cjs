@@ -189,7 +189,8 @@ const SECTIONS = {
     await down(p, 'KeyA');
     await p.skip(0.4);
     d = await p.d0();
-    check('A steers left (steer < 0)', d.steer < -0.1, `steer ${d.steer}`);
+    // (at speed a key is given only the lock that fits the speed, and it first has to undo the right turn)
+    check('A steers left (steer < 0)', d.steer < -0.03, `steer ${d.steer}`);
     await up(p, 'KeyA');
     await p.skip(0.5);
     check('released, the steering returns to centre', Math.abs((await p.d0()).steer) < 0.05);
@@ -219,7 +220,8 @@ const SECTIONS = {
     await press(p, 'KeyR');
     await p.skip(0.5);
     d = await p.d0();
-    check('R puts the car back on the road', d.putBacks === before + 1 && Math.abs(d.lat) < 3, `put-backs ${d.putBacks}, lat ${d.lat}`);
+    const halfWidth = await p.page.evaluate('window.__dreamcar.game.track.halfWidth');
+    check('R puts the car back on the road', d.putBacks === before + 1 && Math.abs(d.lat) < halfWidth, `put-backs ${d.putBacks}, lat ${d.lat} of ±${halfWidth}`);
     const cams = [d.camera];
     for (let i = 0; i < 4; i++) {
       await press(p, 'KeyC');
@@ -385,7 +387,8 @@ const SECTIONS = {
     await p.page.evaluate(() => {
       const g = window.__dreamcar.game;
       const r = g.racers[0];
-      const at = 2100;
+      // past the last sector line, read from the Track
+      const at = g.track.sectors[g.track.sectors.length - 1] + 100;
       const f = g.track.frameAt(at, {});
       const pt = g.track.pointAt(at, 0);
       r.vehicle.reset({ x: pt.x, z: pt.z, yaw: Math.atan2(f.tan.x, f.tan.z) });
