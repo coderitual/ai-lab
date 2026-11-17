@@ -52,10 +52,10 @@ export const RULES = {
 };
 
 /**
- * The time of day the page opens at when the URL does not say (?time=): any name lighting.js's TIMES has; when it
- * has no such time, its first.
+ * The time of day the page opens at when the URL does not say (?time=): a name lighting.js's TIMES has, or null
+ * for the first time of day TIMES holds (the lead's choice: the demo opens on its first, the day).
  */
-export const DEFAULT_TIME = 'dusk';
+export const DEFAULT_TIME = null;
 
 /** The HUD's moments (s of the race clock) and when its warnings and hints show. */
 export const HUD = {
@@ -84,6 +84,8 @@ export const VIEW = {
   blurSpeed: 40,
   /** While the camera dives at the start the shutter is cut to this share (the camera's own motion would smear all). */
   diveShutter: 0.25,
+  /** How split screen shares the window: 'auto' (side by side on a wide window, stacked on a tall one), 'wide', 'tall'. */
+  split: 'auto',
   /** Day and night are switched behind a fade to black and back, each half this long (s). */
   fade: 0.25,
 };
@@ -95,7 +97,7 @@ export const VIEW = {
 export const CAMERA = {
   chase: {
     /** How far behind the car's origin it stands (m), at rest; it drops back `pullBack` more as the speed signal rises. */
-    distance: 6.5,
+    distance: 5.6,
     pullBack: 1.5,
     /**
      * The composition on a level straight: the horizon `horizon` of the way down the picture and the middle of the

@@ -578,7 +578,7 @@ export class Hud {
     this.timeChoice.setAttribute('aria-label', TEXT.timeOfDay);
     /** @type {Map<string, Cell>} */
     this.timeButtons = new Map();
-    button(make('div', 'buttons small', t), TEXT.options, () => this.openOptions(), 'options');
+    button(make('div', 'buttons small', t), TEXT.options, () => this.openOptions(), 'opt-open');
     this.titleBoard = cell('div', 'boardlist titleboard', t);
     this.legend = cell('dl', 'legend', t);
     this._legendKey = '';
@@ -590,7 +590,7 @@ export class Hud {
     const prow = make('div', 'buttons column', this.pause.el);
     this.resumeButton = button(prow, TEXT.resume, () => this.act('pause'), 'primary');
     button(prow, TEXT.restart, () => this.act('again'));
-    button(prow, TEXT.options, () => this.openOptions(), 'options');
+    button(prow, TEXT.options, () => this.openOptions(), 'opt-open');
     button(prow, TEXT.menu, () => this.act('leave'));
     this.pauseBoard = cell('div', 'boardlist', this.pause.el);
     this.pause.show(false);

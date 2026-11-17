@@ -642,6 +642,22 @@
 .hud .view.tall .touchcol {
   flex-direction: column;
 }
+/* upright: the top corners are full, so the moments come down into the sky over the road */
+.hud .view.tall .flash,
+.hud .view.tall .banner,
+.hud .view.tall .lamps {
+  top: 18%;
+}
+.hud .view.tall.flashing .banner {
+  top: calc(18% + var(--u) * 8.5);
+}
+.hud .view.tall .warn,
+.hud .view.tall .hint {
+  top: 36%;
+}
+.hud .view.tall .offer {
+  top: 40%;
+}
 /* on a short picture (a stacked half on a phone) the map steps aside */
 .hud .view.short .map {
   display: none;

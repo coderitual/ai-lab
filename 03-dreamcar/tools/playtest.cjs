@@ -41,8 +41,8 @@ let browser;
 const BENIGN = [/GPU stall due to ReadPixels/, /Automatic fallback to software WebGL/, /swiftshader/i];
 
 /** A fresh page (its own context: its own storage) on `query`, ready to step. */
-async function open(query, { w = 320, h = 180, mobile = false, storage = true, init = null, gpu = true } = {}) {
-  const context = await browser.newContext({ viewport: { width: w, height: h }, isMobile: mobile, hasTouch: mobile });
+async function open(query, { w = 320, h = 180, mobile = false, storage = true, init = null, gpu = true, dpr = 1 } = {}) {
+  const context = await browser.newContext({ viewport: { width: w, height: h }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: dpr });
   if (!storage) {
     await context.addInitScript(() => {
       const no = () => {
@@ -264,7 +264,8 @@ const SECTIONS = {
     let s = await p.until((x) => x.phase === 'results', 400, 10);
     const d = s.drivers[0];
     check('?laps=1: the autopilot finishes and the results come up', s.phase === 'results', s.phase);
-    check('one lap time, in a sensible range', d.laps.length === 1 && d.laps[0].ms > 90000 && d.laps[0].ms < 160000,
+    const L1 = await p.page.evaluate('window.__dreamcar.game.track.length');
+    check('one lap time, in a sensible range (a mean of 20 to 100 m/s over the lap)', d.laps.length === 1 && d.laps[0].ms > (L1 / 100) * 1000 && d.laps[0].ms < (L1 / 20) * 1000,
       d.laps.map((l) => l.ms).join(', '));
     check('three splits, rising, the last = the lap', d.laps[0].splits.length === 3 && d.laps[0].splits[0] < d.laps[0].splits[1]
       && d.laps[0].splits[2] === d.laps[0].ms);
@@ -588,54 +589,233 @@ const SECTIONS = {
     await p.close('resize and context loss');
   },
 
-  /** The HUD never covers the car in the default chase view, at the sizes the HUD was laid out for. */
+  /**
+   * The HUD at every size it is laid out for, solo and in both split-screen arrangements: in the chase view nothing
+   * covers the car, no readout or button covers another, everything is inside its view, and the touch buttons are
+   * at least 44 px. The places are read from the page: a point on the start straight and the most banked point
+   * of the lap. The line's gap and the lap banner are forced on, so that they are checked too.
+   */
   async hud() {
-    for (const [w, h] of [[960, 540], [1280, 720], [1920, 1080], [844, 390], [390, 844], [1024, 768]]) {
-      const p = await open('?manual&q=low&auto&ap&time=day', { w, h, mobile: w < 900 && h < 900, gpu: false });
-      const hits = [];
-      for (const target of [150, 1150]) {
-        await p.page.evaluate(async (target) => {
-          const g = window.__dreamcar.game;
-          for (let k = 0; k < 400; k++) {
-            const d = (((target - g.racers[0].vehicle.s) % g.track.length) + g.track.length) % g.track.length;
-            if (d < 3 || d > g.track.length - 60) break;
-            window.__dreamcar.skip(d > 200 ? 2 : d > 40 ? 0.5 : 0.05);
+    const sizes = [
+      [1920, 1080, 1, false],
+      [1280, 720, 1, false],
+      [852, 393, 3, true],
+      [932, 430, 3, true],
+      [393, 852, 3, true],
+      [1180, 820, 2, true],
+    ];
+    for (const [w, h, dpr, mobile] of sizes) {
+      for (const layout of ['solo', 'wide', 'tall']) {
+        const mode = layout === 'solo' ? 'solo' : 'split';
+        const p = await open(`?manual&q=low&auto&ap&time=day&mode=${mode}&dpr=1`, { w, h, mobile, gpu: false, dpr });
+        if (layout !== 'solo') await p.page.evaluate((l) => window.__dreamcar.set('view.split', l), layout);
+        const places = await p.page.evaluate(() => {
+          const t = window.__dreamcar.game.track;
+          let bank = 0;
+          let sb = 0;
+          const f = {};
+          for (let s = 0; s < t.length; s += 10) {
+            t.frameAt(s, f);
+            if (Math.abs(f.bank) > bank) {
+              bank = Math.abs(f.bank);
+              sb = s;
+            }
           }
-          window.__dreamcar.advance(2 / 30, 30);
-        }, target);
-        const r = await p.page.evaluate(() => {
-          const g = window.__dreamcar.game;
-          const out = [];
-          const views = document.querySelectorAll('.hud .view');
-          g.views.forEach((v, vi) => {
-            const car = v.racer.car;
-            const cam = v.camera;
-            const V = cam.position.constructor;
-            car.object.updateMatrixWorld();
-            cam.updateMatrixWorld();
-            const vr = views[vi].getBoundingClientRect();
-            let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
-            const c = car.box.center, hh = car.box.half;
-            for (let i = 0; i < 8; i++) {
-              const q = new V(c.x + (i & 1 ? 1 : -1) * hh.x, c.y + (i & 2 ? 1 : -1) * hh.y, c.z + (i & 4 ? 1 : -1) * hh.z).applyMatrix4(car.object.matrixWorld).project(cam);
-              x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y);
-            }
-            const box = { l: vr.left + ((x0 + 1) / 2) * vr.width, r: vr.left + ((x1 + 1) / 2) * vr.width, t: vr.top + ((1 - y1) / 2) * vr.height, b: vr.top + ((1 - y0) / 2) * vr.height };
-            for (const e of views[vi].children) {
-              if (e.hidden || getComputedStyle(e).display === 'none' || getComputedStyle(e).visibility === 'hidden') continue;
-              if (!/lapblock|board|next|pos|lamps|map|cluster|touchcol/.test(e.className)) continue;
-              const b = e.getBoundingClientRect();
-              const ox = Math.min(b.right, box.r) - Math.max(b.left, box.l);
-              const oy = Math.min(b.bottom, box.b) - Math.max(b.top, box.t);
-              if (ox > 2 && oy > 2) out.push(`${e.className.split(' ')[0]} ${Math.round(ox)}x${Math.round(oy)}`);
-            }
-          });
-          return out;
+          return [Math.round(t.length * 0.03), Math.round(sb)];
         });
-        hits.push(...r.map((x) => `s${target}: ${x}`));
+        const hits = [];
+        let small = [];
+        for (const target of places) {
+          await p.page.evaluate(async (target) => {
+            const g = window.__dreamcar.game;
+            for (let k = 0; k < 400; k++) {
+              const d = (((target - g.racers[0].vehicle.s) % g.track.length) + g.track.length) % g.track.length;
+              if (d < 3 || d > g.track.length - 60) break;
+              window.__dreamcar.skip(d > 200 ? 2 : d > 40 ? 0.5 : 0.05);
+            }
+            const clock = g.race.clock;
+            for (const v of g.views) {
+              v.hud.flashLine(-1234, true, clock + 5);
+              v.hud.lapBanner(1, 93456, true, clock + 5);
+            }
+            window.__dreamcar.advance(2 / 30, 30);
+          }, target);
+          const r = await p.page.evaluate(() => {
+            const g = window.__dreamcar.game;
+            const out = [];
+            const tiny = [];
+            const views = document.querySelectorAll('.hud .view');
+            const shown = (e) => !e.closest('[hidden]') && getComputedStyle(e).display !== 'none' && getComputedStyle(e).visibility !== 'hidden';
+            g.views.forEach((v, vi) => {
+              const car = g.carRect(vi);
+              const vr = views[vi].getBoundingClientRect();
+              const boxes = [];
+              for (const e of views[vi].children) {
+                if (!shown(e)) continue;
+                const name = e.className.split(' ')[0];
+                if (!/^(lapblock|next|pos|lamps|map|cluster|touchcol|flash|banner)$/.test(name)) continue;
+                if (name === 'touchcol') {
+                  for (const b of e.querySelectorAll('button')) {
+                    if (!shown(b)) continue;
+                    const q = b.getBoundingClientRect();
+                    boxes.push({ name: 'button', r: q });
+                    if (views[vi].classList.contains('touch') && (q.width < 44 || q.height < 44)) tiny.push(`${Math.round(q.width)}x${Math.round(q.height)}`);
+                  }
+                  continue;
+                }
+                boxes.push({ name, r: e.getBoundingClientRect() });
+              }
+              const over = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
+              for (const b of boxes) {
+                // the banner and the gap are moments over the sky, never over the car
+                if (over(b.r, car)) out.push(`view ${vi}: ${b.name} over the car`);
+                if (b.r.left < vr.left - 1 || b.r.right > vr.right + 1 || b.r.top < vr.top - 1 || b.r.bottom > vr.bottom + 1) out.push(`view ${vi}: ${b.name} outside its view`);
+              }
+              for (let i = 0; i < boxes.length; i++)
+                for (let j = i + 1; j < boxes.length; j++)
+                  if (over(boxes[i].r, boxes[j].r)) out.push(`view ${vi}: ${boxes[i].name} over ${boxes[j].name}`);
+            });
+            return { out, tiny };
+          });
+          hits.push(...r.out.map((x) => `s${target}: ${x}`));
+          small = small.concat(r.tiny);
+        }
+        const label = `${w}x${h}${mobile ? ` (touch, x${dpr})` : ''} ${layout}`;
+        check(`${label}: nothing over the car, nothing over anything else, all inside the view`, hits.length === 0, [...new Set(hits)].join('; '));
+        if (mobile) check(`${label}: touch buttons at least 44 px`, small.length === 0, small.join(', '));
+        await p.close(`hud ${label}`);
       }
-      check(`${w}x${h}: no HUD box over the car (s 150 straight, s 1150 bend)`, hits.length === 0, hits.join('; '));
-      await p.close(`hud ${w}x${h}`);
+    }
+  },
+
+  /**
+   * The options, on the title and on the pause sheet: quality (kept under dreamcar.quality, applied by reloading;
+   * ?q= wins), sound, time of day, units, map; reachable by keyboard and by a pad.
+   */
+  async options() {
+    const p = await open('?manual&time=day', { w: 960, h: 540, gpu: false });
+    const tier0 = await p.page.evaluate('window.__dreamcar.stats().tier');
+    await clickText(p, 'Options');
+    await p.advance(0.1);
+    check('Options opens the options sheet over the title', (await visible(p, '.hud .options')) && !(await visible(p, '.hud .title')));
+    const rows = await p.page.evaluate(`[...document.querySelectorAll('.hud .options .optlabel')].filter((e) => !e.closest('[hidden]')).map((e) => e.textContent)`);
+    check('it offers quality, sound, time of day, units and the map', rows.length >= 4 && /quality/i.test(rows.join()) && /time/i.test(rows.join()), rows.join(', '));
+    const auto = await p.page.evaluate(`document.querySelector('.hud .options button[data-value="auto"]').classList.contains('on')`);
+    check(`with nothing chosen the quality is Auto (drawing at ${tier0})`, auto);
+    // units
+    await clickText(p, 'mph', '.options');
+    await p.advance(0.1);
+    check('mph is kept under dreamcar.units', (await p.page.evaluate(`localStorage.getItem('dreamcar.units')`)) === 'mph');
+    // map
+    await clickText(p, 'Hidden', '.options');
+    await p.advance(0.1);
+    check('the map can be hidden (kept under dreamcar.map)', (await p.page.evaluate(`localStorage.getItem('dreamcar.map')`)) === 'off');
+    // sound
+    if (await visible(p, '.hud .options .optrow:nth-of-type(3)')) {
+      await clickText(p, 'Off', '.options');
+      await p.advance(0.1);
+      check('sound off from the options', await p.page.evaluate('window.__dreamcar.game.muted === true'));
+      await clickText(p, 'On', '.options');
+      await p.advance(0.1);
+      check('sound on again', await p.page.evaluate('window.__dreamcar.game.muted === false'));
+    }
+    // time of day from the options
+    const times = await p.page.evaluate('Object.keys(window.__dreamcar.times)');
+    const other = times.find((t) => t !== 'day');
+    if (other) {
+      await p.page.click(`.hud .options .segment button:has-text("${await p.page.evaluate((t) => document.querySelector('.hud .timechoice button:nth-child(' + (Object.keys(window.__dreamcar.times).indexOf(t) + 1) + ')').textContent, other)}")`);
+      await p.advance(1);
+      check(`the time of day from the options (${other})`, (await p.state()).time === other);
+    }
+    // a pad's d-pad and A: down moves the focus, A presses
+    await p.page.evaluate(`document.activeElement && document.activeElement.blur()`);
+    await p.page.evaluate(`window.__dreamcar.game.action('nav:down')`);
+    const f1 = await p.page.evaluate('document.activeElement && document.activeElement.textContent');
+    await p.page.evaluate(`window.__dreamcar.game.action('nav:down')`);
+    const f2 = await p.page.evaluate('document.activeElement && document.activeElement.textContent');
+    check('a pad moves through the options', !!f1 && !!f2 && f1 !== f2, `${f1} > ${f2}`);
+    // Done, by keyboard: focus it and press Enter
+    await p.page.focus('.hud .options .buttons button');
+    await press(p, 'Enter');
+    await p.advance(0.1);
+    check('Done (Enter) goes back to the title', (await visible(p, '.hud .title')) && !(await visible(p, '.hud .options')));
+    check('Tab reaches the options button', await p.page.evaluate(async () => {
+      const b = [...document.querySelectorAll('.hud .title button')].find((x) => /options/i.test(x.textContent));
+      return !!b && b.tabIndex >= 0;
+    }));
+    // into a run: the units and the map follow; the board is not on the run
+    await press(p, 'Enter');
+    await toGo(p);
+    await p.advance(0.2);
+    const unit = await p.page.evaluate(`document.querySelector('.hud .view .unit').textContent`);
+    check('the speed reads in mph', /mph/i.test(unit), unit);
+    check('the map is hidden on the run', !(await visible(p, '.hud .view .map')));
+    check('no best-laps board on the run; the next time to beat is one line', !(await visible(p, '.hud .view .board')) && (await visible(p, '.hud .view .next')));
+    // the pause sheet has the board and the options
+    await press(p, 'KeyP');
+    await p.advance(0.1);
+    check('the pause sheet shows the board', await visible(p, '.hud .pause .boardlist'));
+    await clickText(p, 'Options', '.pause');
+    await p.advance(0.1);
+    check('Options from the pause sheet', await visible(p, '.hud .options'));
+    await press(p, 'Escape');
+    await p.advance(0.1);
+    check('Esc closes the options back to the pause sheet', (await visible(p, '.hud .pause')) && (await p.state()).paused);
+    // quality: a choice is kept and the page is built again with it
+    await clickText(p, 'Options', '.pause');
+    await p.advance(0.1);
+    await Promise.all([p.page.waitForNavigation({ waitUntil: 'load', timeout: 300000 }), clickText(p, 'Medium', '.options')]);
+    await p.page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
+    check('Medium is kept under dreamcar.quality and the page reloads at medium', (await p.page.evaluate(`localStorage.getItem('dreamcar.quality')`)) === 'medium'
+      && (await p.page.evaluate('window.__dreamcar.stats().tier')) === 'medium');
+    await p.go('?manual&q=low&time=day');
+    check('?q= in the address wins over the kept choice', (await p.page.evaluate('window.__dreamcar.stats().tier')) === 'low');
+    await p.go('?manual&time=day');
+    await clickText(p, 'Options');
+    await Promise.all([p.page.waitForNavigation({ waitUntil: 'load', timeout: 300000 }), clickText(p, 'Auto', '.options')]);
+    await p.page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
+    check('Auto again: the tier the probe chooses', (await p.page.evaluate('window.__dreamcar.stats().tier')) === tier0);
+    await p.close('options');
+  },
+
+  /**
+   * The start: one race clock; the camera dives from high behind the car onto its tail while the lamps come on,
+   * is settled before they go out, and does not jump at go. Solo and both halves of split screen.
+   */
+  async start() {
+    for (const mode of ['solo', 'split']) {
+      const p = await open(`?manual&q=low&auto&ap&time=day&mode=${mode}`, { w: 640, h: 360, gpu: false });
+      const sample = () => p.page.evaluate(() => {
+        const g = window.__dreamcar.game;
+        return {
+          clock: g.race.clock,
+          lit: g.race.lit,
+          cams: g.views.map((v) => ({ y: v.camera.position.y - v.racer.vehicle.position.y, x: v.camera.position.x, z: v.camera.position.z, settled: v.rig.settled })),
+        };
+      });
+      await p.advance(1 / 30, 30);
+      const first = await sample();
+      check(`${mode}: the run opens with the camera high over the grid`, first.cams.every((c) => c.y > 6), first.cams.map((c) => c.y.toFixed(1)).join(', '));
+      // to the moment the last lamp is lit
+      let s = first;
+      while (s.lit < 5 && s.clock < 0) {
+        await p.advance(1 / 30, 30);
+        s = await sample();
+      }
+      await p.advance(0.1, 30);
+      s = await sample();
+      check(`${mode}: settled behind the car before the lamps go out`, s.clock < 0 && s.cams.every((c) => c.settled === 1), `clock ${s.clock.toFixed(2)}`);
+      // across go: the camera moves smoothly (no cut)
+      let worst = 0;
+      let prev = s;
+      while (prev.clock < 0.5) {
+        await p.advance(1 / 30, 30);
+        const n = await sample();
+        n.cams.forEach((c, i) => (worst = Math.max(worst, Math.hypot(c.x - prev.cams[i].x, c.z - prev.cams[i].z, c.y - prev.cams[i].y))));
+        prev = n;
+      }
+      check(`${mode}: no jump at go (largest camera step ${worst.toFixed(2)} m in a 30th of a second)`, worst < 0.5);
+      await p.close(`start ${mode}`);
     }
   },
 

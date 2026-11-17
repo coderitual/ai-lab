@@ -136,8 +136,8 @@ export class Game {
     this.pipeline = new FramePipeline(engine.renderer, this.caps, { tier: this.tier, post: params.post });
     this.pipeline.debug = params.debug;
     this.track = createTrack();
-    // the times of day are whatever lighting.js has, in its order; the demo opens at DEFAULT_TIME (config.js)
-    params = { ...params, time: params.time && TIMES[params.time] ? params.time : TIMES[DEFAULT_TIME] ? DEFAULT_TIME : Object.keys(TIMES)[0] };
+    // the times of day are whatever lighting.js has, in its order; the demo opens at DEFAULT_TIME (config.js: null, the first)
+    params = { ...params, time: params.time && TIMES[params.time] ? params.time : DEFAULT_TIME && TIMES[DEFAULT_TIME] ? DEFAULT_TIME : Object.keys(TIMES)[0] };
     this.params = params;
     this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params });
     if (this.world.time.name !== params.time) this.world.setTime(params.time);
@@ -380,7 +380,7 @@ export class Game {
     const W = engine.bufferWidth;
     const H = engine.bufferHeight;
     const two = views.length > 1;
-    const sideBySide = engine.aspect >= 1;
+    const sideBySide = VIEW.split === 'wide' || (VIEW.split !== 'tall' && engine.aspect >= 1);
     views.forEach((view, i) => {
       // whole device pixels, and the two halves share every one of them
       if (!two) view.rect = { x: 0, y: 0, w: W, h: H };
