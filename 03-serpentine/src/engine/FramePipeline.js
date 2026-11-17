@@ -344,8 +344,15 @@ vec3 viewPos(ivec2 h, float d) {
 // One-sided differences, the smaller of the two: across a silhouette the other side belongs to another surface
 // and would tilt the normal.
 vec3 sideStep(vec3 p, ivec2 h, ivec2 step) {
-  vec3 a = viewPos(h + step, distAt(h + step)) - p;
-  vec3 b = p - viewPos(h - step, distAt(h - step));
+  ivec2 up = h + step;
+  ivec2 down = h - step;
+  // at the view's edge only one side exists
+  if (any(greaterThan(up, uHalf))) up = h;
+  if (any(lessThan(down, ivec2(0)))) down = h;
+  vec3 a = viewPos(up, distAt(up)) - p;
+  vec3 b = p - viewPos(down, distAt(down));
+  if (up == h) return b;
+  if (down == h) return a;
   return abs(a.z) < abs(b.z) ? a : b;
 }
 // A fixed 4x4 pattern of sixteen values spread over 0..1: neighbouring pixels turn their sample spiral to
@@ -373,7 +380,7 @@ void main() {
   for (int i = 0; i < AO_SAMPLES; i++) {
     float a = (float(i) + fract(turn * 7.0 + 0.5)) / float(AO_SAMPLES);
     float angle = 6.2831853 * (a * AO_TURNS + turn);
-    ivec2 q = h + ivec2(round(a * rPx * vec2(cos(angle), sin(angle))));
+    ivec2 q = clamp(h + ivec2(round(a * rPx * vec2(cos(angle), sin(angle)))), ivec2(0), uHalf);
     vec3 v = viewPos(q, distAt(q)) - p;
     float vv = dot(v, v);
     float fall = max(1.0 - vv / uAoSize.y, 0.0);
