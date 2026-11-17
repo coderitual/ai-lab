@@ -130,7 +130,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   const far = createFar({ track, terrain, caps, tier, rng: rng.fork('far'), atmosphere });
   far.setPixelRatio(renderer.getPixelRatio());
   lap('far');
-  const structures = createStructures({ track, terrain, caps, tier, atmosphere });
+  const structures = createStructures({ track, terrain, caps, tier, atmosphere, rng: rng.fork('structures') });
   lap('structures');
   const studs = createStuds({ track, caps });
   lap('studs');

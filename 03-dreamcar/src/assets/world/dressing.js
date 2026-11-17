@@ -28,8 +28,9 @@ const GLOW = 1.4;
  * @param {import('../../engine/caps.js').Caps} options.caps
  * @param {import('../../engine/caps.js').Tier} options.tier
  * @param {import('./atmosphere.js').Atmosphere} options.atmosphere
+ * @param {import('../../engine/rng.js').Rng} options.rng
  */
-export function createDressing({ track, terrain, caps, tier, atmosphere }) {
+export function createDressing({ track, terrain, caps, tier, atmosphere, rng }) {
   const group = new THREE.Group();
   group.name = 'dressing';
   const signs = createSigns({ tier, anisotropy: Math.min(tier === 'low' ? 2 : 8, caps?.maxAnisotropy ?? 1) });
@@ -50,7 +51,7 @@ export function createDressing({ track, terrain, caps, tier, atmosphere }) {
   const pits = buildPits({ track, terrain, tier, b, signs });
   const patches = b.build(material, group);
   group.add(start.group);
-  const town = createTown({ track, terrain, tier, atmosphere });
+  const town = createTown({ track, terrain, tier, atmosphere, rng: rng.fork('town') });
   if (town) group.add(town.group);
 
   return {

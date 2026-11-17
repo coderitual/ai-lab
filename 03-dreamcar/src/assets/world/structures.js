@@ -24,8 +24,9 @@ import { createViaducts } from './viaduct.js';
  * @param {import('../../engine/caps.js').Caps} options.caps
  * @param {import('../../engine/caps.js').Tier} options.tier
  * @param {import('./atmosphere.js').Atmosphere} options.atmosphere
+ * @param {import('../../engine/rng.js').Rng} options.rng
  */
-export function createStructures({ track, terrain, caps, tier, atmosphere }) {
+export function createStructures({ track, terrain, caps, tier, atmosphere, rng }) {
   const group = new THREE.Group();
   group.name = 'structures';
   const ms = {};
@@ -46,7 +47,7 @@ export function createStructures({ track, terrain, caps, tier, atmosphere }) {
   lap('posts');
   const viaducts = createViaducts({ track, terrain, atmosphere });
   lap('viaduct');
-  const dressing = createDressing({ track, terrain, caps, tier, atmosphere });
+  const dressing = createDressing({ track, terrain, caps, tier, atmosphere, rng: rng.fork('dressing') });
   lap('dressing');
   const parts = [lamps, tunnels, rails, posts, viaducts, dressing];
   for (const part of parts) group.add(part.group);
