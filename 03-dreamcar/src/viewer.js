@@ -74,7 +74,7 @@
 //   __viewer.view({ az: 30 })  change any of az, el, dist, fov, tx, ty, tz, ortho ('' for none), span; redraws
 //   __viewer.project(x, y, z)  the CSS pixel where a point of the asset's frame lands
 //   __viewer.frames(n)         run and draw n frames, a sixtieth of a second apart (for ?manual)
-//   __viewer.car, .world, .engine, .pipeline, .stand (the Object3D the asset stands in)
+//   __viewer.car, .world, .engine, .pipeline, .stand (the Object3D the asset stands in), .probe (the car's reflection probe)
 
 import * as THREE from 'three';
 import { createCar } from './assets/car/index.js';
