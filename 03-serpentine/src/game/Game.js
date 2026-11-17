@@ -302,7 +302,7 @@ export class Game {
       // two sizes (PROBE in config.js): the smaller at speed, the larger, redrawn whole, while the car is nearly still
       const table = PROBE[this.tier] || PROBE.medium;
       const probe = params.probe ? new ReflectionProbe(engine.renderer, table.size) : null;
-      const still = params.probe ? new ReflectionProbe(engine.renderer, table.stillSize) : null;
+
       return {
         racer,
         camera: new THREE.PerspectiveCamera(CAMERA.chase.fov, 1, VIEW.near, VIEW.far),
@@ -314,7 +314,7 @@ export class Game {
         exposure: this._exposureFor(racer.vehicle),
         /** The probe the paint reads now; `still` says which of the two it is. */
         probe,
-        probes: probe ? [probe, still] : [],
+        probes: probe ? [probe] : [],
         still: false,
       };
     });
@@ -993,6 +993,8 @@ export class Game {
         const still = view.still ? speed < PROBE.movingAbove : speed < PROBE.stillBelow;
         if (still !== view.still) {
           view.still = still;
+          // the larger cube is made the first time it is needed
+          if (still && !view.probes[1]) view.probes[1] = new ReflectionProbe(this.engine.renderer, table.stillSize);
           view.probe = view.probes[still ? 1 : 0];
           // the one taken up is refreshed face by face from what it last showed (its very first update draws all six)
           view.frame.probe = view.probe.texture;
