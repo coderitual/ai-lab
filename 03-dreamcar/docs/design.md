@@ -8,9 +8,10 @@ disagree, decide which is wrong and fix that one.
 
 A silver saloon, a closed mountain road, and a clock. You drive a current
 Mercedes-Benz C-Class (the W206 saloon in AMG Line trim, modelled in code from
-photographs of one particular car) round a three-kilometre pass: a lakeside
-straight, esses through spruce forest, a lit tunnel, a viaduct, three
-hairpins, a summit and a fast descent. Three laps against the clock, alone or
+photographs of one particular car, in a hot dream tune) round a five-kilometre
+circuit in the mountains by a lake: a lakeside straight, fast esses through the
+woods, a lit tunnel, a road on piers across the valley, a slow carousel, a crest,
+a plunge, a ledge, a second bridge and a long right back to the shore. Three laps against the clock, alone or
 against a friend in split screen. The same road exists three times: on a sunlit
 afternoon, at dusk after rain, and at night, when the picture is made of
 headlights, reflectors, the tunnel's lamps and the moon. It plays in a browser with a keyboard, a
@@ -66,6 +67,7 @@ The real thing, as the ruler for the model (W206 saloon):
 | kerb weight | about 1 650 kg |
 | engine | 2.0 l turbocharged four, 190 kW, 400 N·m, 9-speed automatic, rear-wheel drive |
 | 0–100 km/h / top speed | about 6.0 s / 250 km/h (limited) |
+| **the demo's tune** | 640 N·m, 365 kW; 0–100 km/h 3.9 s, 0–200 12.1 s, 284 km/h (limited); about 1.25 g at 100 km/h, a little downforce above that; 100–0 in 28 m |
 
 The particular car: high-tech silver metallic, AMG Line (star-pattern grille
 with one horizontal blade and the large star, sport bumpers with black
@@ -86,27 +88,41 @@ A second car, in a different paint, is the second player's.
 
 ## The road
 
-One closed loop, about 3.2 km, driven clockwise on the map, with roughly
-85 m between its lowest and highest points. Paved width 8.5 m (two lanes and
-two narrow shoulders), then a verge, then something solid: a steel guard rail
-on the valley side, rock on the hill side, parapets on the viaduct, walls in
-the tunnel. Nothing can be driven off the mountain.
+A racing circuit, not a public road: 5.14 km, driven clockwise, 108 m between
+the lake shore and the top (110 m above the water). Paved 12 m wide (three
+lanes, `HALF_WIDTH` 6), a 1.2 m strip beyond each edge line that is a red and
+white kerb in the bends and a paved margin elsewhere, then mown grass 3 to 10 m
+wide (widest on the outside of the fast bends) to a barrier: a steel rail by
+default, a low concrete wall along the start straight, rock where the road is
+cut into the hill, parapets on the bridges, walls in the tunnel. Trees stand
+behind the barrier, never as it. Gradients up to 8 per cent; banking by rule
+from the curvature (up to 9 degrees) and per piece, up to 10 degrees on the
+sky road. The numbers by stretch (s from the line, m; speeds are the
+autopilot's at full pace):
 
-| stretch | what it is for |
-| --- | --- |
-| Lakeside straight, start and finish | speed, the gantry, and the town: a street front with lit windows on one side, palms and the lake on the other |
-| The sweeper and the esses, climbing through spruce | rhythm; tree shadows by day, a corridor of trunks in the beams by night |
-| The tunnel, about 250 m, gently curved | light: the exposure closes down by day and the lamps slide over the paint |
-| The viaduct | the view, the wind, the sky in the paint |
-| Three hairpins | braking, weight transfer, the handbrake, chevrons lighting up |
-| The summit | the far mountains; the moon |
-| The descent along the rock face | speed with consequences: rock on one side, rail on the other |
-| The hook, back onto the straight | a late apex to finish the lap |
+| stretch | s | what it is |
+| --- | --- | --- |
+| Lakeside straight | 4686 to 250 | 700 m, level, along the shore (the line 450 m along it); lamps every 30 m on alternating sides; 225 to 279 km/h |
+| Shore bend | 250 to 657 | a banked right of 220 m radius (9 degrees) away from the water, starting to climb; about 200 km/h |
+| Forest esses | 657 to 1409 | right 260 m, left 330 m, right 240 m, climbing at 5 to 6 per cent; 205 to 240 km/h |
+| The tunnel | 1409 to 2006 | a rock cutting, the lit bore (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out; up to 255 km/h |
+| The sky road | 2006 to 2582 | on piers: a 576 m left of 300 m radius, banked 10 degrees, the valley 42 m under its middle; about 230 to 257 km/h |
+| The carousel | 2582 to 2915 | a 150 m climb, then 190 degrees right round a spur at 55 m radius, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
+| The crest | 2915 to 3115 | the top (108 m), in the open, the lake far below; the car goes light over it at about 160 km/h |
+| The plunge | 3115 to 3394 | 8 per cent down a 400 m right into a compression; to 215 km/h |
+| The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m on the hillside, rock on one side; 216 to 257 km/h |
+| Gully bridge | 3778 to 4115 | 337 m straight on piers, 26 m over the gully, 8 per cent down; to 282 km/h |
+| The long right | 4115 to 4686 | 90 degrees at 300 m radius, banked 9 degrees, onto the straight; 234 to 283 km/h |
 
-Road furniture is that of a Central European mountain road, drawn from
-scratch: white guide posts with reflectors every 50 m (closer in bends),
-red-and-white chevron boards on the hairpins, steel rails on posts, concrete
-portals.
+The autopilot laps in 85.1 s at full pace (217 km/h on average), 92.9 s at
+0.9, 117.1 s at 0.7. Sector lines at 1882 m (just out of the tunnel) and
+3420 m (the start of the ledge).
+
+The Track says where everything of a circuit goes, as data the world reads
+(`src/game/track.js`, header): kerbs, what grows behind each barrier, tyre
+walls on the outside of the fast bends, runs of trackside boards, distance
+boards before the carousel, marshal posts, the start gantry. Road furniture is
+drawn from scratch and carries no real names or words.
 
 ## A run
 
@@ -188,8 +204,8 @@ a few seconds it is offered).
   reads from 150 m. A town of about 330 lamps (high tier) lies on the lake's
   far shore and the slope behind it, mirrored in the lake, with a soft warm
   glow on the haze above it, a radio mast's red lamps and a hamlet high on
-  the slope beyond; it is in the frame from the descent and the hook (the
-  summit's hills and the viaduct's heading hide it from the rest of the lap).
+  the slope beyond (from which stretches of the new circuit it is in the frame
+  has not been checked yet).
 - **Dusk, the hour the demo opens in.** The sun is down; the sky runs from a
   dusty rose band on the horizon through mauve to slate violet overhead, and
   everything is lit by it: soft, cool, low in contrast. The road is wet and
