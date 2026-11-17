@@ -103,7 +103,12 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
       .replace('#include <common>', `#include <common>\n${GROUND_PARS}`)
       .replace('#include <map_fragment>', GROUND_COLOR)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = groundRoughness;')
-      .replace('#include <normal_fragment_maps>', GROUND_NORMAL);
+      .replace('#include <normal_fragment_maps>', GROUND_NORMAL)
+      // blades of grass have next to no sheen: the sky's blue must not wash the green out (rock and earth keep theirs)
+      .replace(
+        '#include <lights_physical_fragment>',
+        '#include <lights_physical_fragment>\nmaterial.specularColor *= 1.0 - 0.8 * groundGrass;\nmaterial.specularColorBlended *= 1.0 - 0.8 * groundGrass;\nmaterial.specularF90 *= 1.0 - 0.8 * groundGrass;',
+      );
   });
   withBake(material);
   // (env lane) light through the blades: mown grass seen against a low sun glows a vivid green (frame D1). After the
@@ -143,6 +148,7 @@ varying vec3 vGroundPos;
 varying vec3 vGroundNormal;
 float groundRoughness;
 vec3 groundThrough;  // what the grass here lets through (0 where it is not grass)
+float groundGrass;   // how much of this pixel is blades of grass
 vec3 groundBump;   // world-space tilt of the normal from the detail
 
 // the detail texture on the ground: from above where it is level, from the side on steep faces
@@ -215,34 +221,38 @@ vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 // (env lane) the verge: mown grass in stripes along the road, a strip of worn earth and loose stones along the
 // kerbs' outer edge, longer grass at the foot of the barrier
 float gVerge = ( 1.0 - step( 0.5, vVerge.w ) ) * ( 1.0 - smoothstep( 0.0, 1.5, vVerge.z ) );
+float gVergeEarth = 0.0;
 float gWoodBehind = gVerge > 0.0 ? clamp( vVerge.w / 0.4, 0.0, 1.0 ) : 0.0;
 if ( gVerge > 0.0 ) {
   float vd = vVerge.x;
   float vAa = 0.6 * ( abs( dFdx( vd ) ) + abs( dFdy( vd ) ) ) + 1.0e-3;
-  // the mower's passes: bands about 1.6 m wide whose blades lean one way or the other
+  // the mower's passes: bands about 1.6 m wide whose blades lean one way or the other (a shade apart, no more:
+  // frame D1's verge is evenly mown), a yellow-green that the low sun warms further
   float pass = abs( fract( vd / 3.2 ) * 2.0 - 1.0 );
   float stripe = clamp( ( pass - 0.5 ) / max( vAa / 1.6, 1.0e-3 ) + 0.5, 0.0, 1.0 );
   stripe = mix( stripe, 0.5, smoothstep( 0.3, 1.0, vAa / 1.6 ) );
-  vec3 mown = mix( vec3( 0.06, 0.13, 0.025 ), vec3( 0.09, 0.18, 0.035 ), stripe ) * ( 0.8 + 0.4 * gDet.r ) * ( 0.85 + 0.3 * gMid.r );
-  // worn earth: ragged, wider where cars have run wide
-  // a narrow verge (a wall close by, frame D3) is mostly rough grass and earth; a wide run-off is mown (D1)
+  vec3 mown = mix( vec3( 0.074, 0.115, 0.017 ), vec3( 0.088, 0.135, 0.02 ), stripe ) * ( 0.85 + 0.3 * gDet.r ) * ( 0.88 + 0.24 * gMid.r );
+  // a wide run-off is mown to the kerb but for a ragged strip of worn earth along it (D1); a narrow verge with a
+  // wall close by is rough grass in tufts with bare earth between them, most of it by the road (D3)
   float vWidth = vd - vVerge.z;
-  float rag = mix( 1.7, 0.55, smoothstep( 4.5, 6.0, vWidth ) ) + 0.5 * ( gDet.b - 0.5 ) + 0.6 * ( gLarge.b - 0.5 ) + 0.4 * ( gDet2.r - 0.5 );
+  float narrow = 1.0 - smoothstep( 4.5, 6.0, vWidth );
+  float rag = 0.55 + 0.5 * ( gDet.b - 0.5 ) + 0.6 * ( gLarge.b - 0.5 ) + 0.4 * ( gDet2.r - 0.5 );
   float earth = 1.0 - smoothstep( rag - 0.15, rag + 0.15, vd );
-  vec3 earthCol = mix( vec3( 0.16, 0.135, 0.1 ), vec3( 0.24, 0.215, 0.18 ), gDet.b ) * ( 0.75 + 0.4 * gDet2.g );
+  float bare = smoothstep( 0.42, 0.6, 0.55 * gDet2.r + 0.45 * gMid.a + 0.35 * ( 1.0 - smoothstep( 0.0, 2.2, vd ) ) - 0.2 * gDet.r );
+  earth = max( earth, narrow * bare );
+  vec3 earthCol = mix( vec3( 0.075, 0.058, 0.04 ), vec3( 0.15, 0.125, 0.095 ), gDet.b ) * ( 0.75 + 0.4 * gDet2.g );
   // a few stones thrown out onto the grass beyond it
   float stones = smoothstep( 0.82, 0.9, gDet.b ) * ( 1.0 - smoothstep( 0.4, 2.0, vd - rag ) );
-  // long grass at the barrier's foot
-  float rough = smoothstep( -1.2, -0.3, vVerge.z );
-  vec3 vergeCol = mix( mown, gGrass * 1.1, rough );
-  // rough tufts in the earth strip: clumps of darker, longer grass
-  float tufts = smoothstep( 0.55, 0.75, gDet.r ) * earth * ( 1.0 - smoothstep( 4.5, 6.0, vWidth ) );
+  // long grass at the barrier's foot, and all over a narrow verge
+  float rough = max( smoothstep( -1.2, -0.3, vVerge.z ), narrow );
+  vec3 roughCol = gGrass * ( 0.75 + 0.7 * smoothstep( 0.35, 0.7, gDet.r ) );
+  vec3 vergeCol = mix( mown, roughCol, rough );
   vergeCol = mix( vergeCol, earthCol, max( earth, stones * 0.8 ) );
-  vergeCol = mix( vergeCol, gGrass * 0.9, tufts );
   // fallen leaves drifted against the barrier's foot under woods (frame D4)
   float leaves = gWoodBehind * smoothstep( -2.2, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
   vergeCol = mix( vergeCol, mix( vec3( 0.2, 0.075, 0.02 ), vec3( 0.09, 0.04, 0.015 ), gDet.b ), leaves );
   gGrass = mix( gGrass, vergeCol, gVerge );
+  gVergeEarth = gVerge * max( earth, stones * 0.8 );
   gScree *= 1.0 - gVerge;
   gForest *= 1.0 - gVerge;
 }
@@ -265,8 +275,9 @@ if ( gVerge > 0.0 ) {
 float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) );
 gForest = max( gForest, gClump );
 vec3 gAlbedo = gGrass;
-// blades let through a bright yellow-green, the mown verge most
-groundThrough = vec3( 0.18, 0.42, 0.05 ) * ( 0.6 + 0.8 * gVerge ) * ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * gFade;
+// blades let through a bright yellow-green, the mown verge most (bare earth none)
+groundGrass = ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * ( 1.0 - gVergeEarth );
+groundThrough = mix( vec3( 0.18, 0.42, 0.05 ), vec3( 0.3, 0.4, 0.03 ), gVerge ) * ( 0.6 + 0.8 * gVerge ) * groundGrass * gFade;
 gAlbedo = mix( gAlbedo, vec3( 0.03, 0.045, 0.02 ) * ( 0.7 + 0.6 * gDet.r ), gScrub * 0.85 );
 gAlbedo = mix( gAlbedo, gForestCol, gForest );
 // (seen from the road a clump is crowns, not forest floor)

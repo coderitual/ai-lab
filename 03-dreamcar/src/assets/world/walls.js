@@ -1,15 +1,22 @@
 // The low concrete walls: wherever the Track's solid edge is a WALL outside a
-// tunnel (the start straight), precast blocks 0.93 m high (the hoardings behind
-// show over them) whose face
-// stands exactly at the edge distance (where the physics stops a car).
+// tunnel, precast blocks 0.93 m high (the hoardings behind show over them)
+// whose face stands exactly at the edge distance (where the physics stops a
+// car).
 //
 // One profile swept along each run (face, a chamfered top, the back), its
-// texture coordinates metres of road and metres up the face. Painted in
-// blocks of our own colours, graphite and a bright teal by turns (frame D1's
-// wall is dark with bright blocks), each block a
+// texture coordinates metres of road and metres up the face. Each block is a
 // precast unit with a dark joint; weathered: dirt sprayed up from the road
 // along the foot, rain streaks down from the top, black rubber where cars
 // have touched it, the paint worn to the concrete on the arrises.
+//
+// The paint depends on where the wall stands, by rule (PAINT):
+//  - along the stretch through the start line, on the side with nothing
+//    behind it (the lake): blocks of our own colours, graphite and a bright
+//    teal by turns (frame D1's wall is dark with bright blocks);
+//  - along the same stretch on the side where the land is (woods behind it:
+//    the pit wall and the grid's far side): white (frame D4);
+//  - everywhere else (the ledge's bend, frame D3): one deep bottle green,
+//    quiet, its top a level dark band.
 
 import * as THREE from 'three';
 import { EDGE, levelFrame, runsOf, stripGeometry } from './furniture.js';
@@ -30,6 +37,8 @@ const PROFILE = [
 const BLOCK = 3;
 /** Metres between cross-sections on a straight and in a bend. */
 const STEP = { straight: 6, bend: 2 };
+/** Which paint a wall wears (the shader has the same numbers). */
+const PAINT = { BLOCKS: 0, WHITE: 1, DARK: 2 };
 
 /**
  * @param {object} options
@@ -44,6 +53,10 @@ export function createWalls({ track, atmosphere }) {
   const base = new THREE.Vector3();
   const strips = [];
   let metres = 0;
+  // the stretch the start line lies on, and which of its sides is the land (the Track says what grows there)
+  const start = track.sectionAt ? track.sectionAt(0) : null;
+  const onStart = (s) => !!start && track.sectionAt(s) === start;
+  const paintAt = (s, side) => (!onStart(s) ? PAINT.DARK : track.woodAt?.(s, side) ? PAINT.WHITE : PAINT.BLOCKS);
   for (const side of [1, -1]) {
     const kinds = side > 0 ? track.kindL : track.kindR;
     const profile = side > 0 ? PROFILE.slice().reverse() : PROFILE;
@@ -52,16 +65,19 @@ export function createWalls({ track, atmosphere }) {
       const s1 = run.s1 + track.ds;
       metres += s1 - s0;
       const rows = [];
+      const paints = [];
       for (let s = s0; ; ) {
         const sw = track.wrap(s);
         levelFrame(track, sw, frame);
         const edge = track.edgeAt(sw, side);
         track.pointAt(sw, side * edge, base);
         rows.push(profile.map(([out, up]) => [base.x + frame.flat.x * side * out, base.y + up, base.z + frame.flat.z * side * out, s, up + out]));
+        const paint = paintAt(sw, side);
+        paints.push(profile.map(() => [paint]));
         if (s >= s1) break;
         s = Math.min(s1, s + (Math.abs(frame.curvature) > 1 / 300 ? STEP.bend : STEP.straight));
       }
-      if (rows.length > 1) strips.push(stripGeometry(rows));
+      if (rows.length > 1) strips.push(stripGeometry(rows, { attributes: { aPaint: { size: 1, rows: paints } } }));
     }
   }
   if (!strips.length) return { group, stats: { metres: 0 } };
@@ -81,13 +97,14 @@ export function createWalls({ track, atmosphere }) {
 function wallPaint(material) {
   return extend(material, 'wall-paint', (shader) => {
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vWall;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWall = uv;');
+      .replace('#include <common>', '#include <common>\nattribute float aPaint;\nvarying vec2 vWall;\nvarying float vWallPaint;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWall = uv;\nvWallPaint = aPaint;');
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
 varying vec2 vWall;
+varying float vWallPaint;
 float wallHash( float x ) { return fract( sin( x * 127.1 ) * 43758.5453 ); }
 float wallNoise( vec2 p ) {
   vec2 i = floor( p );
@@ -108,12 +125,16 @@ float wY = vWall.y;
 float wBlock = floor( wS / ${BLOCK.toFixed(1)} );
 float wAa = fwidth( wS ) + 1.0e-3;
 float wJoint = 1.0 - smoothstep( 0.012, 0.012 + wAa, abs( fract( wS / ${BLOCK.toFixed(1)} + 0.5 ) - 0.5 ) * ${BLOCK.toFixed(1)} );
-// our colours: graphite and a bright teal by turns
+// the paint (PAINT): graphite and a bright teal by turns; white; a deep bottle green
 vec3 wPaint = mod( wBlock, 2.0 ) < 0.5 ? vec3( 0.022, 0.026, 0.03 ) : vec3( 0.04, 0.4, 0.42 );
+wPaint = vWallPaint > ${(PAINT.WHITE - 0.5).toFixed(1)} ? vec3( 0.6, 0.59, 0.56 ) : wPaint;
+wPaint = vWallPaint > ${(PAINT.DARK - 0.5).toFixed(1)} ? vec3( 0.018, 0.048, 0.036 ) : wPaint;
 vec3 wConcrete = vec3( 0.36, 0.35, 0.32 );
 float wN = wallNoise( vec2( wS * 1.3, wY * 6.0 ) ) * 0.6 + wallNoise( vec2( wS * 5.1, wY * 19.0 ) ) * 0.4;
 // worn to the concrete on the chamfered arris and at random
 float wWorn = max( smoothstep( 0.88, 0.95, wY ) * smoothstep( 0.4, 0.7, wN ), smoothstep( 0.78, 0.92, wN ) * 0.6 );
+// (the dark wall is the quiet one: its paint is kept up)
+wWorn *= vWallPaint > ${(PAINT.DARK - 0.5).toFixed(1)} ? 0.3 : 1.0;
 vec3 wCol = mix( wPaint, wConcrete, wWorn );
 // rain streaks from the top, road dirt sprayed up the foot, rubber at a wheel's height
 float wRain = smoothstep( 0.55, 0.85, wallNoise( vec2( wS * 3.0, wY * 0.6 ) ) ) * smoothstep( 0.2, 0.9, wY ) * 0.35;
