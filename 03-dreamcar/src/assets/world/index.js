@@ -136,7 +136,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   const far = createFar({ track, terrain, caps, tier, rng: rng.fork('far'), atmosphere });
   far.setPixelRatio(renderer.getPixelRatio());
   lap('far');
-  const structures = createStructures({ track, terrain, caps, tier, atmosphere });
+  const structures = createStructures({ track, terrain, caps, tier, atmosphere, rng: rng.fork('structures') });
   lap('structures');
   const studs = createStuds({ track, caps });
   lap('studs');
@@ -176,7 +176,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   const world = {
     scene,
     time: null,
-    probeHidden: [sky.stars],
+    probeHidden: [sky.stars, ...structures.probeHidden],
     /** The wet road's planar reflection (null on the low tier): its target, camera, last cost (`ms`). */
     mirror,
     atmosphere,
@@ -222,6 +222,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       lake.update(simTime);
       forest.update(dt, simTime);
       far.update(dt, simTime);
+      structures.update(dt);
     },
 
     prepareView(camera, focus, beams) {
