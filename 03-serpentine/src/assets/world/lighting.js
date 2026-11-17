@@ -201,8 +201,9 @@ export const TIMES = {
     // from being holes
     ambient: { sky: [0.45, 0.6, 1.0], ground: [0.3, 0.36, 0.5], intensity: 0.003 },
     fog: { color: [0.001, 0.0015, 0.0027], sun: [0.0007, 0.0009, 0.0013], sunLobe: 4, density: 0.00042, heightFalloff: 0.011 },
-    // five stops above day
-    exposure: 32,
+    // four stops above day (look lane: was five; at 32 the moonlit land read as dusk and everything that faces a head
+    // lamp within 30 m burnt to white; reference B is darker, its lights brighter against it)
+    exposure: 18,
     // the lit tunnel is two stops brighter than the moonlit road outside
     tunnelExposure: 8,
     look: { contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], lift: [0.0006, 0.0009, 0.0018], vignette: 0.32, chroma: 0.0012, grain: 1.2, bloom: 0.15, ghosts: 0 },

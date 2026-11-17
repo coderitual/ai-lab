@@ -43,6 +43,13 @@ import { createRoad } from './road.js';
 import { createRockFaces } from './rock.js';
 import { createStructures } from './structures.js';
 import { ROW_STEP, createTerrain } from './terrain.js';
+import { PlanarMirror } from '../../engine/PlanarMirror.js';
+
+/**
+ * The wet road's planar reflection, per tier: the target's height against the view's, and how far it reaches (m).
+ * Low: none (the asphalt keeps its speculars and the environment map). Only with half-float targets.
+ */
+const MIRROR = { medium: { scale: 0.35, far: 220 }, high: { scale: 0.5, far: 320 } };
 
 /**
  * @typedef {object} Beam one car's head lamps, for whatever answers them (reflectors)
@@ -104,7 +111,9 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     lights: { day: TIMES.day.sun.dir, night: TIMES.night.sun.dir },
   });
   lap('terrain');
-  const road = createRoad({ track, caps, tier, atmosphere, terrain, rowStep: ROW_STEP[tier] ?? 1 });
+  const mirror = MIRROR[tier] && caps.hdr ? new PlanarMirror(renderer, caps, MIRROR[tier]) : null;
+  if (mirror) mirror.uniforms.uMirrorPlane = { value: new THREE.Vector4(0, 1, 0, 0) };
+  const road = createRoad({ track, caps, tier, atmosphere, terrain, rowStep: ROW_STEP[tier] ?? 1, mirror });
   lap('road');
   const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock') });
   lap('rock');
@@ -131,6 +140,11 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     road.setWetness(wetness);
   };
   let startLights = 0;
+  /** What the wet road's mirror leaves out: the road itself and what lies under or far beyond it. */
+  const mirrorHidden = [road.group, terrain.group, rock.group, lake.mesh, cover.group, far.group];
+  const mirrorPoint = new THREE.Vector3();
+  const mirrorFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
+  const drawing = new THREE.Vector2();
   /** The Track sample each camera's car was last found at: the next search starts there. */
   const hints = new WeakMap();
   const spot = { index: -1, s: 0, lat: 0 };
@@ -150,6 +164,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     scene,
     time: null,
     probeHidden: [sky.stars],
+    /** The wet road's planar reflection (null on the low tier): its target, camera, last cost (`ms`). */
+    mirror,
     atmosphere,
     terrain,
     /** Start-up milliseconds per part, and the terrain's own counts. */
@@ -203,6 +219,18 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       const open = skyOver(camera, focus);
       scene.environmentIntensity = world.time.env.intensity * open;
       sun.setFill(open);
+      // the wet road's reflection, about the road's plane under this view's car (skyOver has just located it)
+      if (mirror) {
+        if (wetness > 0.02 && camera.isPerspectiveCamera) {
+          const s = Math.min(track.length - 1e-3, Math.max(0, spot.s));
+          const lat = Math.max(-track.halfWidth, Math.min(track.halfWidth, spot.lat));
+          track.frameAt(s, mirrorFrame);
+          track.pointAt(s, lat, mirrorPoint);
+          mirror.uniforms.uMirrorPlane.value.set(mirrorFrame.up.x, mirrorFrame.up.y, mirrorFrame.up.z, -mirrorFrame.up.dot(mirrorPoint));
+          renderer.getDrawingBufferSize(drawing);
+          mirror.render(scene, camera, mirrorPoint, mirrorFrame.up, mirrorHidden, Math.min(drawing.y, drawing.x / camera.aspect));
+        } else mirror.uniforms.uMirrorOn.value = 0;
+      }
     },
 
     setStartLights(n) {
@@ -247,6 +275,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       rock.dispose();
       structures.dispose();
       groundMaterial.dispose();
+      mirror?.dispose();
     },
   };
 

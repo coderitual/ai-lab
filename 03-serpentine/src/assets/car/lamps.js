@@ -13,7 +13,10 @@ import * as THREE from 'three';
 import { LAMPS, STATIONS } from './spec.js';
 
 /** What the lamps throw: head lamps in candela-like units at the low beam's hot spot, the tail glow likewise. */
-const THROW = { head: 3200, tail: 0.06, brake: 0.3 };
+// (look lane: head 3200 -> 1600. At the night's exposure (lighting.js, 32) a lamp of 3200 burnt everything that faces
+// it within 30 m to white; the road, lit at a glancing angle, keeps its pool through the asphalt's own backscatter in
+// world/road.js. LAMP_LOW in world/road.js and world/retro.js is this number.)
+const THROW = { head: 1600, tail: 0.06, brake: 0.3 };
 /** Half the angle the beam picture covers. */
 const BEAM_ANGLE = 0.5;
 /** Main beam's hot spot against dipped beam's (110 000 cd against 30 000 cd a lamp, modelling sheet 9). */
@@ -42,10 +45,12 @@ function createBeamTexture(high) {
       const right = Math.atan((((x + 0.5) / width) * 2 - 1) * span) * deg;
       const cutOff = -0.57 + Math.min(1.1, Math.max(0, right) * Math.tan(15 / deg));
       const edge = Math.min(1, Math.max(0, (cutOff - up) / 0.3 + 0.5)); // a third of a degree of softness
-      const depth = Math.min(1, 1.5 / Math.max(1.5, 0.3 - up)) ** 2.6; // full strength down to 1.2 degrees under the horizontal
+      // full strength down to 1.2 degrees under the horizontal; (look lane) steeper still below 4 degrees, so a bank or
+      // a rock face a few metres off the bumper is lit, not burnt white at the night's exposure
+      const depth = Math.min(1, 1.5 / Math.max(1.5, 0.3 - up)) ** 2.6 * Math.min(1, 4 / Math.max(4, -up)) ** 1.5;
       const spread = Math.exp(-((right / 17) ** 2)) * 0.75 + Math.exp(-((right / 6) ** 2)) * 0.25;
-      // a trace above the cut-off, so that signs and reflector posts answer
-      let value = (edge + 0.008 * (1 - edge)) * depth * spread;
+      // a trace above the cut-off, so that signs and reflector posts answer (look lane: 0.008 burnt near banks white)
+      let value = (edge + 0.0025 * (1 - edge)) * depth * spread;
       // (main beam's spot falls off towards the car like dipped beam does, or it whitens the road by the bumper)
       if (high) value += HIGH_GAIN * depth * Math.exp(-Math.LN2 * ((right / 10) ** 2 + ((up - 0.5) / 3.5) ** 2));
       const o = (y * width + x) * 4;

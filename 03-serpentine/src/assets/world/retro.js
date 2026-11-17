@@ -19,8 +19,8 @@ import { extend } from './shading.js';
 /** Up to this many cars' head lamps are answered. */
 export const BEAMS = 2;
 /** Head lamp output (THROW in assets/car/lamps.js: candela at the beam's brightest point, per lamp; two per car). */
-const LAMP_LOW = 3200;
-const LAMP_HIGH = 9000;
+const LAMP_LOW = 1600;
+const LAMP_HIGH = 4500;
 
 /** The beams of every car, shared by all retro-reflective materials. */
 const uniforms = {
