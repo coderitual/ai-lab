@@ -29,7 +29,7 @@ export const SPECIES_DATA = {
   larch: { height: [14, 26], green: [0.447, 0.621, 0.38], autumn: [[0.855, 0.779, 0.564]], turns: 0.35, value: [0.85, 1.15], hue: 0.3, lean: 0.07, through: 0.75 },
   birch: { height: [10, 19], green: [0.457, 0.618, 0.283], autumn: [[0.944, 0.851, 0.422], [0.857, 0.737, 0.348]], turns: 0.4, value: [0.88, 1.15], hue: 0.4, lean: 0.13, through: 0.9 },
   maple: { height: [9, 16], green: [0.383, 0.557, 0.235], autumn: [[1.25, 0.42, 0.04], [1.22, 0.6, 0.05], [1.1, 0.26, 0.04], [1.25, 0.5, 0.04], [1.2, 0.72, 0.07]], turns: 1, value: [0.85, 1.12], hue: 0.35, lean: 0.08, through: 1.0 },
-  hazel: { height: [2.4, 4.6], green: [0.344, 0.518, 0.223], autumn: [[0.848, 0.772, 0.502]], turns: 0.3, value: [0.8, 1.1], hue: 0.35, lean: 0.12, through: 0.9 },
+  hazel: { height: [2.4, 4.6], green: [0.3, 0.5, 0.16], autumn: [[1.05, 0.55, 0.08]], turns: 0.25, value: [0.8, 1.1], hue: 0.35, lean: 0.12, through: 0.9 },
   lime: { height: [12, 21], green: [0.403, 0.577, 0.255], autumn: [[0.973, 0.819, 0.377], [0.897, 0.656, 0.294]], turns: 0.3, value: [0.85, 1.12], hue: 0.3, lean: 0.06, through: 0.95 },
 };
 
