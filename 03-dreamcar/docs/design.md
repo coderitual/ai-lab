@@ -133,10 +133,15 @@ under its middle five columns of four hooded lamps, the lower two red for the
 count, the upper two green for four seconds after lights out. On the land side
 behind the wall a catch fence, a pit lane and a two-storey pit building
 (garages, a glazed floor lit at dusk and at night, a roof terrace under a
-canopy carrying the name); on the lake side a covered stand. Big hoardings on
-legs behind both walls of the straight, low boards along the bends, tyre walls,
-distance boards, marshal huts, all from the Track's data and never inside the
-solid edges. Past the end of the straight a town climbs the slope beyond the
+canopy carrying the name); on the lake side a covered stand. Along the lake
+side of the straight one run of tall hoardings (3.8 m panels, tops near 5 m),
+broken only by the stand and the gantry's tower; the land side stays open
+(grass, the barrier, the pits). Past the pit exit a short tyre wall with low
+boards on a low wall behind it. At the far end of the straight a footbridge
+carrying boards, a marshal's tower, and on the outside of the first bend a
+small stand and distance boards 200, 150 and 100. Low boards along the bends,
+tyre walls, distance boards before the carousel and marshal huts come from
+the Track's data; nothing stands inside the solid edges. Past the end of the straight a town climbs the slope beyond the
 shore bend with a church tower and a large pale hotel on the height; a hamlet
 lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
 
