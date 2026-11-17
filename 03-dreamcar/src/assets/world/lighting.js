@@ -136,28 +136,23 @@ export function towards(bearing, elevation) {
  * the disc stands just over the frame on the descent and the lens still takes its glare (FramePipeline's flare
  * source follows a light up to a quarter of the view's height outside the frame).
  */
-const SUN = towards(-120, 30);
+const SUN = towards(116, 20);
 
 /**
- * The moon: opposite the sun on the map and high. On the straight it is behind and to the right, over the wood,
- * so the tail of the car is moonlit and the moon rides in the rear screen; over the viaduct it is dead ahead; on
- * the descent it lights the rock face that the afternoon leaves in shade.
+ * (sky lane) The moon: low, ahead and a little left of the start straight, beside the massif, so that the massif stands
+ * as a silhouette with moonlit edges, the moon itself rides in the chase view down the straight, and the car is
+ * rim-lit from ahead (its lamps and the street lamps light what faces the camera).
  */
-const MOON = towards(330, 50);
+const MOON = towards(98, 17);
 
 /**
- * (look lane, dusk) Where the sun went down: bearing 100 (along the lake, a little out over it), 5 degrees under
- * the horizon. The rose band lies (headings from the Track, scratchpad head.mjs):
- *   lakeside straight   ahead, 10 degrees left of the road, down the lake over the water (the C-match view)
- *   sweeper, esses      ahead-left to left (35..105 degrees off the road) as the road turns up into the wood
- *   tunnel, viaduct     left and behind (95..130)
- *   hairpins            behind-left on the legs that climb away from the lake, ahead-right (50) on the others
- *   summit              right, then behind-right
- *   descent             behind and to the right (75..160): the descent looks into the slate side of the sky
- *   hook, chute         right, then ahead again as the chute meets the shore
+ * (sky lane) GOLDEN HOUR (references D4 and D2): the sun 3.5 degrees up at bearing 215, out over the lake and behind
+ * the left shoulder of a car on the start straight. Its light crosses the straight from the lake side almost level:
+ * the low wall and the lake-side lamps and trees throw shadows 15 to 20 m long that put the grid in shade or half
+ * shade, while the trees, the gantry and the buildings on the land side, ahead and to the right, stand in full
+ * orange light (D4). Ahead lies the sky opposite the sun: blue overhead, rose low down, with clouds lit from below.
  */
-const DUSK_BEARING = 100;
-const DUSK_SUN = towards(DUSK_BEARING, -5);
+const DUSK_SUN = towards(215, 3.5);
 
 /** @type {{ day: TimeOfDay, dusk: TimeOfDay, night: TimeOfDay }} */
 export const TIMES = {
@@ -165,78 +160,68 @@ export const TIMES = {
   // valleys; a few clouds that catch the light.
   day: {
     name: 'day',
-    sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 6.2 },
+    sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 7.5 },
     sky: {
-      zenith: [0.04, 0.15, 0.5],
-      horizon: [0.23, 0.37, 0.62],
+      zenith: [0.03, 0.12, 0.46],
+      horizon: [0.2, 0.36, 0.68],
       falloff: 0.15,
       phase: 0.4,
       // (look lane: the aureole, `tight`, was 7: now a white-hot halo about four times the disc's radius, which is
       // what the bloom and the glare of the frame spread over the top of the picture)
-      glow: { color: [1.0, 0.9, 0.74], wide: [0.9, 0.74], tight: [40, 0.965] },
+      glow: { color: [1.0, 0.9, 0.74], wide: [0.3, 0.8], tight: [40, 0.988] },
       disc: { size: 0.4, radiance: 3000, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
       // grass, rock and forest of albedo 0.11 under the 3.1 the sun and sky lay on them
       ground: [0.105, 0.112, 0.09],
       stars: 0,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      clouds: { cover: 0.44, wisps: 0.6, lit: 0.2, silver: 1.6, shade: [0.27, 0.31, 0.39], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.4, wisps: 0.15, lit: 0.22, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
     },
     // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
-    env: { intensity: 0.72 },
+    env: { intensity: 0.55 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
-    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.06 },
-    fog: { color: [0.36, 0.46, 0.62], sun: [0.6, 0.42, 0.24], sunLobe: 8, density: 0.0003, heightFalloff: 0.011 },
-    exposure: 1.1,
+    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.04 },
+    fog: { color: [0.3, 0.44, 0.7], sun: [0.16, 0.1, 0.05], sunLobe: 16, density: 0.0002, heightFalloff: 0.011 },
+    exposure: 1.0,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.12, ghosts: 0.008, glare: 0.3 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.18, saturation: 1.22, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
   },
 
-  // (look lane, dusk stage) THE VELVET HOUR: the half hour after sunset, after rain (reference C). The sun is 5
-  // degrees under the horizon at the far end of the lake, so the rose band stands ahead of the start straight,
-  // down the water. Nothing lights directly: the sky's gradient, through the environment map and the fill, is the
-  // light, and a weak high key from the bright side of the sky lets the car and what stands sit on a soft shadow.
-  // The lamps, windows and both towns are on; the road is wetter than at night, with more water standing.
+  // (sky lane) GOLDEN HOUR: dry, the sun low and orange, the shade blue, the sky pale gold low towards the sun, rose
+  // opposite it and blue overhead, the clouds lit from below. The lamps and windows are coming on.
   dusk: {
     name: 'dusk',
-    // `dir` is where the sun went (the band, the haze's warm side); `light` is what the directional light does
-    sun: { dir: DUSK_SUN, color: [0.8, 0.8, 1.0], intensity: 0, light: { dir: towards(DUSK_BEARING + 30, 62), intensity: 0.05 } },
+    sun: { dir: DUSK_SUN, color: [1.0, 0.6, 0.3], intensity: 3.4 },
     sky: {
-      // slate blue-violet overhead, mauve lower down
-      zenith: [0.0135, 0.0155, 0.032],
-      horizon: [0.04, 0.033, 0.047],
-      falloff: 0.22,
-      phase: 0.15,
-      // a broad warm lobe over where the sun went
-      glow: { color: [1.0, 0.56, 0.42], wide: [0.03, 0.55], tight: [0.02, 0.86] },
-      disc: { size: 0.4, radiance: 0, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
-      // the dusty rose band low on the horizon (sky.js): radiance at the horizon under the sun, height (unit y)
-      band: { color: [0.05, 0.026, 0.026], height: 0.09 },
-      ground: [0.005, 0.0047, 0.0062],
-      stars: 6e-7,
+      zenith: [0.012, 0.04, 0.13],
+      horizon: [0.1, 0.1, 0.13],
+      falloff: 0.18,
+      phase: 0.3,
+      glow: { color: [1.0, 0.62, 0.3], wide: [0.35, 0.62], tight: [20, 0.985] },
+      disc: { size: 0.45, radiance: 900, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
+      // the rose belt low all round, gold under the sun (sky.js: radiance at the horizon, height)
+      band: { color: [0.08, 0.04, 0.035], height: 0.1 },
+      ground: [0.03, 0.026, 0.024],
+      stars: 0,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      // a few thin clouds: their undersides lit rose by the set sun, their tops grey
-      clouds: { cover: 0.16, wisps: 0.55, lit: 0, light: [0.075, 0.036, 0.034], silver: 0.8, shade: [0.017, 0.017, 0.024], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.38, wisps: 0.4, lit: 0.06, silver: 1.6, shade: [0.035, 0.035, 0.06], drift: [0.0011, 0.0004] },
     },
-    env: { intensity: 1 },
-    ambient: { sky: [0.8, 0.78, 1.0], ground: [0.55, 0.47, 0.5], intensity: 0.012 },
-    // a soft violet-grey haze, rose towards the band
-    fog: { color: [0.034, 0.029, 0.04], sun: [0.03, 0.014, 0.01], sunLobe: 3, density: 0.00055, heightFalloff: 0.011 },
-    // 2.7 stops above day
-    exposure: 7.2,
-    tunnelExposure: 8,
-    // restrained: a photograph of a wet evening (reference C point 6)
-    look: { contrast: 1.0, saturation: 0.95, tint: [1.0, 0.975, 1.035], lift: [0.0004, 0.0003, 0.0007], vignette: 0.2, chroma: 0.0008, grain: 0.8, bloom: 0.06, ghosts: 0 },
-    lamps: { street: 1, tunnel: 1, windows: 1 },
-    wetness: 0.75,
+    env: { intensity: 0.8 },
+    ambient: { sky: [0.6, 0.7, 1.0], ground: [1.0, 0.7, 0.45], intensity: 0.025 },
+    fog: { color: [0.085, 0.085, 0.11], sun: [0.3, 0.16, 0.06], sunLobe: 6, density: 0.00025, heightFalloff: 0.011 },
+    exposure: 3.2,
+    tunnelExposure: 6,
+    look: { flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 }, contrast: 1.12, saturation: 1.12, tint: [1.03, 1.0, 0.95], lift: [0, 0, 0], vignette: 0.28, chroma: 0.001, grain: 0.6, bloom: 0.09, ghosts: 0.0003, glare: 0.03 },
+    lamps: { street: 1, tunnel: 1, windows: 0.7 },
+    wetness: 0,
     carLights: 'low',
   },
 
@@ -256,7 +241,7 @@ export const TIMES = {
       stars: 1.5e-6,
       milkyWay: 0.0005,
       airglow: [0.0003, 0.00055, 0.0004],
-      clouds: { cover: 0.44, wisps: 0.6, lit: 0.2, silver: 2.2, shade: [0.0004, 0.00055, 0.001], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.3, wisps: 0.25, lit: 0.12, silver: 2.2, shade: [0.0003, 0.00042, 0.0008], drift: [0.0011, 0.0004] },
     },
     env: { intensity: 1 },
     // the night sky lays only about a tenth of the moon's light on the ground; this keeps the moon's shadows

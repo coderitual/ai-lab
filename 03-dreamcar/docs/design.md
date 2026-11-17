@@ -175,12 +175,22 @@ a few seconds it is offered).
   hundreds of times brighter than paint), camera and object motion blur with
   the car held sharp, a slight vignette and grain. No effect that is not also
   on a real camera.
-- **Day:** sun about 24° above the horizon and well to one side of the
-  straight, warm; sky fill cool; long soft shadows; haze that thickens with
-  distance and in the valleys. Exposure for sunlit asphalt, closing by about
-  2.5 stops inside the tunnel and recovering over a second on the way out.
-- **Night:** a three-quarter moon high on the opposite side, enough to draw
-  the ridges and the edges of the road; stars; the low beam reaching about
+- **Day** (references D1, A): the sun 20° above the horizon, 26° left of the
+  start straight's heading, out over the lake (lighting.js `towards(116, 20)`):
+  the straight is driven into the light, shadows fall long towards the camera
+  and everything is rim-lit. A deep blue sky, pale and bright at the horizon,
+  with small lit cumulus (grey-blue bases, silver rims near the sun); a compact
+  sun with a soft aureole; dry asphalt. Sunlit level ground gets about 2.6 from
+  the sun against about 0.5 of sky and fill in the shade (some 2.5 to 3 stops,
+  the shade blue). Haze only with distance (hundreds of metres), bluer towards
+  the horizon, warmer towards the sun. A limestone massif (far.js: nine steep
+  summits with gullies, its own baked sun shadows) stands ahead and to the
+  right of the straight, back-lit, blue-grey in its own shade. Exposure for
+  sunlit asphalt, closing by about 2.5 stops inside the tunnel and recovering
+  over a second on the way out.
+- **Night:** a three-quarter moon low ahead and a little left of the start
+  straight (17° up, beside the massif, which stands as a silhouette with
+  moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
   65 m with a sharp cut-off rising to the right, high beam about 150 m; LED
   daytime running lamps always on; tail lamps red with a hot core; brake lamps
   three times brighter; warm tunnel lamps; lit windows at the chalet by the
@@ -206,15 +216,17 @@ a few seconds it is offered).
   glow on the haze above it, a radio mast's red lamps and a hamlet high on
   the slope beyond (from which stretches of the new circuit it is in the frame
   has not been checked yet).
-- **Dusk, the hour the demo opens in.** The sun is down; the sky runs from a
-  dusty rose band on the horizon through mauve to slate violet overhead, and
-  everything is lit by it: soft, cool, low in contrast. The road is wet and
-  carries that sky, the roofs' silhouettes and every lamp as long streaks.
-  Windows, street lamps and signals are on and glow gently. Nothing is
-  exaggerated: it should pass for a photograph of a wet evening.
-- **Day has the sun in it.** Heading into the low sun the picture is washed
-  by its glare, lens ghosts lie across the frame, and the road goes pale
-  towards the light.
+- **Dusk is golden hour** (references D4, D2): the sun 3.5° up at bearing
+  215, out over the lake behind the left shoulder of a car on the start
+  straight. Its orange light crosses the straight almost level, so whatever
+  stands on the lake side throws shadows 15 to 20 m long over the grid while
+  the trees, the gantry and the buildings on the land side, and the massif,
+  stand in full orange light. The sky runs from pale gold towards the sun
+  through a rose belt to blue overhead, with clouds lit from below that the
+  paint mirrors. Dry. Lamps and windows are coming on.
+- **Day has the sun in it.** Heading into the low sun it blooms into a soft
+  glare, faint lens ghosts lie across the frame (medium and high), the sky
+  stays blue up to it and the road shines towards the light.
 - The paint is a metallic silver under a clear coat: a sharp mirror image of
   the real surroundings over a soft, flake-sparkling base.
 
