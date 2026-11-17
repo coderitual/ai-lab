@@ -55,9 +55,9 @@ export const CASTER_LAYER = 3;
  * foliage tile and bark tile (texels), impostor picture (texels), whether trees cast shadow.
  */
 const TIER = {
-  low: { full: 0, reduced: 60, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 160, rings: 1, casters: false },
-  medium: { full: 34, reduced: 95, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 160, rings: 2, casters: true },
-  high: { full: 50, reduced: 130, far: 1200, keep: 1, tile: 512, bark: 256, cell: 192, rings: 2, casters: true },
+  low: { full: 0, reduced: 60, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: false },
+  medium: { full: 34, reduced: 95, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
+  high: { full: 50, reduced: 130, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
 };
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
 const BLEND = 8;
@@ -103,6 +103,109 @@ export function woodAt(track, noise, s, side) {
   }
   if (!mix) return null;
   return { mix, turned: turnedAt(track, noise, s), from: track.edgeAt(s, side) + BARRIER_CLEAR };
+}
+
+/**
+ * What every tree is made from, without a forest: the textures, the grown individuals, their impostor pictures and
+ * the materials. createForest plants with it; the viewer's tree lab (assets/world/dev.js) shows single trees with it.
+ * @param {object} o
+ * @param {THREE.WebGLRenderer} o.renderer (the impostors are baked with it)
+ * @param {import('../../engine/caps.js').Tier} o.tier
+ * @param {boolean} o.coverage the scene target is multisampled
+ * @param {import('../../engine/rng.js').Rng} o.rng the forest's stream
+ * @param {import('./atmosphere.js').Atmosphere} o.atmosphere
+ */
+export function createTreeKit({ renderer, tier, coverage, rng, atmosphere }) {
+  const ms = {};
+  let clock = performance.now();
+  const lap = (name) => {
+    const now = performance.now();
+    ms[name] = Math.round(now - clock);
+    clock = now;
+  };
+  const T = TIER[tier] ?? TIER.high;
+  const foliage = createFoliageAtlas(T.tile, rng.fork('foliage'));
+  const bark = createBarkTextures(T.bark, rng.fork('bark'));
+  lap('textures');
+  // (the full trees are grown on every tier: the impostors are pictures of them, even where they are never drawn)
+  const models = growTrees(VARIANTS, SPECIES_DATA, rng.fork('grow'), { full: true, barkSize: T.bark });
+  lap('grow');
+  const atlas = bakeImpostors({ renderer, models, foliage: foliage.texture, bark: bark.map, cell: T.cell, rings: T.rings });
+  lap('bake');
+  const uniforms = createTreeUniforms();
+  const material = treeMaterial({ foliage: foliage.texture, bark: bark.map, barkNormal: bark.normal, atmosphere, uniforms, coverage, wind: true });
+  const farMaterial = impostorMaterial({ atlas, atmosphere, uniforms, coverage });
+  const depthMaterial = treeDepthMaterial(uniforms, true, foliage.texture);
+  const casterMaterial = impostorDepthMaterial(atlas);
+  const through = VARIANTS.map((v) => SPECIES_DATA[v.species].through);
+  const card = new THREE.BufferGeometry();
+  card.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0]), 3));
+  card.setIndex([0, 1, 2, 0, 2, 3]);
+
+  /**
+   * One tree alone, for the viewer: a variant at its template height, standing at the origin of its parent.
+   * @param {string} name a variant's name
+   * @param {{ turned?: number, lod?: 'full'|'reduced'|'impostor', autumn?: number, tint?: number[] }} o
+   */
+  function specimen(name, { turned = 0, lod = 'full', autumn = 0, tint = null } = {}) {
+    const v = Math.max(0, VARIANTS.findIndex((x) => x.name === name));
+    const impostor = lod === 'impostor';
+    const g = (impostor ? card : lod === 'reduced' || T.full <= 0 ? models[v].reduced : models[v].full).clone();
+    const attr = (key, values) => g.setAttribute(key, new THREE.InstancedBufferAttribute(new Float32Array(values), values.length));
+    const data = SPECIES_DATA[VARIANTS[v].species];
+    const tone = data.autumn.length ? data.autumn[autumn % data.autumn.length] : data.green;
+    attr('aTint', [...(tint ?? data.green.map((c, k) => c + (tone[k] - c) * turned)), 1]);
+    attr('aBake', [1, 1, 1]);
+    attr('aPlace', [0.2, turned]);
+    if (impostor) attr('aImp', [v, through[v]]);
+    const mesh = new THREE.InstancedMesh(g, impostor ? farMaterial : material, 1);
+    mesh.frustumCulled = false;
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    mesh.setMatrixAt(0, new THREE.Matrix4());
+    // its shadow, by its reduced shape
+    const caster = new THREE.InstancedMesh(models[v].reduced.clone(), material, 1);
+    caster.setMatrixAt(0, new THREE.Matrix4());
+    caster.castShadow = true;
+    caster.frustumCulled = false;
+    caster.layers.set(CASTER_LAYER);
+    caster.customDepthMaterial = depthMaterial;
+    const box = { center: new THREE.Vector3(0, models[v].top / 2, 0), half: new THREE.Vector3(models[v].radius, models[v].top / 2, models[v].radius) };
+    return { mesh, caster, box, triangles: models[v].triangles };
+  }
+
+  return {
+    T,
+    foliage,
+    bark,
+    models,
+    atlas,
+    uniforms,
+    material,
+    farMaterial,
+    depthMaterial,
+    casterMaterial,
+    through,
+    card,
+    ms,
+    specimen,
+    bytes: foliage.bytes + bark.bytes + atlas.bytes,
+    dispose() {
+      card.dispose();
+      for (const m of models) {
+        m.full?.dispose();
+        m.reduced.dispose();
+      }
+      material.dispose();
+      farMaterial.dispose();
+      depthMaterial.dispose();
+      casterMaterial.dispose();
+      foliage.texture.dispose();
+      bark.map.dispose();
+      bark.normal.dispose();
+      atlas.dispose();
+    },
+  };
 }
 
 /**
@@ -358,14 +461,10 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   lap('plant');
 
   // ---------------------------------------------------------------- the trees themselves
-  const foliage = createFoliageAtlas(T.tile, rng.fork('foliage'));
-  const bark = createBarkTextures(T.bark, rng.fork('bark'));
-  lap('textures');
-  // (the full trees are grown on every tier: the impostors are pictures of them, even where they are never drawn)
-  const models = growTrees(VARIANTS, SPECIES_DATA, rng.fork('grow'), { full: true, barkSize: T.bark });
-  lap('grow');
-  const atlas = bakeImpostors({ renderer, models, foliage: foliage.texture, bark: bark.map, cell: T.cell, rings: T.rings });
-  lap('bake');
+  const kit = createTreeKit({ renderer, tier, coverage, rng, atmosphere });
+  const { foliage, bark, models, atlas, uniforms, material, farMaterial, depthMaterial, casterMaterial, through } = kit;
+  Object.assign(ms, kit.ms);
+  clock = performance.now();
 
   // ---------------------------------------------------------------- per-tree data
   const count = trees.length;
@@ -477,12 +576,6 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   }
 
   // ---------------------------------------------------------------- materials and meshes
-  const uniforms = createTreeUniforms();
-  const material = treeMaterial({ foliage: foliage.texture, bark: bark.map, barkNormal: bark.normal, atmosphere, uniforms, coverage, wind: true });
-  const farMaterial = impostorMaterial({ atlas, atmosphere, uniforms, coverage });
-  const depthMaterial = treeDepthMaterial(uniforms, true, foliage.texture);
-  const casterMaterial = impostorDepthMaterial(atlas);
-
   const group = new THREE.Group();
   group.name = 'forest';
   /** The camera the per-view lists were made for: every other camera (mirror, probe) sees the cheaper form. */
@@ -517,9 +610,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const fullMeshes = T.full > 0 ? models.map((m, v) => pool(m.full, material, perVariant[v], `forest-full-${VARIANTS[v].name}`)) : [];
   // (room for the full trees too: the mirror and the probe see them in this form)
   const reducedMeshes = models.map((m, v) => pool(m.reduced, material, perVariant[v] * (T.full > 0 ? 2 : 1), `forest-reduced-${VARIANTS[v].name}`));
-  const card = new THREE.BufferGeometry();
-  card.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0]), 3));
-  card.setIndex([0, 1, 2, 0, 2, 3]);
+  const card = kit.card;
   const farMesh = pool(card, farMaterial, count, 'forest-impostors', { aImp: 2 });
   // the shadow-only proxies: impostor cards, which under the sun's camera turn to the light and cast the crown's
   // silhouette seen from there
@@ -533,7 +624,6 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     mesh.customDepthMaterial = casterMaterial;
     casterMeshes.push(mesh);
   }
-  card.dispose();
   // the floor's two kinds of patch: grass and low growth, fallen leaves
   const floorMaterial = plantMaterial({ map: foliage.texture, atmosphere, uniforms, wind: null, coverage });
   floorMaterial.polygonOffset = true;
@@ -565,8 +655,6 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     a.aTint.array[k * 4 + 3] = fade;
     a.aBake.array.set(bakes.subarray(i * 3, i * 3 + 3), k * 3);
   }
-  const through = VARIANTS.map((v) => SPECIES_DATA[v.species].through);
-
   // ---------------------------------------------------------------- per view
   const frustum = new THREE.Frustum();
   const projView = new THREE.Matrix4();
@@ -696,41 +784,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     counts.drawCalls = group.children.filter((m) => m.visible).length;
   }
 
-  /**
-   * One tree alone, for the viewer: a variant at its template height, standing at the origin of its parent.
-   * @param {string} name a variant's name @param {{ turned?: number, lod?: 'full'|'reduced'|'impostor', autumn?: number }} o
-   */
-  function specimen(name, { turned = 0, lod = 'full', autumn = 0 } = {}) {
-    const v = Math.max(0, VARIANTS.findIndex((x) => x.name === name));
-    const source = lod === 'impostor' ? farMesh : lod === 'reduced' || !fullMeshes.length ? reducedMeshes[v] : fullMeshes[v];
-    const g = source.geometry.clone();
-    const mesh = new THREE.InstancedMesh(g, source.material, 1);
-    mesh.frustumCulled = false;
-    mesh.castShadow = false;
-    mesh.receiveShadow = true;
-    const data = SPECIES_DATA[VARIANTS[v].species];
-    const tone = data.autumn.length ? data.autumn[autumn % data.autumn.length] : data.green;
-    const tint = data.green.map((c, k) => c + (tone[k] - c) * turned);
-    g.attributes.aTint.array.set([...tint, 1]);
-    g.attributes.aBake.array.set([1, 1, 1]);
-    g.attributes.aPlace.array.set([0.2, turned]);
-    if (g.attributes.aImp) g.attributes.aImp.array.set([v, through[v]]);
-    for (const a of Object.values(g.attributes)) a.needsUpdate = true;
-    mesh.setMatrixAt(0, new THREE.Matrix4());
-    // its shadow, by its reduced shape
-    const caster = new THREE.InstancedMesh(reducedMeshes[v].geometry.clone(), material, 1);
-    caster.setMatrixAt(0, new THREE.Matrix4());
-    caster.castShadow = true;
-    caster.frustumCulled = false;
-    caster.layers.set(CASTER_LAYER);
-    caster.customDepthMaterial = depthMaterial;
-    const box = { center: new THREE.Vector3(0, models[v].top / 2, 0), half: new THREE.Vector3(models[v].radius, models[v].top / 2, models[v].radius) };
-    return { mesh, caster, box, triangles: models[v].triangles };
-  }
-
   lap('meshes');
   return {
-    specimen,
+    specimen: kit.specimen,
     /** The impostor atlas (for looking at it). */
     atlas,
     group,
@@ -756,20 +812,13 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       perVariant,
       triangles: models.map((m) => m.triangles),
       view: counts,
-      bytes: foliage.bytes + bark.bytes + atlas.bytes,
+      bytes: kit.bytes,
       ms,
     },
     dispose() {
       for (const m of group.children) m.geometry.dispose();
-      material.dispose();
-      farMaterial.dispose();
-      depthMaterial.dispose();
       floorMaterial.dispose();
-      casterMaterial.dispose();
-      foliage.texture.dispose();
-      bark.map.dispose();
-      bark.normal.dispose();
-      atlas.dispose();
+      kit.dispose();
     },
   };
 }

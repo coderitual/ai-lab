@@ -15,7 +15,7 @@
 import { BARK, TILE } from './forestTextures.js';
 
 /** The species, in the order the forest stores them. */
-export const SPECIES = ['spruce', 'fir', 'larch', 'birch', 'maple', 'lime', 'hazel'];
+export const SPECIES = ['spruce', 'fir', 'larch', 'birch', 'maple', 'lime', 'hazel', 'hornbeam'];
 
 /**
  * Per species: the height range of grown trees (m); `green` the linear multiplier of the atlas colour in summer
@@ -30,6 +30,7 @@ export const SPECIES_DATA = {
   birch: { height: [10, 19], green: [0.62, 0.7, 0.24], autumn: [[0.944, 0.851, 0.422], [0.857, 0.737, 0.348]], turns: 0.4, value: [0.88, 1.15], hue: 0.4, lean: 0.13, through: 0.9 },
   maple: { height: [9, 16], green: [0.58, 0.66, 0.22], autumn: [[1.2, 0.38, 0.05], [1.18, 0.48, 0.05], [1.05, 0.24, 0.05], [1.2, 0.42, 0.05], [1.15, 0.5, 0.05]], turns: 1, value: [0.85, 1.12], hue: 0.35, lean: 0.08, through: 1.0 },
   hazel: { height: [1.8, 3.4], green: [0.48, 0.58, 0.19], autumn: [[0.95, 0.42, 0.07], [1.0, 0.55, 0.08]], turns: 0.35, value: [0.8, 1.1], hue: 0.35, lean: 0.12, through: 0.9 },
+  hornbeam: { height: [14, 21], green: [0.6, 0.69, 0.23], autumn: [[0.95, 0.8, 0.3]], turns: 0.15, value: [0.85, 1.12], hue: 0.3, lean: 0.1, through: 1.0 },
   lime: { height: [12, 21], green: [0.6, 0.69, 0.23], autumn: [[0.973, 0.819, 0.377], [0.897, 0.656, 0.294]], turns: 0.3, value: [0.85, 1.12], hue: 0.3, lean: 0.06, through: 0.95 },
 };
 
@@ -45,12 +46,17 @@ export const SPECIES_DATA = {
  *   of a side frond · curtain how far the twigs hang under a low bough (m; 0: none) · dead dead stubs under the
  *   crown · gaps share of branches missing · lop how lopsided the crown is.
  *
- * Broadleaves (kind 'broadleaf'):
- *   trunkR, bend as above · fork share of H at which the trunk first divides · crown: cy, ry (shares of H) and rx
- *   (m): the ellipsoid no limb leaves · levels of forking after the trunk · forks children per level · leader
- *   chance per level that one child carries straight on · spread angle of the others (rad) · ratio child length
- *   over parent · up how limbs of each level turn towards the light · gnarl how much they wander · clusters leaf
- *   cards on a last limb · leaf [lo, hi] size of one (m) · hang true where the leaves hang in sprays (birch).
+ * Broadleaves (kind 'broadleaf'; `tile` the sprig tile of its leaves and `subs` which quarters of it, `massTile` the
+ * leaf mass of its inside, `hang`: its leaves hang in sprays from a HANG tile):
+ *   trunkR, bend as above · fork share of H at which the trunk divides · mains main limbs from the fork (stems, when
+ *   the fork is near the ground) · leader true where the trunk carries on up the middle · rise how steeply the main
+ *   limbs leave (0: straight to their lobes, 1: up first) · divide how far along the way to their lobes they divide ·
+ *   crown: cy, ry (shares of H) and rx (m): the outline the lobes are arranged in · lobes: rings [count, angle from
+ *   the top (rad), place as a share of the outline's radius], r [lo, hi] a lobe's radius as a share of rx, core the
+ *   same for the dark middle of the crown (0: none) · cards leaf cards · leaf [lo, hi] edge of one (m) · under share
+ *   of the cards kept on the underside of a lobe · flat how much the cards face the sky · fill big cards of leaf mass
+ *   inside each lobe · twigs per lobe · floor how far below its middle the crown ends (share of ry) · barkTone how
+ *   pale the bark is (0.5: as painted)
  */
 export const VARIANTS = [
   {
@@ -103,27 +109,27 @@ export const VARIANTS = [
     kind: 'broadleaf',
     frame: 'narrow',
     tile: TILE.BIRCH,
+    hang: true,
+    massTile: TILE.LIME_MASS,
     bark: BARK.BIRCH,
-    // a slim white stem carried to the top, thin rising branches, the leaves hanging from them in sprays
+    // a slim white stem carried to the top, the leaves hanging in sprays from small masses up along it
     P: {
       H: 16,
       trunkR: 0.15,
-      bend: 0.55,
-      fork: 0.34,
-      crown: { cy: 0.66, ry: 0.36, rx: 2.9 },
-      levels: 3,
-      forks: [3, 3, 2],
-      leader: [1, 1, 0.9],
-      spread: [0.85, 0.8, 0.7],
-      ratio: [0.74, 0.72, 0.7],
-      side: 0.42,
-      up: [0, 0.1, -0.05, -0.25],
-      gnarl: 0.16,
-      shoots: [3, 3, 2],
-      clusters: 9,
-      clump: 0.9,
-      leaf: [0.9, 1.4],
-      hang: true,
+      bend: 0.5,
+      fork: 0.3,
+      mains: 3,
+      leader: true,
+      rise: 0.3,
+      crown: { cy: 0.64, ry: 0.36, rx: 2.7 },
+      lobes: { rings: [[1, 0, 0.6], [3, 0.7, 0.55], [4, 1.3, 0.6], [4, 1.85, 0.6], [3, 2.3, 0.5]], r: [0.36, 0.46], core: 0 },
+      cards: 400,
+      leaf: [1.0, 1.4],
+      under: 0.85,
+      flat: 0,
+      fill: 1,
+      twigs: 2,
+      floor: 1.0,
     },
   },
   {
@@ -134,26 +140,25 @@ export const VARIANTS = [
     tile: TILE.MAPLE,
     massTile: TILE.MAPLE_MASS,
     bark: BARK.BROADLEAF,
-    // a round crown on a short trunk that divides into a few strong rising limbs
+    // a broad round crown of billowing masses on a short trunk that divides into a few strong rising limbs
     P: {
-      H: 13,
-      trunkR: 0.27,
-      bend: 0.25,
-      fork: 0.22,
-      crown: { cy: 0.62, ry: 0.385, rx: 4.9 },
-      levels: 3,
-      forks: [4, 3, 3],
-      leader: [1, 0.4, 0.3],
-      spread: [0.62, 0.7, 0.75],
-      ratio: [1.45, 0.6, 0.62],
-      side: 1,
-      up: [0, 0.18, 0.1, 0.05],
-      gnarl: 0.2,
-      shoots: [0, 3, 2],
-      clusters: 9,
-      clump: 1.15,
-      leaf: [0.8, 1.15],
-      hang: false,
+      H: 14,
+      trunkR: 0.26,
+      bend: 0.3,
+      fork: 0.24,
+      mains: 4,
+      leader: true,
+      rise: 0.6,
+      crown: { cy: 0.58, ry: 0.4, rx: 4.9 },
+      lobes: { rings: [[1, 0, 0.62], [5, 0.8, 0.64], [7, 1.45, 0.7], [5, 2.1, 0.6]], r: [0.36, 0.44], core: 0.5 },
+      cards: 1800,
+      leaf: [0.85, 1.05],
+      under: 0.5,
+      flat: 0.2,
+      fill: 2,
+      twigs: 2,
+      floor: 0.95,
+      barkTone: 0.62,
     },
   },
   {
@@ -164,26 +169,25 @@ export const VARIANTS = [
     tile: TILE.MAPLE,
     massTile: TILE.MAPLE_MASS,
     bark: BARK.BROADLEAF,
-    // an older one: twin stems from low down, a wider, flatter, more open crown
+    // an older one: stems from low down, a wider, flatter crown
     P: {
       H: 14,
-      trunkR: 0.31,
+      trunkR: 0.3,
       bend: 0.4,
-      fork: 0.15,
-      crown: { cy: 0.6, ry: 0.4, rx: 5.6 },
-      levels: 3,
-      forks: [2, 3, 3],
-      leader: [0, 0.4, 0.3],
-      spread: [0.45, 0.75, 0.8],
-      ratio: [2.6, 0.58, 0.62],
-      side: 1,
-      up: [0, 0.1, 0.08, 0.03],
-      gnarl: 0.26,
-      shoots: [0, 4, 2],
-      clusters: 10,
-      clump: 1.25,
-      leaf: [0.8, 1.2],
-      hang: false,
+      fork: 0.16,
+      mains: 3,
+      leader: false,
+      rise: 0.7,
+      crown: { cy: 0.6, ry: 0.36, rx: 5.6 },
+      lobes: { rings: [[2, 0.3, 0.6], [6, 0.95, 0.68], [8, 1.55, 0.72], [5, 2.15, 0.6]], r: [0.33, 0.42], core: 0.48 },
+      cards: 1900,
+      leaf: [0.85, 1.1],
+      under: 0.5,
+      flat: 0.2,
+      fill: 2,
+      twigs: 2,
+      floor: 0.95,
+      barkTone: 0.62,
     },
   },
   {
@@ -192,6 +196,7 @@ export const VARIANTS = [
     kind: 'broadleaf',
     frame: 'wide',
     tile: TILE.LIME,
+    subs: [0, 1],
     massTile: TILE.LIME_MASS,
     bark: BARK.BROADLEAF,
     // an avenue tree: a clear stem, a leader most of the way up, a tall dense dome
@@ -199,21 +204,52 @@ export const VARIANTS = [
       H: 18,
       trunkR: 0.34,
       bend: 0.2,
-      fork: 0.27,
-      crown: { cy: 0.63, ry: 0.385, rx: 4.5 },
-      levels: 3,
-      forks: [4, 3, 3],
-      leader: [1, 0.8, 0.4],
-      spread: [1.0, 0.8, 0.75],
-      ratio: [1.05, 0.72, 0.66],
-      side: 1,
-      up: [0, 0.2, 0.14, 0.08],
-      gnarl: 0.15,
-      shoots: [0, 3, 3],
-      clusters: 9,
-      clump: 1.3,
-      leaf: [0.8, 1.1],
-      hang: false,
+      fork: 0.25,
+      mains: 4,
+      leader: true,
+      rise: 0.5,
+      crown: { cy: 0.62, ry: 0.37, rx: 4.4 },
+      lobes: { rings: [[1, 0, 0.64], [4, 0.6, 0.62], [6, 1.1, 0.66], [7, 1.6, 0.7], [6, 2.1, 0.64]], r: [0.36, 0.44], core: 0.55 },
+      cards: 1800,
+      leaf: [0.85, 1.05],
+      under: 0.4,
+      flat: 0.15,
+      fill: 2,
+      twigs: 2,
+      floor: 0.95,
+    },
+  },
+  {
+    name: 'hornbeam-a',
+    species: 'hornbeam',
+    kind: 'broadleaf',
+    frame: 'wide',
+    tile: TILE.LIME,
+    subs: [2, 3],
+    massTile: TILE.LIME_MASS,
+    bark: BARK.BROADLEAF,
+    // a tall tree of the bank: pale stems that part near the ground and rise far before they divide, an open crown of
+    // separate airy masses of small leaves that reaches out over whatever lies below
+    P: {
+      H: 17,
+      trunkR: 0.3,
+      bend: 0.3,
+      fork: 0.07,
+      mains: 4,
+      leader: false,
+      rise: 0.85,
+      divide: 0.62,
+      gnarl: 0.035,
+      crown: { cy: 0.66, ry: 0.33, rx: 5.4 },
+      lobes: { rings: [[2, 0.35, 0.66], [5, 1.0, 0.74], [5, 1.6, 0.8]], r: [0.3, 0.4], core: 0 },
+      cards: 1300,
+      leaf: [0.85, 1.1],
+      under: 0.75,
+      flat: 0.1,
+      fill: 1,
+      twigs: 4,
+      floor: 1.1,
+      barkTone: 0.85,
     },
   },
   {
@@ -222,28 +258,27 @@ export const VARIANTS = [
     kind: 'broadleaf',
     frame: 'wide',
     tile: TILE.LIME,
+    subs: [0, 1],
     massTile: TILE.LIME_MASS,
     bark: BARK.BROADLEAF,
-    // the undergrowth at the wood's edge: a shrub of many stems from the ground, leafy to the ground
+    // the undergrowth at the wood's edge: a shrub of several stems from the ground, leafy to the ground
     P: {
       H: 4,
       trunkR: 0.07,
-      bend: 0.2,
-      fork: 0.03,
-      crown: { cy: 0.5, ry: 0.56, rx: 2.3 },
-      levels: 2,
-      forks: [6, 3],
-      leader: [0, 0.3],
-      spread: [0.62, 0.7],
-      ratio: [5.5, 0.55],
-      side: 1,
-      up: [0, 0.3, 0.05],
-      gnarl: 0.22,
-      shoots: [0, 3],
-      clusters: 8,
-      clump: 0.55,
-      leaf: [0.6, 0.9],
-      hang: false,
+      bend: 0.15,
+      fork: 0.04,
+      mains: 5,
+      leader: false,
+      rise: 0.6,
+      crown: { cy: 0.52, ry: 0.5, rx: 2.2 },
+      lobes: { rings: [[1, 0, 0.45], [5, 1.15, 0.6]], r: [0.4, 0.52], core: 0 },
+      cards: 170,
+      leaf: [0.7, 0.9],
+      under: 0.6,
+      flat: 0.1,
+      fill: 1,
+      twigs: 1,
+      floor: 1.2,
     },
   },
 ];

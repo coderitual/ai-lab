@@ -15,6 +15,9 @@
 //                  wobbles in the reflections (assets/car/studio.js)
 //   probesize=512  edge of the car's reflection cube (default: the tier's)
 //   mirror=1       the paint as a plain mirror (for reading the surfaces with stripes=1)
+//   asset=tree     one tree of the forest: tree=<variant> turn=0..1 tone=N lod=full|reduced|impostor alone=1;
+//                  lab=1: on a bare field under the world's light, without the world (starts in seconds);
+//                  tint=r,g,b: its tint given by hand (linear), for fitting colours to a reference
 //   time=day|night   q=low|medium|high   paint=NAME   plate=TEXT   manual   post=0   dpr=N   (as in the game)
 //   lights=off|drl|low|high|brake|all    the car's lamps (default: what the time of day asks for); or a list of
 //                  setLights names, each at full strength: lights=tail,reverse,indicatorL
@@ -79,7 +82,7 @@
 import * as THREE from 'three';
 import { createCar } from './assets/car/index.js';
 import { createStudio } from './assets/car/studio.js';
-import { createLightTest, placeOnRoad, roadCamera } from './assets/world/dev.js';
+import { createLightTest, createTreeLab, placeOnRoad, roadCamera } from './assets/world/dev.js';
 import { createWorld } from './assets/world/index.js';
 import { Engine } from './engine/Engine.js';
 import { FramePipeline } from './engine/FramePipeline.js';
@@ -107,12 +110,18 @@ const carTier = TIERS[query.get('carq')] ? query.get('carq') : tier;
 engine.setMaxPixelRatio(TIERS[tier].pixelRatio);
 const pipeline = new FramePipeline(engine.renderer, caps, { tier, post: params.post });
 const track = createTrack();
-const world = createWorld({ renderer: engine.renderer, caps, tier, track, rng: createRng(params.seed), params });
+// (trees lane) lab=1 with asset=tree: the world's light round a bare field and the tree alone, in seconds
+const lab = query.get('lab') === '1' && given.asset === 'tree';
+const world = lab
+  ? createTreeLab({ renderer: engine.renderer, caps, tier, rng: createRng(params.seed), params })
+  : createWorld({ renderer: engine.renderer, caps, tier, track, rng: createRng(params.seed), params });
 const time = world.time;
 
 // ---- where the asset stands: the frame the camera's numbers are measured in
 const stand = new THREE.Group();
-if (given.s !== undefined) {
+if (lab) {
+  // the lab's field is level and the tree stands in its middle
+} else if (given.s !== undefined) {
   const frame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
   track.frameAt(given.s, frame);
   stand.position.copy(frame.pos);
@@ -199,20 +208,41 @@ const ASSETS = {
     return made;
   },
   /**
-   * (trees lane) One tree of the forest, standing where the asset stands: tree=<variant name> (spruce-a, spruce-b,
-   * fir-a, larch-a, birch-a, maple-a, maple-b, lime-a), turn=0..1 how far it has turned, tone=N which of its autumn
-   * colours, lod=full|reduced|impostor. alone=1 hides the rest of the forest.
+   * (trees lane) One tree of the forest, standing where the asset stands: tree=<variant name> (treeSpecies.js
+   * VARIANTS), turn=0..1 how far it has turned, tone=N which of its autumn colours, lod=full|reduced|impostor.
+   * alone=1 hides the rest of the forest. Each of these may be a list: the trees then stand in a row, gap= metres
+   * apart.
    */
   tree() {
-    const found = world.forest.specimen(query.get('tree') || 'maple-a', {
-      turned: number('turn', 0),
-      lod: query.get('lod') || 'full',
-      autumn: number('tone', 0),
+    const tint = (query.get('tint') || '').split(',').map(parseFloat);
+    // several at once, side by side: tree=maple-a,maple-a,maple-a&lod=full,reduced,impostor (a list's last value serves the rest)
+    const names = (query.get('tree') || 'maple-a').split(',');
+    const pick = (key, i) => {
+      const list = (query.get(key) || '').split(',');
+      return list[Math.min(i, list.length - 1)];
+    };
+    const gap = number('gap', 13);
+    const trees = names.map((name, i) => {
+      const found = world.forest.specimen(name, {
+        turned: parseFloat(pick('turn', i)) || 0,
+        lod: pick('lod', i) || 'full',
+        autumn: parseInt(pick('tone', i), 10) || 0,
+        tint: tint.length === 3 && tint.every(Number.isFinite) ? tint : null,
+      });
+      found.mesh.position.x = found.caster.position.x = (i - (names.length - 1) / 2) * gap;
+      stand.add(found.mesh, found.caster);
+      return found;
     });
-    stand.add(found.mesh, found.caster);
     if (query.get('alone') === '1') world.forest.group.visible = false;
-    document.title = `tree ${query.get('tree') || 'maple-a'}: ${found.triangles.join(' / ')} triangles`;
-    return { tree: found, box: found.box, view: { az: 0, el: 6, dist: found.box.half.y * 4.2, fov: 40 } };
+    const found = trees[0];
+    const box = { center: found.box.center.clone(), half: found.box.half.clone() };
+    for (const t of trees) {
+      box.center.y = Math.max(box.center.y, t.box.center.y);
+      box.half.y = Math.max(box.half.y, t.box.half.y);
+    }
+    box.half.x += ((names.length - 1) / 2) * gap;
+    document.title = `tree ${names.join(' ')}: ${trees.map((t) => t.triangles.join(' / ')).join(', ')} triangles`;
+    return { tree: found, trees, box, view: { az: 0, el: 6, dist: Math.max(box.half.y * 4.2, box.half.x * 2.6), fov: 40 } };
   },
   /**
    * The wheels alone: a front one ahead (z +0.42) and a rear one behind (z -0.42), standing on the road with their
@@ -484,6 +514,9 @@ window.__viewer = {
   read,
   wheels: asset.wheels ?? null,
   probe: asset.probe ?? null,
+  /** Whatever the asset's builder returned (a tree: `trees`), and the frame's settings (exposure, look). */
+  asset,
+  frame,
   /** Run and draw `n` frames, a sixtieth of a second apart. */
   frames(n = 1) {
     for (let i = 0; i < n; i++) engine.advance(1 / 60);
