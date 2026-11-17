@@ -10,6 +10,16 @@ import * as config from './game/config.js';
 import { TEXT } from './game/text.js';
 
 const params = parseParams();
+// ?photo=d1 (a named place of the staging camera, config.js PHOTOS): it brings its own moment of the autopilot's run
+// and its time of day, unless the address gives them
+const query = new URLSearchParams(location.search);
+const named = config.PHOTOS[query.get('photo') || ''];
+if (named) {
+  params.auto = true;
+  params.autopilot = true;
+  if (!query.has('t')) params.preAdvance = named.t;
+  if (!query.has('time')) params.time = named.time;
+}
 const veil = document.getElementById('loading');
 
 try {
@@ -47,7 +57,8 @@ try {
     /**
      * The staging camera: { back, right, up, yaw, pitch, fov } (metres behind, right of and above the car's origin
      * in its level frame; degrees left of its heading and up; the lens top to bottom), the HUD hidden unless
-     * { hud: true }; null ends it. Also ?photo=back,right,up,yaw,pitch,fov in the address.
+     * { hud: true }; null ends it; a name ('d1', 'd3', 'd4': config.js PHOTOS) is a reference frame's camera.
+     * Also ?photo=back,right,up,yaw,pitch,fov or ?photo=d1 in the address.
      */
     photo: (o) => game.setPhoto(o),
     /** Change a number of the light or of the run by its path, and show the result. */
@@ -63,8 +74,9 @@ try {
   };
 
   // ?photo=back,right,up,yaw,pitch,fov[,hud]: the staging camera from the first frame (see photo above)
-  const photo = new URLSearchParams(location.search).get('photo');
-  if (photo) {
+  const photo = query.get('photo');
+  if (named) game.setPhoto(named);
+  else if (photo) {
     const n = photo.split(',').map(parseFloat);
     const keys = ['back', 'right', 'up', 'yaw', 'pitch', 'fov'];
     const o = {};

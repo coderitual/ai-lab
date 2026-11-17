@@ -211,7 +211,10 @@ export const CAMERA = {
     across: 0.2,
     down: 0.56,
     tallDown: 0.3,
-    times: { day: { sunBeside: 2.1 }, dusk: { sunBeside: 0.9 } },
+    // by day the sun stands down the straight: the rear three-quarter view that looks 0.75 rad off it shows the
+    // gantry, the boards and the autumn trees behind a car whose paint mirrors the sky; at golden hour the sun is
+    // over the lake behind the car: the view with it almost behind the camera lights the flank and the paint
+    times: { day: { sunBeside: 0.75, frontBias: 0 }, dusk: { sunBeside: 2.9, frontBias: 0 } },
   },
   /** The orbit behind the results: blended in from the chase view over `blend` s while the car rolls home; framed
    * clear of the results panel the same way as the title (the panel is on the right). */
@@ -251,6 +254,20 @@ export const CAMERA = {
   lens: { narrow: 4 / 3, wide: 16 / 9, max: 96 },
   /** The camera modes C steps through. */
   modes: ['chase', 'far', 'bonnet', 'bumper'],
+};
+
+/**
+ * The staging camera's named places (`?photo=d1`, `__dreamcar.photo('d1')`): the reference frames' cameras, each a
+ * pose relative to the car (see Game.setPhoto) and the moment of the autopilot's run it belongs to (`t`, seconds
+ * from the start of a run at RULES.autopilotPace; `time`, the time of day), used when the address does not give
+ * them. D1: the run-up to the line, low behind and right of the car, yawed left; D3: the ledge's first bend, low
+ * behind and left, looking down it; D4: the grid during the countdown at golden hour, low on the lake side behind
+ * the car, looking forward and right at the land side with the gantry's lamps in the picture.
+ */
+export const PHOTOS = {
+  d1: { back: 5, right: 3.4, up: 1.1, yaw: 16, pitch: -1, fov: 46, t: 100, time: 'day' },
+  d3: { back: 6, right: -2.5, up: 1.0, yaw: 6, pitch: 2, fov: 46, t: 77, time: 'day' },
+  d4: { back: 7, right: -3.5, up: 0.5, yaw: -20, pitch: 4, fov: 40, t: 4.2, time: 'dusk' },
 };
 
 /**

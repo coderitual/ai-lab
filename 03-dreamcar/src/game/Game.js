@@ -31,7 +31,7 @@ import { TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
 import { createRng } from '../engine/rng.js';
 import { CameraRig } from './Cameras.js';
-import { CAMERA, DEFAULT_TIME, DRIVERS, EXPOSURE, FX, HUD, LIGHTS, PROBE, RULES, SHOWCASE, VIEW } from './config.js';
+import { CAMERA, DEFAULT_TIME, DRIVERS, EXPOSURE, FX, HUD, LIGHTS, PHOTOS, PROBE, RULES, SHOWCASE, VIEW } from './config.js';
 import { AutoDriver, PlayerDriver } from './drivers.js';
 import { Effects } from './effects.js';
 import { Ghost } from './Ghost.js';
@@ -435,6 +435,7 @@ export class Game {
    * @param {{ back?: number, right?: number, up?: number, yaw?: number, pitch?: number, fov?: number, hud?: boolean }|null} o
    */
   setPhoto(o) {
+    if (typeof o === 'string') o = PHOTOS[o] || null;
     this.photo = o ? { ...o } : null;
     for (const view of this.views) {
       view.rig.photo = this.photo;

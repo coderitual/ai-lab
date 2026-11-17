@@ -513,6 +513,7 @@ const FOOT = 0.8;
         for (let k = 1; k <= 4; k++) offs[2 + k] = offs[2] + (top - offs[2]) * (k / 4);
         for (let k = 0; k < BAND_OUT.length; k++) offs[7 + k] = top + BAND_OUT[k];
         const gravel = (side > 0 ? track.vergeL : track.vergeR)[i] === SURFACE_GRAVEL;
+        const woodHere = track.woodAt ? !!track.woodAt(s, side) : false;
         let lastOwn = 0;
         for (let k = 0; k < cols; k++) {
           let lat = side * (edge + offs[k]);
@@ -539,7 +540,8 @@ const FOOT = 0.8;
           verge[v * 4] = Math.abs(lat) - pave;
           verge[v * 4 + 1] = s + lapOffset;
           verge[v * 4 + 2] = Math.abs(lat) - edge;
-          verge[v * 4 + 3] = 0;
+          // w: 0 on a verge with no wood behind it, 0.4 under woods (leaf litter); vertices without the attribute read 1
+          verge[v * 4 + 3] = woodHere ? 0.4 : 0;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
         }
