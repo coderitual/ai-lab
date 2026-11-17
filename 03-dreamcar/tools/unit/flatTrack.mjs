@@ -7,7 +7,7 @@
 // SURFACE and EDGE repeat the numbering of game/track.js (the vehicle's tables in vehicle/params.js are indexed by
 // it); tools/unit/vehicle.test.mjs checks that the two agree when the real track is there.
 
-export const SURFACE = { ASPHALT: 0, SHOULDER: 1, GRASS: 2, GRAVEL: 3 };
+export const SURFACE = { ASPHALT: 0, SHOULDER: 1, GRASS: 2, GRAVEL: 3, KERB: 4 };
 export const EDGE = { RAIL: 0, ROCK: 1, WALL: 2, PARAPET: 3, TREES: 4 };
 
 /**

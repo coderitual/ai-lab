@@ -7,6 +7,8 @@
 // milliseconds, the one integer every reader uses.
 
 /** The rules of a run. */
+import { HALF_WIDTH } from './trackLayout.js';
+
 export const RULES = {
   laps: 3,
   /**
@@ -31,9 +33,12 @@ export const RULES = {
   /** On its roof this long and the car is put back unasked (s). */
   roofReset: 4,
   /** Where a put-back puts the car: no further from the centre line than this (m). */
-  resetLat: 4.25 - 1.3,
-  /** Lap targets for the medals, flying laps (ms). The autopilot laps in 108.4 s at full pace, 118.4 s at 0.9. */
-  medals: { gold: 112000, silver: 120000, bronze: 135000 },
+  resetLat: HALF_WIDTH - 1.3,
+  /**
+   * Lap targets for the medals, flying laps (ms). The autopilot laps in 85.1 s at full pace, 92.9 s at 0.9 and
+   * 103.7 s at 0.8: gold is about 3 per cent slower than full pace, silver about pace 0.9, bronze about pace 0.8.
+   */
+  medals: { gold: 87600, silver: 93000, bronze: 104000 },
   /** Rows kept on the board per time of day. */
   boardRows: 5,
   /** The live gap uses the best lap's time at every this many metres. */
@@ -58,8 +63,8 @@ export const HUD = {
 
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */
 export const DRIVERS = [
-  { paint: 'silver', plate: 'K1 DOMI', keys: 'wasd', bias: 1.4 },
-  { paint: 'graphite', plate: 'K2 DOMI', keys: 'arrows', bias: -1.4 },
+  { paint: 'silver', plate: 'K1 DOMI', keys: 'wasd', bias: 2.2 },
+  { paint: 'graphite', plate: 'K2 DOMI', keys: 'arrows', bias: -2.2 },
 ];
 
 /** Every view's lens. */

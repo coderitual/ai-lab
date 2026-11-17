@@ -126,13 +126,14 @@ function randomSpot(random) {
 
 // ---- the course as a whole --------------------------------------------------------------------------------------
 
-test('a closed loop of about 3.2 km that returns exactly to its start', () => {
-  between(L, 2900, 3500, 'length (m)');
+test('a closed loop of 4.6 to 5.4 km that returns exactly to its start', () => {
+  between(L, 4600, 5400, 'length (m)');
   between(ds, 0.95, 1.05, 'sample spacing (m)');
   expect(Math.abs(n * ds - L) < 1e-9, 'count * ds is not the length');
   expect(track.closure.gap < 0.01, `the baked layout misses its start by ${fmt(track.closure.gap, 4)} m (refit it)`);
   expect(Math.abs(track.closure.yawGap) < 0.01 * DEG, 'the turned angles do not add up to one full turn');
   between(track.closure.gradeScale, 0.995, 1.005, 'scale applied to the descent to close the height');
+  expect(hw === 6, `paved half width ${hw} m, not 6 (three lanes)`);
   let turn = 0;
   let worstStep = 0;
   let worstTurn = 0;
@@ -166,7 +167,8 @@ test('no NaN in any array, and every frame is a frame', () => {
     const l = [track.lx[i], track.ly[i], track.lz[i]];
     const u = [track.nx[i], track.ny[i], track.nz[i]];
     unit = Math.max(unit, Math.abs(Math.hypot(...t) - 1), Math.abs(Math.hypot(...l) - 1), Math.abs(Math.hypot(...u) - 1));
-    square = Math.max(square, Math.abs(t[0] * l[0] + t[1] * l[1] + t[2] * l[2]));
+    // a banked climb tilts left off square to the tangent by about grade x sin(bank)
+    square = Math.max(square, Math.abs(t[0] * l[0] + t[1] * l[1] + t[2] * l[2]) - Math.abs(track.grade[i] * Math.sin(track.bank[i])));
     // up = forward x left
     const c = [t[1] * l[2] - t[2] * l[1], t[2] * l[0] - t[0] * l[2], t[0] * l[1] - t[1] * l[0]];
     normal = Math.max(normal, Math.hypot(c[0] - u[0], c[1] - u[1], c[2] - u[2]));
@@ -176,11 +178,11 @@ test('no NaN in any array, and every frame is a frame', () => {
     expect(Math.abs(track.ty[i] / Math.hypot(track.tx[i], track.tz[i]) - track.grade[i]) < 1e-5, `tangent and grade disagree at ${i}`);
   }
   expect(unit < 1e-6, `a frame vector is not unit length (off by ${fmt(unit, 8)})`);
-  expect(square < 0.01, `left is ${fmt(square, 4)} off square to the tangent (more than a banked climb explains)`);
+  expect(square < 0.001, `left is ${fmt(square, 4)} off square to the tangent (more than a banked climb explains)`);
   expect(normal < 0.001, `normal is not tangent x left (off by ${fmt(normal, 5)})`);
 });
 
-test('about 85 m between the lowest and the highest point; the top is the summit', () => {
+test('100 to 130 m between the lake and the top; the top is the crest, in the open', () => {
   let lo = Infinity;
   let hi = -Infinity;
   let top = 0;
@@ -191,16 +193,17 @@ test('about 85 m between the lowest and the highest point; the top is the summit
       top = i;
     }
   }
-  between(hi - lo, 82, 88, 'height range (m)');
+  between(hi - LAYOUT.lakeLevel, 100, 130, 'height of the top above the lake (m)');
   expect(Math.abs(lo) < 0.02, `the lowest point is ${fmt(lo)} m, not the shore`);
-  expect(track.sectionAt(top * ds).id === 'summit', `the highest point is on "${track.sectionAt(top * ds).id}", not the summit`);
+  expect(['crest', 'plunge'].includes(track.sectionAt(top * ds).id), `the highest point is on "${track.sectionAt(top * ds).id}"`);
+  expect(track.sky[top] === 1 && !track._onBridge(top * ds), 'the top is not in the open');
   expect(Math.abs(track.grade[top]) < 0.002, 'the highest point is not a crest');
   note(`height ${fmt(lo, 2)} to ${fmt(hi, 2)} m, top at s = ${fmt(top * ds, 0)} m`);
 });
 
 // ---- limits -------------------------------------------------------------------------------------------------------
 
-test('gradient within 10 %, radius never under 18 m, banking into the bends up to about 5 degrees', () => {
+test('gradient within 8 %, radius never under 50 m, banking into every bend, up to 12 degrees', () => {
   let steep = 0;
   let tight = Infinity;
   let bank = 0;
@@ -210,12 +213,17 @@ test('gradient within 10 %, radius never under 18 m, banking into the bends up t
     tight = Math.min(tight, 1 / Math.max(1e-9, Math.abs(track.curvature[i])));
     bank = Math.max(bank, Math.abs(track.bank[i]));
     // + bank lifts the left edge: a left-hander (+ curvature) must lift the right one.
-    if (Math.abs(track.curvature[i]) > 0.003 && track.bank[i] * track.curvature[i] > 0) wrongWay++;
+    if (Math.abs(track.curvature[i]) > 0.002 && track.bank[i] * track.curvature[i] > 0) wrongWay++;
   }
-  expect(steep <= 0.1, `steepest gradient is ${fmt(steep * 100, 2)} %`);
-  expect(tight >= 18, `tightest radius is ${fmt(tight, 2)} m`);
-  between(bank / DEG, 4, 5.3, 'steepest banking (degrees)');
+  expect(steep <= 0.0805, `steepest gradient is ${fmt(steep * 100, 2)} %`);
+  expect(tight >= 50, `tightest radius is ${fmt(tight, 2)} m`);
+  between(bank / DEG, 8, 12.01, 'steepest banking (degrees)');
   expect(wrongWay === 0, `${wrongWay} samples are banked out of the bend`);
+  // the pieces that name a banking get it in their middle
+  for (const { seg, s0, s1 } of Object.values(pieces)) {
+    if (seg.bank == null) continue;
+    between(Math.abs(track.bank[idx((s0 + s1) / 2)]) / DEG, seg.bank - 0.3, seg.bank + 0.3, `banking in the middle of ${seg.id}`);
+  }
   note(`gradient up to ${fmt(steep * 100, 2)} %, tightest radius ${fmt(tight, 2)} m, banking up to ${fmt(bank / DEG, 2)} degrees`);
 });
 
@@ -232,69 +240,61 @@ test('curvature, gradient, banking and height are continuous round the whole lap
     dy = Math.max(dy, Math.abs(track.py[j] - track.py[i] - ((track.grade[i] + track.grade[j]) / 2) * ds));
   }
   expect(dk < 0.0036, `curvature changes by ${fmt(dk, 5)} per metre`);
-  expect(dg < 0.002, `gradient changes by ${fmt(dg, 5)} per metre`);
+  expect(dg < 0.003, `gradient changes by ${fmt(dg, 5)} per metre`);
   expect(db < 0.3 * DEG, `banking changes by ${fmt(db / DEG, 3)} degrees per metre`);
   expect(dy < 1e-4, `height is not the integral of the gradient (off by ${fmt(dy, 6)} m in one step)`);
   note(`per metre: curvature changes up to ${fmt(dk, 5)} /m, gradient ${fmt(dg, 5)}, banking ${fmt(db / DEG, 3)} degrees`);
 });
 
-test('no crest a car can leave the ground on', () => {
-  // "Where the speed can be high" is judged twice. Bluntly: everywhere outside the hairpin section counts as fast,
-  // and no vertical curve there is tighter than 500 m (at 200 km/h a 500 m crest still leaves 37 % of the weight
-  // on the wheels). And by an envelope of the fastest speed physically possible at each sample (1.3 g of grip,
-  // 6 m/s^2 of drive, 13 m/s^2 of brakes, 252 km/h top: all more than the car has): over every crest of the lap,
-  // hairpins included, that speed takes off less than 40 % of the weight.
-  const hairpins = new Set(inSection('hairpins'));
-  let fast = Infinity;
-  let slow = Infinity;
-  let lift = 0;
-  let liftAt = 0;
+test('one crest where the car goes light and one compression, by the vertical curves', () => {
+  // The vertical radius of each crest and sag. The crest is felt at about 190 km/h (the autopilot's speed there is
+  // checked against the wheels' loads in vehicle.test.mjs); everywhere else no crest is sharper than 900 m.
+  let sharpCrest = { r: Infinity, s: 0 };
+  let otherCrest = Infinity;
+  let sharpSag = { r: Infinity, s: 0 };
+  const crestZone = [pieces.crest.s0, pieces.plunge.s0 + 0.3 * pieces.plunge.len];
   for (let i = 0; i < n; i++) {
     const bend = (track.grade[(i + 1) % n] - track.grade[(i + n - 1) % n]) / (2 * ds);
-    const radius = 1 / Math.max(1e-9, Math.abs(bend));
-    if (hairpins.has(i)) slow = Math.min(slow, radius);
-    else fast = Math.min(fast, radius);
-    const light = (speed[i] ** 2 * Math.max(0, -bend)) / G;
-    if (light > lift) {
-      lift = light;
-      liftAt = i;
-    }
+    const r = 1 / Math.max(1e-9, Math.abs(bend));
+    const s = i * ds;
+    if (bend < 0) {
+      if (s >= crestZone[0] && s <= crestZone[1]) {
+        if (r < sharpCrest.r) sharpCrest = { r, s };
+      } else otherCrest = Math.min(otherCrest, r);
+    } else if (r < sharpSag.r) sharpSag = { r, s };
   }
-  expect(fast >= 500, `a vertical curve of ${fmt(fast, 0)} m radius outside the hairpins`);
-  expect(slow >= 300, `a vertical curve of ${fmt(slow, 0)} m radius in the hairpins`);
-  expect((200 / 3.6) ** 2 / fast / G < 0.65, 'a car at 200 km/h would be light over the sharpest crest');
-  expect(lift < 0.4, `the fastest possible car loses ${fmt(lift * 100, 0)} % of its weight at s = ${fmt(liftAt * ds, 0)} m`);
-  note(`vertical radius at least ${fmt(fast, 0)} m outside the hairpins (${fmt(slow, 0)} m inside)`);
-  note(`most weight lost over a crest at the fastest possible speed: ${fmt(lift * 100, 0)} % at s = ${fmt(liftAt * ds, 0)} m`);
+  between(sharpCrest.r, 400, 900, 'vertical radius of the crest (m)');
+  expect(otherCrest >= 900, `another crest of ${fmt(otherCrest, 0)} m radius`);
+  expect(track.sectionAt(sharpSag.s).id === 'plunge', `the sharpest sag is on ${track.sectionAt(sharpSag.s).id}`);
+  between(sharpSag.r, 500, 1500, 'vertical radius of the compression (m)');
+  note(`crest: vertical radius ${fmt(sharpCrest.r, 0)} m at s = ${fmt(sharpCrest.s, 0)} m (others at least ${fmt(otherCrest, 0)} m)`);
+  note(`compression: vertical radius ${fmt(sharpSag.r, 0)} m at s = ${fmt(sharpSag.s, 0)} m`);
 });
 
-test('no self-crossing: parts of the lap more than 60 m apart are at least 26 m apart (hairpin legs 30 m)', () => {
-  const hairpin = new Uint8Array(n);
-  for (const i of inSection('hairpins')) hairpin[i] = 1;
-  const far = Math.ceil(60 / ds);
-  let nearest = Infinity;
-  let nearestLegs = Infinity;
-  let at = [0, 0];
-  for (let i = 0; i < n; i++) {
-    for (let j = i + far + 1; j < n; j++) {
+test('no self-crossing: stretches more than 150 m apart along the lap leave room for the hillside between them (bridges and the bore aside)', () => {
+  // The rule the terrain needs (terrain.js shares the ground between two stretches that are near): between the
+  // barriers of any two stretches at least 40 m of ground, no steeper on average than 1 in 2.
+  const far = Math.ceil(150 / ds);
+  let nearest = { free: Infinity };
+  for (let i = 0; i < n; i += 2) {
+    for (let j = i + far + 1; j < n; j += 2) {
       if (n - (j - i) <= far) break;
-      const d = (track.px[i] - track.px[j]) ** 2 + (track.pz[i] - track.pz[j]) ** 2;
-      if (d < nearest) {
-        nearest = d;
-        at = [i, j];
-      }
-      if (hairpin[i] && hairpin[j] && d < nearestLegs) nearestLegs = d;
+      const d = Math.hypot(track.px[i] - track.px[j], track.pz[i] - track.pz[j]);
+      if (d > 200) continue;
+      if (track.sky[i] < 1 || track.sky[j] < 1 || track._onBridge(i * ds) || track._onBridge(j * ds)) continue;
+      const free = d - Math.max(track.edgeL[i], track.edgeR[i]) - Math.max(track.edgeL[j], track.edgeR[j]);
+      if (free < nearest.free) nearest = { free, d, i, j, dh: Math.abs(track.py[i] - track.py[j]) };
     }
   }
-  expect(Math.sqrt(nearest) >= 26, `s = ${fmt(at[0] * ds, 0)} and ${fmt(at[1] * ds, 0)} m are ${fmt(Math.sqrt(nearest), 1)} m apart`);
-  expect(Math.sqrt(nearestLegs) >= 30, `two hairpin legs are ${fmt(Math.sqrt(nearestLegs), 1)} m apart`);
-  note(`closest approach of two parts of the lap: ${fmt(Math.sqrt(nearest), 1)} m (s = ${fmt(at[0] * ds, 0)} and ${fmt(at[1] * ds, 0)} m)`);
+  expect(nearest.free >= 40, `s = ${fmt(nearest.i * ds, 0)} and ${fmt(nearest.j * ds, 0)} m leave ${fmt(nearest.free, 1)} m between barriers`);
+  expect(nearest.dh / nearest.free < 0.5, `the ground between s = ${fmt(nearest.i * ds, 0)} and ${fmt(nearest.j * ds, 0)} m rises 1 in ${fmt(nearest.free / nearest.dh, 1)}`);
+  note(`closest approach of two stretches: ${fmt(nearest.d, 1)} m apart, ${fmt(nearest.free, 1)} m between barriers, ${fmt(nearest.dh, 1)} m of height (s = ${fmt(nearest.i * ds, 0)} and ${fmt(nearest.j * ds, 0)} m)`);
 });
 
 // ---- the stretches, in the order they are driven ---------------------------------------------------------------
 
 test('the named stretches are the ones of the design, in order, and cover the lap', () => {
-  const ids = ['straight', 'sweeper', 'esses', 'tunnel', 'viaduct', 'hairpins', 'summit', 'descent', 'hook'];
+  const ids = ['straight', 'sweep', 'esses', 'tunnel', 'viaduct', 'carousel', 'crest', 'plunge', 'ledge', 'gully', 'sweepback'];
   expect(track.sections.map((sec) => sec.id).join() === ids.join(), `sections are ${track.sections.map((sec) => sec.id).join()}`);
   expect(JSON.stringify(SECTIONS) === JSON.stringify(track.sections), 'SECTIONS and track.sections disagree');
   for (let k = 0; k < track.sections.length; k++) {
@@ -311,168 +311,66 @@ test('the named stretches are the ones of the design, in order, and cover the la
   }
 });
 
-test('lakeside straight: at least 300 m, level, the line about a third of the way along', () => {
-  const flat = (i) => Math.abs(track.curvature[i]) < 1 / 2000 && Math.abs(track.grade[i]) < 0.003;
+test('lakeside straight: about 700 m along z = 0 towards +X, level, about 250 m of it after the line', () => {
+  const flat = (i) => Math.abs(track.curvature[i]) < 1 / 3000 && Math.abs(track.grade[i]) < 0.003;
   let before = 0;
   while (before < n && flat((n - 1 - before) % n)) before++;
   let after = 0;
   while (after < n && flat(after)) after++;
   const run = (before + after) * ds;
-  expect(run >= 300, `the straight, level run through the line is ${fmt(run, 0)} m`);
-  between((before * ds) / run, 0.25, 0.42, 'share of the straight before the line');
-  for (const i of [0, idx(50), idx(-50), idx(150)]) expect(Math.abs(track.py[i]) < 0.05, `the straight is ${fmt(track.py[i])} m high at sample ${i}`);
+  between(run, 600, 760, 'level, straight run through the line (m)');
+  between(after * ds, 180, 260, 'of it after the line (m)');
+  for (const i of [0, idx(150), idx(-150), idx(-400)]) {
+    expect(Math.abs(track.py[i]) < 0.05 && Math.abs(track.pz[i]) < 0.05, `the straight is off z = 0, y = 0 at sample ${i}`);
+    expect(track.tx[i] > 0.9999, `the straight does not run towards +X at sample ${i}`);
+  }
   note(`straight and level for ${fmt(run, 0)} m, ${fmt(before * ds, 0)} m of it before the line`);
 });
 
-test('the sweeper: one fast right-hander of 150 to 250 m radius', () => {
-  const bends = bendsOf(inSection('sweeper'));
-  expect(bends.length === 1 && bends[0].dir < 0, `the sweeper is ${bends.length} bends`);
-  between(bends[0].radius, 150, 250, 'sweeper radius (m)');
-  for (const i of [idx(section('sweeper').s0 + 80)]) {
-    expect(track.kindL[i] === EDGE.TREES && track.kindR[i] === EDGE.TREES, 'the sweeper is not in the trees');
+test('the bends: one slow carousel of about 55 m, the rest 180 to 450 m (the tunnel 1000 m)', () => {
+  const bends = bendsOf([...Array(n).keys()], 1200);
+  const slow = bends.filter((b) => b.radius < 150);
+  expect(slow.length === 1 && track.sectionAt(slow[0].at * ds).id === 'carousel', `${slow.length} slow bends`);
+  between(slow[0].radius, 50, 75, 'carousel radius (m)');
+  expect(slow[0].dir < 0 && slow[0].count * ds >= 150, 'the carousel is not a long right-hander');
+  for (const b of bends) {
+    if (b === slow[0]) continue;
+    const sec = track.sectionAt(b.at * ds).id;
+    if (sec === 'tunnel') between(b.radius, 800, 1200, 'tunnel bend radius (m)');
+    else between(b.radius, 180, 450, `radius of the bend at s = ${fmt(b.at * ds, 0)} m (${sec})`);
   }
+  note(`${bends.length} bends; the carousel ${fmt(slow[0].radius, 0)} m`);
 });
 
-test('the esses: at least three changes of direction, radii 70 to 110 m, climbing 5 to 6 %', () => {
-  const samples = inSection('esses');
-  const bends = bendsOf(samples);
-  let changes = 0;
-  for (let k = 1; k < bends.length; k++) if (bends[k].dir !== bends[k - 1].dir) changes++;
-  expect(changes >= 3, `only ${changes} changes of direction`);
-  for (const bend of bends) between(bend.radius, 70, 110, `radius of the bend at s = ${fmt(bend.at * ds, 0)} m`);
-  let sum = 0;
-  let steepest = 0;
-  for (const i of samples) {
-    sum += track.grade[i];
-    steepest = Math.max(steepest, track.grade[i]);
-  }
-  between((sum / samples.length) * 100, 5, 6, 'mean gradient of the esses (%)');
-  expect(steepest <= 0.0605, `the esses reach ${fmt(steepest * 100, 2)} %`);
-  note(`esses: ${bends.length} bends of ${bends.map((b) => fmt(b.radius, 0)).join(', ')} m, mean gradient ${fmt((sum / samples.length) * 100, 2)} %`);
-});
-
-test('the tunnel: 230 to 270 m, gently curved, no steeper than 3 %, walls at 0.9 m, no sky', () => {
+test('the tunnel: 300 to 400 m, lit, gently curved, no sky inside', () => {
   expect(track.tunnels.length === 1, `${track.tunnels.length} tunnels`);
-  const { s0, s1 } = track.tunnels[0];
-  between(s1 - s0, 230, 270, 'tunnel length (m)');
-  const samples = samplesOf(s0, s1);
-  let tight = Infinity;
-  let steep = 0;
-  for (const i of samples) {
-    tight = Math.min(tight, 1 / Math.max(1e-9, Math.abs(track.curvature[i])));
-    steep = Math.max(steep, Math.abs(track.grade[i]));
-    expect(track.kindL[i] === EDGE.WALL && track.kindR[i] === EDGE.WALL, `no wall at s = ${fmt(i * ds, 0)}`);
-    expect(Math.abs(track.edgeL[i] - hw - TUNNEL.wallOffset) < 0.005, `left wall at ${fmt(track.edgeL[i] - hw)} m, s = ${fmt(i * ds, 0)}`);
-    expect(Math.abs(track.edgeR[i] - hw - TUNNEL.wallOffset) < 0.005, `right wall at ${fmt(track.edgeR[i] - hw)} m, s = ${fmt(i * ds, 0)}`);
+  const t = track.tunnels[0];
+  between(t.s1 - t.s0, 300, 400, 'tunnel length (m)');
+  for (let s = t.s0 + 20; s < t.s1 - 20; s += 5) expect(track.sky[idx(s)] === 0, `sky inside the tunnel at s = ${fmt(s, 0)}`);
+  for (const side of [1, -1]) {
+    expect(Math.abs(track.edgeAt((t.s0 + t.s1) / 2, side) - (hw + TUNNEL.wallOffset)) < 0.01, 'tunnel walls not at their offset');
   }
-  between(tight, 300, 1000, 'tightest radius in the tunnel (m)');
-  expect(steep <= 0.03, `the tunnel reaches ${fmt(steep * 100, 2)} %`);
-  expect(TUNNEL.height > 4.5 && TUNNEL.wallOffset === 0.9, 'TUNNEL is not the bore the design asks for');
-  // The sky closes over about 25 m at each portal and is gone inside.
-  for (const portal of [s0, s1]) {
-    let easing = 0;
-    for (let d = -60; d <= 60; d += ds) {
-      const sky = track.sky[idx(portal + d)];
-      if (sky > 0.001 && sky < 0.999) easing += ds;
+  expect(track.sectionAt(t.s0 + 1).id === 'tunnel', 'the bore is not in the tunnel section');
+});
+
+test('on piers: two or more bridges, at least 600 m in all; the viaduct a long banked curve over the valley', () => {
+  expect(track.bridges.length >= 2, `${track.bridges.length} bridges`);
+  let total = 0;
+  for (const b of track.bridges) {
+    total += b.s1 - b.s0;
+    expect(b.drop > 15 && typeof b.id === 'string', `bridge ${b.id} has no drop of its own`);
+    for (const side of [1, -1]) {
+      expect(Math.abs(track.edgeAt((b.s0 + b.s1) / 2, side) - (hw + VIADUCT.parapetOffset)) < 0.01, `parapet of ${b.id} not at its offset`);
     }
-    between(easing, 18, 30, `length over which the sky closes at the portal at s = ${fmt(portal, 0)} (m)`);
   }
-  expect(track.sky[idx((s0 + s1) / 2)] === 0 && track.sky[idx(s0 + 30)] === 0, 'there is sky inside the tunnel');
-  expect(track.sky[idx(s0 - 30)] === 1 && track.sky[idx(s1 + 30)] === 1, 'the sky is not open 30 m outside the portals');
-  let open = 0;
-  for (let i = 0; i < n; i++) if (track.sky[i] === 1) open++;
-  expect(open * ds > L - (s1 - s0) - 40, 'the sky is closed somewhere other than the tunnel');
-  note(`tunnel s = ${fmt(s0, 0)} .. ${fmt(s1, 0)} m (${fmt(s1 - s0, 0)} m), radius ${fmt(tight, 0)} m, up to ${fmt(steep * 100, 2)} %`);
-});
-
-test('the viaduct: 140 to 180 m, nearly straight, 40 to 80 m after the tunnel, parapets at 0.7 m over a ravine', () => {
-  expect(track.bridges.length === 1, `${track.bridges.length} bridges`);
-  const { s0, s1, drop } = track.bridges[0];
-  between(s1 - s0, 140, 180, 'viaduct length (m)');
-  between(s0 - track.tunnels[0].s1, 40, 80, 'gap between tunnel and viaduct (m)');
-  expect(drop === VIADUCT.drop && drop > 15, 'the bridge does not say how deep the ravine is');
-  const samples = samplesOf(s0, s1);
-  for (const i of samples) {
-    expect(Math.abs(track.curvature[i]) < 1 / 1500, `the viaduct bends (radius ${fmt(1 / Math.abs(track.curvature[i]), 0)} m)`);
-    expect(track.kindL[i] === EDGE.PARAPET && track.kindR[i] === EDGE.PARAPET, `no parapet at s = ${fmt(i * ds, 0)}`);
-    const offBy = Math.max(Math.abs(track.edgeL[i] - hw - 0.7), Math.abs(track.edgeR[i] - hw - 0.7));
-    expect(offBy < 0.005, `parapet not at 0.7 m, s = ${fmt(i * ds, 0)}`);
-  }
-  for (const i of samplesOf(s0 + 25, s1 - 25)) {
-    expect(track.farSlopeL[i] < -1.5 && track.farSlopeR[i] < -1.5, `the ground does not fall away under the viaduct at s = ${fmt(i * ds, 0)}`);
-  }
-  note(`viaduct s = ${fmt(s0, 0)} .. ${fmt(s1, 0)} m (${fmt(s1 - s0, 0)} m), ${fmt(s0 - track.tunnels[0].s1, 0)} m after the tunnel`);
-});
-
-test('three hairpins: radii 18 to 25 m, alternating, joined by straights of 60 to 110 m, climbing all the way', () => {
-  const samples = inSection('hairpins');
-  const tight = bendsOf(samples, 60);
-  expect(tight.length === 3, `${tight.length} hairpins`);
-  for (const bend of tight) between(bend.radius, 18, 25, `hairpin radius at s = ${fmt(bend.at * ds, 0)} (m)`);
-  expect(tight[0].dir !== tight[1].dir && tight[1].dir !== tight[2].dir, 'the hairpins do not alternate');
-  // How far each one turns, eases included: half a turn, give or take.
-  for (const bend of tight) {
-    let turned = 0;
-    for (const step of [1, -1]) {
-      for (let i = step > 0 ? bend.at : bend.at - 1; track.curvature[(i + n) % n] * bend.dir > 1e-5; i += step) {
-        turned += track.curvature[(i + n) % n] * ds;
-      }
-    }
-    between(Math.abs(turned) / DEG, 165, 195, `angle turned by the hairpin at s = ${fmt(bend.at * ds, 0)} (degrees)`);
-  }
-  // The straights between them: the run where the road is as good as straight (radius over 500 m).
-  const straights = [];
-  for (let k = 0; k < 2; k++) {
-    let run = 0;
-    for (let i = tight[k].at; i !== tight[k + 1].at; i = (i + 1) % n) if (Math.abs(track.curvature[i]) < 1 / 500) run += ds;
-    straights.push(run);
-    between(run, 60, 110, `straight between hairpins ${k + 1} and ${k + 2} (m)`);
-  }
-  for (const i of samples) expect(track.grade[i] > 0.02, `the hairpins do not climb at s = ${fmt(i * ds, 0)} (${fmt(track.grade[i] * 100, 2)} %)`);
-  const radii = tight.map((b) => `${fmt(b.radius, 1)} m (${b.dir > 0 ? 'left' : 'right'})`).join(', ');
-  note(`hairpins of ${radii}; straights of ${straights.map((v) => fmt(v, 0)).join(' and ')} m`);
-});
-
-test('the summit is open; the descent is sweepers of 60 to 200 m radius falling at up to 8 % along a rock face', () => {
-  for (const i of samplesOf(pieces.crest.s0 + 40, pieces.crest.s1 - 40)) {
-    expect(track.kindL[i] === EDGE.RAIL && track.kindR[i] === EDGE.RAIL, 'the summit is not open on both sides');
-    expect(track.farSlopeL[i] < 0 && track.farSlopeR[i] < 0, `the ground does not fall away from the summit at s = ${fmt(i * ds, 0)}`);
-  }
-  const samples = inSection('descent');
-  // The bends that are the descent's own: not the tail of the summit's curve at its top or the way into the hook.
-  const bends = bendsOf(samples).filter((bend) => bend.first !== samples[0] && bend.last !== samples[samples.length - 1]);
-  expect(bends.length >= 3, `only ${bends.length} sweepers`);
-  for (const bend of bends) between(bend.radius, 60, 200, `sweeper radius at s = ${fmt(bend.at * ds, 0)} (m)`);
-  let steepest = 0;
-  let rock = 0;
-  for (const i of samples) {
-    steepest = Math.min(steepest, track.grade[i]);
-    expect(track.grade[i] < -0.05, `the descent is not falling at s = ${fmt(i * ds, 0)}`);
-    if (track.kindR[i] === EDGE.ROCK && track.kindL[i] === EDGE.RAIL) rock++;
-  }
-  between(steepest * 100, -8.2, -7.5, 'steepest gradient of the descent (%)');
-  expect(rock === samples.length, 'the descent is not rock on the right and rail on the left throughout');
-  const radii = bends.map((b) => `${fmt(b.radius, 0)} m ${b.dir > 0 ? 'left' : 'right'}`).join(', ');
-  note(`descent: sweepers of ${radii}; steepest ${fmt(steepest * 100, 2)} %`);
-});
-
-test('the hook: a right-hander that tightens to about 35 m, then a short chute onto the straight', () => {
-  const samples = inSection('hook');
-  const bends = bendsOf(samples);
-  expect(bends.length === 1 && bends[0].dir < 0, 'the hook is not one right-hander');
-  const hook = bends[0];
-  between(hook.radius, 33, 38, 'tightest radius of the hook (m)');
-  // Tightening: the curvature never eases off between the way in and the tightest point, which comes late.
-  let easing = 0;
-  for (let i = hook.first; i !== hook.at; i = (i + 1) % n) {
-    easing = Math.max(easing, Math.abs(track.curvature[i]) - Math.abs(track.curvature[(i + 1) % n]));
-  }
-  expect(easing < 1e-6, 'the hook opens up before its tightest point');
-  const share = ((hook.at - hook.first + n) % n) / hook.count;
-  between(share, 0.6, 0.95, 'how far round the hook its tightest point is');
-  const chute = track.wrap(section('hook').s1 - hook.last * ds);
-  between(chute, 40, 110, 'the chute (m)');
-  note(`hook: tightest ${fmt(hook.radius, 1)} m, ${fmt(share * 100, 0)} % of the way round; chute ${fmt(chute, 0)} m`);
+  expect(total >= 600, `only ${fmt(total, 0)} m on piers`);
+  const v = track.bridges.find((b) => b.id === 'viaduct');
+  expect(v && track.sectionAt((v.s0 + v.s1) / 2).id === 'viaduct', 'no viaduct');
+  const mid = idx((v.s0 + v.s1) / 2);
+  expect(track.curvature[mid] > 0 && 1 / track.curvature[mid] < 400, 'the viaduct is not a long left-hander');
+  expect(Math.abs(track.bank[mid]) > 8 * DEG, 'the viaduct is not banked');
+  expect(v.drop >= 35, `the valley is only ${v.drop} m under the viaduct`);
+  note(`on piers: ${track.bridges.map((b) => `${b.id} ${fmt(b.s1 - b.s0, 0)} m (drop ${b.drop} m)`).join(', ')}`);
 });
 
 // ---- the corridor -----------------------------------------------------------------------------------------------
@@ -526,15 +424,16 @@ test('each stretch has the roadside the design gives it', () => {
   expect(checked > 1.5 * n, `only ${checked} edge samples were far enough from a change to be checked`);
   // The numbers of the design, where they can be checked on a long stretch.
   const mid = (id) => idx((pieces[id].s0 + pieces[id].s1) / 2);
-  between(track.edgeL[mid('grid')] - hw, 8, 12, 'verge on the lake side of the straight (m)');
-  between(track.edgeR[mid('grid')] - hw, 8, 12, 'verge on the land side of the straight (m)');
-  between(track.edgeL[mid('ess3')] - hw, 4, 7, 'trees on the left in the esses (m)');
-  between(track.edgeR[mid('ess3')] - hw, 4, 7, 'trees on the right in the esses (m)');
-  between(track.edgeR[mid('sweep1')] - hw, 1.5, 3, 'rock in the descent (m)');
-  between(track.edgeL[mid('sweep1')] - hw, 1.2, 2, 'rail in the descent (m)');
+  between(track.edgeL[mid('grid')] - hw, 3, 10, 'verge to the wall on the lake side of the straight (m)');
+  between(track.edgeR[mid('grid')] - hw, 3, 10, 'verge to the wall on the town side of the straight (m)');
+  expect(track.kindL[mid('grid')] === EDGE.WALL && track.kindR[mid('grid')] === EDGE.WALL, 'the straight is not between low walls');
+  between(track.edgeL[mid('ess1')] - hw, 7, 10, 'run-off on the outside of the first ess (m)');
+  between(track.edgeL[mid('ledge1')] - hw, 3, 4, 'rock on the ledge (m)');
+  // a circuit: grass, a barrier, and no tree as the barrier
+  for (let i = 0; i < n; i++) expect(track.kindL[i] !== EDGE.TREES && track.kindR[i] !== EDGE.TREES, `trees as the barrier at s = ${fmt(i * ds, 0)}`);
 });
 
-test('rock rises behind its verge, a rail has level or falling ground behind it', () => {
+test('rock rises behind its verge; no hillside steeper than 3 in 1', () => {
   for (const [kind, slope, far, name] of [
     [track.kindL, track.slopeL, track.farSlopeL, 'left'],
     [track.kindR, track.slopeR, track.farSlopeR, 'right'],
@@ -547,51 +446,49 @@ test('rock rises behind its verge, a rail has level or falling ground behind it'
       if (kind[i] === EDGE.ROCK) {
         expect(slope[i] > 0.1, `${name}: rock with a verge slope of ${fmt(slope[i])} at s = ${fmt(i * ds, 0)}`);
         expect(far[i] > -0.02, `${name}: the ground falls (${fmt(far[i])}) behind rock at s = ${fmt(i * ds, 0)}`);
-      } else if (kind[i] === EDGE.RAIL) {
-        expect(slope[i] <= 0.01, `${name}: rail with a rising verge (${fmt(slope[i])}) at s = ${fmt(i * ds, 0)}`);
-        expect(far[i] < 0.02, `${name}: the ground rises (${fmt(far[i])}) behind a rail at s = ${fmt(i * ds, 0)}`);
       }
       expect(Math.abs(far[i]) <= 3.001, `${name}: far slope ${fmt(far[i])} at s = ${fmt(i * ds, 0)}`);
     }
   }
 });
 
-test('in the hairpin stack the ground between two legs is the same ground from either leg', () => {
-  // From the middle of each straight of the stack, walk towards the next leg up until the point is as near to
-  // that leg as to this one: the hillside each leg predicts for that point must be the same height.
-  const hairpins = inSection('hairpins');
+test('beside the carousel the ground between the climb and the crest is the same ground from either', () => {
+  // From the climb, walk towards the crest until the point is as near to it as to the climb: the hillside each
+  // stretch predicts for that point must be the same height.
+  const other = [...inSection('crest'), ...inSection('plunge')];
   let worst = 0;
   let pairs = 0;
-  for (const id of ['ramp', 'leg1', 'leg2']) {
-    for (const s of [pieces[id].s0 + pieces[id].len * 0.35, pieces[id].s0 + pieces[id].len * 0.6, pieces[id].s0 + pieces[id].len * 0.8]) {
-      // The uphill side is the one whose solid edge is rock.
-      const side = track.kindL[idx(s)] === EDGE.ROCK ? 1 : -1;
-      for (let d = 8; d < 40; d += 0.05) {
+  for (const u of [0.1, 0.25, 0.4]) {
+    const s = pieces.climb.s0 + pieces.climb.len * u;
+    let tried = 0;
+    for (const side of [1, -1]) {
+      for (let d = 8; d < 80; d += 0.1) {
         const [x, z] = mapPoint(s, side * d);
-        let other = -1;
+        let near = -1;
         let best = d * d;
-        for (const j of hairpins) {
-          if (along(j * ds, s) < 45) continue;
+        for (const j of other) {
           const dist = (track.px[j] - x) ** 2 + (track.pz[j] - z) ** 2;
           if (dist < best) {
             best = dist;
-            other = j;
+            near = j;
           }
         }
-        if (other < 0) continue;
-        track.locate(x, z, other, where);
+        if (near < 0) continue;
+        track.locate(x, z, near, where);
         const here = track.profile(s, side * d, prof).y;
         const there = track.profile(where.s, where.lat, ground).y;
         worst = Math.max(worst, Math.abs(here - there));
         pairs++;
-        expect(there > track.frameAt(s, frame).pos.y, `the leg above ${id} is not above it`);
+        tried++;
         break;
       }
     }
+    expect(tried === 1, `from s = ${fmt(s, 0)} the crest was found on ${tried} sides`);
   }
-  expect(pairs === 9, `found the next leg from only ${pairs} of 9 places`);
-  expect(worst < 1.5, `the two legs disagree about the ground between them by ${fmt(worst, 2)} m`);
-  note(`hairpin stack: ground between legs agrees from both sides within ${fmt(worst, 2)} m`);
+  expect(pairs === 3, `found the crest from only ${pairs} of 3 places`);
+  // (terrain.js blends the two hillsides where they meet, so what is asked here is that they nearly agree)
+  expect(worst < 5, `the two stretches disagree about the ground between them by ${fmt(worst, 2)} m`);
+  note(`beside the carousel: ground between the legs agrees from both sides within ${fmt(worst, 2)} m`);
 });
 
 // ---- the questions the car asks ------------------------------------------------------------------------------------
@@ -617,16 +514,16 @@ test('locate() is the inverse of frameAt(): a few thousand points of the corrido
   note(`locate round trip over 4000 points x 4 hints: s within ${fmt(worstS * 1000, 3)} mm, lat within ${fmt(worstLat * 1000, 5)} mm`);
 });
 
-test('locate() picks the right leg everywhere in the hairpins, from edge to edge, with no hint', () => {
+test('locate() picks the right leg everywhere round the carousel, from edge to edge, with no hint', () => {
   let wrong = 0;
-  for (const i of inSection('hairpins')) {
+  for (const i of [...inSection('carousel'), ...inSection('crest')]) {
     for (const lat of [-track.edgeR[i], -hw, 0, hw, track.edgeL[i]]) {
       const [x, z] = mapPoint(i * ds, lat);
       track.locate(x, z, -1, where);
       if (along(where.s, i * ds) > 0.02 || Math.abs(where.lat - lat) > 0.02) wrong++;
     }
   }
-  expect(wrong === 0, `${wrong} points of the hairpin corridor were put on the wrong leg`);
+  expect(wrong === 0, `${wrong} points of the carousel's corridor were put on the wrong leg`);
 });
 
 test('surfaceAt() agrees with profile(), and its normal is the slope of its own heights', () => {
@@ -649,6 +546,8 @@ test('surfaceAt() agrees with profile(), and its normal is the slope of its own 
     const a = Math.abs(ground.lat);
     const edge = ground.lat > 0 ? ground.edgeL : ground.edgeR;
     if (Math.abs(a - pave) < 0.2 || Math.abs(a - edge) < 0.2) continue;
+    // (on a kerb the teeth are creases too, every half pitch, and the kerb's inner side is one)
+    if (a > hw - 0.2 && a < pave + 0.2 && track.kerbAt(ground.s, Math.sign(ground.lat)) > 0) continue;
     const e = 0.05;
     const hx = (track.surfaceAt(x + e, z, ground.index, prof).y - track.surfaceAt(x - e, z, ground.index, prof).y) / (2 * e);
     const hz = (track.surfaceAt(x, z + e, ground.index, prof).y - track.surfaceAt(x, z - e, ground.index, prof).y) / (2 * e);
@@ -716,7 +615,7 @@ test('the surface is continuous: across the road from edge to edge, and along it
     const s = random() * L;
     track.frameAt(s, frame);
     const sin = Math.sin(frame.bank);
-    for (const lat of [-pave, -hw, -1.5, 2, hw, pave]) {
+    for (const lat of [-hw, -1.5, 2, hw]) {
       expect(Math.abs(track.profile(s, lat, prof).y - (frame.pos.y + lat * sin)) < 2e-4, `the pavement is not a plane at s = ${fmt(s, 1)}, lat = ${lat}`);
     }
   }
@@ -725,17 +624,22 @@ test('the surface is continuous: across the road from edge to edge, and along it
 test('no facets: at the fastest possible speed the pavement asks for the same gentle vertical acceleration at every scale', () => {
   // The height's second difference along a driven line, measured over a quarter of a metre and over a metre. If
   // the samples showed through (a kink in slope at each one), the short measure would be far larger than the long.
+  // (the crest is left out of the absolute bound: it is meant to make the car light, and its own test says how light)
+  const crest = [pieces.crest.s0, pieces.plunge.s0 + 0.3 * pieces.plunge.len];
   const worst = { 0.25: 0, 1: 0 };
+  let worstOut = 0;
   for (const h of [0.25, 1]) {
     for (const lat of [-3.5, 0, 3.5]) {
       for (let k = 0; k < 4 * n; k++) {
         const s = (k * ds) / 4;
         const bend = (track.profile(s - h, lat, prof).y - 2 * track.profile(s, lat, prof).y + track.profile(s + h, lat, prof).y) / (h * h);
-        worst[h] = Math.max(worst[h], (speed[Math.floor(k / 4) % n] ** 2 * Math.abs(bend)) / G);
+        const acc = (speed[Math.floor(k / 4) % n] ** 2 * Math.abs(bend)) / G;
+        worst[h] = Math.max(worst[h], acc);
+        if (h === 1 && bend < 0 && (s < crest[0] || s > crest[1])) worstOut = Math.max(worstOut, acc);
       }
     }
   }
-  expect(worst[1] < 0.3, `${fmt(worst[1], 2)} g of vertical acceleration at the fastest possible speed`);
+  expect(worstOut < 0.8, `${fmt(worstOut, 2)} g of lift at the fastest possible speed (away from the crest; sags such as the compression push down)`);
   expect(worst[0.25] < worst[1] + 0.03, `the samples show through: ${fmt(worst[0.25], 2)} g over 0.25 m against ${fmt(worst[1], 2)} g over 1 m`);
   note(
     `vertical acceleration along the pavement at the fastest possible speed: at most ${fmt(worst[1], 2)} g ` +
@@ -743,30 +647,71 @@ test('no facets: at the fastest possible speed the pavement asks for the same ge
   );
 });
 
-test('what is underfoot: asphalt, then 0.6 m of shoulder, then the verge; paved to the wall in the tunnel and on the viaduct', () => {
-  expect(GRIP[SURFACE.ASPHALT] === 1 && GRIP.length === 4, 'GRIP is not indexed by SURFACE');
-  between(GRIP[SURFACE.SHOULDER], 0.7, 0.8, 'grip of the shoulder');
+test('what is underfoot: asphalt, then a kerb or a paved margin, then grass; paved to the wall in the tunnel and on the bridges', () => {
+  expect(GRIP[SURFACE.ASPHALT] === 1 && GRIP.length === 5, 'GRIP is not indexed by SURFACE');
+  between(GRIP[SURFACE.SHOULDER], 0.8, 0.9, 'grip of the paved margin');
+  between(GRIP[SURFACE.KERB], 0.88, 0.92, 'grip of a kerb');
   between(GRIP[SURFACE.GRASS], 0.5, 0.6, 'grip of grass');
-  between(GRIP[SURFACE.GRAVEL], 0.55, 0.65, 'grip of gravel');
   const kindAt = (s, lat) => track.profile(s, lat, prof).surface;
-  const open = [pieces.grid.s0 + 100, pieces.ess2.s0 + 40, pieces.sweep1.s0 + 100, pieces.leg1.s0 + 40];
+  const open = [pieces.grid.s0 + 100, pieces.ess2.s0 + 40, pieces.ledge1.s0 + 100, pieces.climb.s0 + 40, pieces.back.s0 + 200];
   for (const s of open) {
     for (const side of [1, -1]) {
       expect(kindAt(s, 0) === SURFACE.ASPHALT && kindAt(s, side * (hw - 0.01)) === SURFACE.ASPHALT, `no asphalt at s = ${s}`);
-      const shoulder = kindAt(s, side * (hw + 0.01)) === SURFACE.SHOULDER && kindAt(s, side * (pave - 0.01)) === SURFACE.SHOULDER;
-      expect(shoulder, `no shoulder at s = ${s}`);
+      const kerb = track.kerbAt(s, side) > 0.5;
+      const strip = kerb ? SURFACE.KERB : SURFACE.SHOULDER;
+      expect(kindAt(s, side * (hw + 0.01)) === strip && kindAt(s, side * (pave - 0.01)) === strip, `no ${kerb ? 'kerb' : 'margin'} at s = ${s}`);
       const verge = (side > 0 ? track.vergeL : track.vergeR)[idx(s)];
-      expect(kindAt(s, side * (pave + 0.05)) === verge, `the verge at s = ${s} is not what the corridor says`);
-      const rock = (side > 0 ? track.kindL : track.kindR)[idx(s)] === EDGE.ROCK;
-      expect(verge === (rock ? SURFACE.GRAVEL : SURFACE.GRASS), `the verge at s = ${s} is ${verge}`);
+      expect(verge === SURFACE.GRASS && kindAt(s, side * (pave + 0.05)) === verge, `the verge at s = ${s} is not grass`);
     }
   }
-  for (const s of [(track.tunnels[0].s0 + track.tunnels[0].s1) / 2, (track.bridges[0].s0 + track.bridges[0].s1) / 2]) {
+  for (const s of [(track.tunnels[0].s0 + track.tunnels[0].s1) / 2, ...track.bridges.map((b) => (b.s0 + b.s1) / 2)]) {
     for (const side of [1, -1]) {
-      expect(kindAt(s, side * (hw + 0.3)) === SURFACE.ASPHALT, `the margin is not paved at s = ${fmt(s, 0)}`);
+      expect(kindAt(s, side * (hw + 0.3)) !== SURFACE.GRASS, `the margin is not paved at s = ${fmt(s, 0)}`);
       expect(kindAt(s, side * (track.edgeAt(s, side) - 0.01)) === SURFACE.ASPHALT, `not paved to the wall at s = ${fmt(s, 0)}`);
     }
   }
+});
+
+test('kerbs: inside every bend from entry to exit, outside at the exits of the faster ones; flush, rising 4 cm', () => {
+  expect(track.kerbs.length >= 10, `${track.kerbs.length} kerbs`);
+  for (const k of track.kerbs) {
+    expect(k.width === SHOULDER && (k.side === 1 || k.side === -1), 'a kerb is not 1.2 m wide on one side');
+    for (const d of [0, 0.5, 1]) expect(!track._onBridge(track.wrap(k.s0 + d * track.wrap(k.s1 - k.s0))), 'a kerb on a bridge');
+  }
+  // the inside of the middle of every arc of the layout tighter than the rule's radius
+  for (const { seg, s0, s1 } of Object.values(pieces)) {
+    if (!seg.r || Math.abs(seg.r) > LAYOUT.kerbs.inside || seg.bridge || seg.tunnel) continue;
+    const side = seg.r > 0 ? 1 : -1;
+    for (const u of [0.1, 0.5, 0.9]) expect(track.kerbAt(s0 + (s1 - s0) * u, side) > 0.99, `no kerb inside ${seg.id} at ${u}`);
+    if (Math.abs(seg.r) <= LAYOUT.kerbs.outside) expect(track.kerbAt(s1 - 5, -side) > 0.99, `no kerb outside the exit of ${seg.id}`);
+  }
+  const k = track.kerbs.find((it) => track.wrap(it.s1 - it.s0) > 60);
+  const s = k.s0 + 30;
+  const plane = (lat) => track.frameAt(s, frame).pos.y + lat * Math.sin(frame.bank);
+  let top = 0;
+  for (let u = 0; u < 1; u += 0.01) top = Math.max(top, track.profile(s + u, k.side * (pave - 0.001), prof).y - plane(k.side * (pave - 0.001)));
+  between(top, 0.035, 0.041, 'kerb height at its outer side (m)');
+  expect(Math.abs(track.profile(s, k.side * (hw + 0.001), prof).y - plane(k.side * (hw + 0.001))) < 0.001, 'the kerb is not flush with the road');
+  track.surfaceAt(...mapPoint(s, k.side * (hw + 0.6)), -1, ground);
+  expect(ground.surface === SURFACE.KERB, 'surfaceAt() does not report the kerb');
+  note(`${track.kerbs.length} kerbs, ${fmt(track.kerbs.reduce((sum, it) => sum + track.wrap(it.s1 - it.s0), 0), 0)} m in all`);
+});
+
+test('a circuit: woods behind the barrier, tyre walls, boards, distance boards, marshals, the gantry', () => {
+  const woods = new Set();
+  for (let s = 0; s < L; s += 10) for (const side of [1, -1]) woods.add(track.woodAt(s, side));
+  for (const w of ['broadleaf', 'conifer', 'mixed', null]) expect(woods.has(w), `no ${w} anywhere`);
+  for (const b of track.bridges) expect(track.woodAt((b.s0 + b.s1) / 2, 1) === null, 'trees on a bridge');
+  expect(track.woodAt(100, 1) === null, 'trees on the lake side of the straight');
+  expect(track.woodAt(pieces.sweep.s0 + 50, -1) === 'broadleaf', 'no broadleaf wood low down');
+  expect(track.woodAt(pieces.ess3.s0 + 50, 1) === 'conifer', 'no conifers higher up');
+  for (const t of track.tyreWalls) expect(Math.abs(t.lat) < track.edgeAt(t.s0, t.side) && Math.abs(t.lat) > pave, 'a tyre wall not in front of the barrier');
+  expect(track.tyreWalls.length >= 4 && track.boards.length >= 4, 'too few tyre walls or boards');
+  expect(track.distanceBoards.map((d) => d.label).join() === '300,200,100', 'distance boards are not 300, 200, 100');
+  const carousel = pieces.carousel.s0;
+  for (const d of track.distanceBoards) between(track.delta(d.s, carousel), Number(d.label) - 1, Number(d.label) + 40, `distance board ${d.label}`);
+  expect(track.marshals.length >= 8, `${track.marshals.length} marshal posts`);
+  expect(track.gantry.s === 0 && track.gantry.latL > hw && track.gantry.latR < -hw, 'the gantry does not span the road at the line');
 });
 
 test('frameAt() matches the samples, wraps, and has no seam at the line', () => {
@@ -834,9 +779,9 @@ test('a car at 80 m/s with a hint never loses the road, across the line included
     }
     // Put somewhere else with a stale hint (a reset): one global search finds it.
     const before = searches;
-    const [x, z] = mapPoint(pieces.leg2.s0 + 40, 1);
-    track.locate(x, z, idx(pieces.leg1.s0 + 40), where);
-    expect(along(where.s, pieces.leg2.s0 + 40) < 0.02, 'a car moved to the next leg with a stale hint was left on the old one');
+    const [x, z] = mapPoint(pieces.crest.s0 + 60, 1);
+    track.locate(x, z, idx(pieces.climb.s0 + 60), where);
+    expect(along(where.s, pieces.crest.s0 + 60) < 0.02, 'a car moved to the next leg with a stale hint was left on the old one');
     expect(searches > before, 'a far move did not look further than the hint');
   } finally {
     track._nearestSample = globalSearch;
@@ -866,15 +811,15 @@ test('far from the road and inside bends, locate() still answers sensibly', () =
 test('lamps: street lamps along the straight, rows in the tunnel', () => {
   const street = track.lamps.filter((lamp) => lamp.kind === 'street').sort((a, b) => track.delta(0, a.s) - track.delta(0, b.s));
   const hung = track.lamps.filter((lamp) => lamp.kind === 'tunnel');
-  expect(street.length >= 8 && street.length + hung.length === track.lamps.length, `${street.length} street lamps`);
+  expect(street.length >= 20 && street.length + hung.length === track.lamps.length, `${street.length} street lamps`);
   for (let k = 0; k < street.length; k++) {
     const lamp = street[k];
     expect(track.sectionAt(lamp.s).id === 'straight', `a street lamp at s = ${fmt(lamp.s, 0)} is not on the straight`);
-    expect(lamp.height === 8, `a street lamp ${lamp.height} m high`);
+    expect(lamp.height === 9, `a street lamp ${lamp.height} m high`);
     const atEdge = Math.abs(Math.abs(lamp.lat) - track.edgeAt(lamp.s, lamp.side)) < 1e-6 && Math.sign(lamp.lat) === lamp.side;
     expect(atEdge, 'a street lamp is not at the solid edge');
     if (k > 0) {
-      between(track.delta(street[k - 1].s, lamp.s), 30, 40, 'spacing of street lamps (m)');
+      between(track.delta(street[k - 1].s, lamp.s), 25, 35, 'spacing of street lamps (m)');
       expect(lamp.side === -street[k - 1].side, 'street lamps do not alternate sides');
     }
   }
@@ -894,26 +839,20 @@ test('lamps: street lamps along the straight, rows in the tunnel', () => {
   );
 });
 
-test('sector lines near one third and two thirds, at landmarks', () => {
+test('sector lines near one third and two thirds, in the open and on the ground', () => {
   expect(track.sectors.length === 2, `${track.sectors.length} sector lines`);
-  between(track.sectors[0] / L, 0.27, 0.4, 'first sector line (share of the lap)');
-  between(track.sectors[1] / L, 0.56, 0.72, 'second sector line (share of the lap)');
-  expect(Math.abs(track.sectors[0] - track.bridges[0].s0) < 1e-9, 'the first line is not where the viaduct begins');
-  let top = 0;
-  for (let i = 0; i < n; i++) if (track.py[i] > track.py[top]) top = i;
-  expect(along(track.sectors[1], top * ds) < 15, 'the second line is not the summit');
-  note(
-    `sector lines at s = ${fmt(track.sectors[0], 1)} m (the viaduct's first joint, ${fmt((track.sectors[0] / L) * 100, 0)} %) ` +
-      `and ${fmt(track.sectors[1], 1)} m (the summit, ${fmt((track.sectors[1] / L) * 100, 0)} %)`,
-  );
+  between(track.sectors[0] / L, 0.3, 0.4, 'first sector line (share of the lap)');
+  between(track.sectors[1] / L, 0.6, 0.72, 'second sector line (share of the lap)');
+  for (const s of track.sectors) expect(track.sky[idx(s)] === 1 && !track._onBridge(s), `a sector line at s = ${fmt(s, 0)} is not in the open`);
+  note(`sector lines at s = ${fmt(track.sectors[0], 1)} m (${fmt((track.sectors[0] / L) * 100, 0)} %) and ${fmt(track.sectors[1], 1)} m (${fmt((track.sectors[1] / L) * 100, 0)} %)`);
 });
 
 test('the grid: two abreast, staggered behind the line, on the road, facing down it', () => {
   const want = [
-    [6, 1.9],
-    [14, -1.9],
-    [22, 1.9],
-    [30, -1.9],
+    [6, 2.6],
+    [14, -2.6],
+    [22, 2.6],
+    [30, -2.6],
   ];
   for (let slot = 0; slot < 4; slot++) {
     const g = track.grid(slot, {});

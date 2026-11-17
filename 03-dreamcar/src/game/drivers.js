@@ -16,17 +16,26 @@ const G = 9.81;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/** Lateral acceleration (m/s²) a full steering input may ask for: just under what the tyres hold. */
-const STEER_GRIP = 9.3;
-/** Front slip angle (rad) a full input adds to the angle the bend itself needs, at low and at high speed. */
-const STEER_SLIP_SLOW = 0.105;
-const STEER_SLIP_FAST = 0.07;
+/** Lateral acceleration (m/s²) a full steering input may ask for, by the path alone. */
+const STEER_GRIP = 12.3;
+/**
+ * What full lock adds to the angle the path needs (rad at the road wheels), at low and at high speed: the front
+ * tyres' slip angle and the car's understeer at the limit. With it a full input puts the car at the peak of its
+ * cornering (about 1.25 g on dry asphalt, measured in tools/handling.mjs) and not past it, where the front axle
+ * has no more to give, the yaw is barely damped at speed and the car only plods wider.
+ */
+const STEER_SLIP_SLOW = 0.08;
+const STEER_SLIP_FAST = 0.058;
+/** Slip angle of the rear axle (rad) inside which the car is cornering, not sliding: about the rear tyres' peak. */
+const REAR_SLIDE = 0.075;
+/** Counter-steer the hand on the wheel gives (rad of steering per rad of rear slide beyond REAR_SLIDE), keys only. */
+const CATCH = 0.75;
 
 /** The most steering (rad at the road wheels) worth having at the car's present speed. */
 function steerLimit(vehicle) {
   const p = vehicle.params;
   const speed = Math.abs(vehicle.speed);
-  const fast = clamp01(speed / 55);
+  const fast = clamp01((speed - 8) / 42);
   const slip = STEER_SLIP_SLOW + (STEER_SLIP_FAST - STEER_SLIP_SLOW) * fast;
   const bend = speed > 1 ? Math.atan((p.wheelbase * STEER_GRIP) / (speed * speed)) : Math.PI / 2;
   return Math.min(p.steering.lock, bend + slip);
@@ -38,6 +47,20 @@ function bodySlip(vehicle) {
   const v = vehicle.velocity;
   const sin = Math.sin(vehicle.yaw), cos = Math.cos(vehicle.yaw);
   return Math.atan2(v.x * cos - v.z * sin, v.x * sin + v.z * cos);
+}
+
+/**
+ * How far the rear axle is sliding (rad, + = it is moving to the left), beyond the slip angle the rear tyres work at
+ * in a bend: zero while the car corners, however hard, and the size of the slide once the tail steps out.
+ */
+function rearSlide(vehicle) {
+  if (vehicle.speed < 3) return 0;
+  const v = vehicle.velocity;
+  const sin = Math.sin(vehicle.yaw), cos = Math.cos(vehicle.yaw);
+  const forward = v.x * sin + v.z * cos;
+  const across = v.x * cos - v.z * sin - vehicle.angularVelocity.y * (vehicle.params.wheelbase / 2 - vehicle.params.com.z);
+  const angle = Math.atan2(across, forward);
+  return angle - clamp(angle, -REAR_SLIDE, REAR_SLIDE);
 }
 
 /** A person on this machine. */
@@ -52,9 +75,11 @@ export class PlayerDriver {
     this.scheme = scheme;
     this.zone = zone;
     this._raw = { steer: 0, throttle: 0, brake: 0, handbrake: 0, analog: false };
-    this._steer = 0; // -1..1 of the lock allowed at this speed
+    this._steer = 0; // -1..1 of the lock allowed at this speed, as the keys have wound it
+    this._wheel = 0; // the same after the hands' lag
     this._throttle = 0;
     this._brake = 0;
+    this._hand = 0; // 0..1 how much the handbrake keeps the hands from catching the slide it makes
   }
 
   /**
@@ -67,30 +92,40 @@ export class PlayerDriver {
     this.input.read(raw, this.scheme, this.zone);
     const lock = vehicle.params.steering.lock;
     const fast = clamp01(Math.abs(vehicle.speed) / 60);
-    const slide = bodySlip(vehicle);
-    // a car that is sliding needs lock to catch it, however fast it is going
-    const limit = Math.min(lock, steerLimit(vehicle) + Math.abs(slide));
+    const base = steerLimit(vehicle);
+    // a car whose tail is out needs lock to catch it, however fast it is going: the room beyond the speed's lock is
+    // given only the way that catches it (+ = to the left), never further into the slide
+    const slide = rearSlide(vehicle);
+    const roomLeft = Math.min(lock, base + Math.max(0, slide));
+    const roomRight = Math.min(lock, base + Math.max(0, -slide));
     const want = clamp(+raw.steer || 0, -1, 1);
+    const handbrake = raw.handbrake ? 1 : 0;
+    // while the handbrake is pulled the hands let the tail come round; they are back on the wheel a moment after
+    this._hand = handbrake ? 1 : Math.max(0, this._hand - dt / 0.25);
+    let angle; // rad at the road wheels, + = left
     if (raw.analog) {
-      this._steer = want;
+      this._steer = this._wheel = want;
       this._throttle = clamp01(+raw.throttle || 0);
       this._brake = clamp01(+raw.brake || 0);
-      out.steer = (want * limit) / lock;
+      angle = -want * (want < 0 ? roomLeft : roomRight);
     } else {
       // a key: wind the wheel on, quicker when it is being reversed, and let it run back when released
       const reversing = want !== 0 && this._steer * want < 0;
-      const time = want === 0 ? 0.14 + 0.22 * fast : (0.17 + 0.42 * fast) / (reversing ? 2.5 : 1);
+      const time = want === 0 ? 0.13 + 0.17 * fast : (0.2 + 0.36 * fast) / (reversing ? 2.5 : 1);
       const step = dt / time;
       this._steer += clamp(want - this._steer, -step, step);
+      // and the hands follow the key with a little lag, which rounds the start and the end of the ramp
+      this._wheel += (this._steer - this._wheel) * (1 - Math.exp(-dt / 0.05));
       this._throttle += clamp((raw.throttle > 0.5 ? 1 : 0) - this._throttle, -dt / 0.08, dt / 0.12);
       this._brake += clamp((raw.brake > 0.5 ? 1 : 0) - this._brake, -dt / 0.08, dt / 0.1);
-      // and a hand on the wheel that turns into a slide without being told (the slip beyond a couple of degrees)
-      const help = slide - clamp(slide, -0.035, 0.035);
-      out.steer = clamp((this._steer * limit - 0.6 * help) / lock, -1, 1);
+      angle = -this._wheel * (this._wheel < 0 ? roomLeft : roomRight);
+      // and a hand on the wheel that turns into a slide without being told
+      angle = clamp(angle + CATCH * slide * (1 - this._hand), -roomRight, roomLeft);
     }
+    out.steer = clamp(-angle / lock, -1, 1);
     out.throttle = this._throttle;
     out.brake = this._brake;
-    out.handbrake = raw.handbrake ? 1 : 0;
+    out.handbrake = handbrake;
     return out;
   }
 }
@@ -157,6 +192,23 @@ function racingLine(track, half) {
   return lat;
 }
 
+/** What the autopilot takes the car to have at full pace (m/s²): across, braking, and drive from the rear tyres. */
+const LATERAL = 11.2;
+const BRAKING = 11;
+const TRACTION = 7.5;
+/** Samples ahead over which a crest's speed is already kept. */
+const CREST_AHEAD = 50;
+/** How much of the banking's help the autopilot counts on. */
+const BANK_CREDIT = 0.5;
+
+/** The engine's most power (W), from its torque curve. */
+function peakPower(p) {
+  const t = p.engine.torque;
+  let most = 0;
+  for (let i = 0; i < t.length; i += 2) most = Math.max(most, (t[i + 1] * t[i] * Math.PI) / 30);
+  return most;
+}
+
 /** An autopilot. */
 export class AutoDriver {
   /**
@@ -200,11 +252,14 @@ export class AutoDriver {
     const { track, params: p } = this;
     const n = track.count;
     const grip2 = this.pace * this.pace;
-    const lateral = 9.0 * grip2; // m/s² across
-    const braking = 8.6 * grip2;
-    const traction = 5.6 * grip2;
+    const lateral = LATERAL * grip2; // m/s² across, on the level and with no help from the air
+    const braking = BRAKING * grip2;
+    const traction = TRACTION * grip2;
     const top = p.topSpeed * Math.min(1, 0.4 + 0.6 * this.pace) - 0.5;
-    const power = 0.86 * 190000 * p.gearbox.efficiency * Math.min(1, grip2 + 0.1);
+    const power = 0.86 * peakPower(p) * p.gearbox.efficiency * Math.min(1, grip2 + 0.1);
+    // the air presses the car down: grip grows with the square of the speed by this much per (m/s)²
+    const aero = (0.5 * p.aero.airDensity * (p.aero.downforceArea ?? 0)) / (p.mass * G);
+    const banking = track.bank || new Float64Array(n);
     const drag = (v) => (0.5 * p.aero.airDensity * p.aero.dragArea * v * v) / p.mass + 0.014 * G;
     const at = (i) => ((i % n) + n) % n;
     const bend = new Float64Array(n);
@@ -226,9 +281,27 @@ export class AutoDriver {
     for (let i = 0; i < n; i++) {
       // the worst of the bend just here, so that a kink is seen coming
       const k = Math.max(bend[at(i - 2)], bend[i], bend[at(i + 2)]);
-      const cornering = Math.sqrt(lateral / Math.max(1e-6, k + (lateral * crest[i]) / G));
-      const light = crest[i] > 1e-6 ? Math.sqrt((0.45 * G) / crest[i]) : Infinity; // keep half the weight on the wheels
-      v[i] = Math.min(top, cornering, light);
+      // a bend banked into by b allows v² k = (a + g tan b) / (1 - (a / g) tan b), a growing with the downforce
+      // (counted at BANK_CREDIT of its worth: the tyres lose grip as the banking loads them, and the line is not
+      // the centre line the banking was laid on)
+      const into = BANK_CREDIT * Math.tan(-Math.sign(track.curvature[i]) * banking[i]);
+      let cornering = Math.sqrt(lateral / Math.max(1e-6, k + (lateral * crest[i]) / G));
+      for (let it = 0; it < 3; it++) {
+        const a = lateral * (1 + aero * cornering * cornering);
+        const reach = (a + G * into) / Math.max(0.3, 1 - (a / G) * into);
+        cornering = Math.sqrt(reach / Math.max(1e-6, k + (a * crest[i]) / G));
+      }
+      v[i] = Math.min(top, cornering);
+    }
+    // over a crest keep about half the weight on the wheels, and be at that speed before it begins: braking on a
+    // crest unloads the rear tyres just when they are lightest
+    for (let i = 0; i < n; i++) {
+      let light = Infinity;
+      for (let j = 0; j <= CREST_AHEAD; j++) {
+        const c = crest[at(i + j)];
+        if (c > 1e-6) light = Math.min(light, Math.sqrt((0.45 * G) / c));
+      }
+      v[i] = Math.min(v[i], light);
     }
     const share = (speed, k, most) => most * Math.sqrt(Math.max(0.08, 1 - ((speed * speed * k) / lateral) ** 2));
     // backwards: no faster here than can be shed before what comes next

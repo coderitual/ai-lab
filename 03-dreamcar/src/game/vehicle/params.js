@@ -103,8 +103,8 @@ export const CAR = {
 
   tyre: {
     /** Peak friction at the reference load, along and across. */
-    muX: 1.14,
-    muY: 1.15,
+    muX: 1.5,
+    muY: 1.52,
     loadRef: (loadFront + loadRear) / 2,
     loadSensitivity: 0.13, // fraction of grip lost per reference load added
     /** Slip at which the force peaks. */
@@ -117,12 +117,14 @@ export const CAR = {
     curvatureY: -0.6,
     /** On a loose surface the peak comes later: slip scale = 1 + looseSlip·(1 − grip). */
     looseSlip: 1.6,
+    /** wheel.skid from the combined normalised slip (1 = the peak) and the speed the patch slides at (m/s). */
+    squeal: { from: 0.35, span: 0.9, slide: 0.15, slideSpan: 0.8 },
     /** Below this speed (m/s) slip is measured against it instead of the wheel's own speed. */
     minSpeed: 0.1,
   },
 
   /**
-   * Per surface (indexed by SURFACE in game/track.js: asphalt, shoulder, grass, gravel): rolling resistance
+   * Per surface (indexed by SURFACE in game/track.js: asphalt, paved margin, grass, gravel, kerb): rolling resistance
    * coefficient, and the height (m) and length (m) of the unevenness that comes through the springs.
    */
   surfaces: [
@@ -130,21 +132,23 @@ export const CAR = {
     { rolling: 0.014, rough: 0.002, wavelength: 0.9 },
     { rolling: 0.055, rough: 0.011, wavelength: 1.7 },
     { rolling: 0.085, rough: 0.008, wavelength: 0.8 },
+    { rolling: 0.013, rough: 0.003, wavelength: 0.45 },
   ],
   /** Rolling resistance grows with speed: coefficient × (1 + (v / rollingSpeed)²). */
   rollingSpeed: 62,
 
   aero: {
     dragArea: 0.55, // Cd·A, m²
+    /** Cl·A of the downforce (m²): a splitter, a lip on the boot and a flat floor; it presses the car down at speed. */
+    downforceArea: 0.7,
     airDensity: 1.225,
   },
 
   engine: {
-    /** Full-throttle torque (rpm, N·m): 400 N·m from 2000 to 3200, 190 kW at 5800. */
-    torque: [750, 190, 1000, 235, 1250, 285, 1500, 335, 1750, 375, 2000, 400, 3200, 400, 4000, 388, 4800, 362, 5400, 334, 5800, 313,
-      6100, 294, 6500, 268, 6800, 230],
+    /** Full-throttle torque (rpm, N·m), the hot version: 640 N·m from 2500 to 4500, 365 kW at 6300. */
+    torque: [750, 300, 1000, 380, 1500, 500, 2000, 600, 2500, 640, 4500, 640, 5500, 610, 6300, 553, 6800, 500, 7200, 430],
     idle: 750,
-    limiter: 6500,
+    limiter: 7000,
     /** Closed-throttle drag (N·m) = frictionBase + frictionSlope × rpm. */
     frictionBase: 22,
     frictionSlope: 0.013,
@@ -160,11 +164,11 @@ export const CAR = {
     final: 3.07,
     efficiency: 0.9,
     /** The torque converter: the engine speed it lets a stationary car reach at full throttle, and how much it multiplies torque there. */
-    stallRpm: 2350,
+    stallRpm: 3000,
     stallRatio: 1.7,
     /** Shift points (rpm): light throttle, full throttle, and what it holds on to under braking. */
     upLight: 1900,
-    upFull: 6350,
+    upFull: 6850,
     brakeLight: 2400,
     brakeFull: 3700,
     /** A downshift happens when the lower gear would run below this fraction of the upshift point. */
@@ -173,7 +177,9 @@ export const CAR = {
     kickdownTime: 0.22,
     shiftTorque: 0.3, // fraction of torque passed in the middle of a shift
     minInterval: 0.3, // s between shifts
-    holdAfterLift: 1.5, // s the box remembers a wide throttle before it shifts up after lifting
+    holdAfterLift: 1.5, // s the box holds on to a wide throttle after lifting before it starts to forget it
+    holdAfterBrake: 2, // s it holds on to hard braking (the gear for the exit of the bend), unless the throttle opens
+    forget: 1.2, // s to forget a full pedal once the hold is over
     reverseSpeed: 11, // m/s, where reverse runs out
   },
 
@@ -186,13 +192,13 @@ export const CAR = {
 
   brakes: {
     /** Torque at one wheel with the pedal on the floor (N·m). About 68 % of the braking is at the front. */
-    front: 2700,
-    rear: 1270,
+    front: 3700,
+    rear: 1750,
     handbrake: 3200, // on each rear wheel
     hold: 900, // on each wheel when standing with the throttle closed
   },
 
-  topSpeed: 250 / 3.6, // m/s, where the limiter closes the throttle
+  topSpeed: 285 / 3.6, // m/s, where the limiter closes the throttle
 
   assists: {
     /** ABS, per wheel: the slip it aims for, and how fast it learns, forgets and reacts (per unit of excess slip). */
@@ -201,14 +207,23 @@ export const CAR = {
     tc: { slip: 0.085, bendSlip: 0.17, learn: 5, forget: 2.5, react: 0.35 },
     esc: {
       minSpeed: 6,
-      /** Characteristic speed (m/s) of the car's understeer: what yaw rate a steering angle is taken to ask for. */
-      characteristicSpeed: 28,
+      /**
+       * Characteristic speed (m/s) of the car's understeer: what yaw rate a steering angle is taken to ask for. It is
+       * the car's own (measured by tools/handling.mjs: 44.7 m/s, 1.0° of steering per g in the linear range); a lower
+       * figure makes ordinary cornering look like oversteer to the stability control.
+       */
+      characteristicSpeed: 44,
+      /** The most lateral acceleration (g, on dry asphalt) the reference may ask for: the tyres' grip, more on a banked bend. */
+      holdG: 1.6,
+      lag: 0.12, // s, the yaw's answer to the steering, as the reference follows it
       deadband: 0.07, // rad/s of yaw-rate error let pass
+      deadbandG: 1.0, // m/s²: and no more than this much lateral acceleration
       yawGain: 17000, // N·m of correcting moment per rad/s beyond that
       slipAllowed: 0.085, // rad of body slip let pass (about 5°)
       slipGain: 52000, // N·m per rad beyond that
       slipRateGain: 9000, // N·m per rad/s of the slip angle growing
       understeerGain: 0.9, // throttle trimmed per rad/s of missing yaw rate
+      handbrakePause: 0.35, // s it stays out of the way after the handbrake is let go (the turn it made is wanted)
     },
   },
 
@@ -222,6 +237,8 @@ export const CAR = {
       { restitution: 0.08, friction: 0.6 },
     ],
     impactSpeed: 0.6, // m/s of closing speed below which a touch is not reported as an impact
+    again: 1.5, // while still against the edge, a knock is reported only if this many times harder than the last
+    apart: 0.3, // s off the edge after which the next touch is a new meeting
   },
 
   /** Car against car. */

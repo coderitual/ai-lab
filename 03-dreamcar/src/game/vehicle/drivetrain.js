@@ -40,7 +40,10 @@ export class Drivetrain {
     this._time = 1;
     this._sinceShift = 1;
     this._load = 0; // the throttle as the engine has answered it so far
-    this._memory = 0; // the widest recent throttle, fading: what the shift points go by
+    this._memory = 0; // the widest recent throttle, held and then fading: what the shift points go by
+    this._memoryAge = 0; // s since the throttle was last that wide
+    this._brakeMemory = 0; // the hardest recent braking, held and then fading
+    this._brakeAge = 0;
   }
 
   /** Full-throttle torque (N·m) at an engine speed (rpm). */
@@ -78,9 +81,18 @@ export class Drivetrain {
       this._forward = 1;
       this._timer = 0;
     } else {
-      this._memory = throttle > this._memory ? throttle : Math.max(throttle, this._memory - dt / b.holdAfterLift);
+      // What the shift points go by: the widest recent throttle and the hardest recent braking, each held for a
+      // while after the pedal comes back and then let go. Without the hold a pedal worked on and off (a key, or a
+      // foot on a downhill) has the box change down and up again every time.
+      this._memoryAge = throttle >= this._memory ? 0 : this._memoryAge + dt;
+      if (throttle >= this._memory) this._memory = throttle;
+      else if (this._memoryAge > b.holdAfterLift) this._memory = Math.max(throttle, this._memory - dt / b.forget);
+      const pressing = brake > 0.1 ? brake : 0;
+      this._brakeAge = pressing >= this._brakeMemory ? 0 : this._brakeAge + dt;
+      if (pressing >= this._brakeMemory) this._brakeMemory = pressing;
+      else if (this._brakeAge > b.holdAfterBrake || throttle > 0.3) this._brakeMemory = Math.max(pressing, this._brakeMemory - dt / b.forget);
       const light = b.upLight + (b.upFull - b.upLight) * this._memory ** 1.4;
-      const braking = brake > 0.1 ? b.brakeLight + (b.brakeFull - b.brakeLight) * brake : 0;
+      const braking = this._brakeMemory > 0 ? b.brakeLight + (b.brakeFull - b.brakeLight) * this._brakeMemory : 0;
       const up = Math.max(light, braking);
       if (this._timer > 0) {
         this._timer -= dt;

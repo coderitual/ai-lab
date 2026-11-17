@@ -25,6 +25,15 @@
 //   ?mute          no sound
 //   ?debug=NAME    show one intermediate buffer of the frame
 //   ?ldr           use the 8-bit fallback even where float targets exist (to test it)
+//   Grade overrides, for matching a picture by hand (they replace the time of day's own Look fields, in
+//   every view; FramePipeline applies them):
+//   ?ao=1          ambient occlusion strength      ?halo=0.2      the lamps' halo in the glow
+//   ?star=0.05     glints: a small star on the brightest points
+//   ?contrast= ?saturation= ?bloom= ?vignette= ?grain=   one number each
+//   ?tint=r,g,b ?lift=r,g,b                       three numbers each
+//   ?splitlo=r,g,b ?splithi=r,g,b ?splitbal=0.5   split toning: shadows' colour, highlights' colour, balance
+//   ?ev=-0.5       exposure, in stops on top of what the game sets
+//   ?shutter=0.8   the motion blur's shutter in place of the game's (a fraction of 1/60 s)
 //
 // The viewer (viewer.html) reads the same ones and, in `viewer`, its own:
 //   ?asset=car|world|track   &lights=off|drl|low|high|brake|all
@@ -37,6 +46,24 @@ const MODES = ['solo', 'split'];
 const CAMERAS = ['chase', 'far', 'bonnet', 'bumper'];
 const LIGHT_PRESETS = ['off', 'drl', 'low', 'high', 'brake', 'all'];
 const ORTHO_VIEWS = ['side', 'front', 'rear', 'top'];
+/** URL key -> Look field, for the grade overrides. */
+const LOOK_NUMBERS = [
+  ['ao', 'ao'],
+  ['halo', 'halo'],
+  ['star', 'star'],
+  ['contrast', 'contrast'],
+  ['saturation', 'saturation'],
+  ['bloom', 'bloom'],
+  ['vignette', 'vignette'],
+  ['grain', 'grain'],
+  ['splitbal', 'splitBalance'],
+];
+const LOOK_COLOURS = [
+  ['tint', 'tint'],
+  ['lift', 'lift'],
+  ['splitlo', 'splitShadows'],
+  ['splithi', 'splitHighlights'],
+];
 
 /**
  * @typedef {object} ViewerParams
@@ -74,6 +101,9 @@ const ORTHO_VIEWS = ['side', 'front', 'rear', 'top'];
  * @property {boolean} mute
  * @property {string|null} debug
  * @property {boolean} ldr
+ * @property {Partial<import('./FramePipeline.js').Look>} look grade overrides: only the fields that were given
+ * @property {number} ev exposure bias in stops (0: none)
+ * @property {number|null} shutter the motion blur's shutter in place of the game's (null: the game's)
  * @property {ViewerParams} viewer only the values that were given
  */
 
@@ -112,6 +142,16 @@ export function parseParams(search = typeof location !== 'undefined' ? location.
     if (v !== undefined) viewer[key] = v;
   }
 
+  const look = {};
+  for (const [key, field] of LOOK_NUMBERS) {
+    const v = num(key);
+    if (v !== undefined) look[field] = v;
+  }
+  for (const [key, field] of LOOK_COLOURS) {
+    const v = (q.get(key) || '').split(',').map(parseFloat);
+    if (v.length === 3 && v.every(Number.isFinite)) look[field] = v;
+  }
+
   const laps = num('laps');
   return {
     manual: q.has('manual'),
@@ -139,6 +179,9 @@ export function parseParams(search = typeof location !== 'undefined' ? location.
     mute: q.has('mute'),
     debug: word('debug'),
     ldr: q.has('ldr'),
+    look,
+    ev: num('ev') ?? 0,
+    shutter: num('shutter') ?? null,
     viewer,
   };
 }

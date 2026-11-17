@@ -94,25 +94,26 @@ test('at rest it sits at ride height and does not move', () => {
   check(slope.moved < 1e-4, `creeps ${slope.moved} m in 10 s on a slope`);
 });
 
-test('0-100 km/h in 5.8 to 6.6 s', () => {
+test('0-100 km/h in 4.0 s or less, 0-200 in about 13 s', () => {
   const a = M.acceleration();
-  within(a.t100, 5.8, 6.6, '0-100 km/h (s)');
+  within(a.t100, 3.4, 4.0, '0-100 km/h (s)');
+  within(a.t200, 11, 14, '0-200 km/h (s)');
   const gears = a.shifts.map((s) => s.to);
   check(gears.every((g, i) => g === i + 2), `gears taken out of order: ${gears}`);
   return `${a.t100.toFixed(2)} s, 0-200 in ${a.t200.toFixed(1)} s`;
 });
 
-test('top speed 245 to 255 km/h, held steadily', () => {
+test('top speed about 285 km/h, held steadily', () => {
   const t = M.topSpeed();
-  within(t.kmh, 245, 255, 'top speed (km/h)');
+  within(t.kmh, 278, 290, 'top speed (km/h)');
   check(t.ripple < 1, `hunts by ${t.ripple} km/h at the limiter`);
   check(t.drift < 0.05, `wanders ${t.drift} m off a straight line`);
   return `${t.kmh.toFixed(1)} km/h in ${t.gear}th`;
 });
 
-test('100-0 km/h in 34 to 39 m, straight', () => {
+test('100-0 km/h in 32 m or less, straight', () => {
   const b = M.braking(100);
-  within(b.distance, 34, 39, '100-0 km/h (m)');
+  within(b.distance, 24, 32, '100-0 km/h (m)');
   check(b.drift < 0.05 && b.yaw < 0.5, `pulls to one side: ${b.drift} m, ${b.yaw}°`);
   within(b.divePerG, 1.4, 2.1, 'dive (° per g)');
   const locked = M.braking(100, CAR, { abs: false });
@@ -120,9 +121,9 @@ test('100-0 km/h in 34 to 39 m, straight', () => {
   return `${b.distance.toFixed(1)} m (${locked.distance.toFixed(1)} m with the wheels locked)`;
 });
 
-test('0.95 to 1.05 g round a 50 m circle, running wide at the limit, about 3.5° of roll per g', () => {
+test('about 1.25 g round a 50 m circle, running wide at the limit, about 3.5° of roll per g', () => {
   const s = M.skidpad(50);
-  within(s.maxG, 0.95, 1.05, 'steady cornering (g)');
+  within(s.maxG, 1.18, 1.35, 'steady cornering (g)');
   check(s.ended === 'ran wide', `at the limit it ${s.ended}`);
   within(s.understeer, 0.5, 3, 'understeer gradient (° per g)');
   within(s.rollPerG, 3, 4, 'roll (° per g)');
@@ -523,6 +524,30 @@ test('no objects are made while stepping', () => {
   return `${(grown / 60000).toFixed(1)} bytes per step over 60 000 steps of two cars (boxed numbers)`;
 });
 
+test('forgiving: full key lock at 150 to 280 km/h, either way, never spins the car', () => {
+  const notes = [];
+  for (const kmh of [150, 200, 250, 280]) {
+    for (const way of [1, -1]) {
+      const r = M.fullLockAt(kmh, 3, CAR, way);
+      check(!r.spun && r.mostSlip < 8, `full lock at ${kmh} km/h: slid ${r.mostSlip.toFixed(1)}°${r.spun ? ', spun' : ''}`);
+      check(Math.abs(r.turned) > 20, `full lock at ${kmh} km/h turned the car only ${r.turned.toFixed(0)}°`);
+      if (way > 0) notes.push(`${kmh}: ${r.mostSlip.toFixed(1)}°`);
+    }
+  }
+  return `most body slip with a key held over for 3 s: ${notes.join(', ')}`;
+});
+
+test('forgiving: a rail touched at a shallow angle at speed keeps 90 % and lays the car along it', () => {
+  const notes = [];
+  for (const [kmh, angle] of [[100, 10], [200, 5], [250, 8]]) {
+    const t = M.railTouch(kmh, angle);
+    check(t.least >= 0.9, `${angle}° at ${kmh} km/h keeps only ${(t.least * 100).toFixed(0)} %`);
+    check(t.parallel < 0.3, `${angle}° at ${kmh} km/h: along the rail after ${t.parallel} s`);
+    notes.push(`${angle}° at ${kmh}: ${(t.least * 100).toFixed(0)} %`);
+  }
+  return notes.join(', ');
+});
+
 // ---- the drivers ---------------------------------------------------------------------------------------------
 
 test('a key is turned into steering that fits the speed; a stick is only given the lock', () => {
@@ -532,24 +557,19 @@ test('a key is turned into steering that fits the speed; a stick is only given t
   const driver = new PlayerDriver(input, 'all', null);
   const out = controls();
   const lock = CAR.steering.lock;
-  const angleAt = (kmh, analog) => {
-    car.velocity.set(0, 0, kmh / KMH);
-    car._sync();
-    Object.assign(keys, { steer: 1, analog });
-    for (let i = 0; i < 240; i++) driver.drive(car, DT, out);
-    return out.steer * lock * DEG;
-  };
-  within(angleAt(4, false), lock * DEG - 0.01, lock * DEG + 0.01, 'key held at walking pace (°)');
-  within(angleAt(200, false), 2, 7, 'key held at 200 km/h (°)');
-  within(angleAt(200, true), 2, 7, 'stick held over at 200 km/h (°)');
-  check(angleAt(100, false) > angleAt(200, false), 'the lock does not shrink with speed');
+  within(M.lockAt(4), lock * DEG - 0.01, lock * DEG + 0.01, 'key held at walking pace (°)');
+  within(M.lockAt(40), 16, 22, 'key held at 40 km/h (°)');
+  within(M.lockAt(200), 3, 4.5, 'key held at 200 km/h (°)');
+  within(M.lockAt(200, true), 3, 4.5, 'stick held over at 200 km/h (°)');
+  check(Math.abs(M.lockAt(100) - M.lockAt(100, true)) < 1e-9, 'a key and a stick are given different locks');
   // the ramp: a tap gives a little, and it comes back
-  Object.assign(keys, { steer: 0, analog: false });
+  car.velocity.set(0, 0, 200 / KMH);
+  car._sync();
   for (let i = 0; i < 240; i++) driver.drive(car, DT, out);
   check(Math.abs(out.steer) < 1e-9, 'does not centre on release');
   keys.steer = -1;
   for (let i = 0; i < 6; i++) driver.drive(car, DT, out); // 50 ms
-  check(out.steer < 0 && out.steer > -0.5 * (angleAt(200, false) / DEG / lock), 'a 50 ms tap at 200 km/h is more than half the lock');
+  check(out.steer < 0 && out.steer > -0.25 * (M.lockAt(200) / DEG / lock), 'a 50 ms tap at 200 km/h is more than a quarter of the lock');
   // pedals: ramped from keys, passed from a stick
   Object.assign(keys, { steer: 0, throttle: 1, brake: 0, analog: false });
   driver.drive(car, DT, out);
@@ -559,6 +579,94 @@ test('a key is turned into steering that fits the speed; a stick is only given t
   Object.assign(keys, { throttle: 0.37, brake: 0.21, analog: true, handbrake: true });
   driver.drive(car, DT, out);
   check(out.throttle === 0.37 && out.brake === 0.21 && out.handbrake === 1, 'a stick is not passed through');
+});
+
+test('keys: the yaw arrives in 0.30 to 0.45 s at 80 km/h and goes in under 0.35 s; a held key holds a steady line', () => {
+  const k = M.keyResponse(80);
+  within(k.rise, 0.3, 0.45, 'key down to 90 % of the yaw rate at 80 km/h (s)');
+  within(k.release, 0, 0.35, 'key up to under 10 % of the yaw rate (s)');
+  within(k.steadyG, 1.15, 1.32, 'lateral g with the key held at 80 km/h');
+  for (const kmh of [40, 110, 140]) {
+    const h = M.keyResponse(kmh, CAR, 4);
+    within(h.steadyG, 1.1, 1.35, `lateral g with the key held at ${kmh} km/h`);
+    check(h.swing < 0.1, `a key held at ${kmh} km/h swings the car by ${h.swing.toFixed(2)} g`);
+  }
+  return `${k.rise.toFixed(2)} s on, ${k.release.toFixed(2)} s off, ${k.steadyG.toFixed(2)} g`;
+});
+
+test('keys: a tap at 200 km/h does not saw; the brake key stops in 33 m or less and still steers; the throttle key does not spin it', () => {
+  for (const ms of [50, 100, 200]) {
+    const t = M.keyTap(200, ms);
+    check(t.reversals <= 2 && t.late < 0.01, `a ${ms} ms tap at 200 km/h: ${t.reversals} reversals, still yawing ${t.late.toFixed(4)} rad/s a second on`);
+    check(Math.abs(t.heading) < 2, `a ${ms} ms tap at 200 km/h turns the car ${t.heading.toFixed(2)}°`);
+  }
+  const b = M.brakeKey(100), bs = M.brakeKey(100, -1);
+  within(b.distance, 24, 33, 'brake key, 100-0 km/h (m)');
+  check(bs.heading > 30, `steering under the brake key turns the car only ${bs.heading.toFixed(0)}°`);
+  const l = M.launchKey(0), ll = M.launchKey(1);
+  check(l.kmh > 65 && ll.mostSlip < 8 && ll.kmh > 20, `throttle key from rest: ${l.kmh.toFixed(0)} km/h; with full lock ${ll.kmh.toFixed(0)} km/h, slid ${ll.mostSlip.toFixed(1)}°`);
+  return `brake key ${b.distance.toFixed(1)} m`;
+});
+
+test('keys: the handbrake turns the car by as much as it is pulled, and the car drives on', () => {
+  const short = M.handbrakeKeys(60, 0.2), mid = M.handbrakeKeys(60, 0.3), fast = M.handbrakeKeys(100, 0.3);
+  check(short.turned > 20 && short.turned < mid.turned, `60 km/h: 0.2 s turns ${short.turned.toFixed(0)}°, 0.3 s ${mid.turned.toFixed(0)}°`);
+  within(mid.turned, 35, 120, 'a 0.3 s pull at 60 km/h (°)');
+  within(fast.turned, 40, 150, 'a 0.3 s pull at 100 km/h (°)');
+  check(mid.endKmh > 40 && fast.endKmh > 20, `after the turn: ${mid.endKmh.toFixed(0)} and ${fast.endKmh.toFixed(0)} km/h`);
+  return `${short.turned.toFixed(0)}° and ${mid.turned.toFixed(0)}° at 60 km/h, ${fast.turned.toFixed(0)}° at 100 km/h`;
+});
+
+test('the gearbox does not hunt: a key worked on and off, a long hill held by the brake', () => {
+  const h = M.gearHunt();
+  check(h.keyShifts <= 2 && h.hillShifts <= 2, `${h.keyShifts} shifts with the key, ${h.hillShifts} down the hill in 15 s`);
+});
+
+test('the tyres squeal from 80 to 90 % of the grip; the stability control knows the car', () => {
+  for (const kmh of [60, 110]) within(M.squealOnset(kmh).onset, 0.78, 0.92, `squeal onset at ${kmh} km/h (fraction of the most g)`);
+  const v = M.characteristicSpeed();
+  within(CAR.assists.esc.characteristicSpeed / v, 0.9, 1.1, 'the stability control\'s characteristic speed against the car\'s');
+  const l = M.bend(90, 0.9, (c) => { c.throttle = 0; });
+  check(l.after.radius < l.before.radius && !l.spun && Math.abs(l.mostSlip) < 6, `lift-off at 0.9 g: radius ${l.before.radius.toFixed(0)} -> ${l.after.radius.toFixed(0)} m, slip ${l.mostSlip.toFixed(1)}°`);
+  return `characteristic speed ${v.toFixed(1)} m/s`;
+});
+
+test('rails: a 10° touch at 100 km/h keeps 90 % and lays the car along it, one knock; a 45° hit at 80 can be driven away', () => {
+  const t = M.railTouch(100, 10);
+  check(t.least >= 0.9, `keeps only ${(t.least * 100).toFixed(0)} %`);
+  check(t.parallel < 0.3, `along the rail after ${t.parallel} s`);
+  check(t.impacts === 1, `${t.impacts} impacts reported for one touch`);
+  check(t.endKmh > 85 && t.away > 1, `steered off at ${t.endKmh.toFixed(0)} km/h, ${t.away.toFixed(1)} m from the rail`);
+  const h = M.railTouch(80, 45);
+  check(h.least > 0.3 && h.least < 0.8, `a 45° hit keeps ${(h.least * 100).toFixed(0)} %`);
+  check(h.parallel < 0.6 && h.endKmh > 40 && h.away > 1, `after a 45° hit: along the rail in ${h.parallel} s, ${h.endKmh.toFixed(0)} km/h, ${h.away.toFixed(1)} m off`);
+  return `${(t.least * 100).toFixed(0)} % kept at 10°, ${(h.least * 100).toFixed(0)} % at 45°`;
+});
+
+test('left and right mirror exactly; a step of 1/240 s drives as 1/120 s does', () => {
+  const run = (way, dt) => {
+    const car = M.makeCar();
+    const c = M.cruise(car, 22);
+    const trace = [];
+    for (let i = 0; i < Math.round(3 / dt); i++) {
+      const t = i * dt;
+      c.steer = way * (t < 1.5 ? -0.35 * Math.sin(2 * Math.PI * 0.8 * t) : -0.5);
+      c.brake = t > 1.5 && t < 2.2 ? 0.7 : 0;
+      c.throttle = t > 2.2 ? 1 : 0.2;
+      car.step(dt, c);
+      trace.push({ x: car.position.x * way, z: car.position.z, yaw: car.yaw * way });
+    }
+    return trace;
+  };
+  const left = run(1, DT), right = run(-1, DT), fine = run(1, DT / 2);
+  let mirror = 0, yawDiff = 0;
+  for (let i = 0; i < left.length; i++) {
+    mirror = Math.max(mirror, Math.abs(left[i].x - right[i].x), Math.abs(left[i].yaw - right[i].yaw));
+    yawDiff = Math.max(yawDiff, Math.abs(left[i].yaw - fine[2 * i + 1].yaw) * DEG);
+  }
+  check(mirror < 1e-9, `left and right differ by ${mirror}`);
+  check(yawDiff < 1, `heading at 1/120 s and 1/240 s differs by ${yawDiff.toFixed(2)}°`);
+  return `${mirror.toExponential(1)} between the two sides, ${yawDiff.toFixed(2)}° between the steps`;
 });
 
 /** Laps by the autopilot: the times, and what it touched. */
@@ -606,12 +714,65 @@ if (realTrack) {
       const r = laps(realTrack, pace, count);
       check(r.times.length === count, `pace ${pace}: did not finish`);
       check(r.impacts === 0, `pace ${pace}: ${r.impacts} impacts`);
-      check(r.off < 0.05, `pace ${pace}: the body was ${r.off.toFixed(2)} m off the pavement`);
+      // (the kerbs are part of the course: the line may use them, never the grass)
+      check(r.off < realTrack.shoulder, `pace ${pace}: the body was ${r.off.toFixed(2)} m off the pavement, past the kerbs`);
       check(r.slip < 9, `pace ${pace}: slid to ${r.slip.toFixed(1)}°`);
       check(Math.max(...r.times) - Math.min(...r.times) < 0.5, `pace ${pace}: lap times wander: ${r.times.map((x) => x.toFixed(2))}`);
       notes.push(`${pace}: ${r.times[r.times.length - 1].toFixed(1)} s`);
     }
     return notes.join(', ');
+  });
+
+  test('a thumb (full throttle unless braking), a pad and keys lap the real road cleanly', () => {
+    const notes = [];
+    for (const kind of ['thumb', 'pad', 'keys']) {
+      const r = M.laps(realTrack, kind, { pace: 1, count: 1 });
+      check(r.finite && r.times.length === 1, `${kind}: did not finish`);
+      check(r.impacts === 0, `${kind}: ${r.impacts} impacts`);
+      check(r.off < realTrack.shoulder, `${kind}: the body was ${r.off.toFixed(2)} m off the pavement, past the kerbs`);
+      check(r.slip < 9, `${kind}: slid to ${r.slip.toFixed(1)}°`);
+      notes.push(`${kind} ${r.best.toFixed(1)} s`);
+    }
+    return notes.join(', ');
+  });
+
+  test('a ham-fisted keyboard driver laps the real road flat out and never leaves it', () => {
+    const r = M.laps(realTrack, 'hamfist', { count: 2 });
+    check(r.finite && r.times.length === 2, 'did not finish');
+    check(r.impacts === 0, `${r.impacts} impacts`);
+    check(r.off < realTrack.shoulder, `the body was ${r.off.toFixed(2)} m off the pavement, past the kerbs`);
+    check(r.slip < 15, `slid to ${r.slip.toFixed(1)}°`);
+    return `${r.times.map((x) => x.toFixed(1)).join(', ')} s, body ${r.off.toFixed(2)} m beyond the pavement at most, ${r.slip.toFixed(1)}° of slip`;
+  });
+
+  test('the crest: the car goes light at the autopilot\'s pace, but every wheel stays on the road', () => {
+    const notes = [];
+    for (const pace of [1, 0.9]) {
+      const driver = new AutoDriver(realTrack, { pace });
+      const car = new Vehicle(realTrack);
+      car.reset(realTrack.grid(0, {}));
+      const c = controls();
+      const crest = [realTrack.at('crest', 0.5), realTrack.at('plunge', 0.25)];
+      let least = Infinity, lightest = Infinity, t = 0, laps = 0, last = car.s;
+      while (laps < 2 && t < 400) {
+        driver.drive(car, DT, c);
+        car.step(DT, c);
+        t += DT;
+        if (car.s < last - realTrack.length / 2) laps++;
+        last = car.s;
+        if (laps < 1) continue;
+        let total = 0;
+        for (const w of car.wheels) {
+          least = Math.min(least, w.load / w._spec.staticLoad);
+          total += w.load;
+        }
+        if (car.s > crest[0] && car.s < crest[1]) lightest = Math.min(lightest, total / (CAR.mass * CAR.gravity));
+      }
+      check(least > 0.05, `pace ${pace}: a wheel was down to ${(least * 100).toFixed(0)} % of its load`);
+      check(lightest < 0.8, `pace ${pace}: the car is not light over the crest (${(lightest * 100).toFixed(0)} % of its weight)`);
+      notes.push(`pace ${pace}: ${(lightest * 100).toFixed(0)} % of the weight over the crest, no wheel under ${(least * 100).toFixed(0)} %`);
+    }
+    return notes.join('; ');
   });
 
   test('two autopilots side by side do not touch', () => {
