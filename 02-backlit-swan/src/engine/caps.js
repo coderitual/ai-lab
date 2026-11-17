@@ -47,8 +47,11 @@ function guessTier(gpu, software, mobile) {
   if (software) return 'low';
   if (mobile) {
     if (/apple/.test(gpu)) return 'medium';
-    // recent flagship families; everything older or unnamed starts low and can only be told apart by running
-    if (/adreno \(tm\) (6[4-9]\d|7\d\d|8\d\d)|mali-g(7[1-9]|[6-9]1\d|7\d\d)|immortalis|xclipse/.test(gpu)) return 'medium';
+    // Recent flagship families; everything older or unnamed starts low and can only be told apart by running.
+    // A family name says nothing of the core count: Mali-G71 and G72 were also built two and three
+    // cores wide for budget phones, so they start low. The last two entries (Arm's "Mali G1" tiers of
+    // 2025, Imagination's D-series) go by the vendors' published names, not by a string read off a device.
+    if (/adreno \(tm\) (6[4-9]\d|7\d\d|8\d\d)|mali-g(7[6-9]|[6-9]1\d|7\d\d)|immortalis|xclipse|mali[- ]g1\b|powervr d/.test(gpu)) return 'medium';
     return 'low';
   }
   if (/intel/.test(gpu) && !/arc|iris\(r\) xe|iris xe/.test(gpu)) return 'medium';
@@ -118,6 +121,16 @@ export function createTarget(caps, { depth = false, samples = 0, filter = THREE.
     depthBuffer: depth,
     stencilBuffer: false,
     samples: msaa,
+    // Only for multisampled targets. Nothing in the pipeline reads a depth
+    // buffer after the render call that filled it, so the samples' depth is
+    // neither resolved into a single-sample copy nor kept: on a phone's tiled
+    // GPU that is a depth resolve and megabytes written out per frame for
+    // nothing. (three.js does both by default.) It is safe only as long as
+    // each multisampled target gets exactly one render call a frame, which
+    // docs/engine.md already demands.
+    resolveDepthBuffer: false,
+    resolveStencilBuffer: false,
+    storeMultisampledDepthBuffer: false,
   });
 }
 

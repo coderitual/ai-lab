@@ -13,10 +13,32 @@ const params = parseParams();
 const root = document.getElementById('scene');
 let ui = null;
 
+/** Say on the page that something is wrong (a phone has no console to look in). */
+let failure = null; // what was said before the Ui existed, for it to take over
+const fail = (message, detail = '', onTap = null) => {
+  if (ui) ui.fail(message, detail, onTap);
+  else {
+    failure = [message, detail, onTap];
+    const veil = document.getElementById('loading');
+    if (veil) veil.textContent = message;
+  }
+};
+
 try {
   const engine = new Engine(root, { manual: params.manual, pixelRatio: params.dpr });
+  // A shader that this device's driver refuses would otherwise only show as a
+  // part of the picture that is missing: three.js logs it and carries on.
+  // (Setting this replaces three's own report, so it is logged here too.)
+  engine.renderer.debug.onShaderError = (gl, program, vertex, fragment) => {
+    const logs = [gl.getProgramInfoLog(program), gl.getShaderInfoLog(vertex), gl.getShaderInfoLog(fragment)].map((log) => (log || '').trim()).filter(Boolean);
+    console.error(`A shader did not compile or link:\n${logs.join('\n')}`);
+    fail('This device’s graphics driver refused a part of the picture.', logs.join('\n').slice(0, 700));
+  };
+  engine.onContextGone = () => fail('The picture was lost. Tap to load it again.', '', () => location.reload());
   const world = new World(engine, params);
   ui = createUi(world.ctx, { world, enabled: params.ui, instant: params.manual || !params.ui });
+  // a shader refused while the world was being built: the Ui keeps the notice up when the veil would go
+  if (failure) ui.fail(...failure);
 
   engine.onUpdate = (dt) => {
     world.update(dt);
@@ -75,16 +97,13 @@ try {
   if (params.preAdvance > 0) advance(params.preAdvance, { render: false });
   // the first complete frame, then the veil can go
   engine.advance(0, true);
+  // whatever WebGL objected to while everything was built and drawn once (shown in the look panel's small print)
+  world.startError = engine.renderer.getContext().getError();
   engine.start();
   ui.ready();
   window.__ready = true;
 } catch (err) {
   console.error(err);
-  const message = 'This device could not start WebGL 2. Try a recent version of Safari or Chrome.';
-  if (ui) ui.fail(message);
-  else {
-    const veil = document.getElementById('loading');
-    if (veil) veil.textContent = message;
-  }
+  fail('This device could not start WebGL 2. Try a recent version of Safari or Chrome.');
   window.__ready = true;
 }

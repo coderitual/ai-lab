@@ -133,12 +133,12 @@ void main() {
   // swell-aligned coordinates: x runs with the main swell, y along its crests
   vec2 sp = vec2(dot(vBase, uSwellDir), dot(vBase, vec2(-uSwellDir.y, uSwellDir.x)));
 
-  // ---- ripples: four scrolling layers of the tiling normal map, squeezed along
-  //      the swell so they read as fine wind streaks lying across it
-  vec2 n1 = texture2D(uNormalTex, sp * vec2(0.16, 0.07) + t * vec2(0.03, 0.012)).xy - 0.5;
-  vec2 n2 = texture2D(uNormalTex, sp.yx * vec2(0.21, 0.47) + t * vec2(-0.03, 0.05)).xy - 0.5;
+  // ---- ripples: four scrolling layers of the tiling normal map, squeezed a little along
+  //      the swell: small facets, each catching the sky or the sun on its own
+  vec2 n1 = texture2D(uNormalTex, sp * vec2(0.14, 0.095) + t * vec2(0.03, 0.012)).xy - 0.5;
+  vec2 n2 = texture2D(uNormalTex, sp.yx * vec2(0.27, 0.38) + t * vec2(-0.03, 0.05)).xy - 0.5;
   vec2 n3 = texture2D(uNormalTex, vBase * 0.023 + t * vec2(0.004, -0.006)).xy - 0.5;
-  vec2 n4 = texture2D(uNormalTex, sp * vec2(1.25, 0.55) + t * vec2(0.09, 0.04)).xy - 0.5;
+  vec2 n4 = texture2D(uNormalTex, sp * vec2(1.1, 0.78) + t * vec2(0.09, 0.04)).xy - 0.5;
   vec2 rs = n1 * 0.8 + n2.yx * 0.75 + n4 * 0.65;       // in swell space
   vec2 ripple = (uSwellDir * rs.x + vec2(-uSwellDir.y, uSwellDir.x) * rs.y + n3 * 0.35) * uDetail;
   ripple *= 0.4 + 0.6 * ampScale;                  // glassier in sheltered water
@@ -173,7 +173,7 @@ void main() {
   crest *= 0.82;
   // small whitecaps where the short chop piles up as well
   float chop = 1.0 - jac;
-  crest = max(crest, 0.75 * smoothstep(0.5, 0.7, chop));
+  crest = max(crest, 0.85 * smoothstep(0.36, 0.58, chop));
 
   // lacy pattern, stretched along the swell so foam reads as streaks
   float veins = texture2D(uNoiseTex, sp * vec2(0.032, 0.075) + t * vec2(0.004, 0.002)).g;
@@ -186,7 +186,7 @@ void main() {
 
   // surf along the shore
   float sd = shore + (fine - 0.5) * 3.5 + sin(t * 0.9 + vBase.x * 0.05) * 0.8;
-  float wash = smoothstep(9.0, 0.5, sd) * mix(0.3, 1.0, 0.5 + 0.5 * sin(sd * 1.15 - t * 1.4));
+  float wash = (1.0 - smoothstep(0.5, 9.0, sd)) * mix(0.3, 1.0, 0.5 + 0.5 * sin(sd * 1.15 - t * 1.4));
 
   float mask = max(crest, wash * 0.85);
   // white threads where the pattern is strong; in between, a thin veil of bubbles
@@ -212,8 +212,8 @@ void main() {
 
   // ---- water body: dark in the troughs, clearer toward the tops
   float hn = clamp(0.5 + vWorldPos.y / (uSeaHeight * max(ampScale, 0.3)), 0.0, 1.0);
-  vec3 body = mix(uDeepColor, uMidColor, smoothstep(0.1, 0.85, hn));
-  body *= 0.55 + 0.82 * lit;
+  vec3 body = mix(uDeepColor, uMidColor, smoothstep(0.18, 0.9, hn));
+  body *= 0.46 + 0.95 * lit;
   // little peaks catch the light, the hollows between them go dark
   body *= clamp(1.0 + chop * 0.9, 0.6, 1.4);
 
@@ -224,7 +224,7 @@ void main() {
   // The less water behind the surface, the more gets through: the upper part
   // of a wave, a crest where the swell bunches up, a peak of the chop.
   float top = smoothstep(0.3, 1.0, hn);
-  float thin = max(top * top * 0.8, smoothstep(0.03, 0.36, crestNow) * (0.35 + 0.65 * top));
+  float thin = max(top * top * 0.5, smoothstep(0.07, 0.42, crestNow) * (0.35 + 0.65 * top));
   thin = max(thin, 0.55 * smoothstep(0.16, 0.5, chop));
   // strongest looking toward the sun: the wave stands between you and the light
   float sunward = pow(clamp(dot(V, -normalize(uSunDir + N * 0.5)) * 0.5 + 0.5, 0.0, 1.0), 3.0);
@@ -337,10 +337,10 @@ export function createWater({ normalTex, noiseTex, causticTex, segments = 192 })
       uShallowColor: { value: PALETTE.waterShallow.clone() },
       uScatterColor: { value: PALETTE.waterScatter.clone() },
       uFoamColor: { value: PALETTE.foam.clone() },
-      uDetail: { value: 0.3 },
+      uDetail: { value: 0.38 },
       uSeaHeight: { value: SEA_HEIGHT },
       uSwellDir: { value: new THREE.Vector2(waves[0].dx, waves[0].dz) },
-      uFoam: { value: new THREE.Vector3(1.7, 0.3, 0.66) },
+      uFoam: { value: new THREE.Vector3(1.7, 0.26, 0.6) },
       uGlint: { value: new THREE.Vector4(2.2, 1.45, 1000, 18) },
       uWakeTex: { value: getBlackTexture() },
       uWake: { value: new THREE.Vector3(0, 0, 0.001) },

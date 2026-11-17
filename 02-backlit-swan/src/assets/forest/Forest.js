@@ -1,138 +1,253 @@
-// The wood round the pond, the bank and the meadow.
+// The wood round the pond, the bank and the clearing.
 //
-// The film's surroundings are almost all darkness: a wall of trunks with
-// nothing between them, one soft shaft of blue haze coming down behind the
-// swan, clumps of sun-dappled leaves up to the left and right, and, to the
-// east-north-east where the trees open, a meadow in full sun with a
-// post-and-rail fence, framed by one big trunk. That is what is built here:
-// dark upright trunks, small leaves of which a few are many times brighter
-// than white (the disc blur turns each into a soft blob of light), sheets of
-// haze, a ground that is black under the trees and yellow in the clearing.
+// The film's surroundings are almost all darkness, a little out of focus:
+// thick dark trunks, masses of foliage with clusters of sun-dappled leaves up
+// to the left and right, a soft shaft of blue haze coming down behind the
+// swan, and, to the north-east where the trees open, a hillside of grass in
+// full sun with a fence at the top of its bank, framed by a big dark tree.
 //
-// Everything in `far` is drawn into the far layer, which is thrown out of
-// focus as a whole (FarLayer.js). Things in `near` are drawn sharp with the
-// swan; there are none.
+// It is built as a wood, not painted as a backdrop, so that it holds from
+// every side of the pond and in the water:
+//   trees.js     trunks, boughs and branches, one mesh
+//   foliage.js   the dark masses of leaves and the lights in them
+//   haze.js      the air: aerial perspective, what shows behind the last tree, the shafts
+//   here         the ground, the clearing, the fence, and where everything stands
+//
+// What lights it is lighting.js: the sun's direction, and canopyLight(), the
+// pattern of gaps the sun comes through. Nothing here has a lit side of its
+// own; turn the sun and the whole wood follows.
+//
+// Everything is in the far scene, which is drawn small and thrown out of focus
+// as a whole (FarLayer.js), once for the backdrop and once upside down for the
+// water. `near` (things drawn sharp with the swan) stays empty.
 //
 // Compass angles here are radians, 0 north (-Z), PI/2 east (+X), as in pond.js.
 
 import * as THREE from 'three';
+import { createLimbs, growTree, limbGeometry } from './trees.js';
+import { createFoliage } from './foliage.js';
+import { createHaze, AIR_GLSL } from './haze.js';
 
 const DEG = Math.PI / 180;
-/** Where the trees open onto the meadow, and how wide the gap is. */
-const MEADOW = { theta: 43 * DEG, halfWidth: 18 * DEG };
+/**
+ * Where the trees open onto the clearing: from the big dark tree that frames
+ * it for the film (`near`) round to `far`, compass radians. Placed so that the
+ * film's camera finds it where the film does at 10.5 s: that tree three
+ * quarters of the way across the picture, the fence beside it, sunlit grass
+ * from there to the right edge. The near edge is abrupt (the grass is bright
+ * right beside the trunk, over `nearEdge`), the far one eases into the wood
+ * (over `farEdge`). The near edge does not run straight out from the pond's
+ * middle: it follows the film camera's line of sight past that tree (the
+ * camera stands 4 m south of the middle), which swings it toward the north by
+ * `skew` radians for every metre behind the shore; otherwise the camera would
+ * see the wood close over the grass behind the tree.
+ */
+const MEADOW = { near: 21.5 * DEG, far: 51 * DEG, nearEdge: 2.4 * DEG, farEdge: 6 * DEG, skew: 0.18 * DEG };
+/** The hill the clearing lies on reaches this much further round under the trees on either side. */
+const HILL_FLANK = 16 * DEG;
+/**
+ * The lane behind the swan as the film's camera sees it: between these compass
+ * directions no tree stands nearer the shore than `depth` metres, except the
+ * two the film shows at its sides, and there are no bushes on the bank where
+ * the main shaft of light (haze.js) comes down in it.
+ */
+const LANE = { from: -6.5 * DEG, to: 4 * DEG, depth: 13 };
+/** Whether a compass direction (any multiple of a turn) is in the lane. */
+function inLane(theta) {
+  const t = Math.atan2(Math.sin(theta), Math.cos(theta));
+  return t > LANE.from && t < LANE.to;
+}
 
-// three.js declares instanceMatrix and instanceColor itself when the mesh is instanced.
+const smooth = (a, b, x) => {
+  const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
+  return t * t * (3 - 2 * t);
+};
+
+/** A compass direction as -PI .. PI (the clearing does not straddle due south, so it can be compared as a number). */
+const compass = (theta) => Math.atan2(Math.sin(theta), Math.cos(theta));
+
+/** Where the clearing's near edge is, this many metres behind the shore. */
+const nearEdgeAt = (back) => MEADOW.near - MEADOW.skew * Math.min(Math.max(back, 0), 30);
+
+/** 1 in the clearing, 0 in the wood. */
+function meadowShare(theta, back) {
+  const t = compass(theta);
+  const near = nearEdgeAt(back);
+  return smooth(near - MEADOW.nearEdge * 0.5, near + MEADOW.nearEdge * 0.5, t) * (1 - smooth(MEADOW.far - MEADOW.farEdge, MEADOW.far, t));
+}
+
+/**
+ * The hill the clearing lies on is wider than the clearing: 1 across the
+ * whole gap, falling to 0 over HILL_FLANK on either side. Its flanks are under
+ * the trees, so the lit grass ends at trunks and shadows, not at the outline
+ * of a mound.
+ */
+function hillShare(theta, back) {
+  const t = compass(theta);
+  const near = nearEdgeAt(back);
+  return smooth(near - HILL_FLANK, near, t) * (1 - smooth(MEADOW.far, MEADOW.far + HILL_FLANK, t));
+}
+
+/**
+ * How much sun is getting into the wood, 0 .. 1. The film opens with the wood
+ * dark and quiet (two pixels in ten thousand of its upper half are lit leaf at
+ * 0.3 s) and over the next six seconds the leaves light up (1 in a hundred at
+ * 2.5 s, 3 at 4.6 s, 8 by 6.5 s) and the shaft brightens and greens, while the
+ * swan in the open is in full sun all along: mist in the crowns, thinning.
+ * Here it thins like that from the start (a twenty-fifth of the sun for the
+ * first BREATH_RISE[0] seconds, all of it from BREATH_RISE[1]), stays thin,
+ * and closes in and opens again once every BREATH_PERIOD seconds. Only the
+ * wood's own leaves and shafts follow it; the sun itself (lighting.js) does
+ * not change.
+ */
+const BREATH_PERIOD = 52;
+const BREATH_RISE = [1.5, 7];
+function woodBreath(time) {
+  const sinceDip = Math.abs(((time + BREATH_PERIOD / 2) % BREATH_PERIOD) - BREATH_PERIOD / 2);
+  return 0.04 + 0.96 * smooth(BREATH_RISE[0], BREATH_RISE[1], sinceDip);
+}
+
+/** The lie of the land under the trees: [metres behind the shore, height]. Nearly level. */
+const PROFILE = [
+  [-4, -0.5],
+  [-1.5, -0.15],
+  [0, 0.02],
+  [2, 0.25],
+  [6, 0.45],
+  [14, 0.6],
+  [30, 0.8],
+  [52, 1.2],
+];
+
+/**
+ * Height of the ground. Under the trees it barely rises. The clearing is a
+ * hillside: a bank of bare earth at the water, between 0.7 and 1.0 m high
+ * (worn down in places, never a level wall), then grass rising another 6 m
+ * over the next thirty (hillShare: the hill is wider than the gap in the
+ * trees). In the film the grass fills the picture's right edge far above the
+ * horizon: the ground must climb.
+ * @param {number} theta compass direction from the pond's centre
+ * @param {number} back metres behind the shore (negative: in the pond)
+ */
+function groundHeight(theta, back) {
+  let i = 0;
+  while (i < PROFILE.length - 2 && back > PROFILE[i + 1][0]) i++;
+  const [b0, h0] = PROFILE[i];
+  const [b1, h1] = PROFILE[i + 1];
+  const base = h0 + (h1 - h0) * Math.min(Math.max((back - b0) / (b1 - b0), 0), 1);
+  const bank = 0.85 + 0.1 * Math.sin(theta * 23 + 0.7) + 0.05 * Math.sin(theta * 61 + 2.1);
+  return base + meadowShare(theta, back) * bank * smooth(0, 3.0, back) + hillShare(theta, back) * 6.0 * smooth(2, 34, back);
+}
+
 const WORLD_VERTEX = /* glsl */ `
 out vec3 vWorldPos;
 out vec3 vNormal;
-out vec3 vTint;
-out vec2 vUv;
 void main() {
-  vec4 local = vec4(position, 1.0);
-  vec3 n = normal;
-#ifdef USE_INSTANCING
-  local = instanceMatrix * local;
-  // Instances are stretched (a trunk is a unit cylinder made twenty times
-  // taller than wide), and a normal must be squashed where the surface is
-  // stretched: divide by the square of each axis's scale before turning it.
-  mat3 im = mat3(instanceMatrix);
-  n = im * (n / vec3(dot(im[0], im[0]), dot(im[1], im[1]), dot(im[2], im[2])));
-#endif
-#ifdef USE_INSTANCING_COLOR
-  vTint = instanceColor;
-#else
-  vTint = vec3(1.0);
-#endif
-  vec4 world = modelMatrix * local;
-  vWorldPos = world.xyz;
-  vNormal = normalize(n);
-  vUv = uv;
-  gl_Position = projectionMatrix * viewMatrix * world;
+  vWorldPos = position;
+  vNormal = normal;
+  gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
 }
 `;
 
 const ground = (ctx) => /* glsl */ `
 ${ctx.light.glsl}
 ${ctx.pond.glsl}
+${AIR_GLSL}
 in vec3 vWorldPos;
 void main() {
   vec2 xz = vWorldPos.xz;
   float theta = atan(xz.x, -xz.y);
-  float off = abs(atan(sin(theta - ${MEADOW.theta.toFixed(4)}), cos(theta - ${MEADOW.theta.toFixed(4)})));
-  float shore = shoreDistance(xz);
-  // the meadow: grass in full sun, starting a few metres back from the water
-  float meadow = (1.0 - smoothstep(${(MEADOW.halfWidth * 0.7).toFixed(4)}, ${MEADOW.halfWidth.toFixed(4)}, off)) * smoothstep(0.4, 2.2, shore);
-  // Grass in low sun is yellow, not green (the film's meadow is 234, 209, 57
-  // on screen): long blades lit from behind and through.
-  float patches = 0.55 + 0.9 * fbm(xz * 0.45, 3);
-  vec3 grass = vec3(0.19, 0.165, 0.014) * uSunColor * patches;
-  // a path of bare red-brown earth runs along the bank inside the fence
-  float path = (1.0 - smoothstep(0.5, 1.4, abs(shore - 3.3 - 0.8 * sin(theta * 9.0)))) * 0.85;
-  grass = mix(grass, vec3(0.05, 0.022, 0.008) * uSunColor * (0.6 + 0.6 * fbm(xz * 1.7, 2)), path);
-  // tree shadows lie across the clearing in long bars
-  grass *= 0.25 + 0.75 * smoothstep(0.25, 0.6, fbm(vec2(dot(xz, vec2(0.9, 0.44)) * 0.5, dot(xz, vec2(-0.44, 0.9)) * 0.07), 2));
-  // under the trees: nothing but a trace of sky
-  vec3 floorColor = vec3(0.02, 0.03, 0.02) * (uSkyColor * 0.5 + uAmbient);
-  outColor = toTarget(vec4(mix(floorColor, grass, meadow), 1.0));
+  float back = shoreDistance(xz);
+  // the same shares as meadowShare() and hillShare() above
+  float near = ${MEADOW.near.toFixed(4)} - ${MEADOW.skew.toFixed(6)} * clamp(back, 0.0, 30.0);
+  float open = smoothstep(near - ${(MEADOW.nearEdge * 0.5).toFixed(4)}, near + ${(MEADOW.nearEdge * 0.5).toFixed(4)}, theta) * (1.0 - smoothstep(${(MEADOW.far - MEADOW.farEdge).toFixed(4)}, ${MEADOW.far.toFixed(4)}, theta));
+  float hill = smoothstep(near - ${HILL_FLANK.toFixed(4)}, near, theta) * (1.0 - smoothstep(${MEADOW.far.toFixed(4)}, ${(MEADOW.far + HILL_FLANK).toFixed(4)}, theta));
+
+  // Under the trees: leaf litter in shade, with flecks of sun where the canopy
+  // has a gap. None near the water: the bank is the darkest line in the picture.
+  float flecks = canopyLight(vWorldPos) * smoothstep(2.5, 8.0, back);
+  vec3 litter = vec3(0.02, 0.019, 0.012) * (uSkyColor * 0.4 + uAmbient + uSunColor * (0.12 * flecks));
+  // (the bed of the pond's last metres, which shows through the water's faded edge: black)
+  litter *= smoothstep(-0.6, 0.4, back);
+
+  // The clearing. Grass in low sun is yellow, not green (228, 215, 65 on
+  // screen in the film, which is 0.81, 0.79, 0.09 before the print): long
+  // blades lit from behind and through. Where it is
+  // open to the sun, the trees round it still lay shadows across it (the same
+  // kind of pattern as the canopy's, here four fifths open), and grass in such
+  // a shadow keeps an eighth of its light (92, 88, 24 in the film). The wood's
+  // own shadow closes over it at the far side and from the top of the hill,
+  // where the trees stand against the sun, with the ragged outline of crowns:
+  // there a twentieth is left. (At the near side the lit grass runs right up
+  // to the framing tree, as in the film.)
+  vec2 q = acrossSun(vWorldPos);
+  float sunny = smoothstep(0.3, 0.42, valueNoise(q * 0.21 + 1.7) * 0.6 + valueNoise(q * 0.7 + 8.1) * 0.4);
+  float ragged = (fbm(xz * 0.23 + 5.0, 2) - 0.5) * 2.0;
+  float crowns = (fbm(xz * 0.6 + 9.0, 2) - 0.5) * 2.0;
+  float clear = open * (1.0 - smoothstep(${(MEADOW.far - 12 * DEG).toFixed(4)}, ${(MEADOW.far - 5 * DEG).toFixed(4)}, theta + 0.07 * ragged)) * (1.0 - smoothstep(17.0, 27.0, back + 4.0 * ragged + 5.0 * crowns));
+  // (tussocks and bare patches: grass is never one flat colour)
+  float tussocks = (0.55 + 0.9 * fbm(xz * 0.45, 3)) * (0.78 + 0.44 * valueNoise(xz * 3.1));
+  vec3 grass = vec3(0.2, 0.2, 0.024) * uSunColor * tussocks * mix(0.05, mix(0.13, 1.0, sunny), clear);
+  // Bare red-brown earth between the water and the grass: the path along the
+  // top of the bank (74, 51, 29 in the film) and the bank's face, which is
+  // turned away from the sun and nearly as dark as the wood. Its upper edge
+  // wanders.
+  float earthy = 1.0 - smoothstep(2.3, 3.3, back + 0.5 * sin(theta * 23.0) + 0.8 * (fbm(xz * 1.3, 2) - 0.5));
+  vec3 earth = vec3(0.04, 0.0135, 0.0085) * uSunColor * (0.6 + 0.6 * fbm(xz * 1.7, 2)) * mix(0.06, 0.75, smoothstep(1.4, 2.4, back)) * mix(0.3, 1.0, sunny) * mix(0.3, 1.0, clear);
+  vec3 meadow = mix(grass, earth, earthy);
+
+  // The clearing begins at the shore (what is under the water's faded edge
+  // stays dark); the hill's flanks under the trees begin behind the bank.
+  vec3 color = mix(litter, meadow, max(open, hill * smoothstep(2.5, 5.0, back)) * smoothstep(-0.2, 0.5, back));
+  // The mist is under the trees. Over the open, sunlit grass the air is clear:
+  // a quarter of the haze the same distance of wood would put in front of it.
+  vec3 toEye = cameraPosition - vWorldPos;
+  float dist = length(toEye);
+  outColor = toTarget(vec4(mix(color, hazeGlow(toEye / dist), hazeAmount(dist) * (1.0 - 0.75 * clear)), 1.0));
 }
 `;
 
-const trunk = (ctx) => /* glsl */ `
+const bark = (ctx) => /* glsl */ `
 ${ctx.light.glsl}
+${AIR_GLSL}
 in vec3 vWorldPos;
 in vec3 vNormal;
 void main() {
   vec3 n = normalize(vNormal);
-  // bark is dark; the sun only finds the edge of a trunk that faces it
-  vec3 col = vec3(0.03, 0.025, 0.018) * (uSunColor * sunWrap(n, 0.0) * 0.25 + fillLight(n) * 0.35);
-  outColor = toTarget(vec4(col, 1.0));
+  // Bark is dark and streaked up and down. The sun finds it only where the
+  // canopy has a gap and only on the side that faces it: from the film's side
+  // of the pond that is a thin lit edge here and there, from the other side
+  // flecks of sun on the trunks.
+  float streak = valueNoise(vec2(dot(vWorldPos.xz, vec2(7.0, 5.0)), vWorldPos.y * 0.9));
+  vec3 color = vec3(0.034, 0.028, 0.02) * (0.5 + streak) * (uSunColor * (sunWrap(n, 0.0) * canopyLight(vWorldPos) * 0.5) + fillLight(n) * 0.3);
+  outColor = toTarget(vec4(throughHaze(color, vWorldPos), 1.0));
 }
 `;
 
-// Weathered wood in the open: in silhouette against the grass, with the sun
-// catching the tops of the rails and posts as thin bright lines.
+// Weathered wood in the open: in silhouette against the grass, the sun
+// catching the tops of the rails and pales as thin bright lines (251, 228,
+// 124 on screen in the film), the faces lit by what comes back off the grass
+// (40, 38, 24).
 const fence = (ctx) => /* glsl */ `
 ${ctx.light.glsl}
+${AIR_GLSL}
 in vec3 vWorldPos;
 in vec3 vNormal;
 void main() {
   vec3 n = normalize(vNormal);
-  vec3 col = vec3(0.3, 0.26, 0.17) * (uSunColor * max(dot(n, uSunDir), 0.0) * 1.1 + fillLight(n) * 0.25);
-  outColor = toTarget(vec4(col, 1.0));
-}
-`;
-
-const LEAF_FRAGMENT = /* glsl */ `
-in vec3 vTint;
-in vec2 vUv;
-void main() {
-  // a rounded leaf cut out of the square
-  vec2 q = vUv * 2.0 - 1.0;
-  if (dot(q, q) > 1.0) discard;
-  outColor = toTarget(vec4(vTint, 1.0));
-}
-`;
-
-const GLOW_FRAGMENT = /* glsl */ `
-uniform vec3 uColor;
-in vec2 vUv;
-void main() {
-  // Soft in every direction: bright along the middle and gone at the edges;
-  // strongest high up, where the light comes in, thinning toward the ground
-  // (the film's shaft is half as bright at the water as at the top of the picture).
-  float across = 1.0 - abs(vUv.x * 2.0 - 1.0);
-  float along = smoothstep(0.0, 0.04, vUv.y) * (0.3 + 0.7 * smoothstep(0.0, 0.55, vUv.y)) * (1.0 - smoothstep(0.8, 1.0, vUv.y));
-  outColor = toTarget(vec4(uColor * across * across * along, 1.0));
+  vec3 light = uSunColor * max(dot(n, uSunDir), 0.0) + fillLight(n) * 0.25 + uSunColor * vec3(0.006, 0.0045, 0.0006);
+  outColor = toTarget(vec4(throughHaze(vec3(0.62, 0.43, 0.17) * light, vWorldPos), 1.0));
 }
 `;
 
 /**
- * @param {object} ctx the shared context (see World.js); uses ctx.quality.counts.trunks and .leaves
+ * @param {object} ctx the shared context (see World.js); uses ctx.quality.counts.trunks, .sprays and .leaves,
+ *   and LOOK.shadeDapple, .shadeDappleSize, .canopyOpen, .haze, .shafts, .leafLight through ctx.look
  * @returns {{ far: THREE.Group, near: THREE.Group, update: (dt: number, time: number, camera: THREE.Camera) => void, dispose: () => void }}
  */
 export function createForest(ctx) {
   const rng = ctx.rng.fork('forest');
-  const { pond, light } = ctx;
+  const { pond, light, look } = ctx;
   const far = new THREE.Group();
   far.name = 'forest-far';
   const near = new THREE.Group();
@@ -142,27 +257,29 @@ export function createForest(ctx) {
     disposables.push(thing);
     return thing;
   };
-  const inMeadow = (theta, slack = 0) => {
-    const d = Math.atan2(Math.sin(theta - MEADOW.theta), Math.cos(theta - MEADOW.theta));
-    return Math.abs(d) < MEADOW.halfWidth + slack;
+  /** The wood's own uniforms: see AIR_GLSL in haze.js. */
+  const uniforms = { uWood: { value: new THREE.Vector4(1, 1, 1, 1) } };
+  /** The quality tier as a number, from the trunks it affords: 0 low, 1 medium, 2 high. */
+  const detail = ctx.quality.counts.trunks >= 200 ? 2 : ctx.quality.counts.trunks >= 120 ? 1 : 0;
+  const at = (theta, back) => {
+    const r = pond.shoreRadius(theta) + back;
+    return { x: r * Math.sin(theta), y: groundHeight(theta, back), z: -r * Math.cos(theta) };
   };
 
   // The ground: rings from just inside the shore (under the water's faded
-  // edge) out past the trees, rising gently away from the pond.
+  // edge) out to the wall behind the wood (haze.js).
   {
-    const rings = [-4, -1.5, 0, 2, 6, 14, 30, 60, 110];
-    const heights = [-0.5, -0.15, 0.02, 0.25, 0.45, 0.6, 0.8, 1.2, 2];
-    const segments = 96;
+    const backs = [-4, -1.5, 0, 0.8, 1.6, 2.4, 3.5, 6, 9, 13, 18, 24, 32, 42, 52];
+    const segments = 128;
     const positions = [];
     const indices = [];
-    for (let j = 0; j < rings.length; j++) {
+    for (const back of backs) {
       for (let i = 0; i <= segments; i++) {
-        const theta = (i / segments) * Math.PI * 2;
-        const r = pond.shoreRadius(theta) + rings[j];
-        positions.push(r * Math.sin(theta), heights[j], -r * Math.cos(theta));
+        const p = at((i / segments) * Math.PI * 2, back);
+        positions.push(p.x, p.y, p.z);
       }
     }
-    for (let j = 0; j < rings.length - 1; j++) {
+    for (let j = 0; j < backs.length - 1; j++) {
       for (let i = 0; i < segments; i++) {
         const a = j * (segments + 1) + i;
         const b = a + 1;
@@ -183,199 +300,197 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
 }`,
         fragmentShader: ground(ctx),
-        uniforms: { ...light.uniforms },
+        uniforms: { ...light.uniforms, ...uniforms },
         side: THREE.DoubleSide,
       }),
     );
-    far.add(new THREE.Mesh(geometry, material));
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = 'wood-ground';
+    mesh.frustumCulled = false;
+    far.add(mesh);
   }
 
-  // Trunks: a wide belt of them, none in the meadow's gap.
-  const trunkSpots = [];
+  // Where the trees stand.
+  /** @type {{ theta: number, back: number, girth: number, height: number, kind: 'edge' | 'inner' | 'framing', bare?: boolean, leafy?: boolean }[]} (see growTree in trees.js) */
+  const spots = [
+    // The trees the film shows. Two thick dark trunks on the bank with the
+    // shaft of light coming down between them, behind the swan (bare: the
+    // lane between them is for looking into the wood)...
+    { theta: -7.5 * DEG, back: 2.2, girth: 0.25, height: 21, kind: 'edge', bare: true },
+    { theta: 5.5 * DEG, back: 3.0, girth: 0.21, height: 19, kind: 'edge', bare: true },
+    // ...the trees some way in whose leaves are the lit masses up to the left and right of the lane...
+    { theta: -10 * DEG, back: 11, girth: 0.2, height: 17, kind: 'inner', leafy: true },
+    { theta: -12.5 * DEG, back: 15, girth: 0.24, height: 20, kind: 'inner', leafy: true },
+    { theta: -8 * DEG, back: 17, girth: 0.18, height: 18, kind: 'inner', leafy: true },
+    { theta: 5.5 * DEG, back: 14, girth: 0.22, height: 19, kind: 'inner', leafy: true },
+    { theta: 7.5 * DEG, back: 11, girth: 0.19, height: 16, kind: 'inner', leafy: true },
+    { theta: 9.5 * DEG, back: 16, girth: 0.25, height: 20, kind: 'inner', leafy: true },
+    // ...and the big dark tree at the near side of the clearing, two stems of it, that frames the grass.
+    { theta: MEADOW.near, back: 1.5, girth: 0.22, height: 23, kind: 'framing' },
+    { theta: MEADOW.near - 3 * DEG, back: 2.6, girth: 0.2, height: 20, kind: 'framing' },
+  ];
   {
     const count = ctx.quality.counts.trunks;
-    const geometry = keep(new THREE.CylinderGeometry(0.75, 1, 1, 7, 1, true));
-    geometry.translate(0, 0.5, 0);
-    const material = keep(ctx.createMaterial({ vertexShader: WORLD_VERTEX, fragmentShader: trunk(ctx), uniforms: { ...light.uniforms } }));
-    const mesh = new THREE.InstancedMesh(geometry, material, count);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const s = new THREE.Vector3();
-    const p = new THREE.Vector3();
-    const lean = new THREE.Euler();
-    let placed = 0;
-    for (let tries = 0; placed < count && tries < count * 20; tries++) {
-      const theta = rng.range(0, Math.PI * 2);
-      if (inMeadow(theta, 2 * DEG)) continue;
+    const places = spots.map((s) => at(s.theta, s.back));
+    for (let tries = 0; spots.length < count && tries < count * 30; tries++) {
+      // (from -PI to PI, like every compass angle that is compared with another here)
+      const theta = rng.range(-Math.PI, Math.PI);
       // crowded near the bank, thinning out behind
       const back = 1.2 + 34 * Math.pow(rng.float(), 1.7);
-      const r = pond.shoreRadius(theta) + back;
-      const girth = rng.range(0.14, 0.42);
-      const height = rng.range(14, 24);
-      p.set(r * Math.sin(theta), 0, -r * Math.cos(theta));
-      q.setFromEuler(lean.set(rng.gauss() * 0.03, rng.range(0, 6.28), rng.gauss() * 0.03));
-      mesh.setMatrixAt(placed, m.compose(p, q, s.set(girth, height, girth)));
-      trunkSpots.push({ x: p.x, z: p.z, height });
-      placed++;
+      // none in the clearing, but the wood closes again at the top of its hill
+      if (meadowShare(theta, back) > 0.02 && back < 28) continue;
+      // and none in the lane behind the swan, where the film looks into the wood and the shaft stands
+      if (theta > LANE.from && theta < LANE.to && back < LANE.depth) continue;
+      const p = at(theta, back);
+      if (places.some((o) => Math.hypot(o.x - p.x, o.z - p.z) < 1.1)) continue;
+      places.push(p);
+      // From nine metres behind the shore, for fifteen metres, every other
+      // tree is in leaf from low down: these carry the lit masses (see `shade` below).
+      const leafy = rng.float() < 0.5 && back > 9 && back < 24;
+      spots.push({ theta, back, girth: rng.range(0.12, 0.38), height: rng.range(13, 24), kind: back < 4.5 ? 'edge' : 'inner', leafy });
     }
-    mesh.count = placed;
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.frustumCulled = false;
-    far.add(mesh);
   }
 
-  // Leaves: clumps hung in the crowns. Most are dark; the ones the sun reaches
-  // are many times brighter than white, which is what makes the bokeh.
+  // Grow them, and collect where their leaves belong.
+  /** @type {Parameters<typeof createFoliage>[1]['clumps']} */
+  const clumps = [];
   {
-    const count = ctx.quality.counts.leaves;
-    const geometry = keep(new THREE.PlaneGeometry(1, 1));
-    const material = keep(ctx.createMaterial({ vertexShader: WORLD_VERTEX, fragmentShader: LEAF_FRAGMENT, side: THREE.DoubleSide }));
-    const mesh = new THREE.InstancedMesh(geometry, material, count);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const s = new THREE.Vector3();
-    const p = new THREE.Vector3();
-    const turn = new THREE.Euler();
-    const color = new THREE.Color();
-    const sun = light.uniforms.uSunColor.value;
-    const clumps = Math.max(1, Math.round(count / 40));
-    let i = 0;
-    for (let c = 0; c < clumps && trunkSpots.length; c++) {
-      // half of the clumps go to the trees in the north, behind the swan as
-      // the default camera sees it, so that even a few leaves are in the picture
-      let tree = rng.pick(trunkSpots);
-      if (c % 2 === 0) for (let tries = 0; tries < 12 && !(tree.z < -9 && tree.z > -22 && Math.abs(tree.x) < 12); tries++) tree = rng.pick(trunkSpots);
-      const cx = tree.x + rng.gauss() * 2.2;
-      // Low boughs over the bank and the first few metres of crown: from 5 m
-      // away and a metre up, the picture's top edge is only 13 degrees above
-      // the horizon, so anything higher than about 7 m is never seen.
-      const cy = 3.4 + 7.5 * Math.pow(rng.float(), 0.9);
-      const cz = tree.z + rng.gauss() * 2.2;
-      const radius = rng.range(0.7, 1.9);
-      // whole clumps are in the sun or out of it
-      const lit = rng.float() < 0.42;
-      const perClump = Math.ceil(count / clumps);
-      for (let k = 0; k < perClump && i < count; k++, i++) {
-        p.set(cx + rng.gauss() * radius, cy + rng.gauss() * radius * 0.6, cz + rng.gauss() * radius);
-        q.setFromEuler(turn.set(rng.range(0, 6.28), rng.range(0, 6.28), rng.range(0, 6.28)));
-        const size = rng.range(0.05, 0.13);
-        mesh.setMatrixAt(i, m.compose(p, q, s.set(size, size, size)));
-        if (lit && rng.float() < 0.55) {
-          // Sun through a leaf: yellow-olive (156, 157, 72 on screen in the
-          // film, up to 195, 186, 96), scaled by the sun itself. A few are
-          // much brighter: the small hot points among the soft blobs.
-          const k2 = rng.float() < 0.13 ? rng.range(2.5, 7) : rng.range(0.2, 1.25);
-          color.setRGB(0.085 * sun.x * k2, 0.088 * sun.y * k2, 0.03 * sun.z * k2);
-        } else {
-          const k2 = rng.range(0.3, 1);
-          color.setRGB(0.006 * k2, 0.011 * k2, 0.008 * k2);
-        }
-        mesh.setColorAt(i, color);
+    const limbs = createLimbs();
+    const treeRng = rng.fork('trees');
+    for (const spot of spots) {
+      const p = at(spot.theta, spot.back);
+      const r = Math.hypot(p.x, p.z);
+      // its light is the pond; for the trees that frame the clearing, the clearing
+      const toward = spot.kind === 'framing' ? [Math.cos(spot.theta), Math.sin(spot.theta)] : [-p.x / r, -p.z / r];
+      const anchors = growTree(limbs, treeRng, { ...spot, ...p, toward, detail });
+      for (const anchor of anchors) {
+        // leaves do not hang in the water
+        anchor.y = Math.max(anchor.y, 0.5 + anchor.size * 0.3);
+        // Where the sun gets at the leaves. Not on the bank: the trees and
+        // bushes at the water are the dark front of the wood (a fifth of the
+        // sun at most), and the lit masses are on the trees behind them, seen
+        // over and between them. That is depth, and it is also what keeps the
+        // water dark: in the film the lit leaves reach the top of the picture
+        // but the water in front of the swan hardly mirrors them, which a
+        // dark bank does by standing in front of their mirror image (the
+        // further back they are, the more of it). And low in the wood, for
+        // the same reason: all of the sun up to 5 m, a sixth of it from 9 m,
+        // and a quarter of that in the crowns.
+        const deep = smooth(6, 9, spot.back);
+        const shade = (0.2 + 0.8 * deep) * (anchor.low ? 1 : 0.25) * (1 - (5 / 6) * smooth(5, 9, anchor.y));
+        // The leaf lights go where the lit leaves are: eight parts to those
+        // boughs, two to the boughs of the bank, and little to the crowns.
+        const lights = !anchor.low ? 0.6 : deep > 0.5 ? 8 : 2;
+        clumps.push(spot.kind === 'framing' && anchor.low ? { ...anchor, size: anchor.size * 1.3, rank: 0, lights, shade } : { ...anchor, lights, shade });
       }
     }
-    mesh.count = i;
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    const geometry = keep(limbGeometry(limbs));
+    const material = keep(ctx.createMaterial({ vertexShader: WORLD_VERTEX, fragmentShader: bark(ctx), uniforms: { ...light.uniforms, ...uniforms } }));
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = 'wood-trees';
     mesh.frustumCulled = false;
     far.add(mesh);
   }
 
-  // Glows: the haze between the trunks and a few shafts of light. All of them
-  // are additive sheets that fade to nothing at their edges.
+  // Undergrowth: bushes all along the bank, some hanging over the water. They
+  // are in the wood's own shade (a fifth of the sun at most): a dark edge
+  // where the wood meets the pond, which is also what hides the feet of the
+  // trunks. Few and low where the clearing's bank is bare earth.
   {
-    const glow = (color) =>
-      keep(
-        ctx.createMaterial({
-          vertexShader: WORLD_VERTEX,
-          fragmentShader: GLOW_FRAGMENT,
-          uniforms: { uColor: { value: new THREE.Vector3().fromArray(color) } },
-          side: THREE.DoubleSide,
-          transparent: true,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        }),
-      );
-    // haze: a low wall of cool light standing among the first trees, all the way round
-    const hazeGeometry = keep(new THREE.CylinderGeometry(pond.SHORE.radius + 9, pond.SHORE.radius + 9, 16, 64, 1, true));
-    hazeGeometry.translate(0, 6, 0);
-    // a cylinder's u runs round it and v up it; the glow shader wants "across" in u, so make u the height
-    const uvAttr = hazeGeometry.attributes.uv;
-    for (let i = 0; i < uvAttr.count; i++) uvAttr.setXY(i, 0.25 + 0.5 * uvAttr.getY(i), 0.45);
-    const haze = new THREE.Mesh(hazeGeometry, glow([0.0012, 0.0018, 0.0042]));
-    haze.renderOrder = 5;
-    far.add(haze);
-
-    // Shafts: tall sheets of lit haze leaning along the sunlight. The first is
-    // the film's: straight behind the swan, a touch right of centre, blue
-    // (31, 45, 47 on screen at the top of the picture). The others are
-    // fainter and stand where the camera finds them when it is moved round.
-    const shaftGeometry = keep(new THREE.PlaneGeometry(1, 1));
-    shaftGeometry.translate(0, 0.5, 0);
-    const sunDir = light.uniforms.uSunDir.value;
-    const shafts = [
-      { theta: 3, back: 5, width: 4.6, color: [0.013, 0.02, 0.044] },
-      { theta: -31, back: 7, width: 3.2, color: [0.006, 0.01, 0.022] },
-      { theta: 27, back: 8, width: 3.6, color: [0.007, 0.011, 0.02] },
-      { theta: 118, back: 6, width: 4, color: [0.005, 0.008, 0.018] },
-      { theta: -105, back: 6, width: 4.5, color: [0.005, 0.008, 0.018] },
-      { theta: 190, back: 7, width: 4, color: [0.004, 0.007, 0.016] },
-    ];
-    for (const spec of shafts) {
-      const theta = spec.theta * DEG;
-      const r = pond.shoreRadius(theta) + spec.back;
-      const shaft = new THREE.Mesh(shaftGeometry, glow(spec.color));
-      shaft.position.set(r * Math.sin(theta), -0.4, -r * Math.cos(theta));
-      shaft.scale.set(spec.width, 16, 1);
-      // lean the sheet's long axis along the light, keep its face toward the pond
-      shaft.rotation.set(0, -theta, 0);
-      shaft.rotateX(-Math.atan2(Math.hypot(sunDir.x, sunDir.z), sunDir.y) * 0.35);
-      shaft.renderOrder = 6;
-      far.add(shaft);
+    const bushRng = rng.fork('bushes');
+    const bushes = [56, 80, 104][detail];
+    for (let i = 0; i < bushes; i++) {
+      const theta = ((i + bushRng.float()) / bushes) * Math.PI * 2;
+      const open = meadowShare(theta, 0);
+      // (in the clearing: only tufts at the foot of the bank)
+      const tuft = open > 0.3;
+      const back = tuft ? bushRng.range(-0.3, 0.5) : bushRng.range(-0.3, 2.4);
+      // (none in the mouth of the lane: the glow of the film's shaft reaches the waterline)
+      if (inLane(theta)) continue;
+      const p = at(theta, back);
+      const size = bushRng.range(0.45, 1.0) * (tuft ? 0.55 : 1);
+      clumps.push({ x: p.x, y: Math.max(p.y, 0) + size * bushRng.range(0.4, 1.1), z: p.z, size, low: true, shade: 0.2, rank: 0, lights: 1.5 });
     }
   }
 
-  // The fence at the near edge of the meadow: posts and one rail, dark against the grass.
+  for (const mesh of createFoliage(ctx, { clumps, uniforms, keep })) far.add(mesh);
+  for (const mesh of createHaze(ctx, { uniforms, groundHeight, keep })) far.add(mesh);
+
+  // The fence along the top of the clearing's bank: posts and two rails, and
+  // at its near end, by the framing tree, a stretch of upright pales. One mesh.
   {
-    const material = keep(ctx.createMaterial({ vertexShader: WORLD_VERTEX, fragmentShader: fence(ctx), uniforms: { ...light.uniforms } }));
-    const post = keep(new THREE.BoxGeometry(0.11, 1.15, 0.11));
-    post.translate(0, 0.575, 0);
+    const positions = [];
+    const normals = [];
+    const indices = [];
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const one = new THREE.Vector3(1, 1, 1);
+    /** A box of the given size, its middle at `centre`, turned by `q`. */
+    const addBox = (centre, w, h, d) => {
+      const box = new THREE.BoxGeometry(w, h, d).applyMatrix4(m.compose(centre, q, one));
+      const first = positions.length / 3;
+      positions.push(...box.attributes.position.array);
+      normals.push(...box.attributes.normal.array);
+      for (const index of box.index.array) indices.push(first + index);
+      box.dispose();
+    };
+    const turn = new THREE.Euler();
     const posts = 8;
-    const from = MEADOW.theta - MEADOW.halfWidth * 0.86;
-    const to = MEADOW.theta + MEADOW.halfWidth * 0.86;
+    const from = MEADOW.near + 1.2 * DEG;
+    const to = MEADOW.far - 4 * DEG;
     let previous = null;
     for (let k = 0; k < posts; k++) {
       const theta = from + ((to - from) * k) / (posts - 1);
-      // close to the water, on the first rise of the bank, and not quite in line
-      const r = pond.shoreRadius(theta) + 1.7 + rng.range(-0.12, 0.12);
-      const here = new THREE.Vector3(r * Math.sin(theta), 0.2, -r * Math.cos(theta));
-      const mesh = new THREE.Mesh(post, material);
-      mesh.position.copy(here);
-      mesh.rotation.set(rng.gauss() * 0.04, rng.range(0, 1.5), rng.gauss() * 0.04);
-      far.add(mesh);
+      // on the path at the top of the bank, and not quite in line
+      const here = new THREE.Vector3().copy(at(theta, 3.0 + rng.range(-0.15, 0.15)));
+      q.setFromEuler(turn.set(rng.gauss() * 0.04, rng.range(0, 1.5), rng.gauss() * 0.04));
+      addBox(new THREE.Vector3(here.x, here.y + 0.5, here.z), 0.11, 1.2, 0.11);
       if (previous) {
-        for (const height of [0.5, 0.95]) {
-          const rail = new THREE.Mesh(keep(new THREE.BoxGeometry(0.05, 0.11, here.distanceTo(previous) + 0.1)), material);
-          rail.position.copy(here).add(previous).multiplyScalar(0.5);
-          rail.position.y += height + rng.range(-0.03, 0.03);
-          rail.lookAt(here.x, rail.position.y + rng.range(-0.04, 0.04), here.z);
-          far.add(rail);
+        const span = here.distanceTo(previous);
+        const along = Math.atan2(here.x - previous.x, here.z - previous.z);
+        for (const height of [0.45, 0.9]) {
+          const middle = new THREE.Vector3().addVectors(here, previous).multiplyScalar(0.5);
+          middle.y += height + rng.range(-0.03, 0.03);
+          // a rail lies along the line between its posts, and follows the ground up or down
+          q.setFromEuler(turn.set(-Math.atan2(here.y - previous.y, span) + rng.gauss() * 0.02, along, 0, 'YXZ'));
+          addBox(middle, 0.05, 0.11, span + 0.1);
+        }
+        // pales in the first two bays: weathered, none quite upright or the same height
+        if (k <= 2) {
+          const pales = Math.round(span / 0.27);
+          for (let j = 1; j < pales; j++) {
+            const t = j / pales;
+            const foot = new THREE.Vector3().lerpVectors(previous, here, t);
+            const tall = 1.0 + rng.range(-0.12, 0.08);
+            q.setFromEuler(turn.set(rng.gauss() * 0.05, along, rng.gauss() * 0.06, 'YXZ'));
+            addBox(new THREE.Vector3(foot.x, foot.y + tall * 0.5 + 0.03, foot.z), 0.085, tall, 0.03);
+          }
         }
       }
       previous = here;
     }
-    // The big trunk that frames the clearing on its north side, right on the bank.
-    const framing = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.42, 0.55, 22, 9, 1, true)), keep(ctx.createMaterial({ vertexShader: WORLD_VERTEX, fragmentShader: trunk(ctx), uniforms: { ...light.uniforms } })));
-    const ft = MEADOW.theta - MEADOW.halfWidth - 3 * DEG;
-    const fr = pond.shoreRadius(ft) + 1.1;
-    framing.position.set(fr * Math.sin(ft), 10.5, -fr * Math.cos(ft));
-    framing.rotation.z = 0.03;
-    far.add(framing);
+    const geometry = keep(new THREE.BufferGeometry());
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geometry.setIndex(indices);
+    const material = keep(ctx.createMaterial({ vertexShader: WORLD_VERTEX, fragmentShader: fence(ctx), uniforms: { ...light.uniforms, ...uniforms } }));
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = 'wood-fence';
+    mesh.frustumCulled = false;
+    far.add(mesh);
   }
 
   return {
     far,
     near,
-    update() {},
+    /** Nothing here moves by itself: the shaders read the clock. This hands the wood's numbers of the look to them. */
+    update(dt, time) {
+      // The leaves that break the edge of the wood's shadow are this wood's:
+      // it tells the light how broken the edge is, how open the canopy, and
+      // what time it is for the stirring of the leaves (lighting.js, uDapple).
+      light.uniforms.uDapple.value.set(look.shadeDapple, 1 / Math.max(0.05, look.shadeDappleSize), look.canopyOpen, time);
+      uniforms.uWood.value.set(look.haze, look.shafts, look.leafLight, woodBreath(time));
+    },
     dispose() {
       for (const thing of disposables) thing.dispose();
     },

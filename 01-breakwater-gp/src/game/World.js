@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { createEnvironment } from '../assets/environment.js';
 import { createIsland, createTerrainMaterial, findSpotOnIsland, terrainUniforms } from '../assets/island.js';
 import { createPalms, palmUniforms } from '../assets/palm.js';
+import { FOLIAGE_TONES, rockField } from '../assets/rocks.js';
+import { withSkyFog } from '../assets/sky.js';
 import { createLighthouse, createPier, createSailboat, createSeaStacks } from '../assets/scenery.js';
 import { SUN_DIR } from '../assets/palette.js';
 import { BakedShadow, withBakedShadow } from '../engine/BakedShadow.js';
@@ -63,6 +65,96 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
 
   setSeaIslands(solid.map((i) => ({ x: i.x, z: i.z, r: i.radius })));
 
+  // ---- the rock of the main island (assets/rocks.js): a massif of crags on the high ground, outcrops down its
+  //      slopes, boulders along the back of the beach and a few down on the sand. None of it stands where a boat
+  //      can float: it is scenery, like everything above the beach.
+  /** Where a stone stands and how much room it takes, so that nothing is planted inside one. */
+  const stones = [];
+  {
+    const rr = makeRng(77);
+    const rocks = [];
+    // (a rock is seated a little into the ground under its middle, and goes on down as a root far enough to stay
+    // buried where the ground falls away under one side of it)
+    const put = (x, z, o, sink = 0.3) => {
+      rocks.push({ x: main.x + x, z: main.z + z, y: main.heightAt(main.x + x, main.z + z) - o.radius * sink, root: o.radius * 1.1, ...o });
+      stones.push({ x: main.x + x, z: main.z + z, r: o.radius });
+    };
+    // the massif: three crags, the tallest on the summit, and the shoulders they stand on
+    const fine = coarse ? 2 : 3; // (phones cut the big crags from a coarser ball)
+    put(-8, 10, { seed: 3, radius: 15, height: 54, blocks: 6, lean: [0.07, -0.03], moss: 0.55, detail: fine }, 0.45);
+    put(20, -9, { seed: 5, radius: 12, height: 34, blocks: 4, lean: [-0.03, 0.04], moss: 0.55, detail: fine }, 0.45);
+    put(-11, -21, { seed: 8, radius: 10, height: 24, blocks: 3, moss: 0.5, detail: fine }, 0.45);
+    put(8, 6, { seed: 23, radius: 11, height: 20, blocks: 3, moss: 0.6, detail: 2 }, 0.5);
+    put(-24, 2, { seed: 27, radius: 8, height: 13, blocks: 2, moss: 0.6, detail: 2 }, 0.45);
+    put(33, -12, { seed: 31, radius: 7, height: 11, blocks: 2, moss: 0.5, detail: 2 }, 0.45);
+    put(3, 27, { seed: 35, radius: 7, height: 12, blocks: 2, moss: 0.6, detail: 2 }, 0.45);
+    put(10, -33, { seed: 39, radius: 6, height: 9, blocks: 2, moss: 0.5, detail: 2 }, 0.45);
+    // boulders: clusters where the grass meets the sand, thinning out toward the water
+    const clusters = [28, 74, 118, 152, 204, 246, 288, 330];
+    clusters.forEach((deg, c) => {
+      const count = 4 + Math.floor(rr() * 4);
+      for (let i = 0; i < count; i++) {
+        const a = (deg + (rr() - 0.5) * 16) * DEG;
+        // most at the back of the beach, a few strays lower down
+        const spot = findSpotOnIsland(main, a, rr() < 0.7 ? 2.2 + rr() * 2.2 : 0.5 + rr() * 1.3);
+        const radius = 0.9 + rr() * rr() * 3.4;
+        const o = { seed: 100 + c * 13 + i, radius, height: radius * (0.75 + rr() * 0.6), cuts: 8 + Math.floor(rr() * 4), detail: radius > 2.2 ? 2 : 1, squash: 0.7 + rr() * 0.3, moss: spot.y > 2.4 ? 0.35 : 0 };
+        rocks.push({ x: spot.x, z: spot.z, y: spot.y - radius * 0.22, root: radius * 0.5, ...o });
+        stones.push({ x: spot.x, z: spot.z, r: radius });
+      }
+    });
+    // outcrops breaking through the grass of the hill
+    for (let i = 0; i < 26; i++) {
+      const a = rr() * TAU;
+      const d = 14 + rr() * 34;
+      const x = Math.cos(a) * d + 4;
+      const z = Math.sin(a) * d - 6;
+      const h = main.heightAt(main.x + x, main.z + z);
+      if (h < 4 || stones.some((s) => s.r > 5 && Math.hypot(s.x - main.x - x, s.z - main.z - z) < s.r * 0.9)) continue;
+      const radius = 1.6 + rr() * 3.2;
+      put(x, z, { seed: 300 + i, radius, height: radius * (0.9 + rr() * 0.9), cuts: 9 + Math.floor(rr() * 4), detail: 2, squash: 0.75 + rr() * 0.25, moss: 0.6 }, 0.35);
+    }
+    const solidRock = () => withSkyFog(main.extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true })));
+    const mesh = new THREE.Mesh(rockField(rocks), solidRock());
+    mesh.name = 'rocks';
+    mesh.renderOrder = -1; // (before the ground, whose costlier shader is then skipped where rock hides it)
+    mesh.matrixAutoUpdate = false;
+    root.add(mesh);
+    main.casters.push(mesh);
+
+    // ---- the thicket: clumps of bush over the hill and along the back of the beach, cut with the same chisel.
+    //      A clump is two or three rounded masses grown into one another.
+    const clumps = [];
+    const count = coarse ? 70 : 130;
+    let grown = 0;
+    for (let i = 0; i < count * 4 && grown < count; i++) {
+      const a = rr() * TAU;
+      const d = Math.sqrt(rr()) * 62;
+      const x = main.x + Math.cos(a) * d + 3;
+      const z = main.z + Math.sin(a) * d - 4;
+      const h = main.heightAt(x, z);
+      if (h < 2.9 || (h < 4.5 && rr() < 0.6)) continue;
+      if (stones.some((s) => Math.hypot(s.x - x, s.z - z) < s.r * (s.r > 5 ? 0.75 : 1) + 0.6)) continue;
+      const size = (1.5 + rr() * 2.0) * (h > 8 ? 1.25 : 1);
+      const masses = 2 + Math.floor(rr() * 2);
+      for (let k = 0; k < masses; k++) {
+        const radius = size * (k ? 0.55 + rr() * 0.3 : 1);
+        const ox = k ? (rr() - 0.5) * size * 1.5 : 0;
+        const oz = k ? (rr() - 0.5) * size * 1.5 : 0;
+        const y = main.heightAt(x + ox, z + oz);
+        clumps.push({ x: x + ox, z: z + oz, y: y - radius * 0.32, seed: 500 + i * 3 + k, radius, height: radius * (1.05 + rr() * 0.4), cuts: 10 + Math.floor(rr() * 4), taper: 0.62, detail: !coarse && radius > 2.3 ? 2 : 1, squash: 0.85 + rr() * 0.15, root: radius * 1.2, tones: FOLIAGE_TONES, round: true });
+      }
+      stones.push({ x, z, r: size * 0.6 });
+      grown++;
+    }
+    const thicket = new THREE.Mesh(rockField(clumps), solidRock());
+    thicket.name = 'thicket';
+    thicket.renderOrder = -1;
+    thicket.matrixAutoUpdate = false;
+    root.add(thicket);
+    main.casters.push(thicket);
+  }
+
   // palms: groves along the back of the beach, loners out on the sand, a few up the hill
   const grove = (island, count, low, high, seed) => {
     const spots = [];
@@ -73,6 +165,7 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
       const spot = findSpotOnIsland(island, angle, low + (loner ? rng() : rng() * rng()) * (high - low));
       if (spot.y < low * 0.8) continue;
       if (spots.some((s) => Math.hypot(s.x - spot.x, s.z - spot.z) < 2.6)) continue;
+      if (island === main && stones.some((s) => Math.hypot(s.x - spot.x, s.z - spot.z) < s.r + 1.3)) continue;
       spots.push(spot);
     }
     const palms = createPalms(spots, { seed, scale: coarse ? 0.5 : 1, anisotropy: Math.min(4, engine.renderer.capabilities.getMaxAnisotropy()), extend: island.extend });
@@ -81,6 +174,28 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
   };
   grove(main, 44, 1.7, 9.5, 5);
   grove(sandIslet, 11, 1.3, 4.2, 6);
+
+  // the rocky islet: a small crag for the lighthouse to stand against, and boulders round its shore
+  {
+    const rr = makeRng(91);
+    const rocks = [];
+    const at = (deg, height, o) => {
+      const spot = findSpotOnIsland(lightIslet, deg * DEG, height);
+      rocks.push({ x: spot.x, z: spot.z, y: spot.y - o.radius * 0.3, root: o.radius * 1.1, ...o });
+    };
+    at(140, 5.5, { seed: 61, radius: 5.5, height: 12, blocks: 3, moss: 0.5, detail: 2 });
+    at(305, 4.5, { seed: 63, radius: 4.2, height: 7, blocks: 2, moss: 0.5, detail: 2 });
+    for (let i = 0; i < 16; i++) {
+      const radius = 0.9 + rr() * rr() * 2.6;
+      at(i * 22.5 + rr() * 14, 0.2 + rr() * 2.4, { seed: 70 + i, radius, height: radius * (0.8 + rr() * 0.6), cuts: 8 + Math.floor(rr() * 4), detail: radius > 2 ? 2 : 1, squash: 0.7 + rr() * 0.3, moss: 0.3, wet: 0.5 });
+    }
+    const mesh = new THREE.Mesh(rockField(rocks), withSkyFog(lightIslet.extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }))));
+    mesh.name = 'islet-rocks';
+    mesh.renderOrder = -1;
+    mesh.matrixAutoUpdate = false;
+    root.add(mesh);
+    lightIslet.casters.push(mesh);
+  }
 
   // lighthouse on the rocky islet
   const lighthouse = createLighthouse();
@@ -223,5 +338,5 @@ export function createWorld(engine, { waterSegments, shadows } = {}) {
     palmUniforms.uPalmTime.value = time;
   }
 
-  return { env, track, root, islands: solid, colliders, buoys, arch, floats, sailboats, terrainHeightAt, update, prepareView };
+  return { env, track, root, islands: solid, colliders, buoys, arch, floats, sailboats, thicket: root.getObjectByName('thicket'), terrainHeightAt, update, prepareView };
 }

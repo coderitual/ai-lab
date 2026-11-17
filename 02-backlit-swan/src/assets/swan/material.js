@@ -6,8 +6,8 @@
 // feather it has to cross, using a stand-in for the bird made of a few
 // ellipsoids (the loose plumage as a whole, the two wings, the body under
 // them, the tail) and a chain of cylinders (the neck and head). Light that
-// crosses little comes out cream; a little more and the blue is gone and it
-// is amber; more still and nothing comes through, and the surface is left
+// crosses little comes out cream; a little more and it is dimmer and a little
+// warmer; more still and nothing comes through, and the surface is left
 // with the blue light of the sky: the teal shadow side. The bright rim, the
 // glowing bow, the lit tail and the dark middle are all this one sum, so they
 // move correctly when the bird turns or the sun does. Nothing is painted on.
@@ -259,7 +259,7 @@ ${RINGS}
 in float aRing;
 in vec4 aFin;      // xy: the way the strip stands, in the ring's axes; z: 0 foot .. 1 top; w: random per strip
 in float aAlong;   // distance along the neck, in L
-uniform vec4 uFringe;  // height of the down on a straight run (m), how much taller on the outside of a bend; unused
+uniform vec4 uFringe;  // height of the down on a straight run (m), how much taller on the outside of a bend, how much brighter than skin (fragment stage); unused
 ${VARYINGS_OUT}
 out vec4 vFin;     // along (L), 0 foot .. 1 top, random, how far this side is stretched by the bend
 out vec3 vRadial;
@@ -312,14 +312,16 @@ uniform vec4 uSky;        // share of the sky's light on a surface that faces do
 uniform vec3 uAlbedo;
 uniform vec3 uStain;      // the feathers of the head and upper neck are a little stained
 uniform vec3 uBillColor;
-uniform vec2 uNeckSky;     // x: share of the sky's light the neck and head get (they stand upright under their own arch);
-                           // y: share of the light inside them that leaves through their skin (dense, close feathering: little)
+uniform vec3 uNeckSky;     // x: share of the sky's light the neck and head get (they stand upright under their own arch);
+                           // y: share of the light inside them that leaves through their skin (dense, close feathering: little);
+                           // z: share of the sun that gets round them in the down, however thick they are
 in vec3 vWorldPos;
 in vec3 vNormal;
 in float vDepth;
 in vec4 vHead;
 in float vAlong;
 #ifdef FRINGE
+uniform vec4 uFringe;
 in vec4 vFin;
 in vec3 vRadial;
 #endif
@@ -344,7 +346,8 @@ void main() {
     float edge = h.z - (${f(BILL_START - 0.012)} + 0.012 * clamp(h.y / 0.045, -1.0, 1.0));
     bare = smoothstep(-0.0015, 0.0015, edge);
     // black: the knob and the base of the bill, the nail at its tip, the lower mandible, the edge of the gape
-    float knob = smoothstep(${f(KNOB.at + 0.03)}, ${f(KNOB.at + 0.018)}, h.z) * smoothstep(0.004, 0.012, h.y);
+    // (edges in rising order: smoothstep is undefined in GLSL ES with them the other way round)
+    float knob = (1.0 - smoothstep(${f(KNOB.at + 0.018)}, ${f(KNOB.at + 0.03)}, h.z)) * smoothstep(0.004, 0.012, h.y);
     float base = 1.0 - smoothstep(0.004, 0.009, edge);
     float nail = smoothstep(0.268, 0.274, h.z) * smoothstep(-0.012, -0.004, h.y);
     float under = 1.0 - smoothstep(-0.016, -0.011, h.y);
@@ -373,7 +376,7 @@ void main() {
   // Light inside the plumage leaves through any surface, whichever way it
   // faces; a surface turned to the sun is lit by it directly as well, and
   // shows whichever of the two is the brighter.
-  vec3 sunFeather = uSunColor * reach * through * max(mix(uFeather.x, uNeckSky.y, vHead.w), direct);
+  vec3 sunFeather = uSunColor * reach * max(through * max(mix(uFeather.x, uNeckSky.y, vHead.w), direct), vec3(uNeckSky.z * vHead.w));
   // Bare parts let nothing through: plain sunlight, shadowed by the bird.
   vec3 sunBare = uSunColor * reach * through * max(nl, 0.0);
 
@@ -423,8 +426,10 @@ void main() {
   profile = max(max(profile, barb), 0.16);
   float soft = max(fwidth(h) * 1.2, 0.02);
   alpha = side * (1.0 - smoothstep(profile - soft, profile + soft, h));
-  // the down thins toward its tips
-  col *= mix(1.0, 0.65, h);
+  // The down thins toward its tips. Loose down throws far more of the light
+  // on toward the eye than the close feathers under it do (uFringe.z): it is
+  // the bright line round the film's neck.
+  col *= mix(1.0, 0.65, h) * uFringe.z;
   if (alpha < 0.02) discard;
 #endif
 

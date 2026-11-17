@@ -69,6 +69,9 @@ Nothing here has been seen on a phone or in Safari (see
   stretching the lens pass's copy of the frame radially.
 - **A float target for the lens pass**, so the glow knows how bright the sun
   on the water really was before tone mapping (`game/Lens.js`).
+- **A waterfall off the main crag**, falling into the thicket, and cloud
+  caught on the peak: the two things a painted island has that this one
+  does not yet (`assets/rocks.js`, `game/World.js`).
 - **The island's shadow on the lagoon**: let the water shader read the main
   island's baked shadow map (`engine/BakedShadow.js`).
 - **Palms that bend**, and a cheaper far model for the ones on the horizon.

@@ -50,6 +50,11 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
   above that it is scenery and can be reshaped freely.
 - A team is `{ hull, accent, mark, pattern }` (`src/assets/palette.js`): each
   boat is painted to its own design. Keep them tellable apart from any side.
+- Rock, sea stacks and the thicket are all cut by one function
+  (`src/assets/rocks.js`) and painted from one set of tones. On the islands
+  they stand only on ground no boat can reach; a rock a boat could touch
+  needs a collider (`colliders` in `src/game/World.js`), as the sea stacks
+  have.
 
 ## 02-backlit-swan
 

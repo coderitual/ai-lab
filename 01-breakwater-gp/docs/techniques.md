@@ -25,7 +25,8 @@ where to take it next. For exact numbers see [spec.md](spec.md).
 - [19. A drift from one curve](#19-a-drift-from-one-curve)
 - [20. Shadows drawn once](#20-shadows-drawn-once)
 - [21. Sand that is mostly shader](#21-sand-that-is-mostly-shader)
-- [22. Palms from a strip and a picture](#22-palms-from-a-strip-and-a-picture)
+- [22. Rock cut with a chisel](#22-rock-cut-with-a-chisel)
+- [23. Palms from a strip and a picture](#23-palms-from-a-strip-and-a-picture)
 
 ---
 
@@ -101,13 +102,25 @@ depth buffer read.
   two copies slide over each other and are *multiplied*, so lines flare where
   they meet and vanish where they part. The same texture lights the inside of
   the waves and lies sharp on the sand in the shallows.
+- **Light kept to where the water is thin.** The same terms could light the
+  whole upper half of every swell, and for a while did: the sea looked like a
+  swimming pool lit from below. Now the broad term (how high up the wave you
+  are) counts for little and the narrow ones (a crest bunching up, a peak of
+  the chop, a steep face turned to the eye) for most, so the body of the sea
+  stays deep and the turquoise sits along the crests, where the references
+  put it.
+- **Ripples as facets, not streaks.** Four scrolling lookups of one normal
+  map make the fine surface. Squeezed hard along the swell they read as
+  smeared streaks; squeezed by 1.4 instead of 2.3, and a quarter stronger, they read as small
+  sharp facets, each catching the sky or the sun on its own.
 - **Foam that lingers.** Foam belongs where a crest broke a moment ago, not
   where the crest is now. Rather than simulate it, the shader asks the wave
   function how hard the swell was bunching up here *now and 0.9, 1.9 and 3.1
   seconds ago* (the waves are a closed formula, so the past is free) and keeps
   the strongest, fading with age. The result trails behind the moving crest.
   A noise pattern cut by that mask gives lacy threads over a veil of aerated
-  water.
+  water. Short chop makes whitecaps of its own, where the Jacobian of all
+  the waves together says the surface is folding (`1 − J` above 0.36).
 - **Glitter at constant size.** Sun sparkle comes from a normal-map lookup
   whose scale is chosen per pixel from `log2(distance)`, blended between the
   two nearest octaves, so facets stay a few pixels across from the bow to the
@@ -646,7 +659,7 @@ driver can choose to slide.
 shadows float on the sand.
 
 **Trick.** Each island is drawn once, from the sun, into a depth texture
-(`engine/BakedShadow.js`): the land, the palms (through their cut-out
+(`engine/BakedShadow.js`): the land, the rock and the thicket, the palms (through their cut-out
 texture, so the shadow has leaflets), the pier, the lighthouse. Any material
 can then be patched (`withBakedShadow`) to ask that picture how much of the
 sun reaches a point, and to scale the sun's part of its light by the answer.
@@ -703,7 +716,55 @@ very close the sand is a smooth surface with a picture on it.
 **Next.** Tracks: write where boats have beached into a texture and read it
 in the sand.
 
-## 22. Palms from a strip and a picture
+## 22. Rock cut with a chisel
+
+**Problem.** The island needed rock with character: crags, boulders, sea
+stacks, in the manner of a painted adventure island, not a height field with
+a rock texture on it. No models, so it has to come out of a function, and it
+has to look hewn, not lumpy: noise on a sphere gives potatoes.
+
+**Trick.** `assets/rocks.js` starts from a ball and chisels it. A chisel
+stroke is a plane: every vertex beyond it is moved back onto it, so the
+stroke leaves a flat face with a crisp edge all round, whatever the mesh
+underneath.
+
+- A **block** gets one stroke for a flat top, four to six for walls set
+  round it at uneven angles, and a few more that take the corners off. It is
+  then drawn out to its height, narrowed toward the top and leaned.
+- A **crag** is blocks piled on one another, each smaller than the one it
+  stands on, with its foot about halfway up it (they overlap by half), ending
+  in a horn. The ledges where one block meets the next are what makes it
+  read as rock that has weathered in beds.
+- **Paint follows the faces.** A flat face is many triangles; give each a
+  tone of its own and the mesh shows through as a mosaic. So the tone of a
+  wall is taken from the *direction the face looks* (a noise of the normal),
+  on which all the triangles of one stroke agree, and only then shifted by
+  height: paler toward the top, darker toward the foot, pale flats that take
+  the sun, dark undersides, moss in patches on what faces up. (The shift by
+  height is per triangle, so a tall face still grades a little from top to
+  bottom.)
+- **The same chisel cuts the thicket.** A clump of bush is the same function
+  with no flat top and no walls (only corner strokes, so it stays round),
+  painted in greens that are pale on top and dark underneath, two or three
+  grown into one another.
+- **What is asked for is what is built.** A rock's highest point lands
+  exactly on the height it is given (the ball is measured after the chisel
+  and stretched to fit), a crag's blocks are sized so that the pile ends at
+  the crag's height, and the lowest block stands where the crag is put. Below
+  its foot every rock goes on as a root, as deep as it is told, so that one
+  planted on a slope (or a stack in a deep trough) never shows its underside.
+- Shaded flat, in one draw call for an island's rock and one for its
+  thicket, drawn before the ground they hide, casting into and reading the
+  island's baked shadow map (section 20), so the massif throws its afternoon
+  shadow across the hill and the beach.
+
+**Limits.** Blocks pass through one another rather than fit: fine from a
+boat, not from a climber's distance. Nothing grows *on* the crags but paint.
+
+**Next.** A waterfall off the main crag; cloud caught on the peak; the far
+hills cut the same way.
+
+## 23. Palms from a strip and a picture
 
 **Problem.** A palm frond is a spine with ninety leaflets. Modelled, a grove
 is millions of triangles; as a flat card it looks like one.

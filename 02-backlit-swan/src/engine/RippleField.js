@@ -41,8 +41,17 @@ const SUBSTEP = 1 / 120;
 const MAX_SUBSTEPS = 8;
 /** Disturbances applied in one step. More than that wait for the following steps. */
 const DISTURB_MAX = 8;
-/** Stirs applied per field update (once a frame). More than that wait. */
-const STIR_MAX = 12;
+/**
+ * Stirs applied per second of water time (12 in a sixtieth), and the most one
+ * field update can take. More than that wait. The allowance goes by time, not
+ * by update: a field update happens once a frame, and a burst (the spray of a
+ * shake landing) must not take three times as long to show at 20 frames a
+ * second as at 60.
+ */
+const STIR_RATE = 720;
+/** What an update may always take, however little time it covers (slow motion). */
+const STIR_MIN = 12;
+const STIR_MAX = 48;
 /** How many past disturbances the CPU-side estimate remembers. */
 const MEMORY = 32;
 /** The largest agitation the field holds. */
@@ -493,7 +502,8 @@ vec3 rippleSample(vec2 xz) { return rippleSample4(xz).xyz; }
       this.agitationFromSlope,
       1 - Math.exp(-elapsed * 2.5),
     );
-    const count = Math.min(STIR_MAX, this._stirs.length);
+    const allowed = Math.min(STIR_MAX, Math.max(STIR_MIN, Math.round(STIR_RATE * elapsed)));
+    const count = Math.min(allowed, this._stirs.length);
     for (let j = 0; j < count; j++) this._stirUniform[j].fromArray(this._stirs[j]);
     this._stirs.splice(0, count);
     f.uStirCount.value = count;

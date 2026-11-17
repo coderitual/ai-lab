@@ -116,9 +116,15 @@ driving. See [boat.md](boat.md).
 ## The course
 
 One island, one loop of about 1.1 km round it. The island is the thing you
-look at when you are not looking at the water: a forested hill with a rock
-face, a beach of rippled sand going dark and glossy where the sea reaches it,
-and groves of coconut palms laying long afternoon shadows across it. The swell comes from the open
+look at when you are not looking at the water, and it is drawn the way a
+painter of adventure islands would draw it rather than the way a surveyor
+would: a massif of crags standing fifty metres over a hill thick with bush,
+every rock cut in big flat planes (pale where the sun lies on them, warm on
+their faces, dark underneath), boulders tumbled down to a beach of rippled
+sand going dark and glossy where the sea reaches it, and groves of coconut
+palms laying long afternoon shadows across it. The peak is the landmark of
+the lap: you can tell where you are on the course from which side of it you
+see. The swell comes from the open
 ocean on one side; the island shelters the other. So each lap has a rough
 half, where the boat is in the air a good part of the time, and a calm half,
 where you can make up places. The start arch stands on the calm side.

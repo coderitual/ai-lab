@@ -3,8 +3,9 @@
 
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { fbm2, lerp, makeRng, TAU } from '../engine/math.js';
-import { facet, loft, merge, part } from './geo.js';
+import { lerp, makeRng, TAU } from '../engine/math.js';
+import { loft, merge, part } from './geo.js';
+import { crag } from './rocks.js';
 import { withSkyFog } from './sky.js';
 import { PALETTE, TEAMS } from './palette.js';
 
@@ -12,37 +13,64 @@ const lit = (opts = {}) => withSkyFog(new THREE.MeshStandardMaterial({ vertexCol
 
 // ------------------------------------------------------------------ rocks
 
-/** Faceted sea stack. Returns a geometry sitting on y = 0. */
-export function rockGeometry(seed, radius, tallness = 1.3) {
-  const g = new THREE.IcosahedronGeometry(1, 2);
-  const pos = g.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const n = fbm2(v.x * 1.7 + seed * 5.1, v.z * 1.7 + v.y * 2.3 - seed * 2.3, 3, seed);
-    const r = radius * (0.72 + n * 0.62);
-    const flat = v.y < -0.35 ? 0.4 : 1;
-    pos.setXYZ(i, v.x * r, (v.y * tallness * flat + 0.42 * tallness) * r, v.z * r);
-  }
-  return facet(g, (c, normal, out) => {
-    const k = fbm2(c.x * 0.8, c.z * 0.8 + c.y, 2, seed + 3);
-    out.copy(PALETTE.rock).lerp(PALETTE.rockDark, 0.25 + k * 0.6);
-    if (c.y < radius * 0.28) out.lerp(new THREE.Color('#2b2a2e'), 0.55); // wet line
-    if (normal.y > 0.78 && c.y > radius * 0.9) out.lerp(PALETTE.grassDark, 0.55); // moss cap
-  });
+/**
+ * A sea stack: a small crag (see rocks.js) standing in the water. Its foot is at y = 0, and it goes on `root` metres
+ * below that, so that the deepest trough never shows its underside.
+ */
+export function rockGeometry(seed, radius, tallness = 1.3, root = 5) {
+  return crag(seed, { radius: radius * 1.3, height: radius * tallness * 1.6, blocks: tallness > 1.45 ? 3 : 2, moss: 0.45, wet: radius * 0.34 + 0.5, root, detail: 2 });
 }
 
-/** `stacks` = [{x, z, r, tall?}] — merged into one mesh; also returns colliders. */
+/** How far below the still waterline a stack's foot is set. */
+const STACK_SINK = 0.5;
+
+/**
+ * The circle a hull meets: fitted to the stack's outline at the height of a hull (the mean of how far the rock
+ * reaches in each direction, about the middle of those reaches), so that what bounces a boat is where the rock is.
+ */
+function hullCircle(geometry, x, z) {
+  const pos = geometry.attributes.position;
+  const N = 24;
+  const reach = new Float32Array(N).fill(-Infinity);
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y < -0.4 || y > 1.3) continue;
+    const dx = pos.getX(i) - x;
+    const dz = pos.getZ(i) - z;
+    for (let k = 0; k < N; k++) {
+      const a = (k / N) * TAU;
+      const d = dx * Math.cos(a) + dz * Math.sin(a);
+      if (d > reach[k]) reach[k] = d;
+    }
+  }
+  // the middle of the outline, then its mean reach from there
+  let cx = 0;
+  let cz = 0;
+  for (let k = 0; k < N; k++) {
+    const a = (k / N) * TAU;
+    cx += (reach[k] * Math.cos(a) * 2) / N;
+    cz += (reach[k] * Math.sin(a) * 2) / N;
+  }
+  let r = 0;
+  for (let k = 0; k < N; k++) {
+    const a = (k / N) * TAU;
+    r += (reach[k] - cx * Math.cos(a) - cz * Math.sin(a)) / N;
+  }
+  return { x: x + cx, z: z + cz, r };
+}
+
+/** `stacks` = [{x, z, r, tall?}] — merged into one mesh; also returns the circles boats are bounced off. */
 export function createSeaStacks(stacks, seed = 11) {
+  const colliders = [];
   const parts = stacks.map((s, i) => {
     const g = rockGeometry(seed + i * 3, s.r, s.tall || 1.3);
-    g.translate(s.x, -s.r * 0.25, s.z);
+    g.translate(s.x, -STACK_SINK, s.z);
+    colliders.push({ ...hullCircle(g, s.x, s.z), bounce: 0.35 });
     return g;
   });
   const mesh = new THREE.Mesh(merge(parts), withSkyFog(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true })));
   mesh.name = 'seaStacks';
   mesh.matrixAutoUpdate = false;
-  const colliders = stacks.map((s) => ({ x: s.x, z: s.z, r: s.r * 0.95, bounce: 0.35 }));
   return { mesh, colliders };
 }
 

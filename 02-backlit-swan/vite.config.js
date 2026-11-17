@@ -7,5 +7,6 @@ export default defineConfig({
     chunkSizeWarningLimit: 900,
   },
   server: { port: 5180, strictPort: false },
-  preview: { port: 4180, strictPort: false },
+  // 4173 is the port package.json's `npm test`, tools/playtest.cjs and docs/tools.md expect
+  preview: { port: 4173, strictPort: false },
 });

@@ -23,7 +23,7 @@ while a test is running against the preview.
 
 | script | what it does |
 | --- | --- |
-| `tools/playtest.cjs URL` | Solo and split screen through the real input paths: keys, touch on phone-sized viewports in both orientations, rules, panels, a lost WebGL context. 71 checks. |
+| `tools/playtest.cjs URL` | Solo and split screen through the real input paths: keys, touch on phone-sized viewports in both orientations, rules, a hull against a sea stack, panels, a lost WebGL context. 72 checks. |
 | `tools/soundtest.cjs URL [dir]` | Renders the soundtrack offline and looks for every cue: moment, side, level. 16 checks. With `dir`, keeps the WAV files. |
 | `tools/nettest.cjs URL [dir] [--only=a\|b\|c\|d]` | Online play between pages of one browser: A the whole two-player flow, B a slow lossy link, C real time, D four players. 61 checks. |
 | `tools/screenshots.cjs` | Regenerates every picture in the README and these documents. `--list`, `--only a,b`. |
@@ -57,7 +57,8 @@ node tools/capture.cjs --url "http://localhost:4173/?mode=split&manual&dpr=1" --
 viewer.html?asset=craft&team=0&flat&sea=0.05&az=250&el=17&dist=8.5&fov=40&ty=0.45
 ```
 
-`asset` is `sea`, `craft`, `crafts` (the four liveries) or `world`. `az`, `el`
+`asset` is `sea`, `craft`, `crafts` (the four liveries), `rocks` (a study of
+the chiselled rock: crags and boulders) or `world`. `az`, `el`
 and `dist` place the camera round the target (`tx`, `ty`, `tz`); `az=270` is
 astern, `az=90` ahead of the bow. `flat` holds a boat level, `sea` scales the
 waves, `manual` stops the loop (step with `__viewer.frames(n)`).

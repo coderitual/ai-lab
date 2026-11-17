@@ -12,7 +12,7 @@ index.html              the page: #scene (canvas goes here), #loading (veil)
 src/main.js             boots Engine, World, Ui; window.__swan, window.__ready
 src/engine/             reusable; knows nothing about swans or ponds
   Engine.js             renderer, canvas, loop, manual stepping, resize, lost context, adaptive render scale
-  caps.js               capability probe, tier guess, createTarget / resizeTarget
+  caps.js               capability probe, tier guess, createTarget / resizeTarget (multisampled targets keep no resolved depth)
   params.js             URL parameters
   rng.js                seeded random numbers with named sub-streams
   events.js             on / off / emit
@@ -31,7 +31,8 @@ src/assets/             what is visible
   swan/                 the swan (see swan.md)
   pond/Water.js         the water's surface; pond/surface.js, what the swan does to it
   pond/Specks.js        what floats on it
-  forest/Forest.js      the wood, the meadow, the fence, the haze
+  forest/Forest.js      the wood: where things stand, the ground, the meadow, the fence
+  forest/trees.js       trunks and boughs; forest/foliage.js, leaves; forest/haze.js, the air and its shafts
   fx/Droplets.js        drops in the air
 src/scene/              the show
   config.js             LOOK, CAMERA, SIM, TIERS
@@ -70,7 +71,7 @@ scale.
 
 | # | What | Target | Size | Format |
 | - | ---- | ------ | ---- | ------ |
-| 1 | Ripple step, 0 to 8 times (1/240 s of slowed time each; about 1.6 a frame at 60 fps) | ripple state, ping-pong | `rippleSize`² | RG32F, nearest (RG16F if only half-float targets exist; RGBA8 hand-packed 16-bit with `?ldr`) |
+| 1 | Ripple step, 0 to 8 times (1/120 s of slowed time each; 2 a frame at 60 fps) | ripple state, ping-pong | `rippleSize`² | RG32F, nearest (RG16F if only half-float targets exist; RGBA8 hand-packed 16-bit with `?ldr`) |
 | 1 | Ripple field (once per frame that stepped) | ripple field | `rippleSize`² | RGBA16F, linear: height, dH/dx, dH/dz (RGBA8 with `?ldr`) |
 | 2 | Mirror camera placed (no drawing) | | | |
 | 3 | Far scene from the camera | `far.sharp` | `farScale` | RGBA16F + depth, mip chain |
@@ -82,7 +83,7 @@ scale.
 | 7 | Bloom down: `bloomLevels` passes, 13 taps (the first with threshold and firefly damping) | `post.down[i]` | 1/2, 1/4, ... | RGBA16F |
 | 7 | Bloom up: `bloomLevels - 1` passes, 9-tap tent + this level weighted and tinted | `post.up[i]` | 1/2 ... | RGBA16F |
 | 7 | Grade: scene + bloom, exposure, vignette, tone curve, split toning, saturation, lift, sRGB, dither (chromatic aberration if `LOOK.chroma > 0`) | `post.gradeTarget` | 1 | RGBA8 (sRGB values, luma in alpha) |
-| 7 | Finish: FXAA, film grain | canvas | canvas | |
+| 7 | Finish: FXAA, film grain (skipped when `LOOK.grain` is 0), its own one-step dither only when the canvas and the graded picture differ in size | canvas | canvas | |
 
 With `?ldr`, or where neither `EXT_color_buffer_half_float` nor
 `EXT_color_buffer_float` exists, every RGBA16F above is RGBA8 holding
@@ -97,6 +98,7 @@ the finish pass, and the sRGB curve is applied by the grade pass.
 |  | low | medium | high |
 | - | --- | ------ | ---- |
 | pixel ratio cap | 1.5 | 2 | 2 |
+| canvas pixel budget (`maxPixels`; the Engine lowers the ratio to fit; a forced `?dpr=` is exempt) | 1.2 M | 2.2 M | 4 M |
 | scene MSAA | 0 | 4 | 4 |
 | mirror MSAA | 0 | 4 | 4 |
 | `farScale` | 0.4 | 0.5 | 0.5 |
@@ -107,12 +109,16 @@ the finish pass, and the sRGB curve is applied by the grade pass.
 | FXAA search steps | 5 | 7 | 10 |
 | ripple texture | 256² | 384² | 512² |
 | `waterDetail` (ripple trains summed; mirror read twice at 2) | 0 | 1 | 2 |
-| specks / leaves / trunks / droplets | 7000 / 3200 / 80 / 192 | 13000 / 6000 / 140 / 384 | 16000 / 9000 / 220 / 768 |
+| specks / leaf lights / leaf sprays / trunks / droplets | 7000 / 4800 / 1200 / 80 / 192 | 13000 / 9000 / 2100 / 140 / 384 | 16000 / 13500 / 3300 / 220 / 768 |
 | `featherDetail` (the swan's mesh and fringe) | 0 | 1 | 2 |
 
 The tier is `?q=` if given, else the probe's guess (`caps.tier`): software
-rasterisers low; phones medium for Apple GPUs and recent Adreno / Mali /
-Xclipse, otherwise low; desktops high, except older Intel graphics medium.
+rasterisers low; phones medium for Apple GPUs and recent Adreno (6.4x and
+up) / Mali (G76 and up, G610 and up) / Immortalis / Xclipse, plus Arm's
+"Mali G1" and Imagination's PowerVR D-series, otherwise low (Mali-G71 and
+G72 included: they were built too narrow for budget phones to tell by name);
+desktops high, except older Intel graphics medium. `?msaa=0|2|4` overrides
+the tier's multisampling.
 
 Sizes on a 390 x 844 CSS-pixel phone with a device pixel ratio of 2 or more:
 
@@ -121,6 +127,10 @@ Sizes on a 390 x 844 CSS-pixel phone with a device pixel ratio of 2 or more:
 | low | 585 x 1266 | 234 x 506 | 146 x 317 | 293 x 633 | 293 x 633 ... 19 x 40 |
 | medium | 780 x 1688 (4x) | 390 x 844 | 234 x 506 | 585 x 1266 (4x) | 390 x 844 ... 13 x 27 |
 | high | 780 x 1688 (4x) | 390 x 844 | 312 x 675 | 780 x 1688 (4x) | 390 x 844 ... 7 x 14 |
+
+These (1.32 MP at most) are under every budget. A tablet at 820 x 1180 CSS
+pixels and ratio 2 is 3.9 MP: on medium the budget lowers the ratio to 1.508,
+a canvas of 1236 x 1779 (2.2 MP).
 
 ### What a frame costs
 
@@ -149,7 +159,8 @@ analytic wave trains.
   after the opaque things with the depth test on.
 - **The far scene is one layer.** Everything in `ctx.farScene` is drawn at
   reduced size and blurred by the same amount (`LOOK.aperture * LOOK.bokehMax`
-  of the picture height). It never occludes anything in the main scene.
+  of the picture height; the mirrored copy by at least `LOOK.mirrorSoftness`
+  of it, because a reflection is never as sharp as the thing itself). It never occludes anything in the main scene.
   Small things much brighter than white become bokeh discs; that is the
   intended way to make them. It is cleared to `LOOK.farClear`.
 - **The far scene is also drawn mirrored**, with the near plane slanted into
@@ -205,12 +216,12 @@ Built in `World.createContext`, handed to every factory.
 | `params` | the parsed URL parameters |
 | `look` | the live `LOOK` object (added to the contract: assets may not import `scene/config.js`) |
 | `uniforms` | `{ uTime, uResolution }` (`uResolution` added to the contract) |
-| `light` | `{ uniforms: { uSunDir, uSunColor, uSkyColor, uBounceColor, uAmbient }, setSun(azDeg, elDeg), glsl }`; the GLSL adds `sunWrap(n, wrap)`, `fillLight(n)`, `towardSun(viewDir)` |
+| `light` | `{ uniforms: { uSunDir, uSunColor, uSkyColor, uBounceColor, uAmbient, uShade }, setSun(azDeg, elDeg), glsl }`; the GLSL adds `sunWrap(n, wrap)`, `fillLight(n)`, `towardSun(viewDir)` |
 | `pond` | `{ SHORE, SHORE_MAX_RADIUS, shoreRadius(theta), shoreTheta(x, z), shoreDistance(x, z), glsl }`; the GLSL has `shoreRadius(float)` and `shoreDistance(vec2 xz)` |
 | `ripple` | the `RippleField` |
 | `scene`, `farScene` | the two scenes |
 | `layers` | `{ MAIN: 0, MIRROR: 2 }` |
-| `events` | `on(name, fn)` (returns an unsubscribe), `off`, `emit`. Emitted so far: `'drop' { x, z, size }`, `'billEnter' { x, z }`, `'billExit' { x, z }`. `'tap'` is reserved for Interaction |
+| `events` | `on(name, fn)` (returns an unsubscribe), `off`, `emit`. Emitted: `'drop' { x, z, size }`, `'billEnter' { x, z }`, `'billExit' { x, z }`, `'tap' { x, z, swan? }` (Interaction), `'cut' {}` (the film starts again), `'camera' { mode, view? }` (Director), `'key' { name: 'slow'\|'sound'\|'hide' }` |
 | `subject` | `Vector3`, where the swan is; copied from `SwanMind.position` every step (added to the contract; the ripple window and the water's reflection follow it) |
 | `createMaterial(options)` | see above (added) |
 | `showInMirror(object)` | enables the MIRROR layer on the object and all its children (added) |
@@ -229,7 +240,11 @@ What each engine class offers.
   `disturb(x, z, radius, strength)`: **positive strength pushes the water
   down** at the centre, by `strength` metres, with a raised ring round it so
   that no water is added; a radius under 1.5 texels is widened to that. At
-  most 8 disturbances are applied per step, the rest wait. `heightAt` is an
+  most 8 disturbances are applied per step, the rest wait. The stirs
+  (`stir`: the agitation that every disturbance also leaves) wait too: 720 are allowed per second of water time, at
+  least 12 and at most 48 per field update (exactly 12 at the 1/60 s step,
+  24 at 30 fps, 36 at 20 fps), so a burst lands as fast at a low frame rate
+  as at a high one. `heightAt` is an
   estimate from the last 32 disturbances replayed as ideal rings, not a
   readback. `rippleSample` uses `textureLod`, so vertex shaders may call it.
 - `PlanarMirror(renderer, caps, { level, clipBias, samples })`: `camera`,
@@ -256,19 +271,26 @@ What each engine class offers.
   pixel, coasting when released), two pinch, the wheel zooms; `onTap(x, y)`,
   `onDoubleTap(x, y)` and `onGrab()` are called for a press that does not
   move, two of them within a third of a second, and the start of any
-  movement by hand. `idle` is the seconds since a person last moved it,
+  movement by hand, including the landing of a second finger (so that a pinch
+  as the first gesture takes the camera from the Director and cancels a
+  blend). `idle` is the seconds since a person last moved it,
   `held` whether they are holding it now, `nudge(daz, del, zoom)` moves it
   from keys. `enabled` switches gestures off; views set from code always
   apply.
-- `Engine(container, { manual, pixelRatio, maxPixelRatio, adaptive })`:
+- `Engine(container, { manual, pixelRatio, maxPixelRatio, maxPixels, adaptive })`:
   `onUpdate(dt)`, `onRender()`, `onResize(fn)`, `onContextRestored(fn)`,
-  `advance(dt, render)`, `start`, `stop`, `targetWidth`, `targetHeight`,
-  `aspect`, `pixelRatio`, `renderScale`, `frameMs`, `frame`, `contextLost`.
+  `onContextGone` (a callback: the context was lost and did not come back
+  within 3 s with the page showing; main.js puts up "The picture was lost"),
+  `setMaxPixelRatio(value, maxPixels)`, `advance(dt, render)`, `start`,
+  `stop`, `targetWidth`, `targetHeight`, `aspect`, `pixelRatio`,
+  `renderScale`, `frameMs`, `frame`, `contextLost`.
   The live loop passes real frame time (capped at 1/15 s) to `onUpdate`;
   there is no fixed-step accumulator. Everything fixed-step goes through
   `__swan.advance`, which uses 1/60 s.
 - `createUi(ctx, { world, enabled, instant })` returns `ready()` and
-  `fail(message)` besides `update` and `dispose`.
+  `fail(message, detail, onTap)` (a notice over the picture, with small print
+  and an optional tap handler) besides `update` and `dispose`. main.js feeds
+  it shader errors (`renderer.debug.onShaderError`) and the lost context.
 - The swan's interface (its pose, `billTip`, `measure`) is in
   [swan.md](swan.md). Its feather material is its own; nothing else depends
   on it.
@@ -277,11 +299,17 @@ What each engine class offers.
 
 `Engine._adapt`. The canvas keeps its size; only the off-screen targets
 shrink (steps 1, 0.85, 0.72, 0.6, 0.5) and the finish pass stretches them
-back. Down after about 1.5 s of frames slower than 1/48 s. If the frame time
-does not improve by 7 % after a step down, the step is undone and no further
-steps down are tried (a browser capping the frame rate itself). Up after 6 s
-of steady frames; if that brings slow frames back within 10 s the wait
-doubles. Off with `?manual` and with `?dpr=`.
+back. Down after about 1.5 s of frames slower than 1/48 s, as a descent: a
+step that does not shorten the frame by 7 % (under vsync, frame times come in
+whole refreshes) is followed by the next smaller step, and the descent stops
+at the first scale that is at least 7 % faster. Only if the smallest scale is
+no faster either is the rate taken as held by the browser (iOS Low Power
+Mode): the descent is undone and no steps down are tried for 60 s, doubling
+up to 600 s, or until a second of fast frames, or until the page is shown
+again. One frame counts for at most 0.25 s here (and 1 s in `frameMs`), so a
+single stall costs nothing. Up after 6 s of steady frames; if that brings
+slow frames back within 10 s the wait doubles. Off with `?manual` and with
+`?dpr=`.
 
 ## URL parameters
 
@@ -289,7 +317,8 @@ doubles. Off with `?manual` and with `?dpr=`.
 | --- | --- |
 | `manual` | no animation loop; frames are drawn only by `__swan.advance`, `__swan.view`, `__swan.set`, and once on resize |
 | `q=low\|medium\|high` | force a tier |
-| `dpr=` | force the canvas pixel ratio (and switch adaptive resolution off) |
+| `dpr=` | force the canvas pixel ratio (and switch adaptive resolution and the tier's pixel budget off) |
+| `msaa=0\|2\|4` | force the multisampling of the scene and mirror targets |
 | `seed=` | seed of all random choices (default 1) |
 | `ui=0` | no overlay; the veil is removed at once |
 | `az= el= dist= fov= tx= ty= tz=` | staged camera; any of them also stops the idle drift |
@@ -320,7 +349,9 @@ failure to start). `window.__swan`:
 
 Useful one-liners: `__swan.ctx.ripple.disturb(1, 1, 0.15, 0.02)`,
 `__swan.world.mind.act('shake')`, `__swan.world.mind.callTo(2, 1)`,
-`__swan.engine.renderer.getContext().getError()`.
+`__swan.engine.renderer.getContext().getError() || __swan.world.startError`
+(main.js reads the GL error flag once after the first frame, which clears it,
+and keeps what it found in `world.startError`; the look panel shows it).
 
 ## Taking a picture
 
@@ -348,7 +379,8 @@ What has and has not been verified, for the engine and everything else, is in
 these branches have never run, because the test machine's software rasteriser
 supports everything: the fall-back from multisampled half-float targets, the
 `'half'` ripple precision (half-float targets without 32-bit float ones), and
-the part of the adaptive scale that detects a browser capping the frame rate.
+the part of the adaptive scale that detects a browser capping the frame rate
+(simulated in Node, never run against a real browser cap).
 
 ## Known weaknesses
 

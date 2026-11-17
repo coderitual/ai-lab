@@ -35,11 +35,11 @@ const RANGE = { min: 1.8, max: 9 };
 const TILE = 0.4;
 /**
  * How many specks it takes, per unit of "width of the view" (the tangent of
- * half its horizontal angle), for the film's sprinkling: about 15 specks
+ * half its horizontal angle), for the film's sprinkling: about 11 specks
  * standing out in a patch of 100 x 100 pixels of the 1206 pixel wide film.
  * A narrow view needs fewer than the tier has; the rest are then left out.
  */
-const SPECKS_PER_WIDTH = 57000;
+const SPECKS_PER_WIDTH = 40000;
 /** The sheet's drift, metres per second (x, z). */
 const DRIFT = [0.011, 0.006];
 /** A dot is never drawn smaller than this many pixels across: smaller ones flicker as they cross pixel centres. */
@@ -169,7 +169,8 @@ void main() {
   float inside = clamp(0.5 - edge / pixel, 0.0, 1.0);
   if (inside <= 0.0) discard;
   // a dry leaf lying on the water with the sun behind it: lit through, and the midrib a shade darker
-  float rib = 1.0 - 0.25 * smoothstep(0.12, 0.0, abs(vLeafUv.y));
+  // (edges in rising order: smoothstep is undefined in GLSL ES with them the other way round)
+  float rib = 1.0 - 0.25 * (1.0 - smoothstep(0.0, 0.12, abs(vLeafUv.y)));
   vec3 col = uSunColor * uLeafColor * rib * vLit + uSkyColor * 0.02;
   outColor = toTarget(vec4(col * inside, inside));
 }

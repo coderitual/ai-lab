@@ -3,7 +3,8 @@
 //
 //   ?manual        no animation loop: frames are drawn only by __swan.advance()
 //   ?q=low|medium|high   force a quality tier (default: chosen by a capability probe)
-//   ?dpr=1.5       force the canvas pixel ratio (also switches adaptive resolution off)
+//   ?dpr=1.5       force the canvas pixel ratio (also switches adaptive resolution and the tier's pixel budget off)
+//   ?msaa=0|2|4    force the multisampling of the scene and mirror targets (default: the tier's)
 //   ?seed=7        seed of every random choice
 //   ?ui=0          no HTML overlay
 //   ?az= &el= &dist= &fov= &tx= &ty= &tz=   staged camera (degrees and metres)
@@ -23,6 +24,7 @@ const TIERS = ['low', 'medium', 'high'];
  * @property {boolean} manual
  * @property {'low'|'medium'|'high'|null} quality
  * @property {number|null} dpr
+ * @property {0|2|4|null} msaa
  * @property {number} seed
  * @property {boolean} ui
  * @property {{ az?: number, el?: number, dist?: number, fov?: number, target?: [number|undefined, number|undefined, number|undefined] }} view
@@ -75,6 +77,7 @@ export function parseParams(search = typeof location !== 'undefined' ? location.
     manual: q.has('manual'),
     quality: oneOf('q', TIERS),
     dpr: num('dpr') ?? null,
+    msaa: [0, 2, 4].includes(num('msaa')) ? num('msaa') : null,
     seed: Math.floor(num('seed') ?? 1),
     ui: q.get('ui') !== '0',
     view,

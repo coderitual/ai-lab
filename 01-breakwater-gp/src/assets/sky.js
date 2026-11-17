@@ -102,7 +102,7 @@ void main() {
   col = mix(col, cloudCol, cover * horizonFade * 0.9);
 
   // below the horizon (only really seen by the environment map)
-  col = mix(col, uBelow, smoothstep(0.0, -0.08, dir.y));
+  col = mix(col, uBelow, (1.0 - smoothstep(-0.08, 0.0, dir.y)));
 
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>

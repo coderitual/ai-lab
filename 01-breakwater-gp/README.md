@@ -16,7 +16,7 @@ keyboard, or online with up to four players and no game server.
 | --- | --- |
 | ![Racing: the view from the chase camera](docs/images/race.jpg) | ![Off the top of a swell](docs/images/jump.jpg) |
 | ![Sliding through a turn](docs/images/drift.jpg) | ![In the pack: other boats' spray as rain on the lens](docs/images/rain.jpg) |
-| ![The island](docs/images/island.jpg) | ![Palms, their shadows, and ripples in the sand](docs/images/beach.jpg) |
+| ![The island](docs/images/island.jpg) | ![Boulders, thicket and palms at the back of the beach](docs/images/beach.jpg) |
 | ![The boat from astern](docs/images/boat-rear.jpg) | ![The four liveries](docs/images/fleet.jpg) |
 | ![Two players on one keyboard](docs/images/split-screen.jpg) | ![Phone, one thumb on the glass](docs/images/phone.jpg) |
 
@@ -37,9 +37,9 @@ keyboard, or online with up to four players and no game server.
   lingers behind breaking crests, wakes that age from white water to lace,
   spray plumes, and rain running across the camera lens when you sit in
   somebody's spray.
-- **An island worth looking at**: rippled sand that goes dark and glossy at
-  the water's edge, a forested hill, coconut palms swaying over their own
-  long shadows.
+- **An island worth looking at**: a massif of chiselled crags over a hill
+  thick with bush, boulders down to rippled sand that goes dark and glossy at
+  the water's edge, coconut palms swaying over their own long shadows.
 - **Multiplayer**: split screen, and online for up to four with no server:
   browsers connect directly, and you pass the invite along in any chat app.
 - **Phones**: one thumb is enough. Written for iPhone Safari.
