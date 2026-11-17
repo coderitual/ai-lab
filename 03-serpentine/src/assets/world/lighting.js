@@ -120,21 +120,24 @@ export function towards(bearing, elevation) {
 }
 
 /**
- * Where the sun stands, chosen on the track map for the pictures round the lap (bearing of travel in brackets):
- *   lakeside straight (90)   60 degrees to the left, over the lake: it rakes across the road from ahead-left; the
- *                            gantry and the lamp posts throw shadows three times their height across both lanes
- *   sweeper, esses (70..-15) from the left and behind, square to the road for most of it: the spruces of the
- *                            downhill side lay their shadows across the pavement, bend after bend
- *   viaduct, ramp (-28)      dead astern: the car, the deck and the hill ahead are lit full on, the sky ahead is
- *                            at its deepest blue
- *   hairpins                 the legs driven at 152 look straight into it, the one between has it behind
- *   summit (177..-130)       ahead and to the right, swinging out of the picture round the crest
- *   descent (-100..172)      to the right and ahead, behind the rock face: the road runs in the mountain's shade
- *                            with the valley bright beyond the rail, and looks into the sun on the two straights
- *                            that point at it (-22 and -35 degrees off the nose)
- *   hook (133)               17 degrees off the nose on the way back down to the shore
+ * Where the sun stands, chosen on the track map (look lane, day stage; was bearing 150, 24 degrees up, which left
+ * the descent and the hook in the mountain's shade and never put the sun in the picture). Bearing of travel in
+ * brackets; "lit" from a march of the land between each point of the road and the sun (scratchpad sunsurvey):
+ *   lakeside straight (90)   behind and to the right, over the meadow: the straight is in full sun, the gantry
+ *                            and the lamp posts throw their shadows forwards across the lanes
+ *   sweeper (70..35)         the wooded slope above it shades it: the lap's one long stretch of shade
+ *   esses (55..-18)          in and out of the trees' shadows; the bends at 600..660 m point at the sun
+ *   tunnel exit, viaduct, ramp (-18..-28)   INTO THE SUN for 350 m at the lap's top speed: the sun sits in the
+ *                            upper middle of the far chase view, the deck and the road ahead glare
+ *   hairpins                 the legs driven at -28 (1700..1800 m) look into it again, uphill and slow; the
+ *                            others have it behind
+ *   summit, descent, hook    behind the car: the road and the valley in full sun, the rock faces above it in
+ *                            their own shade
+ * 77 % of the open road is in direct sun. The height is a compromise: the far chase camera sees up to about 27
+ * degrees above level on the climbs (56 degree lens, looking a little down), so a sun higher than about 25 never
+ * appears in it.
  */
-const SUN = towards(150, 24);
+const SUN = towards(-36, 22.5);
 
 /**
  * The moon: opposite the sun on the map and high. On the straight it is behind and to the right, over the wood,

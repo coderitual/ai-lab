@@ -54,8 +54,11 @@ import { GLSL_PROBE, installLdrEncoding } from './glsl.js';
  *   the corners, as a fraction of the view (0.001 is about a pixel at 720p; 0: none; not drawn on the low tier)
  * @property {number} grain film grain, in 8-bit steps
  * @property {number} bloom how much of the picture is replaced by its own glow, 0..1 (0.1: a mist filter)
- * @property {number} ghosts lens ghosts: how strongly the brightest things are mirrored through the centre of the
- *   view (0: none; a few hundredths; not drawn on the low tier)
+ * @property {number} ghosts lens ghosts: the share of the brightest light in the view (the sun) that each of the
+ *   ghosts on the line from it through the middle of the view carries (0: none; a few thousandths; not drawn on the
+ *   low tier)
+ * @property {number} [glare] the veil the brightest light lays over the view round itself, as the glass of a real lens
+ *   scatters it (0: none; 0.1..0.3 for a sun in the picture; not drawn on the low tier)
  */
 
 /**
@@ -85,6 +88,7 @@ export const NEUTRAL_LOOK = Object.freeze({
   grain: 0,
   bloom: 0,
   ghosts: 0,
+  glare: 0,
 });
 
 /** The frame time the shutter is a fraction of, whatever the screen's own. */
@@ -282,6 +286,29 @@ void main() {
 }
 `;
 
+// LOOK LANE (day stage): the flare source. One pixel that sums, over a small level of the pyramid, the light
+// far above white: where it is (its centroid on the view, 0..1) and how much there is (scene units times the
+// share of the view it covers). Only the sun gets over the threshold; lamps, glints and the sky do not. The lens
+// ghosts and the glare veil of the last pass are drawn from this, as shapes, not as copies of the picture.
+const FLARE_FRAGMENT = /* glsl */ `
+uniform sampler2D uTex;
+uniform ivec2 uSize;     // the view's texels in that level
+uniform float uFloor;    // scene units below which nothing counts
+void main() {
+  vec3 sum = vec3(0.0);
+  for (int j = 0; j < 64; j++) {
+    if (j >= uSize.y) break;
+    for (int i = 0; i < 64; i++) {
+      if (i >= uSize.x) break;
+      float w = max(luma(fromTarget(texelFetch(uTex, ivec2(i, j), 0)).rgb) - uFloor, 0.0);
+      sum += vec3(w, w * (vec2(i, j) + 0.5) / vec2(uSize));
+    }
+  }
+  float n = float(uSize.x * uSize.y);
+  outColor = toTarget(vec4(sum.y / max(sum.x, 1.0e-6), sum.z / max(sum.x, 1.0e-6), sum.x / n, 1.0));
+}
+`;
+
 // Back up the pyramid: this level's own picture times its weight, plus everything smaller, enlarged with a
 // 3x3 tent.
 const UP_FRAGMENT = /* glsl */ `
@@ -337,9 +364,8 @@ uniform vec4 uGrade;          // contrast, saturation, vignette, chromatic aberr
 uniform vec3 uTint;
 uniform vec3 uLift;
 #ifdef LENS
-uniform sampler2D uGhostTex;  // a small level of the pyramid
-uniform vec4 uGhostTexels;    // 1 / its target's size (xy), the view's size in it (zw)
-uniform vec2 uGhosts;         // amount, and the brightness (scene units) below which nothing is mirrored
+uniform sampler2D uGhostTex;  // the flare source: one pixel (FLARE_FRAGMENT)
+uniform vec3 uGhosts;         // ghosts' share each, the glare veil's strength, the view's width over its height
 #endif
 ${DITHER_GLSL}
 #ifndef SPLIT
@@ -347,23 +373,37 @@ ${GRAIN_GLSL}
 #endif
 
 #ifdef LENS
-// Lens ghosts: the brightest things, mirrored through the middle of the view at a few magnifications, as the
-// surfaces inside a lens throw them back; and a faint ring at a fixed distance from each.
-vec3 ghostAt(vec2 uv) {
-  vec2 inside = step(vec2(0.0), uv) * step(uv, vec2(1.0));
-  vec3 c = fromTarget(texture(uGhostTex, clamp(uv, 0.0, 1.0) * uGhostTexels.zw * uGhostTexels.xy)).rgb;
-  // only what is far brighter than white, and nothing from the last tenth before the edge
-  vec2 edge = smoothstep(vec2(0.0), vec2(0.1), uv) * smoothstep(vec2(0.0), vec2(0.1), 1.0 - uv);
-  return max(c - uGhosts.y, 0.0) * inside.x * inside.y * edge.x * edge.y;
+// LOOK LANE (day stage): lens ghosts and glare, drawn from the flare source (its centroid f on the view and its
+// light e). The ghosts lie on the line from it through the middle of the view, at -k times its offset from the
+// middle: soft discs and rings of a few sizes, blue-violet with a slight colour fringe (each channel's edge a few
+// per cent apart). Each carries the same share of the light, spread over its own area, so the small ones are the
+// brighter. The glare is a broad warm veil round the source itself.
+float ghostDisc(float d, float r) { return 1.0 - smoothstep(r * 0.72, r, d); }
+float ghostRing(float d, float r) { return smoothstep(r * 0.62, r * 0.9, d) * (1.0 - smoothstep(r * 0.9, r, d)) + 0.18 * ghostDisc(d, r); }
+vec3 ghostShape(vec2 uv, vec2 f, float k, float r, float ring) {
+  vec2 g = 0.5 + (f - 0.5) * k;
+  float d = length((uv - g) * vec2(uGhosts.z, 1.0));
+  vec3 fr = vec3(1.04, 1.0, 0.96) * r;
+  vec3 a = ring > 0.5 ? vec3(ghostRing(d, fr.r), ghostRing(d, fr.g), ghostRing(d, fr.b))
+                      : vec3(ghostDisc(d, fr.r), ghostDisc(d, fr.g), ghostDisc(d, fr.b));
+  return a / (3.1416 * r * r);
 }
 vec3 ghosts(vec2 uv) {
-  vec2 q = uv - 0.5;
-  vec3 sum = ghostAt(0.5 - q * 0.42) * vec3(0.9, 1.0, 0.75)
-    + ghostAt(0.5 - q * 1.6) * vec3(0.7, 0.85, 1.0) * 0.6
-    + ghostAt(0.5 + q * 2.4) * vec3(1.0, 0.8, 0.6) * 0.35;
-  float r = length(q);
-  if (r > 1.0e-4) sum += ghostAt(uv - q / r * 0.38) * vec3(0.8, 0.9, 1.0) * 0.25;
-  return sum;
+  vec4 src = fromTarget(texelFetch(uGhostTex, ivec2(0), 0));
+  float e = src.z;
+  if (e <= 0.0) return vec3(0.0);
+  vec2 f = src.xy;
+  vec3 sum = ghostShape(uv, f, -0.30, 0.080, 0.0) * vec3(0.55, 0.5, 1.0)
+    + ghostShape(uv, f, -0.44, 0.026, 1.0) * vec3(1.0, 0.55, 0.6) * 0.7
+    + ghostShape(uv, f, -0.50, 0.012, 0.0) * vec3(1.0, 0.45, 0.4) * 0.35
+    + ghostShape(uv, f, -0.64, 0.062, 1.0) * vec3(0.6, 0.55, 1.0)
+    + ghostShape(uv, f, -0.84, 0.046, 1.0) * vec3(0.55, 0.65, 1.0)
+    + ghostShape(uv, f, -1.02, 0.060, 1.0) * vec3(0.6, 0.5, 1.0)
+    + ghostShape(uv, f, -1.06, 0.018, 0.0) * vec3(0.5, 0.55, 1.0) * 0.5;
+  // the glare: about as bright as the source's light over a patch a seventh of the view across, falling off slowly
+  float d = length((uv - f) * vec2(uGhosts.z, 1.0)) / 0.15;
+  vec3 veil = vec3(1.0, 0.95, 0.86) * (uGhosts.y * 25.0 / (1.0 + d * d));
+  return e * (sum * uGhosts.x + veil);
 }
 #endif
 
@@ -389,7 +429,7 @@ void main() {
   // The glow is mixed in, not added: light is spread, none is made.
   if (uBloomMix > 0.0) c = mix(c, fromTarget(texture(uBloom, min(p * 0.5, uBloomTexels.zw) * uBloomTexels.xy)).rgb, uBloomMix);
 #ifdef LENS
-  if (uGhosts.x > 0.0) c += ghosts(vUv) * uGhosts.x;
+  if (uGhosts.x + uGhosts.y > 0.0) c += ghosts(vUv);
 #endif
 
   c *= uExposure * uTint;
@@ -653,6 +693,14 @@ export class FramePipeline {
     const downUniforms = () => ({ uTex: { value: null }, uTexels: { value: new THREE.Vector4() } });
     this._karis = pass(DOWN_FRAGMENT, { ...downUniforms(), uKnee: { value: 1 } }, { KARIS: 1 });
     this._halve = pass(DOWN_FRAGMENT, downUniforms());
+    // LOOK LANE: the flare source, one pixel (only where the lens is drawn)
+    this._flareTarget = null;
+    this._flare = null;
+    if (this.lens) {
+      this._flareTarget = keep(createTarget(caps));
+      resizeTarget(this._flareTarget, 1, 1);
+      this._flare = pass(FLARE_FRAGMENT, { uTex: { value: null }, uSize: { value: new THREE.Vector2() }, uFloor: { value: 30 } });
+    }
     this._enlarge = pass(UP_FRAGMENT, {
       uSmall: { value: null },
       uBase: { value: null },
@@ -679,8 +727,7 @@ export class FramePipeline {
         uTint: { value: new THREE.Vector3(1, 1, 1) },
         uLift: { value: new THREE.Vector3() },
         uGhostTex: { value: null },
-        uGhostTexels: { value: new THREE.Vector4() },
-        uGhosts: { value: new THREE.Vector2() },
+        uGhosts: { value: new THREE.Vector3() },
         uGrain: this._grain,
       },
       finalDefines,
@@ -945,7 +992,9 @@ export class FramePipeline {
     const p11 = camera.projectionMatrix.elements[5];
     const focal = camera.isPerspectiveCamera ? 0.5 * h * p11 : h;
     const ghosts = this.lens ? look.ghosts || 0 : 0;
-    const glowing = this.post && debug !== DEBUG_MODES.scene && ((look.bloom || 0) > 0 || ghosts > 0 || debug === DEBUG_MODES.bloom);
+    const glare = this.lens ? look.glare || 0 : 0;
+    const flaring = ghosts > 0 || glare > 0;
+    const glowing = this.post && debug !== DEBUG_MODES.scene && ((look.bloom || 0) > 0 || flaring || debug === DEBUG_MODES.bloom);
     const glow = glowing ? this._bloom(picture, w, h, view, focal) : null;
     const half = this._levels[0];
 
@@ -975,16 +1024,21 @@ export class FramePipeline {
     u.uGrade.value.set(look.contrast ?? 1, look.saturation ?? 1, look.vignette || 0, this.lens ? look.chroma || 0 : 0);
     u.uTint.value.fromArray(look.tint || ONES);
     u.uLift.value.fromArray(look.lift || ZEROS);
-    if (ghosts > 0) {
-      // the third level, or the smallest there is: small enough that a ghost is a soft blob, and already free of fireflies
-      const level = Math.min(2, this._levels.length - 1);
-      const small = this._down[level];
-      u.uGhostTex.value = small.texture;
-      u.uGhostTexels.value.set(1 / small.width, 1 / small.height, this._levels[level].w, this._levels[level].h);
-      // only what is some thirty times brighter than white is mirrored
-      u.uGhosts.value.set(ghosts, 30 / Math.max(view.exposure, 1e-6));
+    if (flaring && glow) {
+      // LOOK LANE: the flare source from the first level no more than 48 texels wide (or the smallest there is):
+      // only what is some thirty times brighter than white counts
+      let level = 0;
+      while (level < this._levels.length - 1 && this._levels[level].w > 48) level++;
+      const fu = this._flare.material.uniforms;
+      fu.uTex.value = this._down[level].texture;
+      fu.uSize.value.set(Math.min(64, this._levels[level].w), Math.min(64, this._levels[level].h));
+      fu.uFloor.value = 30 / Math.max(view.exposure, 1e-6);
+      this._flare.render(renderer, this._flareTarget, FLARE_RECT);
+      this._passes++;
+      u.uGhostTex.value = this._flareTarget.texture;
+      u.uGhosts.value.set(ghosts, glare, w / h);
     } else {
-      u.uGhosts.value.set(0, 0);
+      u.uGhosts.value.set(0, 0, 1);
     }
     // Grain changes with the run's own time (in steps of a 240th of a second), so the same moment has the same
     // grain, and its cells keep their size on a dense screen.
@@ -1042,6 +1096,7 @@ export class FramePipeline {
 }
 
 const ONES = [1, 1, 1];
+const FLARE_RECT = { x: 0, y: 0, w: 1, h: 1 };
 const ZEROS = [0, 0, 0];
 const RECT = {
   x: 0,
