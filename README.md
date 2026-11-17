@@ -15,7 +15,7 @@ All demos: https://coderitual.github.io/ai-lab/
 | -- | ---- | ---- |
 | 01 | [Breakwater GP](01-breakwater-gp/) — an original powerboat slalom race on simulated waves, built with three.js. Solo, two-player split screen, or up to four players online with no server | https://coderitual.github.io/ai-lab/01-breakwater-gp/ |
 | 02 | [Backlit Swan](02-backlit-swan/) — a mute swan on a dark forest pond, backlit by low sun: eleven seconds of film measured and rebuilt as an interactive real-time scene, built with three.js. Drag to look round, touch the water, ask the swan to shake, dunk and reach | https://coderitual.github.io/ai-lab/02-backlit-swan/ |
-| 03 | [Dreamcar](03-dreamcar/) — a time trial over a mountain pass in a silver saloon modelled in code from photographs of a real one, by day, at dusk after rain and at night, built with three.js. Solo or two-player split screen; keyboard, gamepad or touch | https://coderitual.github.io/ai-lab/03-dreamcar/ |
+| 03 | [Dreamcar](03-dreamcar/) — a time trial on a racing circuit in the mountains by a lake, in a silver saloon modelled in code from photographs of a real one: a sunlit day with the sun down the straight, golden hour, and the wet night, built with three.js. Solo or two-player split screen; keyboard, gamepad or touch | https://coderitual.github.io/ai-lab/03-dreamcar/ |
 
 Each demo documents itself in its own `docs/` folder: what it is meant to be,
 what the build does, how the tricky parts work, and what to do next. The

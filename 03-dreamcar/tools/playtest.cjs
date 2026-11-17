@@ -492,42 +492,77 @@ const SECTIONS = {
 
   /** Touch on phone-sized windows: the stick under the thumb, pull to brake, a second finger, the buttons; split. */
   async touch() {
+    // the layout is read from the page (Input's TOUCH table): the steering share and the buttons' places
     for (const [w, h] of [[390, 844], [844, 390]]) {
       const p = await open('?manual&q=low&auto&time=day', { w, h, mobile: true, gpu: false });
+      const T = await p.page.evaluate(() => window.__dreamcar.touchLayout);
       await toGo(p);
-      const x = w * 0.3;
+      const x = w * T.steerShare * 0.5;
       const y = h * 0.75;
+      const bx = w * (T.steerShare + (1 - T.steerShare) * 0.4);
+      const by = h * 0.35;
+      const drift = [w - T.drift.right, h - T.drift.bottom];
+      const gas = [w - T.gas.right, h - T.gas.bottom];
+      check(`${w}x${h}: the zones are named on the first touch run`, await visible(p, '.hud .view .zonehint'));
       await pointer(p, 'pointerdown', 1, x, y);
       await p.advance(2);
       let d = await p.d0();
-      check(`${w}x${h}: a thumb down drives (throttle is automatic)`, d.input === 'touch' && d.throttle > 0.5 && d.kmh > 10, `${d.input} ${d.kmh} km/h`);
+      check(`${w}x${h}: a thumb on the left drives (throttle on auto)`, d.input === 'touch' && d.throttle > 0.5 && d.kmh > 10, `${d.input} ${d.kmh} km/h`);
       check(`${w}x${h}: the stick appears under the thumb`, await p.page.evaluate(([x, y]) => {
-        // the stick is a point at the thumb's first touch (its ring is drawn round it)
         const e = [...document.querySelectorAll('.hud .stick')].find((s) => !s.hidden && getComputedStyle(s).display !== 'none');
         if (!e) return false;
         const r = e.getBoundingClientRect();
         return Math.abs(r.left - x) < 30 && Math.abs(r.top - y) < 30;
       }, [x, y]));
-      await pointer(p, 'pointermove', 1, x + 50, y);
+      await pointer(p, 'pointermove', 1, x + 60, y);
       await p.advance(0.3);
       d = await p.d0();
-      check(`${w}x${h}: thumb to the right steers right`, d.steer > 0.2, `steer ${d.steer}`);
-      await pointer(p, 'pointermove', 1, x, y + 60);
+      // (at speed the car's hands give a thumb only the lock that fits the speed)
+      check(`${w}x${h}: thumb to the right steers right`, d.steer > 0.08, `steer ${d.steer}`);
+      await pointer(p, 'pointermove', 1, x + 60, y + 80);
       await p.advance(0.3);
       d = await p.d0();
-      check(`${w}x${h}: pulling down brakes`, d.brake > 0.3 && d.throttle < 0.2, `brake ${d.brake} throttle ${d.throttle}`);
+      check(`${w}x${h}: pulling the steering thumb down does not brake`, d.brake < 0.05 && d.throttle > 0.3, `brake ${d.brake} throttle ${d.throttle}`);
       await pointer(p, 'pointermove', 1, x, y);
-      await p.advance(0.3);
-      await pointer(p, 'pointerdown', 2, w * 0.8, h * 0.3);
+      await pointer(p, 'pointerdown', 3, x + 20, y - 40);
+      await p.advance(0.2);
+      check(`${w}x${h}: a second finger on the steering side is ignored`, (await p.d0()).brake < 0.05);
+      await pointer(p, 'pointerup', 3, x + 20, y - 40);
+      await pointer(p, 'pointerdown', 2, bx, by);
       await p.advance(0.3);
       d = await p.d0();
-      check(`${w}x${h}: a second finger brakes`, d.brake > 0.3, `brake ${d.brake}`);
-      await pointer(p, 'pointerup', 2, w * 0.8, h * 0.3);
+      check(`${w}x${h}: a finger on the right brakes, and the throttle lets go`, d.brake > 0.5 && d.throttle < 0.1, `brake ${d.brake} throttle ${d.throttle}`);
+      await pointer(p, 'pointerup', 2, bx, by);
+      await pointer(p, 'pointerdown', 4, drift[0], drift[1]);
+      await p.advance(0.2);
+      d = await p.d0();
+      const hand = await p.page.evaluate('window.__dreamcar.game.racers[0].controls.handbrake');
+      check(`${w}x${h}: DRIFT pulls the handbrake, does not brake, and cuts the throttle`, hand > 0.5 && d.brake < 0.05 && d.throttle < 0.1, `hand ${hand} brake ${d.brake} throttle ${d.throttle}`);
+      check(`${w}x${h}: DRIFT is drawn pressed`, await p.page.evaluate(`!!document.querySelector('.hud .view .pad.drift.held')`));
+      await pointer(p, 'pointerup', 4, drift[0], drift[1]);
       await pointer(p, 'pointerup', 1, x, y);
-      await p.advance(0.5);
-      d = await p.d0();
-      check(`${w}x${h}: released, no throttle`, d.throttle < 0.1, `throttle ${d.throttle}`);
-      const cam = d.camera;
+      await p.steps(0.2, 60);
+      check(`${w}x${h}: the throttle stays a moment after the thumb lifts`, (await p.d0()).throttle > 0.5);
+      await p.steps(0.4, 60);
+      check(`${w}x${h}: and then lets go`, (await p.d0()).throttle < 0.1);
+      // manual throttle: GAS appears and drives; the steering thumb alone does not
+      await p.page.evaluate(`window.__dreamcar.game.action('throttle:manual')`);
+      await p.advance(0.1);
+      check(`${w}x${h}: Throttle manual shows GAS (kept under dreamcar.throttle)`, (await visible(p, '.hud .view .pad.gas'))
+        && (await p.page.evaluate(`localStorage.getItem('dreamcar.throttle')`)) === 'manual');
+      await pointer(p, 'pointerdown', 1, x, y);
+      await p.advance(0.3);
+      check(`${w}x${h}: on manual the steering thumb alone does not drive`, (await p.d0()).throttle < 0.1);
+      await pointer(p, 'pointerdown', 5, gas[0], gas[1]);
+      await p.advance(0.3);
+      check(`${w}x${h}: GAS drives`, (await p.d0()).throttle > 0.5);
+      await pointer(p, 'pointerup', 5, gas[0], gas[1]);
+      await pointer(p, 'pointerup', 1, x, y);
+      await p.page.evaluate(`window.__dreamcar.game.action('throttle:auto')`);
+      await p.advance(3.5);
+      check(`${w}x${h}: the zones' names go after the first seconds, for good`, !(await visible(p, '.hud .view .zonehint'))
+        && (await p.page.evaluate(`localStorage.getItem('dreamcar.zones.v1')`)) === '1');
+      const cam = (await p.d0()).camera;
       const tapped = await p.page.evaluate(() => {
         const b = document.querySelector('.hud .view .touchcol .icon');
         if (!b) return false;
@@ -538,23 +573,71 @@ const SECTIONS = {
       check(`${w}x${h}: the first touch button (${tapped}) works`, tapped && (await p.d0()).camera !== cam);
       await p.close(`touch ${w}x${h}`);
     }
-    // split: a stick in each half
-    const p = await open('?manual&q=low&auto&mode=split&time=day', { w: 844, h: 390, mobile: true, gpu: false });
+    // split, side by side: each half has its own steering, brake and DRIFT
+    const W = 844;
+    const H = 390;
+    const p = await open('?manual&q=low&auto&mode=split&time=day', { w: W, h: H, mobile: true, gpu: false });
+    const T = await p.page.evaluate(() => window.__dreamcar.touchLayout);
     await toGo(p);
-    await pointer(p, 'pointerdown', 1, 200, 300);
-    await pointer(p, 'pointerdown', 2, 640, 300);
+    const half = W / 2;
+    const sx = [half * T.steerShare * 0.5, half + half * T.steerShare * 0.5];
+    await pointer(p, 'pointerdown', 1, sx[0], 300);
+    await pointer(p, 'pointerdown', 2, sx[1], 300);
     await p.advance(1.5);
-    await pointer(p, 'pointermove', 1, 250, 300);
-    await pointer(p, 'pointermove', 2, 590, 300);
+    await pointer(p, 'pointermove', 1, sx[0] + 60, 300);
+    await pointer(p, 'pointermove', 2, sx[1] - 60, 300);
     await p.advance(0.3);
-    const s = await p.state();
+    let s = await p.state();
     check('split touch: each half drives its own car', s.drivers.every((d) => d.input === 'touch' && d.kmh > 5),
       s.drivers.map((d) => `${d.input} ${d.kmh}`).join(' / '));
     check('split touch: each thumb steers its own car', s.drivers[0].steer > 0.2 && s.drivers[1].steer < -0.2,
       s.drivers.map((d) => d.steer).join(' / '));
-    await pointer(p, 'pointerup', 1, 250, 300);
-    await pointer(p, 'pointerup', 2, 590, 300);
+    await pointer(p, 'pointerdown', 3, W - T.drift.right, H - T.drift.bottom);
+    await pointer(p, 'pointerdown', 4, half * (T.steerShare + 0.3), 100);
+    await p.advance(0.2);
+    const hands = await p.page.evaluate('window.__dreamcar.game.racers.map((r) => r.controls.handbrake)');
+    s = await p.state();
+    check('split touch: the right half\'s DRIFT is car two\'s, the left half\'s brake car one\'s', hands[1] > 0.5 && hands[0] < 0.5 && s.drivers[0].brake > 0.5 && s.drivers[1].brake < 0.05,
+      `hand ${hands.join('/')} brake ${s.drivers.map((d) => d.brake).join('/')}`);
+    for (const id of [1, 2, 3, 4]) await pointer(p, 'pointerup', id, 0, 0);
     await p.close('split touch');
+  },
+
+  /**
+   * A slide through the real input path (keys: power, a turn, the handbrake) at the default driving help and at
+   * Sport: the car's own slide measure rises past the readout's threshold and the readout shows; the driving help
+   * chosen in the options is stored and reaches the car.
+   */
+  async slide() {
+    const p = await open('?manual&q=low&auto&time=day', { w: 640, h: 360, gpu: false });
+    await p.page.evaluate(`window.__dreamcar.game.action('assists:sport')`);
+    check('Driving help Sport is kept under dreamcar.assists and reaches the car',
+      (await p.page.evaluate(`localStorage.getItem('dreamcar.assists')`)) === 'sport'
+      && (await p.page.evaluate('window.__dreamcar.game.racers[0].vehicle.level.name')) === 'Sport');
+    await toGo(p);
+    await down(p, 'KeyW');
+    await p.skip(4);
+    let most = 0;
+    let shown = false;
+    await down(p, 'KeyD');
+    await down(p, 'Space');
+    for (let k = 0; k < 24; k++) {
+      await p.advance(1 / 15, 30);
+      if (k === 6) await up(p, 'Space');
+      const a = await p.page.evaluate('window.__dreamcar.game.racers[0].vehicle.slide.angle');
+      most = Math.max(most, a);
+      if (a >= 12) shown = shown || (await p.page.evaluate(`!!document.querySelector('.hud .view .slide.on')`));
+    }
+    await up(p, 'KeyD');
+    await up(p, 'KeyW');
+    check('a handbrake turn at speed slides the car past 12 degrees', most >= 12, `${most.toFixed(1)} degrees at most`);
+    check('the slide readout shows while it does', shown);
+    await p.advance(2.5, 30);
+    check('and fades once the slide is over', !(await p.page.evaluate(`!!document.querySelector('.hud .view .slide.on')`)));
+    await p.page.reload({ waitUntil: 'load' });
+    await p.page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
+    check('the driving help survives a reload', (await p.page.evaluate('window.__dreamcar.game.racers[0].vehicle.level.name')) === 'Sport');
+    await p.close('slide');
   },
 
   /** Resizing and rotating mid-run; a lost and restored WebGL context mid-run. */
@@ -665,7 +748,16 @@ const SECTIONS = {
               for (const e of views[vi].children) {
                 if (!shown(e)) continue;
                 const name = e.className.split(' ')[0];
-                if (!/^(lapblock|next|pos|lamps|map|cluster|touchcol|flash|banner)$/.test(name)) continue;
+                if (!/^(lapblock|next|pos|lamps|map|cluster|touchcol|flash|banner|pads)$/.test(name)) continue;
+                if (name === 'pads') {
+                  for (const b of e.querySelectorAll('.pad')) {
+                    if (!shown(b)) continue;
+                    const q = b.getBoundingClientRect();
+                    boxes.push({ name: `pad ${b.className.split(' ')[1]}`, r: q });
+                    if (q.width < 64 || q.height < 64) tiny.push(`pad ${Math.round(q.width)}x${Math.round(q.height)}`);
+                  }
+                  continue;
+                }
                 if (name === 'touchcol') {
                   for (const b of e.querySelectorAll('button')) {
                     if (!shown(b)) continue;
@@ -869,6 +961,18 @@ const SECTIONS = {
     const a2 = await read(p2);
     check('the same address gives the same camera', JSON.stringify(a2) === JSON.stringify(a), `${JSON.stringify(a2)}`);
     await p2.close('photo again');
+    // a named place: it brings its moment and its time of day (read from the page's PHOTOS table)
+    const p3 = await open('?manual&q=low&photo=d4', { w: 640, h: 360, gpu: false });
+    const preset = await p3.page.evaluate('window.__dreamcar.game.photo');
+    const st = await p3.state();
+    const named = await p3.page.evaluate(() => {
+      const c = window.__dreamcar.game.views[0].camera;
+      return { fov: c.fov, hud: !document.querySelector('.hud').hidden };
+    });
+    const clock = await p3.page.evaluate('window.__dreamcar.game.race.clock + window.__dreamcar.game.race.lead');
+    check('?photo=d4: the named camera, its time of day and its moment', !!preset && Math.abs(named.fov - preset.fov) < 0.01 && !named.hud
+      && st.time === preset.time && Math.abs(clock - preset.t) < 0.05, `${st.time}, ${st.phase}, ${clock.toFixed(2)} s into the run, fov ${named.fov}`);
+    await p3.close('photo d4');
   },
 
   /** The same run is the same run: twice by keys, and by the autopilot at 30, 60 and 144 frames a second. */

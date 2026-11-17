@@ -122,7 +122,7 @@ export function buildPits({ track, terrain, tier, b, nb, signs }) {
   face(pf, pf.len / 2 - 7.2, pf.len / 2 + 7.2, canopyY - 0.78, canopyY + 1.02, 0.32, signs.gantry);
 
   // ---- the pit lane: an apron of asphalt from the wall to the garages, following the ground
-  const lane = lineFrame(PIT.s0 - 25, PIT.s1 + 25, side, edge + 0.2);
+  const lane = lineFrame(PIT.s0 - 25, PIT.s1 + 6, side, edge + 0.2);
   lane.hand = -1;
   const steps = Math.round(lane.len / 6);
   const across = PIT.beyond - 0.2;
@@ -139,7 +139,7 @@ export function buildPits({ track, terrain, tier, b, nb, signs }) {
   }
 
   // ---- the catch fence on the pit wall: posts, a top that leans over the road, cables
-  const fence = lineFrame(PIT.s0 - 30, PIT.s1 + 30, side, edge + 0.12);
+  const fence = lineFrame(PIT.s0 - 30, PIT.s1 + 6, side, edge + 0.12);
   fence.hand = -1;
   const posts = Math.round(fence.len / 4);
   const fy = (x) => {

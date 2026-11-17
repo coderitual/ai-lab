@@ -774,7 +774,9 @@ const ASPHALT_NORMAL = /* glsl */ `
   vec3 r1 = cross( dPy, n0 );
   vec3 r2 = cross( n0, dPx );
   float det = dot( dPx, r1 );
-  vec3 grad = ( dFdx( roadBump ) * r1 + dFdy( roadBump ) * r2 ) / ( sign( det ) * max( abs( det ), 1.0e-10 ) );
+  // (multiplied by the sign, never divided by it: sign( 0 ) is 0, and a road seen exactly edge-on, as the car's
+  // reflection probe can see it, would be 0 / 0: one such pixel is enough to bloom the whole picture white)
+  vec3 grad = sign( det ) * ( dFdx( roadBump ) * r1 + dFdy( roadBump ) * r2 ) / max( abs( det ), 1.0e-10 );
   grad *= roadFade * ( 1.0 - roadPuddle ) / max( 1.0, length( grad ) );
   normal = normalize( bent - grad );
   roadSheenNormal = normalize( mix( n0, normal, ${SHEEN.grain.toFixed(2)} ) );

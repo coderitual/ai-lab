@@ -5,9 +5,11 @@
 // with the game's fixed step and driven through Vehicle.step's public controls; the only liberties taken are giving
 // the body a velocity to start a manoeuvre at speed or to kick the springs.
 
-import { AutoDriver, PlayerDriver } from '../../src/game/drivers.js';
+import { AutoDriver, PlayerDriver, analogFor, steerLimit } from '../../src/game/drivers.js';
+import { HANDS } from '../../src/game/config.js';
 import { Vehicle } from '../../src/game/vehicle/Vehicle.js';
 import { CAR } from '../../src/game/vehicle/params.js';
+import { createCurve, secant } from '../../src/game/vehicle/tyre.js';
 import { EDGE, createPlane } from './flatTrack.mjs';
 
 export const DT = 1 / 120;
@@ -162,6 +164,7 @@ export function braking(fromKmh, params, { abs = true } = {}) {
  */
 export function skidpad(radius, params, { esc = true } = {}) {
   const car = makeCar(params);
+  if (!esc) car.setAssists(null);
   car.assistsOn.esc = esc;
   car.reset({ x: -radius, y: 0, z: 0, yaw: 0 });
   const c = controls();
@@ -242,6 +245,8 @@ const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
  */
 export function bend(kmh, g, action, params, { esc = true, tc = true, seconds = 3 } = {}) {
   const car = makeCar(params);
+  // switching the assists off is the bare model: no level, no slide help
+  if (!esc || !tc) car.setAssists(null);
   car.assistsOn.esc = esc;
   car.assistsOn.tc = tc;
   const speed = kmh / KMH;
@@ -581,12 +586,13 @@ export function squealOnset(kmh, params) {
 /** The steering gain of the car in the linear range: its characteristic speed (m/s; infinite would be neutral). */
 export function characteristicSpeed(params, speed = 30) {
   const car = makeCar(params);
+  car.setAssists(null);
   car.assistsOn.esc = false;
   const c = cruise(car, speed);
   const angle = 0.3 / speed;
   c.steer = -angle / car.params.steering.lock;
   hold(car, speed, 4, c);
-  const gain = yawRate(car) / angle;
+  const gain = yawRate(car) / (angle * (1 - car.rearShare(speed))); // (per radian of the fronts' angle less the rear wheels' share)
   return speed / Math.sqrt(speed / (car.params.wheelbase * gain) - 1);
 }
 
@@ -647,6 +653,8 @@ export function lapDriver(track, kind, pace = 0.9, bias = 0, params = CAR) {
   const auto = new AutoDriver(track, { pace, bias, params });
   if (kind === 'auto') return auto;
   if (kind === 'hamfist') return hamfistDriver(track, params);
+  if (kind.startsWith('human')) return humanDriver(track, kind.slice(6) || 'thumb', params);
+  const device = kind === 'thumb' ? 'thumb' : 'pad';
   const input = fakeInput();
   const player = new PlayerDriver(input);
   const probe = new PlayerDriver(fakeInput());
@@ -654,12 +662,9 @@ export function lapDriver(track, kind, pace = 0.9, bias = 0, params = CAR) {
   const wish = controls();
   let key = 0;
   /** The angle (rad, + = left) a full analog input gives at this speed that way. */
-  const room = (car, left) => {
-    Object.assign(probe.input.state, { analog: true, steer: left ? -1 : 1 });
-    probe.drive(car, 0, scratch);
-    return Math.max(0.01, Math.abs(scratch.steer) * car.params.steering.lock);
-  };
+  const room = (car) => Math.max(0.01, steerLimit(car));
   return {
+    player,
     drive(car, dt, out) {
       auto.drive(car, dt, wish);
       const lock = car.params.steering.lock;
@@ -674,7 +679,8 @@ export function lapDriver(track, kind, pace = 0.9, bias = 0, params = CAR) {
         Object.assign(s, { analog: false, steer: key, throttle: wish.throttle > 0.35 ? 1 : 0, brake: wish.brake > 0.15 ? 1 : 0, handbrake: 0 });
       } else {
         s.analog = true;
-        s.steer = Math.max(-1, Math.min(1, -angle / room(car, angle > 0)));
+        s.device = kind === 'thumb' ? 'touch' : 'pad';
+        s.steer = analogFor(car, Math.max(-1, Math.min(1, -angle / room(car))), device);
         s.brake = wish.brake;
         s.throttle = kind === 'thumb' ? (wish.brake < 0.12 ? 1 : 0) : wish.throttle;
         s.handbrake = 0;
@@ -749,6 +755,242 @@ export function hamfistDriver(track, params = CAR) {
   };
 }
 
+/**
+ * A person, with a person's limits. What they see is REACTION s old, and they allow for it (they steer for where
+ * the car will be). Keys are down or up and none changes more often than a finger can. A thumb on the glass has
+ * `range` px of travel to full lock, moves at up to `speed` px/s and wavers by `shake` px (a slow wander, the same
+ * every run), through the curve and dead zone engine/Input.js gives that device; a stick the same in shares of its
+ * travel. A thumb has the throttle on by itself and the brake under the other thumb; triggers are pressed part-way.
+ * `rearG`, `frontG`: what the person has learnt the car does in a slide (the sideways g with the front wheels
+ * pointing where it goes, and what steering into the bend adds).
+ */
+export const HUMAN = {
+  reaction: 0.15,
+  keys: { hold: 0.07 },
+  thumb: { range: 62, speed: 900, shake: 3, curve: 1.25, dead: 0 },
+  pad: { range: 1, speed: 9, shake: 0.02, curve: 1.6, dead: 0.12 },
+  rearG: 0.7,
+  frontG: 0.62,
+  /** How much of the racing line's offset from the middle of the road a person keeps to while sliding. */
+  slideLine: 0.6,
+  /** In a slide: below this share of the front grip the person dabs the steering (to `dab`) to keep the slide lit, and below `against` steers against it. */
+  keepAlive: 0.3,
+  dab: 0.3,
+  against: -0.5,
+  /** In a slide the person corrects their steering by what the car is doing (per g of error, per s), and arrives at a bend to be slid at this share of the tidy pace. */
+  trim: 1.5,
+  slidePace: 0.97,
+  /** In a slide they mean, the least steering into the bend they keep on (of a full input) while there is room inside. */
+  keepIn: 0.25,
+  /** Throwing the car in: the steering goes hard over this long (s) before the lift, the brake or the handbrake. */
+  turnIn: 0.2,
+  /** A slide the person did not ask for, beyond this angle (rad): they lift. */
+  unmeant: 0.2,
+  /** In a slide the person steers by the road over this many seconds of travel ahead, and lets the slide go this many seconds before the bend ends. */
+  slidePreview: 0.9,
+  letGo: 1.0,
+};
+
+const frontCurve = createCurve(CAR.tyre.shapeY, CAR.tyre.curvatureY);
+/** The share of its peak slip a tyre needs for a share `y` (0..1) of its peak force (the tyre curve backwards). */
+function slipFor(y) {
+  if (y <= 0) return 0;
+  if (y >= 1) return 1;
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (secant(frontCurve, mid) * mid < y) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * A person driving a lap on a device ('keys', 'thumb', 'pad'): they look where the car is GOING (not where it
+ * points), aim at the racing line a little way ahead, and turn that into what their device wants: in grip the
+ * steering the bend needs, in a slide the steering into the bend that holds the line (what a slide's steering means
+ * with the opposite lock given). Speed is the autopilot's judgement at `human.pace` (default 1).
+ *
+ * `drifts`: bends to be taken sideways, [{ id (a piece of the layout), start: 'handbrake' | 'lift' | 'brake' |
+ * 'power', lead (m before the piece at which the slide is asked for) }]: there the person throws the car in that
+ * way with the steering hard over, and then keeps the throttle down and steers the line.
+ */
+export function humanDriver(track, device = 'thumb', params = CAR, human = HUMAN, drifts = null) {
+  const auto = new AutoDriver(track, { pace: human.pace ?? 1, params });
+  // (a bend to be slid through is arrived at a little slower than the tidy line would take it: the slide needs the room)
+  const slow = drifts && drifts.length ? new AutoDriver(track, { pace: (human.pace ?? 1) * human.slidePace, params }) : auto;
+  const input = fakeInput();
+  const player = new PlayerDriver(input);
+  const wish = controls();
+  const n = track.count;
+  const delay = Math.max(1, Math.round(human.reaction / DT));
+  const seen = new Float64Array(delay * 4); // share of the lock (+ = left), throttle, brake, handbrake, as decided `reaction` ago
+  const dev = human[device];
+  const zones = (drifts || []).map((d) => ({ lead: 25, start: 'handbrake', ...d, s0: track.at(d.id, 0), s1: track.at(d.id, 1), state: 'before', t0: 0 }));
+  for (const z of zones) z.way = Math.sign(track.curvature[Math.floor(track.wrap((z.s0 + z.s1) / 2) / track.ds) % n]) || 1; // + = a left-hander
+  let at = 0, t = 0, pos = 0, key = 0, held = 1, trim = 0, lastGoing = 0;
+  let ghost = null;
+  const me = {
+    player, input, zones, device,
+    /** What the person is doing about a slide right now: null, or the zone they are in. */
+    zone: null,
+    drive(car, dt, out) {
+      t += dt;
+      // where the car will be when the hand has moved
+      const ahead = human.reaction;
+      if (!ghost) ghost = Object.create(car, { position: { value: car.position.clone(), writable: true }, yaw: { value: 0, writable: true }, s: { value: 0, writable: true }, lat: { value: 0, writable: true } });
+      ghost.position.copy(car.position).addScaledVector(car.velocity, ahead);
+      ghost.yaw = car.yaw + car.angularVelocity.y * ahead;
+      ghost.s = car.s + car.speed * ahead;
+      ghost.lat = car.lat;
+      // how fast: the autopilot's plan for where the car will be in a moment, held with the pedals as it does
+      const soon = Math.floor(track.wrap(ghost.s + car.speed * 0.12) / track.ds) % n;
+      let plan = auto;
+      for (const z of zones) if (track.delta(car.s, z.s0) < z.lead + 250 && track.delta(car.s, z.s1) > 0) plan = slow;
+      const error = plan.speed[soon] - car.speed;
+      const planned = plan.accel[soon];
+      wish.throttle = wish.brake = 0;
+      if (error < -0.3 || planned < -1.5) {
+        wish.brake = Math.max(0, Math.min(1, Math.max(0, -planned) / 10.5 + Math.max(0, -error) * 0.22));
+        if (error > 1) wish.brake = 0;
+      }
+      if (wish.brake === 0) wish.throttle = Math.max(0, Math.min(1, error * 0.6 + (planned > 0.5 ? 0.5 : 0.12) + 0.004 * car.speed));
+      const v = Math.max(3, Math.hypot(car.velocity.x, car.velocity.z));
+      const going = Math.atan2(car.velocity.x, car.velocity.z) + car.angularVelocity.y * ahead; // the way the car is travelling
+      const sin = Math.sin(going), cos = Math.cos(going);
+      const sliding = car.drift || 0;
+      // the sideways g the car is making now (+ = to the left), as the person feels and sees it
+      let turned = Math.atan2(car.velocity.x, car.velocity.z) - lastGoing;
+      turned -= Math.round(turned / (2 * Math.PI)) * 2 * Math.PI;
+      lastGoing = Math.atan2(car.velocity.x, car.velocity.z);
+      const making = ((turned / dt) * v) / G;
+      // aim at the line a little way ahead (in a slide, further ahead and at a line nearer the middle: the car needs the room)
+      const reach = Math.max(7, Math.min(28, 5 + 0.32 * v));
+      const f = track.wrap(ghost.s + reach) / track.ds;
+      const a = Math.floor(f) % n, b = (a + 1) % n, u = f - Math.floor(f);
+      const ax = auto.x[a], az = auto.z[a], bx = auto.x[b], bz = auto.z[b];
+      const dx = ax + (bx - ax) * u - ghost.position.x, dz = az + (bz - az) * u - ghost.position.z;
+      const left = dx * cos - dz * sin;
+      const bend = (2 * left) / Math.max(dx * dx + dz * dz, 1); // the curvature of the path that gets there (1/m, + = left)
+      // in grip: the steering that bend needs, as a share of the lock for the speed
+      const p = car.params;
+      const ratio = v / p.assists.esc.characteristicSpeed;
+      const angle = (Math.atan(p.wheelbase * bend) * (1 + ratio * ratio)) / (1 - car.rearShare(v));
+      let share = Math.max(-1, Math.min(1, angle / Math.max(0.005, steerLimit(car)))); // + = left
+      let throttle = wish.throttle, brake = wish.brake, handbrake = 0;
+      // the bends to be taken sideways: where the person is with each
+      me.zone = null;
+      let letGo = false;
+      for (const z of zones) {
+        const before = track.delta(car.s, z.s0);
+        const left_ = track.delta(car.s, z.s1); // m of the bend still to come
+        if (z.state === 'before' && before < z.lead && before > -10) {
+          z.state = 'kick';
+          z.t0 = t;
+        } else if (z.state !== 'before' && left_ < -60) z.state = 'before';
+        if (z.state === 'kick') {
+          me.zone = z;
+          const since = t - z.t0;
+          const length = z.start === 'handbrake' ? human.turnIn + 0.3 : 1.1;
+          if (since >= length || (since > human.turnIn && sliding > 0.6)) z.state = 'hold';
+        } else if (z.state === 'hold') {
+          me.zone = z;
+          // (the bend is nearly done: let the slide go in time for the car to be straight where the road is)
+          if (left_ < v * human.letGo) z.state = 'exit';
+        } else if (z.state === 'exit') {
+          me.zone = z;
+          letGo = true;
+          if (sliding < 0.2 || left_ < -40) z.state = 'done';
+        }
+      }
+      const z = me.zone;
+      if (z && z.state === 'kick') {
+        // thrown in: the steering hard over into the bend, and a moment later (the car turning) the kick
+        const kicking = t - z.t0 > human.turnIn;
+        share = z.way;
+        if (z.start === 'power') {
+          throttle = 1;
+          brake = 0;
+        } else if (kicking) {
+          throttle = 0;
+          brake = z.start === 'brake' ? 0.7 : 0;
+          handbrake = z.start === 'handbrake' ? 1 : 0;
+        }
+      } else if (z) {
+        // In the slide the person steers as ever, at the line ahead (steering into the bend tightens the line and
+        // holds the slide, easing it widens the line, letting go ends the slide), and keeps the throttle down
+        // unless the car is plainly too fast for what is coming. Near the end of the bend they let the slide go.
+        // (someone who means to slide keeps a little steering in for as long as the road leaves room inside)
+        const room = track.halfWidth - 1.6 - car.lat * z.way; // m between the car and the inside edge of the pavement
+        if (!letGo && sliding > 0.3 && room > 0) share = z.way * Math.max(share * z.way, human.keepIn * Math.min(1, room / 1.5));
+        if (letGo) share = z.way * Math.min(0, share * z.way);
+        if (sliding > 0.3 && error > -3) {
+          throttle = 1;
+          brake = 0;
+        }
+      } else {
+        trim = 0;
+        // a slide that was not meant: a person lifts and eases the steering, and the car comes back
+        if (sliding > 0.5 && Math.abs(car.slideAngle) > human.unmeant) {
+          throttle = 0;
+          share *= 0.3;
+        }
+      }
+
+      // decided now, done a reaction later
+      seen[at * 4] = share;
+      seen[at * 4 + 1] = throttle;
+      seen[at * 4 + 2] = brake;
+      seen[at * 4 + 3] = handbrake;
+      at = (at + 1) % delay;
+      const want = seen[at * 4]; // the oldest entry
+      throttle = seen[at * 4 + 1];
+      brake = seen[at * 4 + 2];
+      handbrake = seen[at * 4 + 3];
+      const s = input.state;
+      if (device === 'keys') {
+        // keys: pressed while the wheel is short of what is wanted, let go when it is there, the other key when it
+        // is the wrong side; and no key changes faster than a finger does
+        const now = -player._wheel; // + = left: what the hands have wound on, of the lock
+        const band = 0.06 + 0.12 * Math.abs(want);
+        let next = key;
+        if (want - now > band) next = -1;
+        else if (want - now < -band) next = 1;
+        else next = 0;
+        held += dt;
+        if (next !== key && held >= human.keys.hold) {
+          key = next;
+          held = 0;
+        }
+        Object.assign(s, { analog: false, device: undefined, steer: key, throttle: throttle > 0.35 ? 1 : 0, brake: brake > 0.15 ? 1 : 0, handbrake });
+      } else {
+        // where the thumb has to be for that share, through the device's curve and dead zone; it gets there no
+        // faster than a thumb moves, and it wavers
+        const wanted = analogFor(car, Math.max(-1, Math.min(1, -want)), device); // + = right, as the device gives it
+        const travel = Math.sign(wanted) * (dev.dead + (1 - dev.dead) * Math.abs(wanted) ** (1 / dev.curve));
+        const rate = dev.speed / dev.range;
+        pos += Math.max(-rate * dt, Math.min(rate * dt, travel - pos));
+        const shake = (dev.shake / dev.range) * Math.sin(t * 2.3 + 1) * Math.sin(t * 0.71);
+        const where = Math.max(-1, Math.min(1, pos + shake));
+        const size = Math.abs(where);
+        s.analog = true;
+        s.device = device === 'thumb' ? 'touch' : 'pad';
+        s.steer = size < dev.dead ? 0 : Math.sign(where) * ((size - dev.dead) / (1 - dev.dead)) ** dev.curve;
+        if (device === 'thumb') {
+          s.brake = brake > 0.12 ? Math.min(1, 0.3 + brake) : 0; // a thumb on the brake presses it most of the way
+          s.throttle = s.brake > 0 ? 0 : 1; // (it accelerates by itself: there is no lift on a phone)
+        } else {
+          s.brake = brake > 0.05 ? Math.min(1, brake * 1.1) : 0;
+          s.throttle = Math.min(1, throttle * 0.95);
+        }
+        s.handbrake = handbrake;
+      }
+      return player.drive(car, dt, out);
+    },
+  };
+  return me;
+}
+
 /** Laps from the grid: the flying lap times (the run to the line and the first lap from rest are left out) and what happened. */
 export function laps(track, kind, { pace = 0.9, count = 2, bias = 0, slot = 0, params = CAR } = {}) {
   const driver = lapDriver(track, kind, pace, bias, params);
@@ -756,7 +998,7 @@ export function laps(track, kind, { pace = 0.9, count = 2, bias = 0, slot = 0, p
   car.reset(track.grid(slot, {}));
   const c = controls();
   const times = [];
-  let t = 0, started = 0, last = car.s, impacts = 0, off = -Infinity, slip = 0, escTime = 0, finite = true, minLoad = Infinity, minLoadAt = 0;
+  let t = 0, started = 0, last = car.s, impacts = 0, off = -Infinity, slip = 0, escTime = 0, finite = true, minLoad = Infinity, minLoadAt = 0, offAt = 0;
   while (times.length < count + 2 && t < 400 * (count + 2)) {
     driver.drive(car, DT, c);
     car.step(DT, c);
@@ -765,7 +1007,11 @@ export function laps(track, kind, { pace = 0.9, count = 2, bias = 0, slot = 0, p
     impacts += car.impacts.length;
     car.impacts.length = 0;
     if (times.length >= 1) {
-      off = Math.max(off, Math.abs(car.lat) + car.params.box.halfWidth - track.halfWidth);
+      const o = Math.abs(car.lat) + car.params.box.halfWidth - track.halfWidth;
+      if (o > off) {
+        off = o;
+        offAt = car.s;
+      }
       if (car.speed > 8) slip = Math.max(slip, Math.abs(bodySlip(car)));
       if (car.assists.esc > 0.1) escTime += DT;
       for (const w of car.wheels) {
@@ -783,5 +1029,5 @@ export function laps(track, kind, { pace = 0.9, count = 2, bias = 0, slot = 0, p
     last = car.s;
   }
   const flying = times.slice(2);
-  return { times: flying, best: Math.min(...flying), impacts, off, slip, escPerLap: escTime / Math.max(1, times.length - 1), finite, minLoad, minLoadAt };
+  return { times: flying, best: Math.min(...flying), impacts, off, slip, escPerLap: escTime / Math.max(1, times.length - 1), finite, minLoad, minLoadAt, offAt };
 }

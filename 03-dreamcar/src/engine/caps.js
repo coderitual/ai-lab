@@ -42,8 +42,8 @@ import * as THREE from 'three';
  */
 export const TIERS = {
   low: { pixelRatio: 1.5, msaa: 0, blurTaps: 6, blurLength: 0.04, blurInline: true, bloomLevels: 4, lens: false, aoSamples: 0, aoTurns: 0, probeSize: 64, probeFaces: 1, probeEvery: 2 },
-  medium: { pixelRatio: 2, msaa: 4, blurTaps: 10, blurLength: 0.06, blurInline: false, bloomLevels: 5, lens: true, aoSamples: 8, aoTurns: 5, probeSize: 128, probeFaces: 1, probeEvery: 1 },
-  high: { pixelRatio: 2, msaa: 4, blurTaps: 16, blurLength: 0.075, blurInline: false, bloomLevels: 6, lens: true, aoSamples: 14, aoTurns: 9, probeSize: 256, probeFaces: 2, probeEvery: 1 },
+  medium: { pixelRatio: 2, msaa: 4, blurTaps: 12, blurLength: 0.075, blurInline: false, bloomLevels: 5, lens: true, aoSamples: 8, aoTurns: 5, probeSize: 128, probeFaces: 1, probeEvery: 1 },
+  high: { pixelRatio: 2, msaa: 4, blurTaps: 18, blurLength: 0.09, blurInline: false, bloomLevels: 6, lens: true, aoSamples: 14, aoTurns: 9, probeSize: 256, probeFaces: 2, probeEvery: 1 },
 };
 
 /**

@@ -40,7 +40,11 @@ const BOARDS = [
   [CIRCUIT_NAME, '#163a4c', '#efe6cf', 'lake', '#e59a2c'],
   ['ARVENT', '#e8742a', '#1b1b1d', 'wave', '#1b1b1d'],
   ['SOLMERE', '#2a2b30', '#f1f1ec', 'sun', '#f0a224'],
+  // a red block and a white one with the word across both (the run of the ledge's first bend)
+  ['TERNA', '#c4261f', '#f4f1ea', 'split', '#f2f1ec'],
 ];
+/** Designs by index, for runs that want a palette of their own. */
+export const DESIGN = { varno: 0, torvel: 1, miralta: 2, brennik: 3, oskali: 4, lundar: 5, pellora: 6, calvenna: 7, arvent: 8, solmere: 9, terna: 10 };
 /** Board designs available (cells), and how many there are. */
 export const BOARD_COUNT = BOARDS.length;
 
@@ -390,6 +394,15 @@ function drawTall(g, [x, y, w, h], [layout, field, ink, words, accent]) {
 function drawBoard(g, [x, y, w, h], [name, field, ink, mark, markColor]) {
   g.fillStyle = field;
   g.fillRect(x, y, w, h);
+  if (mark === 'split') {
+    // the right part white, the word in red over it; a white bar on the red
+    g.fillStyle = markColor;
+    g.fillRect(x + w * 0.42, y, w * 0.58, h);
+    g.fillRect(x + 30, y + h / 2 - 12, w * 0.3, 20);
+    g.strokeStyle = field;
+    writeFit(g, name, x + w * 0.71, y + h / 2 - 4, w * 0.5, 70, { pen: 0.2, wide: 1.1, slant: 0.1 });
+    return;
+  }
   // a darker band along the foot, as a printed board has
   g.fillStyle = 'rgba(0,0,0,0.18)';
   g.fillRect(x, y + h - 12, w, 12);

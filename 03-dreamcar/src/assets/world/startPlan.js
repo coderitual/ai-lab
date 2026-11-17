@@ -11,15 +11,28 @@
 import { PIT } from './gantry.js';
 import { STAND } from './pits.js';
 import { TOWNS } from './town.js';
+import { hallSite } from './landmarks.js';
 
 /** Margin round each footprint (m). */
 const MARGIN = 4;
 
 /**
  * @param {object} track
+ * @param {(x: number, z: number) => number} [heightAt] the ground (to find the pale hall's hilltop: landmarks.js)
  * @returns {(x: number, z: number) => boolean}
  */
-export function keepOut(track) {
+export function keepOut(track, heightAt) {
+  const hall = heightAt ? hallSite(track, heightAt) : null;
+  // viewpoints along the ledge's first piece, each with its unit direction to the hall
+  const view = [];
+  const ledge = track.sections.find((sec) => sec.id === 'ledge');
+  if (hall && ledge) {
+    for (let d = 30; d <= 270; d += 60) {
+      const p = track.pointAt(track.wrap(ledge.s0 + d), 0);
+      const l = Math.hypot(hall.x - p.x, hall.z - p.z);
+      view.push({ x: p.x, z: p.z, dx: (hall.x - p.x) / l, dz: (hall.z - p.z) / l });
+    }
+  }
   const g0 = track.gantry.s;
   const spot = {};
   const line = track.pointAt(g0, 0);
@@ -34,6 +47,15 @@ export function keepOut(track) {
     return { x: t.x, z: t.z, f, t: [-f[1], f[0]], half: t.length / 2 + 15, back: t.rows * t.spacing + 15, hotel: t.hotel };
   });
   return (x, z) => {
+    // the hall itself (its cypresses are its own, round it)
+    if (hall && (x - hall.x) ** 2 + (z - hall.z) ** 2 < 70 ** 2) return true;
+    // the view of it from the ledge's first bend: no tree stands on the line from the road to the hall
+    for (const v of view) {
+      const dx = x - v.x;
+      const dz = z - v.z;
+      const along = dx * v.dx + dz * v.dz;
+      if (along > 3 && along < 450 && Math.abs(dx * v.dz - dz * v.dx) < 12 + 0.08 * along) return true;
+    }
     for (const s of sites) {
       const dx = x - s.x;
       const dz = z - s.z;

@@ -31,7 +31,7 @@
 //   boards          [{ s0, s1, side, lat, height }]  runs of trackside boards facing the road
 //   distanceBoards  [{ s, side, lat, label, bridge }]  300, 200, 100 m before the slow corner (on a bridge: hung on the parapet)
 //   marshals        [{ s, side, lat }]  posts behind the barrier
-//   gantry          { s, latL, latR }  the start gantry across the road at the line
+//   gantry          { s, latL, latR }  the start gantry across the road, 8 m beyond the line
 //   bridges         [{ s0, s1, drop, id }]  each deck with the depth of the ground under its middle
 //   lamps, tunnels, sectors, sections  as before
 //
@@ -57,6 +57,7 @@ const TAU = Math.PI * 2;
 const G = 9.81;
 
 const SAMPLE_SPACING = 1; // m between samples of the centre line (the real spacing divides the lap exactly)
+const GANTRY_AHEAD = 8; // m beyond the start line at which the start gantry stands
 const SUBSTEPS = 8; // integration steps per sample
 const CLOSE_GAP = 0.05; // m the baked layout may miss its own start by (spread along the lap) before it is an error
 const EDGE_RATE = 0.12; // m per metre: the most a solid edge may move towards or away from the road
@@ -680,8 +681,9 @@ function layCircuit(track, plan) {
     const side = track.edgeAt(s, 1) >= track.edgeAt(s, -1) ? 1 : -1;
     track.marshals.push({ s, side, lat: side * (track.edgeAt(s, side) + 2.5) });
   }
-  // the start gantry spans the road at the line, its feet just beyond the walls
-  track.gantry = { s: 0, latL: track.edgeAt(0, 1) + 0.7, latR: -(track.edgeAt(0, -1) + 0.7) };
+  // the start gantry spans the road a little beyond the line (GANTRY_AHEAD), its feet just beyond the walls: far
+  // enough ahead of the grid that the lamps hanging from it are seen from the cars without looking straight up
+  track.gantry = { s: GANTRY_AHEAD, latL: track.edgeAt(GANTRY_AHEAD, 1) + 0.7, latR: -(track.edgeAt(GANTRY_AHEAD, -1) + 0.7) };
 }
 
 /**

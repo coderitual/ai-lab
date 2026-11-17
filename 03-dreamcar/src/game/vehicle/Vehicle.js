@@ -12,6 +12,7 @@
 // Nothing here allocates while driving (it runs 120 times a second per car on a phone), which is why the vector
 // algebra is written out in components.
 
+import { ASSISTS } from '../config.js';
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { Drivetrain } from './drivetrain.js';
 import { CAR } from './params.js';
@@ -23,6 +24,7 @@ const TAU = Math.PI * 2;
 const MAX_IMPACTS = 8;
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const finite = (v) => (Number.isFinite(v) ? v : 0);
 
@@ -90,6 +92,34 @@ export class Vehicle {
     this.assists = { abs: 0, tc: 0, esc: 0 };
     /** Switches (the handling tests turn them off; the game leaves them on). */
     this.assistsOn = { abs: true, tc: true, esc: true };
+    /**
+     * The assist level (an entry of ASSISTS.levels in game/config.js, or null: the switches above alone). It sets the
+     * switches, how far the stability control lets the car slide, and the slide help (see setAssists). A new car
+     * has the default level.
+     */
+    this.level = ASSISTS.levels[ASSISTS.default];
+    /** 0..1 how much the car is sliding: its tail beyond the slip its tyres grip at (the hands, the camera, the HUD and the sound may read it). */
+    this.drift = 0;
+    /** Where the rear axle is going, measured from where the body points (rad, + = the tail is out to the left): the angle of a slide. */
+    this.slideAngle = 0;
+    /** The same at the front axle: front wheels turned to this angle point where the car is going. */
+    this.frontAngle = 0;
+    /**
+     * The slide as a game might score it (all in the fixed step): `angle` now (degrees, unsigned, 0 when not sliding),
+     * `time` s and `score` of the slide in progress (degrees beyond 10 times metres travelled, over 100), `last` the
+     * score of the slide that ended last (0 if it ended against an edge or in a spin), `best` and `total` over the run.
+     */
+    this.slide = { angle: 0, time: 0, score: 0, last: 0, best: 0, total: 0 };
+    this._driftM = 0; // the slide help's yaw moment this step (N·m, + = to the left)
+    this._relief = 0; // 0..1 how much the slide help keeps the car's speed this step
+    this._slideRate = 0; // how fast the slide is growing (rad/s)
+    this._slideLast = 0;
+    this._slideSide = 0; // which way the last slide went (the sign of slideAngle)
+    this._slideMemory = 0; // 1 just after a slide, falling to 0
+    this._kick = 0; // 0..1 a slide being asked for off the throttle, on the brake or with the handbrake; it fades after
+    this._slideQuiet = 0; // s since the car last slid
+    this._stay = 0; // 0..1 the driver is steering into the bend, or was a moment ago: the slide is wanted
+    this._into = 0; // how hard the front wheels are turned into the bend, of their peak (-1..1)
 
     this.trackIndex = 0;
     this.s = 0;
@@ -114,6 +144,14 @@ export class Vehicle {
     // the ground and in pitch to one along it, so it is less than a quarter of the car.
     this._massLat = 0.25 / (this._invMass + p.com.y * p.com.y * this._invIz);
     this._massLong = 0.25 / (this._invMass + p.com.y * p.com.y * this._invIx);
+    // the axles from the centre of mass (m), and the rear-wheel steering's law (see _rearShare)
+    this._a = p.wheels[0].z - p.com.z;
+    this._b = p.com.z - p.wheels[2].z;
+    const perSlip = (this._contact.curveY.slope * p.tyre.muY) / p.tyre.alphaPeak; // force per unit load and radian, before grip and give
+    const stiffF = (2 * perSlip * p.wheels[0].grip * p.wheels[0].staticLoad) / p.wheels[0].give; // N/rad, the axle
+    const stiffR = (2 * perSlip * p.wheels[2].grip * p.wheels[2].staticLoad) / p.wheels[2].give;
+    this._rearA = (this._a * p.mass) / (stiffR * p.wheelbase);
+    this._rearB = (this._b * p.mass) / (stiffF * p.wheelbase);
     this._dragK = 0.5 * p.aero.airDensity * p.aero.dragArea;
     this._liftK = 0.5 * p.aero.airDensity * (p.aero.downforceArea ?? 0);
     // body axes in world space, refreshed from the quaternion
@@ -186,6 +224,11 @@ export class Vehicle {
     this._drivetrain.reset();
     this._reverse = false;
     this._selectTimer = 0;
+    this.drift = this.slideAngle = this.frontAngle = 0;
+    this._driftM = this._relief = this._slideRate = this._slideLast = this._kick = 0;
+    this._slideSide = this._slideMemory = this._slideQuiet = this._stay = this._into = 0;
+    const sl = this.slide;
+    sl.angle = sl.time = sl.score = sl.last = sl.best = sl.total = 0;
     this._hold = 1;
     this._tcCut = 0;
     this._escPause = 0;
@@ -225,7 +268,8 @@ export class Vehicle {
   /**
    * One fixed step.
    * @param {number} dt
-   * @param {{steer:number, throttle:number, brake:number, handbrake?:number|boolean}} controls
+   * @param {{steer:number, throttle:number, brake:number, handbrake?:number|boolean}} controls `steer` -1..1 of the
+   *   lock (+ = right); a driver may ask for more than the lock (to ±3): the wheels stop at it, the slide help reads on
    */
   step(dt, controls) {
     this.prevPosition.copy(this.position);
@@ -257,9 +301,12 @@ export class Vehicle {
     const vLong = v.x * fx + v.y * fy + v.z * fz;
     const vLat = v.x * lx + v.y * ly + v.z * lz;
     const yawRate = o.x * ux + o.y * uy + o.z * uz;
+    const speedBefore = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 
     // ---- the driver --------------------------------------------------------------------------------------
-    const steerIn = clamp(finite(c.steer), -1, 1);
+    // (the steering asked for may be beyond the lock: the wheels stop there, but the slide help reads what was meant)
+    const steerAsk = clamp(finite(c.steer), -3, 3);
+    const steerIn = clamp(steerAsk, -1, 1);
     const throttleIn = clamp01(finite(c.throttle));
     const brakeIn = clamp01(finite(c.brake));
     const handbrake = clamp01(finite(+c.handbrake || 0));
@@ -295,42 +342,141 @@ export class Vehicle {
     this.steerAngle += clamp(wanted - this.steerAngle, -p.steering.rate * dt, p.steering.rate * dt);
     const steer = this.steerAngle;
     wheels[0].steer = wheels[1].steer = steer;
+    // the rear wheels take a share of it at speed, the same way (rear-axle steering: see rearShare)
+    const rear = clamp(steer * this.rearShare(vLong), -p.steering.rear.most, p.steering.rear.most);
+    wheels[2].steer = wheels[3].steer = rear;
 
     // ---- the assists (they read what the last step left) -----------------------------------------------------
     const a = p.assists;
     if (handbrake > 0.1) this._escPause = a.esc.handbrakePause;
     else this._escPause = Math.max(0, this._escPause - dt);
 
-    // stability control: the yaw moment (about +Y) that would put the car back where the steering points it
-    let moment = 0;
-    let trim = 0;
+    // where each axle is going, measured from where the body points (+ = to the left of it)
     const beta = Math.abs(vLong) > 2 ? Math.atan2(vLat, Math.abs(vLong)) : 0;
     this._betaRate += ((beta - this._beta) / dt - this._betaRate) * Math.min(1, dt * 30);
     this._beta = beta;
+    const forwards = vLong > 2;
+    const betaR = forwards ? Math.atan2(vLat - this._b * yawRate, vLong) : 0;
+    const betaF = forwards ? Math.atan2(vLat + this._a * yawRate, vLong) : 0;
+    const latG = Math.abs(yawRate * vLong) / p.gravity;
+    const level = this.level;
+    const help = p.drift;
+    // a slide: the rear tyres further across their path than the slip they grip at, fully so a few degrees on
+    // (measured from the rear wheels themselves, which steer a little at speed)
+    const slipR = betaR - rear;
+    const slide = Math.abs(slipR);
+    // which way the tail is out (+ = to the left, as in a right-hander); while it is not, the way the car is turning
+    const side = slide > help.from * 0.5 ? (slipR > 0 ? 1 : -1) : yawRate < -1e-3 ? 1 : yawRate > 1e-3 ? -1 : steer < 0 ? 1 : -1;
+    this._slideRate += ((slide - this._slideLast) / dt - this._slideRate) * Math.min(1, dt * 30);
+    this._slideLast = slide;
+    const sliding = vLong > help.minSpeed ? smooth01((slide - help.from) / (help.full - help.from)) : 0;
+    // which way the last slide went, remembered for a moment: the help stays with the car while it comes back into
+    // line, and a slide that swings through straight into the other way is the snap of a slide let go
+    if (sliding > 0.5) {
+      this._slideSide = side;
+      this._slideMemory = 1;
+    } else this._slideMemory = Math.max(0, this._slideMemory - dt / help.snapMemory);
+    const snap = this._slideMemory > 0 && side !== this._slideSide && slide > 0.01;
+    this.drift = sliding;
+    this.slideAngle = slipR;
+    this.frontAngle = betaF;
+    // how hard the front wheels are turned into the bend, measured from where the front axle is going (1 = at the
+    // slip their grip peaks at, -1 = as far the other way): this is what the driver's steering comes to in a slide
+    const meant = Math.abs(steerAsk) > 1 ? -steerAsk * lock : steer; // (beyond the lock: the angle the driver asked for)
+    const into = forwards ? clamp((side * (betaF - meant)) / help.frontSlip, -1, 1) : 0;
+
+    // A slide asked for: the car thrown into a bend off the throttle or on the brake (loaded up, with the steering
+    // hard over), or the handbrake. The help then lets the tail out: a kick, which fades over a moment once the
+    // tail is out. From there the slide lives on the throttle: a lift or the brake in a slide ends it (and does
+    // not ask for another until the car has been straight for a moment).
+    const helping = !!level && level.hold > 0 && vLong > help.minSpeed;
+    let kick = 0;
+    if (helping) {
+      const loaded = clamp01((latG - help.kickG) / help.kickSpan) * clamp01((into - help.kickInto) / help.kickIntoSpan) * (1 - Math.max(sliding, this._slideMemory));
+      const lift = clamp01(1 - throttleIn / help.kickLift) * level.liftKick;
+      const brake = clamp01(brakeIn / help.kickBrake) * level.brakeKick;
+      kick = Math.max(lift, brake) * loaded;
+      if (handbrake > 0.1) kick = level.handKick;
+    }
+    this._kick = Math.max(kick, this._kick - dt / help.kickTime);
+    const kicked = clamp01(this._kick * 4);
+    this._into = into;
+    // Whether the slide is wanted: the driver is steering into the bend (any steering beyond the first little of it
+    // counts in full: how much of it there is only tightens the line), or was a moment ago. It comes at once and
+    // goes over most of a second, so a key tapped to hold a line keeps the slide and steering let go ends it.
+    const wants = smooth01(into / help.intoFull);
+    // (steered the other way, it goes at once)
+    this._stay = wants > this._stay ? Math.min(wants, this._stay + dt / help.stayRise) : Math.max(wants, this._stay - (dt / help.stayFall) * (1 + help.stayAgainst * clamp01(-into * 3)));
+    // the slide a level holds narrows at speed (a big angle at 250 km/h is a crash in the making), and the angle
+    // at which it catches the car opens up at walking pace, where a spin is only a turn
+    const open = helping ? level.slip * Math.min(1, help.slipSpeed / vLong) : 0;
+    const slow = clamp01(1 - vLong / help.slowSpeed);
+    const limit = helping ? open + help.margin + help.slowSlip * slow * slow : Infinity;
+
+    // stability control: the yaw moment (about +Y) that would put the car back where the steering points it
+    let moment = 0;
+    let trim = 0;
     if (!(this.assistsOn.esc && vLong > a.esc.minSpeed && this._escPause === 0)) this._wantedYaw = yawRate;
     else {
       const e = a.esc;
+      const slipAllowed = helping ? limit : e.slipAllowed;
+      // (it does not fight the yaw of a slide the help is holding, or of one just let go that is coming back)
+      const minds = helping ? 1 - Math.max(sliding, kicked, this._slideMemory) : 1;
       const ratio = vLong / e.characteristicSpeed;
       const holds = (e.holdG * p.gravity * this._grip) / vLong; // no more yaw than the road can hold (banking and the air help)
       // what the steering asks for, as the car would answer it: through the car's own understeer and with the lag
       // its yaw takes to build (a reference without the lag reads every quick release of a key as oversteer)
-      const asked = clamp((vLong * steer) / (p.wheelbase * (1 + ratio * ratio)), -holds, holds);
+      const asked = clamp((vLong * (steer - rear)) / (p.wheelbase * (1 + ratio * ratio)), -holds, holds);
       this._wantedYaw += (asked - this._wantedYaw) * (1 - Math.exp(-dt / e.lag));
       const wantedYaw = this._wantedYaw;
       const error = yawRate - wantedYaw;
       // the error let pass is a lateral acceleration (about 0.1 g) rather than a yaw rate, so that at speed, where a
       // yaw rate is a lot of sideways g and the yaw is least damped, the brakes steady the car sooner
       const beyond = Math.abs(error) - Math.min(e.deadband, e.deadbandG / vLong) - 0.12 * Math.abs(wantedYaw);
-      if (beyond > 0) moment -= Math.sign(error) * e.yawGain * beyond;
-      const slip = beta - clamp(beta, -e.slipAllowed, e.slipAllowed);
+      if (beyond > 0) moment -= Math.sign(error) * e.yawGain * beyond * minds;
+      const slip = beta - clamp(beta, -slipAllowed, slipAllowed);
       if (slip !== 0) {
         moment += e.slipGain * slip;
         if (slip * this._betaRate > 0) moment += e.slipRateGain * this._betaRate;
       }
       // turning less than asked with the front already sliding: brakes cannot find grip that is not there, so ease the power
-      if (beyond > 0 && error * wantedYaw < 0 && Math.abs(wantedYaw) > Math.abs(yawRate)) trim = clamp01(e.understeerGain * beyond);
+      if (beyond > 0 && error * wantedYaw < 0 && Math.abs(wantedYaw) > Math.abs(yawRate)) trim = clamp01(e.understeerGain * beyond * minds);
       // turning more than asked, or sideways: take the power off the rear wheels
       if (moment * yawRate < 0) trim = Math.max(trim, clamp01(Math.abs(moment) / 5000));
+    }
+
+    // The slide help: an arcade car's hidden hand. It turns the body, without brakes, towards the slide the driver
+    // is asking for: as much of the level's angle as the throttle is open (or the kick still lasts), for as long as
+    // the driver steers into the bend. So a slide holds on the throttle while the steering picks the line, closes
+    // when the steering is let go or the throttle is lifted, and never grows past what the level allows. The same hand keeps the tail from coming back faster than the eye can follow, and stays with the car
+    // through straight, so that a slide let go does not snap the other way.
+    this._driftM = 0;
+    this._relief = 0;
+    if (helping) {
+      const rate = this._slideRate;
+      let accel = 0; // rad/s², + closes the slide (turns the nose back towards where the car is going)
+      let gate = 0;
+      if (handbrake <= 0.1) {
+        // (and never further than the front wheels can still be pointed where the car is going, with the driver's
+        // steering on top: a slide the steering could not catch is a spin held up by magic)
+        const reach = lock - help.frontSlip * clamp01(into) - help.lockSpare + side * (slipR - betaF);
+        const asked = snap ? 0 : Math.min(open * Math.max(throttleIn, this._kick) * this._stay, Math.max(0, reach));
+        accel = help.hold * (slide - asked) + (rate > 0 ? help.damp : help.dampClose) * rate;
+        // (a kick lets the tail out briskly: the throw is a moment, not a second)
+        if (kicked > 0 && slide < asked) accel -= help.kickHold * (asked - slide) * kicked;
+        if (snap && rate > 0) accel += help.snapDamp * rate;
+        // letting the tail out is for a slide in progress or one just asked for; bringing it back in also for the
+        // moment after a slide
+        gate = accel < 0 ? Math.max(sliding, kicked) : Math.max(sliding, this._slideMemory);
+      }
+      // beyond the level's angle the car is caught, handbrake or not
+      if (slide > limit) {
+        accel = Math.max(accel, 0) + help.catch * (slide - limit) + (rate > 0 ? help.catchDamp * rate : 0);
+        gate = 1;
+      }
+      this._driftM = side * clamp(accel, -help.most, snap || slide > limit ? help.catchMost : help.mostClose) * p.inertia.y * level.hold * gate;
+      // and a slide held on the throttle keeps its speed, near enough (see where the tyres have acted, below)
+      this._relief = sliding * throttleIn * (handbrake <= 0.1 ? 1 : 0);
     }
 
     // traction control: trim the engine while a driven wheel spins faster than the road (not while the handbrake is
@@ -348,7 +494,11 @@ export class Vehicle {
     let cut = 0;
     if (tcOn && throttle > 0.02) {
       // in a bend it lets the wheels spin a little more: the tail may move, and the stability control minds the yaw
-      const over = spin / (a.tc.slip + a.tc.bendSlip * clamp01(Math.abs(yawRate * vLong) / 6)) - 1;
+      const target = (level?.tcSlip ?? a.tc.slip) + a.tc.bendSlip * clamp01((latG * p.gravity) / 6);
+      // and in a slide as much again as turns the rear tyres' push from across the car to along it: the further
+      // sideways, the more they must spin to drive at all (that spin is the slide's own, and its smoke)
+      // (only while the slide is wanted: let go, the tyres are given back their grip and the car comes straight)
+      const over = spin / (target + (level?.spin ?? 0) * sliding * Math.max(this._stay, kicked) * Math.min(help.spinMost, Math.tan(slide))) - 1;
       // what it has learnt the road will take, plus an answer to the slip of this instant
       this._tcCut = clamp(this._tcCut + dt * (over > 0 ? a.tc.learn * Math.min(over, 3) : a.tc.forget * Math.max(over, -1)), 0, 0.95);
       cut = clamp(this._tcCut + a.tc.react * Math.max(0, over), 0, 0.97);
@@ -365,13 +515,14 @@ export class Vehicle {
     // ---- engine and gearbox ---------------------------------------------------------------------------------
     const dt_ = this._drivetrain;
     const rearOmega = (wheels[2].omega + wheels[3].omega) / 2;
-    dt_.update(dt, throttle, keep, pedal, rearOmega, vLong, Math.abs(yawRate * vLong) / p.gravity, reverse);
+    dt_.update(dt, throttle, keep, pedal, rearOmega, vLong, latG, reverse, sliding > 0.5);
     this.rpm = dt_.rpm;
     this.gear = dt_.gear;
     const axle = dt_.axleTorque;
     const d = p.differential;
-    const locking = d.preload + d.bias * Math.abs(axle);
-    const across = clamp(d.viscous * (wheels[2].omega - wheels[3].omega), -locking, locking);
+    // (in a slide the differential closes up: both rear wheels spin together, as a slide wants them)
+    const locking = d.preload + d.bias * Math.abs(axle) + d.slideLock * sliding;
+    const across = clamp(d.viscous * (1 + d.slideViscous * sliding) * (wheels[2].omega - wheels[3].omega), -locking, locking);
     wheels[0]._drive = wheels[1]._drive = 0;
     wheels[2]._drive = axle / 2 - across;
     wheels[3]._drive = axle / 2 + across;
@@ -406,7 +557,8 @@ export class Vehicle {
       w._brake = torque + surface.rolling * rolling * w.load * spec.radius;
     }
     this.assists.abs += (absWork - this.assists.abs) * Math.min(1, dt * 20);
-    this.assists.tc += (cut - this.assists.tc) * Math.min(1, dt * 20);
+    // (in a slide the traction control is shaping the wheelspin, not fighting the driver: its lamp stays dark)
+    this.assists.tc += (cut * (1 - sliding) - this.assists.tc) * Math.min(1, dt * 20);
     this.assists.esc += (Math.max(clamp01(escTorque / 900), trim) - this.assists.esc) * Math.min(1, dt * 20);
 
     // ---- springs: where each wheel meets the road, and how hard --------------------------------------------
@@ -492,6 +644,11 @@ export class Vehicle {
     v.x += Fx * this._invMass * dt;
     v.y += Fy * this._invMass * dt;
     v.z += Fz * this._invMass * dt;
+    if (this._driftM !== 0 && grounded > 0) {
+      Tx += ux * this._driftM;
+      Ty += uy * this._driftM;
+      Tz += uz * this._driftM;
+    }
     this._invInertia(Tx, Ty, Tz);
     o.x += this._ox * dt;
     o.y += this._oy * dt;
@@ -513,7 +670,11 @@ export class Vehicle {
 
     // ---- tyres: friction against the velocity the car now has ----------------------------------------------
     const contact = this._contact;
+    // (which way the car is going over the ground)
+    const going = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    const gx_ = going > 1 ? v.x / going : 0, gy_ = going > 1 ? v.y / going : 0, gz_ = going > 1 ? v.z / going : 0;
     const cosS = Math.cos(steer), sinS = Math.sin(steer);
+    const cosR = Math.cos(rear), sinR = Math.sin(rear);
     let Px = 0, Py = 0, Pz = 0;
     let Qx = 0, Qy = 0, Qz = 0;
     for (let i = 0; i < 4; i++) {
@@ -536,9 +697,10 @@ export class Vehicle {
       const nx = s.nx, ny = s.ny, nz = s.nz;
       const rx = w._rx, ry = w._ry, rz = w._rz;
       // the wheel's heading, laid onto the road, and the direction to its left
-      let hx = spec.front ? fx * cosS + lx * sinS : fx;
-      let hy = spec.front ? fy * cosS + ly * sinS : fy;
-      let hz = spec.front ? fz * cosS + lz * sinS : fz;
+      const cosW = spec.front ? cosS : cosR, sinW = spec.front ? sinS : sinR;
+      let hx = fx * cosW + lx * sinW;
+      let hy = fy * cosW + ly * sinW;
+      let hz = fz * cosW + lz * sinW;
       const along = hx * nx + hy * ny + hz * nz;
       hx -= nx * along; hy -= ny * along; hz -= nz * along;
       const length = Math.sqrt(hx * hx + hy * hy + hz * hz);
@@ -615,6 +777,18 @@ export class Vehicle {
     v.x += Px * this._invMass * dt;
     v.y += Py * this._invMass * dt;
     v.z += Pz * this._invMass * dt;
+    if (this._relief > 0 && going > 1) {
+      // A slide held on the throttle keeps its speed, near enough: sideways tyres scrub speed off faster than this
+      // engine can put it back at speed, and in a low gear the engine would run away with the car. The help lets
+      // the car lose or gain only so much (help.lose, help.gain, m/s²) while it slides with the throttle open, by a
+      // push along the way it is going. That is what lets a slide be held through a whole bend with a key down.
+      // With the steering hard over (the car asked to turn more than it can) it may lose more and gains nothing:
+      // it slows and tightens instead of pushing wide.
+      const hard = smooth01((this._into - help.hardFrom) / (1 - help.hardFrom));
+      const change = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) - speedBefore;
+      const push = (clamp(change, -(help.lose + (help.loseHard - help.lose) * hard) * dt, help.gain * (1 - hard) * dt) - change) * this._relief;
+      v.x += gx_ * push; v.y += gy_ * push; v.z += gz_ * push;
+    }
     this._invInertia(Qx, Qy, Qz);
     o.x += this._ox * dt;
     o.y += this._oy * dt;
@@ -659,6 +833,33 @@ export class Vehicle {
     this.upsideDown = this._uy < 0.15;
     if (this._uy < 0.8) this._shell();
     this._sync();
+
+    // ---- the slide, as a game might score it ------------------------------------------------------------------
+    const sl = this.slide;
+    const angle = Math.abs(this.slideAngle) * (180 / Math.PI);
+    const scoring = this.drift > 0.5 && angle > help.scoreFrom && vLong > help.scoreSpeed;
+    if (this._touching || angle > help.scoreSpin) {
+      // against an edge or round too far: the slide in progress counts for nothing
+      sl.score = 0;
+      sl.time = 0;
+      sl.last = 0;
+    }
+    if (scoring) {
+      this._slideQuiet = 0;
+      sl.time += dt;
+      sl.score += ((angle - help.scoreFrom) * vLong * dt) / 100;
+    } else if (sl.time > 0) {
+      this._slideQuiet += dt;
+      if (this._slideQuiet > help.scoreEnd) {
+        // it has ended cleanly: it counts
+        sl.last = sl.score;
+        sl.total += sl.score;
+        if (sl.score > sl.best) sl.best = sl.score;
+        sl.score = 0;
+        sl.time = 0;
+      }
+    }
+    sl.angle = this.drift > 0.5 ? angle : 0;
 
     // ---- has it come to rest? --------------------------------------------------------------------------------
     if (holding && grounded === 4 && v.lengthSq() < 0.0016 && o.lengthSq() < 0.0016 && !this._touching) {
@@ -869,6 +1070,31 @@ export class Vehicle {
     this._ox = this._lx * a + this._ux * b + this._fx * c;
     this._oy = this._ly * a + this._uy * b + this._fy * c;
     this._oz = this._lz * a + this._uz * b + this._fz * c;
+  }
+
+  /**
+   * Rear-axle steering: the share of the front wheels' angle that the rear wheels take, the same way, at a speed
+   * (m/s). It is `steering.rear.share` of what would let the car corner with no body slip at all: nothing below
+   * about 85 km/h, growing with speed. The rear tyres then answer the steering at once instead of waiting for the
+   * body to swing round to its slip angle, and that swing is what makes a car dart and then settle at speed.
+   * @param {number} speed
+   */
+  rearShare(speed) {
+    const v2 = speed * speed;
+    return Math.max(0, (this.params.steering.rear.share * (this._rearA * v2 - this._b)) / (this._a + this._rearB * v2));
+  }
+
+  /**
+   * Choose an assist level: an entry of ASSISTS.levels in game/config.js (which says what each field means), or
+   * null for the bare switches of assistsOn. The hands read the level from the car (PlayerDriver).
+   * @param {object|null} level
+   */
+  setAssists(level) {
+    this.level = level;
+    if (!level) return;
+    this.assistsOn.abs = level.abs !== false;
+    this.assistsOn.tc = !!level.tc;
+    this.assistsOn.esc = !!level.esc;
   }
 
   /** The body's axes in world space, from the quaternion. */

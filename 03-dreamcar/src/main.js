@@ -4,6 +4,7 @@
 // URL parameters are described in engine/params.js.
 
 import { TIMES } from './assets/world/lighting.js';
+import { TOUCH } from './engine/Input.js';
 import { parseParams } from './engine/params.js';
 import { Game } from './game/Game.js';
 import * as config from './game/config.js';
@@ -61,6 +62,8 @@ try {
      * Also ?photo=back,right,up,yaw,pitch,fov or ?photo=d1 in the address.
      */
     photo: (o) => game.setPhoto(o),
+    /** The touch layout (engine/Input.js TOUCH), for tests. */
+    touchLayout: TOUCH,
     /** Change a number of the light or of the run by its path, and show the result. */
     set(path, value) {
       const keys = String(path).split('.');
