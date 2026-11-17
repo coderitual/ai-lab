@@ -554,13 +554,16 @@ function broadleafSkeleton(P, rng) {
         // a leaf mass, not a row: clusters stand round the limb in a clump of their own (P.clump m), more of them
         // towards its end
         const r = (P.clump ?? 0) * Math.sqrt(rng.next()) * (0.5 + 0.5 * u);
-        const at = mad(along(pts, u), norm([rng.range(-1, 1), rng.range(-0.6, 1), rng.range(-1, 1)]), r);
+        const off = norm([rng.range(-1, 1), rng.range(-0.6, 1), rng.range(-1, 1)]);
+        const at = mad(along(pts, u), off, r);
+        // where in its own clump it sits: each clump is a small dome, lit on top, darker underneath
+        const dome = (P.clump ?? 0) > 0 ? off[1] * (r / P.clump) : 0;
         const tan = tangentAt(pts, u);
         const out = norm(sub(at, c));
         // a cluster leans away from its limb, out of the crown and a little up
         const dir0 = turn(tan, square(tan), rng.range(0.3, 1.2));
         const dir = norm(add(add(turn(dir0, tan, rng.range(0, Math.PI * 2)), scale(out, 0.55)), [0, 0.15, 0]));
-        me.clusters.push({ at, dir, size: rng.range(P.leaf[0], P.leaf[1]), roll: rng.range(-1.2, 1.2), hue: rng.next(), sway: swayAt(u), spin: rng.range(0, Math.PI) });
+        me.clusters.push({ at, dir, dome, clumpN: off, size: rng.range(P.leaf[0], P.leaf[1]), roll: rng.range(-1.2, 1.2), hue: rng.next(), sway: swayAt(u), spin: rng.range(0, Math.PI) });
       }
     }
   }
@@ -623,7 +626,7 @@ function broadleafMesh(variant, sk, rng, full, barkSize, through) {
         } else {
           const across = turn(square(dir), dir, k * 1.05 + r.range(-0.4, 0.4));
           const end = mad(base, dir, big);
-          ribbon(b, { pts: [base, end], across, width: big * 0.95, tile: variant.tile, fold: 0, normalAt, ao: [aoAt(base), aoAt(end)], hue: [hue, hue], through, sway: [limb.sway0, limb.sway1], phase: limb.phase, flutter: 1 });
+          ribbon(b, { pts: [base, end], across, width: big * 0.95, tile: variant.massTile ?? variant.tile, fold: 0, normalAt, ao: [aoAt(base), aoAt(end)], hue: [hue, hue], through, sway: [limb.sway0, limb.sway1], phase: limb.phase, flutter: 1 });
         }
       }
       continue;
@@ -642,7 +645,10 @@ function broadleafMesh(variant, sk, rng, full, barkSize, through) {
         const across = turn(square(k.dir), k.dir, k.roll);
         const line = frondLine(k.at, k.dir, k.size, 2, 0.35);
         const end = line[line.length - 1];
-        ribbon(b, { pts: line, across, width: k.size * 0.95, tile: variant.tile, fold: 0, normalAt, ao: [aoAt(k.at), aoAt(end)], hue: [k.hue, k.hue], through, sway: [k.sway, k.sway + 0.04], phase: limb.phase, flutter: 1 });
+        // the crown's normal, bent towards the clump's own: the crown billows, sub-crown by sub-crown
+        const domeNormal = (p) => norm(add(scale(normalAt(p), 0.65), scale(k.clumpN, 0.35)));
+        const domeAo = 0.72 + 0.28 * clamp01(0.5 + 0.9 * k.dome);
+        ribbon(b, { pts: line, across, width: k.size * 0.95, tile: variant.tile, fold: 0, normalAt: domeNormal, ao: [aoAt(k.at) * domeAo, aoAt(end) * domeAo], hue: [k.hue, k.hue], through, sway: [k.sway, k.sway + 0.04], phase: limb.phase, flutter: 1 });
       }
     }
   }

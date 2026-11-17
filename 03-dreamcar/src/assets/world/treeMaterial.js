@@ -118,8 +118,8 @@ vec3 treeCrown = vec3( 0.0, 0.0, 1.0 );      // the crown's own normal, view spa
  */
 const CROWN_TONE = /* glsl */ `
 vec3 crownTone( float lit, float turn ) {
-  vec3 shade = mix( vec3( 0.78, 0.92, 1.12 ), vec3( 1.18, 0.7, 0.5 ), turn );
-  vec3 light = mix( vec3( 1.12, 1.06, 0.78 ), vec3( 0.94, 1.14, 1.45 ), turn );
+  vec3 shade = mix( vec3( 0.78, 0.92, 1.12 ), vec3( 1.15, 0.72, 0.6 ), turn );
+  vec3 light = mix( vec3( 1.12, 1.06, 0.78 ), vec3( 1.0, 1.08, 0.85 ), turn );
   return mix( shade, light, smoothstep( 0.2, 0.95, lit ) );
 }
 `;
@@ -328,6 +328,7 @@ export function impostorMaterial({ atlas, atmosphere, uniforms, coverage }) {
   material.defines.IMP_VARIANTS = atlas.variants;
   material.defines.IMP_ROWS = atlas.rows;
   material.defines.IMP_ELEV = atlas.elevation.toFixed(4);
+  material.defines.IMP_BIAS = '-0.6';
   const own = {
     uImpColor: { value: atlas.color },
     uImpNormal: { value: atlas.normal },
@@ -360,10 +361,11 @@ ${IMP_CARD}`,
   // (half a texel in from the cell's edge, so the picture next door never shows)
   vec2 inCell = mix( uImpInset, 1.0 - uImpInset, clamp( vImpCell.xy, 0.0, 1.0 ) ) * cells.zw;
   #define IMP_UV( n ) ( cells.xy + vec2( mod( n, perRow ), floor( ( n ) / perRow ) ) * cells.zw + inCell )
-  vec4 ca = texture2D( uImpColor, IMP_UV( vImpIdx.x ) );
-  vec4 cb = texture2D( uImpColor, IMP_UV( vImpIdx.y ) );
-  vec4 na = texture2D( uImpNormal, IMP_UV( vImpIdx.x ) );
-  vec4 nb = texture2D( uImpNormal, IMP_UV( vImpIdx.y ) );
+  // (a sharper mip than the screen's footprint asks for: the leaves stay leaves; the cut keeps the edges clean)
+  vec4 ca = texture2D( uImpColor, IMP_UV( vImpIdx.x ), IMP_BIAS );
+  vec4 cb = texture2D( uImpColor, IMP_UV( vImpIdx.y ), IMP_BIAS );
+  vec4 na = texture2D( uImpNormal, IMP_UV( vImpIdx.x ), IMP_BIAS );
+  vec4 nb = texture2D( uImpNormal, IMP_UV( vImpIdx.y ), IMP_BIAS );
   // colours and normals are mixed by what each picture covers, so a hole in one does not grey the other
   float wa = ca.a * ( 1.0 - vImpMix.x );
   float wb = cb.a * vImpMix.x;
@@ -371,10 +373,10 @@ ${IMP_CARD}`,
   vec4 shape = ( na * wa + nb * wb ) / max( wa + wb, 1.0e-4 );
   #if IMP_ROWS > 1
   if ( vImpMix.z > 0.004 ) {
-    ca = texture2D( uImpColor, IMP_UV( vImpIdx.z ) );
-    cb = texture2D( uImpColor, IMP_UV( vImpIdx.w ) );
-    na = texture2D( uImpNormal, IMP_UV( vImpIdx.z ) );
-    nb = texture2D( uImpNormal, IMP_UV( vImpIdx.w ) );
+    ca = texture2D( uImpColor, IMP_UV( vImpIdx.z ), IMP_BIAS );
+    cb = texture2D( uImpColor, IMP_UV( vImpIdx.w ), IMP_BIAS );
+    na = texture2D( uImpNormal, IMP_UV( vImpIdx.z ), IMP_BIAS );
+    nb = texture2D( uImpNormal, IMP_UV( vImpIdx.w ), IMP_BIAS );
     wa = ca.a * ( 1.0 - vImpMix.y );
     wb = cb.a * vImpMix.y;
     float low = colour.a * ( 1.0 - vImpMix.z );

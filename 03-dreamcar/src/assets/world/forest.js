@@ -35,12 +35,12 @@
 // Wind: update()'s clock moves every level the same way (treeMaterial.js).
 
 import * as THREE from 'three';
-import { createBarkTextures, createFoliageAtlas } from './forestTextures.js';
+import { TILE, createBarkTextures, createFoliageAtlas, tileRect } from './forestTextures.js';
 import { layBy } from './gantry.js';
 import { bakeImpostors } from './impostors.js';
 import { planeNoise, smoothstep } from './shading.js';
 import { growTrees } from './treeGeometry.js';
-import { createTreeUniforms, impostorDepthMaterial, impostorMaterial, treeDepthMaterial, treeMaterial } from './treeMaterial.js';
+import { createTreeUniforms, impostorDepthMaterial, impostorMaterial, plantMaterial, treeDepthMaterial, treeMaterial } from './treeMaterial.js';
 import { SPECIES, SPECIES_DATA, VARIANTS, VARIANTS_OF } from './treeSpecies.js';
 
 /** The Track's edge kind TREES (game/track.js EDGE.TREES; assets/ does not import game/). */
@@ -55,12 +55,14 @@ export const CASTER_LAYER = 3;
  * foliage tile and bark tile (texels), impostor picture (texels), whether trees cast shadow.
  */
 const TIER = {
-  low: { full: 0, reduced: 60, far: 650, keep: 0.5, tile: 256, bark: 128, cell: 96, casters: false },
-  medium: { full: 34, reduced: 95, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 160, casters: true },
-  high: { full: 50, reduced: 130, far: 1200, keep: 1, tile: 512, bark: 256, cell: 192, casters: true },
+  low: { full: 0, reduced: 60, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 160, rings: 1, casters: false },
+  medium: { full: 34, reduced: 95, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 160, rings: 2, casters: true },
+  high: { full: 50, reduced: 130, far: 1200, keep: 1, tile: 512, bark: 256, cell: 192, rings: 2, casters: true },
 };
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
 const BLEND = 8;
+/** How far the wood's floor (grass and fallen leaves under the road's trees) is drawn, per tier (m). */
+const FLOOR_REACH = { low: 70, medium: 110, high: 150 };
 /** The general forest's lattice (m). */
 const LATTICE = 6.5;
 /** The cells prepareView culls by (m). */
@@ -171,14 +173,16 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const BROAD = [SPECIES.indexOf('maple'), SPECIES.indexOf('lime'), SPECIES.indexOf('birch')];
   const NEEDLE = [SPECIES.indexOf('spruce'), SPECIES.indexOf('fir'), SPECIES.indexOf('larch')];
   /** A species for a tree of this mix at this height (the road's edge has more birch). */
-  function pickSpecies(mix, y, edge) {
+  function pickSpecies(mix, y, edge, turned = 0) {
     const conifer = mix === 'conifer' ? 0.9 : mix === 'broadleaf' ? 0.06 : 0.12 + 0.8 * smoothstep(lakeLevel + 30, lakeLevel + 95, y);
     if (plantRng.next() < conifer) {
       const r = plantRng.next();
       return NEEDLE[r < 0.5 ? 0 : r < 0.8 ? 1 : 2];
     }
+    // where the wood has turned, it is mostly maples that turned it
     const r = plantRng.next();
-    return BROAD[r < 0.38 ? 0 : r < (edge ? 0.68 : 0.78) ? 1 : 2];
+    const maple = 0.38 + 0.45 * turned * turned;
+    return BROAD[r < maple ? 0 : r < maple + (1 - maple) * (edge ? 0.5 : 0.65) ? 1 : 2];
   }
   function addTree(x, y, z, species, { road, turned, inside, young = 1 }) {
     const data = SPECIES_DATA[SPECIES[species]];
@@ -217,10 +221,47 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         if (!free(point.x, point.z, r === 0 ? 2.6 : 3.0)) continue;
         const y = terrain.heightAt(point.x, point.z);
         if (y < lakeLevel + 0.5) continue;
-        addTree(point.x, y - 0.15, point.z, pickSpecies(wood.mix, y, r === 0), { road: true, turned: wood.turned, inside: row.inside });
+        addTree(point.x, y - 0.15, point.z, pickSpecies(wood.mix, y, r === 0, wood.turned), { road: true, turned: wood.turned, inside: row.inside });
       }
     });
   }
+  // THE START: along the straight a wall of turned crowns on the land side, tall and close, three rows deep with the
+  // wood behind; on the lake side a looser row where there is ground. (The straight is the Track's section
+  // `straight`; which side is the land is the side the Track says is wooded.)
+  const straight = track.sections?.find((x) => x.id === 'straight');
+  if (straight) {
+    const MAPLE = SPECIES.indexOf('maple');
+    const LIME = SPECIES.indexOf('lime');
+    const BIRCH = SPECIES.indexOf('birch');
+    const span = (track.delta(straight.s0, straight.s1) + track.length) % track.length;
+    const FIR = SPECIES.indexOf('fir');
+    // most of it maples; a lime or a birch here and there; a dark fir or two among them
+    const startWood = (r) => (r < 0.84 ? MAPLE : r < 0.91 ? LIME : r < 0.95 ? BIRCH : FIR);
+    for (const side of [1, -1]) {
+      const land = !!woodAt(track, noise, straight.s0 + span / 2, side);
+      const rows = land
+        ? [
+            { off: [0.2, 1.4], step: [2.6, 3.4], r: 2.2 },
+            { off: [3.6, 5.6], step: [2.8, 3.8], r: 2.4 },
+            { off: [7.5, 10.5], step: [3.0, 4.2], r: 2.6 },
+          ]
+        : [{ off: [0.5, 4], step: [9, 16], r: 4 }];
+      for (const row of rows) {
+        let hint = -1;
+        for (let d = plantRng.range(0, 2); d < span; d += plantRng.range(row.step[0], row.step[1])) {
+          const s = (straight.s0 + d) % track.length;
+          track.pointAt(s, side * (track.edgeAt(s, side) + BARRIER_CLEAR + plantRng.range(row.off[0], row.off[1])), point);
+          if (blocked(point.x, point.z, 0, hint)) continue;
+          hint = spot.index;
+          if (!free(point.x, point.z, row.r)) continue;
+          const y = terrain.heightAt(point.x, point.z);
+          if (y < lakeLevel + 0.4) continue;
+          addTree(point.x, y - 0.15, point.z, startWood(plantRng.next()), { road: true, turned: turnedAt(track, noise, s), inside: land ? 0.3 : 0.1, young: land ? 1.2 : 1 });
+        }
+      }
+    }
+  }
+
   // the undergrowth at the wood's edge, in front of and between the first trunks: hazel shrubs and young trees
   const HAZEL = SPECIES.indexOf('hazel');
   for (const side of [1, -1]) {
@@ -278,9 +319,10 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const foliage = createFoliageAtlas(T.tile, rng.fork('foliage'));
   const bark = createBarkTextures(T.bark, rng.fork('bark'));
   lap('textures');
-  const models = growTrees(VARIANTS, SPECIES_DATA, rng.fork('grow'), { full: T.full > 0, barkSize: T.bark });
+  // (the full trees are grown on every tier: the impostors are pictures of them, even where they are never drawn)
+  const models = growTrees(VARIANTS, SPECIES_DATA, rng.fork('grow'), { full: true, barkSize: T.bark });
   lap('grow');
-  const atlas = bakeImpostors({ renderer, models, foliage: foliage.texture, bark: bark.map, cell: T.cell });
+  const atlas = bakeImpostors({ renderer, models, foliage: foliage.texture, bark: bark.map, cell: T.cell, rings: T.rings });
   lap('bake');
 
   // ---------------------------------------------------------------- per-tree data
@@ -329,6 +371,44 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       spheres[i * 4 + 3] = Math.max(model.top * 0.5, model.radius) * s * 1.1;
     });
   }
+  // THE WOOD'S FLOOR: under each tree of the road's rows (and each shrub) a patch of grass and low growth, and under a
+  // turned one a patch of its fallen leaves: flat cards lying on the ground, turned to its slope (a few per tree,
+  // two triangles each), so that there is no bare dark ground at the wood's edge.
+  const patchStart = new Int32Array(count + 1);
+  const patchKind = [];
+  const patchMatrix = [];
+  const patchTint = [];
+  {
+    const floorRng = rng.fork('floor');
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const qy = new THREE.Quaternion();
+    const n = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
+    const p = new THREE.Vector3();
+    const sc = new THREE.Vector3();
+    const add = (i, kind, x, z, size, tint) => {
+      terrain.normalAt(x, z, n);
+      q.setFromUnitVectors(up, n).multiply(qy.setFromAxisAngle(up, floorRng.range(0, Math.PI * 2)));
+      m.compose(p.set(x, terrain.heightAt(x, z) + 0.05, z), q, sc.set(size, 1, size));
+      patchKind.push(kind);
+      patchMatrix.push(...m.elements);
+      patchTint.push(...tint);
+    };
+    trees.forEach((t, i) => {
+      patchStart[i] = patchKind.length;
+      if (!t.road) return;
+      const reach = Math.max(2.5, Math.min(7, t.h * 0.42));
+      const g = floorRng.range(0.8, 1.15);
+      add(i, 0, t.x + floorRng.range(-1, 1), t.z + floorRng.range(-1, 1), reach * 1.6, [0.3 * g, 0.4 * g, 0.16 * g]);
+      if (t.turned > 0.4) {
+        const k = i * 3;
+        add(i, 1, t.x + floorRng.range(-1.5, 1.5), t.z + floorRng.range(-1.5, 1.5), reach * 1.9, [tints[k] * 0.8, tints[k + 1] * 0.8, tints[k + 2] * 0.8]);
+      }
+    });
+    patchStart[count] = patchKind.length;
+  }
+
   // cells
   const cx0 = Math.floor(X0 / CELL);
   const cz0 = Math.floor(Z0 / CELL);
@@ -412,6 +492,37 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     casterMeshes.push(mesh);
   }
   card.dispose();
+  // the floor's two kinds of patch: grass and low growth, fallen leaves
+  const floorMaterial = plantMaterial({ map: foliage.texture, atmosphere, uniforms, wind: null, coverage });
+  floorMaterial.polygonOffset = true;
+  floorMaterial.polygonOffsetFactor = -2;
+  floorMaterial.polygonOffsetUnits = -2;
+  const floorMeshes = [TILE.FLOOR, TILE.LITTER].map((tile, kind) => {
+    const [u0, v0, u1, v1] = tileRect(tile);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5]), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]), 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([u0, v0, u1, v0, u1, v1, u0, v1]), 2));
+    g.setAttribute('aShade', new THREE.BufferAttribute(new Float32Array([1, 0, 1, 0, 1, 0, 1, 0]), 2));
+    g.setIndex([0, 2, 1, 0, 3, 2]);
+    const capacity = patchKind.filter((k) => k === kind).length;
+    const mesh = pool(g, floorMaterial, capacity, kind ? 'forest-floor-leaves' : 'forest-floor-grass');
+    g.dispose();
+    // (the floor is not in the mirror or the probe)
+    mesh.userData.floor = true;
+    return mesh;
+  });
+  function writePatch(j, i, fade) {
+    const mesh = floorMeshes[patchKind[j]];
+    const k = mesh.count++;
+    const a = mesh.geometry.attributes;
+    for (let e = 0; e < 16; e++) mesh.instanceMatrix.array[k * 16 + e] = patchMatrix[j * 16 + e];
+    a.aTint.array[k * 4] = patchTint[j * 3];
+    a.aTint.array[k * 4 + 1] = patchTint[j * 3 + 1];
+    a.aTint.array[k * 4 + 2] = patchTint[j * 3 + 2];
+    a.aTint.array[k * 4 + 3] = fade;
+    a.aBake.array.set(bakes.subarray(i * 3, i * 3 + 3), k * 3);
+  }
   const through = VARIANTS.map((v) => SPECIES_DATA[v.species].through);
 
   // ---------------------------------------------------------------- per view
@@ -485,6 +596,12 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         if (caster && Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR) write(casterMeshes[0], i, 1);
         if (!seenCell || !frustum.intersectsSphere(sphere)) continue;
         // (small things, the undergrowth and young trees, go to the simpler levels sooner)
+        // the floor under it
+        if (patchStart[i] < patchStart[i + 1]) {
+          const df = flat ? 0 : sphere.center.distanceTo(eye);
+          const reachF = FLOOR_REACH[tier] ?? FLOOR_REACH.high;
+          if (df < reachF) for (let j = patchStart[i]; j < patchStart[i + 1]; j++) writePatch(j, i, coverage ? Math.min(1, (reachF - df) / 15) : 1);
+        }
         const small = trees[i].h < 6;
         const fD = small ? fullD * 0.55 : fullD;
         const rD = small ? redD * 0.6 : redD;
@@ -508,6 +625,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     }
     // what the view draws; then, behind it in the reduced meshes, the full trees for the mirror and the probe
     for (const m of group.children) m.userData.main = m.userData.other = m.count;
+    for (const m of floorMeshes) m.userData.other = 0;
     for (const m of fullMeshes) m.userData.other = 0;
     for (const i of fullList) write(reducedMeshes[trees[i].variant], i, 1);
     for (const m of reducedMeshes) m.userData.other = m.count;
@@ -527,6 +645,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     });
     counts.impostors = farMesh.userData.main;
     counts.triangles += farMesh.userData.main * 2;
+    counts.floor = floorMeshes[0].userData.main + floorMeshes[1].userData.main;
+    counts.triangles += counts.floor * 2;
     for (const m of casterMeshes) {
       counts.casters += m.count;
       counts.casterTriangles += m.count * 2;
@@ -602,6 +722,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       material.dispose();
       farMaterial.dispose();
       depthMaterial.dispose();
+      floorMaterial.dispose();
       casterMaterial.dispose();
       foliage.texture.dispose();
       bark.map.dispose();
