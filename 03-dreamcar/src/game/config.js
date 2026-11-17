@@ -261,13 +261,13 @@ export const CAMERA = {
  * pose relative to the car (see Game.setPhoto) and the moment of the autopilot's run it belongs to (`t`, seconds
  * from the start of a run at RULES.autopilotPace; `time`, the time of day), used when the address does not give
  * them. D1: the run-up to the line, low behind and right of the car, yawed left; D3: the ledge's first bend, low
- * behind and left, looking down it; D4: the grid during the countdown at golden hour, low on the lake side behind
+ * behind and left, looking down it; D4: the grid at golden hour just after the lights go out (the lamps show green), low on the lake side behind
  * the car, looking forward and right at the land side with the gantry's lamps in the picture.
  */
 export const PHOTOS = {
   d1: { back: 6.5, right: 3.2, up: 0.9, yaw: 17, pitch: 3.5, fov: 46, t: 100, time: 'day' },
   d3: { back: 5.5, right: -2.5, up: 1.0, yaw: -4, pitch: 4, fov: 46, t: 78.8, time: 'day' },
-  d4: { back: 7, right: -3.5, up: 0.5, yaw: -20, pitch: 4, fov: 40, t: 4.2, time: 'dusk' },
+  d4: { back: 7, right: -3.5, up: 0.5, yaw: -20, pitch: 4, fov: 40, t: 6.6, time: 'dusk' },
 };
 
 /**
