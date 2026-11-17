@@ -20,6 +20,21 @@
 //    climb it is a hair off square to the tangent in space; the normal is
 //    tangent x left.
 //
+// What else the Track says, as plain data for the world, the cameras, the HUD and the sound (nothing here is
+// drawn; s in metres from the line, side +1 left / -1 right, lat in metres, + = left; a range may run through
+// the line, so read its length as wrap(s1 - s0)):
+//   kerbs           [{ s0, s1, side, width }]  part of the course: profile() and surfaceAt() return SURFACE.KERB
+//                   between halfWidth and halfWidth + width, flush at the road, rising KERB.rise with a saw-tooth;
+//                   kerbAt(s, side) says how much kerb stands there (0..1, ramped at the ends)
+//   woodAt(s, side) what grows behind the barrier: 'broadleaf', 'conifer', 'mixed' or null
+//   tyreWalls       [{ s0, s1, side, lat, depth }]  in front of the barrier on the outside of the fast bends
+//   boards          [{ s0, s1, side, lat, height }]  runs of trackside boards facing the road
+//   distanceBoards  [{ s, side, lat, label, bridge }]  300, 200, 100 m before the slow corner (on a bridge: hung on the parapet)
+//   marshals        [{ s, side, lat }]  posts behind the barrier
+//   gantry          { s, latL, latR }  the start gantry across the road at the line
+//   bridges         [{ s0, s1, drop, id }]  each deck with the depth of the ground under its middle
+//   lamps, tunnels, sectors, sections  as before
+//
 // Pure JavaScript: runs in Node as well as in the browser.
 
 import { Vector3 } from 'three';

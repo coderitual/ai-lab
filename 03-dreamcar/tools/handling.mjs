@@ -28,17 +28,17 @@ row('parked on a 10 % hill, 6 % camber', `${f(slope.moved * 1000, 2)} mm in 10 s
 
 section('Straight line');
 const acc = (data.acceleration = M.acceleration());
-row('0-100 km/h', `${f(acc.t100, 2)} s`, '[5.8-6.6]');
-row('0-200 km/h', `${f(acc.t200, 1)} s`);
+row('0-100 km/h', `${f(acc.t100, 2)} s`, '[4.0 or less]');
+row('0-200 km/h', `${f(acc.t200, 1)} s`, '[about 13]');
 row('standing 400 m', `${f(acc.t400m, 2)} s at ${f(acc.v400m, 0)} km/h`);
 row('launch', `${f(acc.launchG, 2)} g peak, ${f(acc.squat, 2)}° squat`);
 row('up-shifts at', acc.shifts.map((s) => `${s.to}:${f(s.kmh, 0)}`).join(' ') + ' km/h');
 const top = (data.topSpeed = M.topSpeed());
-row('top speed', `${f(top.kmh, 1)} km/h in ${top.gear}th at ${f(top.rpm, 0)} rpm`, '[245-255, limited]');
+row('top speed', `${f(top.kmh, 1)} km/h in ${top.gear}th at ${f(top.rpm, 0)} rpm`, '[about 285, limited]');
 const free = (data.topSpeedUnlimited = M.topSpeed(M.tuned((p) => { p.topSpeed = 400 / 3.6; })));
 row('top speed without the limiter', `${f(free.kmh, 1)} km/h in ${free.gear}th at ${f(free.rpm, 0)} rpm`);
 const b100 = (data.braking100 = M.braking(100));
-row('100-0 km/h', `${f(b100.distance, 1)} m in ${f(b100.time, 2)} s (mean ${f(b100.meanG, 2)} g, peak ${f(b100.peakG, 2)} g)`, '[34-39 m]');
+row('100-0 km/h', `${f(b100.distance, 1)} m in ${f(b100.time, 2)} s (mean ${f(b100.meanG, 2)} g, peak ${f(b100.peakG, 2)} g)`, '[32 m or less]');
 row('dive under braking', `${f(b100.dive, 2)}° at most, ${f(b100.divePerG, 2)}° per g`, '[1.5-2° per g]');
 const b200 = (data.braking200 = M.braking(200));
 row('200-0 km/h', `${f(b200.distance, 1)} m in ${f(b200.time, 2)} s (mean ${f(b200.meanG, 2)} g)`);
@@ -49,9 +49,15 @@ row('hands off at 200 km/h after a shove', `slip ${f(hands.mostSlip, 2)}° at mo
 const rev = (data.reversing = M.reversing());
 row('reverse', `${f(-rev.back.kmh, 0)} km/h after 5 s on the brake; throttle stops it in ${f(rev.stopTime, 1)} s, then ${rev.gearAfter}st gear`);
 
+{
+  const locks = [150, 200, 250, 280].map((kmh) => [kmh, M.fullLockAt(kmh, 3)]);
+  data.fullLock = locks;
+  row('full key lock for 3 s, throttle held', locks.map(([k, r]) => `${k}: ${f(r.mostSlip, 1)}°`).join(', ') + ' of slip', '[never spins]');
+}
+
 section('Cornering');
 const pad = (data.skidpad = M.skidpad(50));
-row('steady state, 50 m circle', `${f(pad.maxG, 2)} g at ${f(pad.speedAtMax, 0)} km/h (${pad.ended})`, '[0.95-1.05 g]');
+row('steady state, 50 m circle', `${f(pad.maxG, 2)} g at ${f(pad.speedAtMax, 0)} km/h (${pad.ended})`, '[about 1.25-1.3 g]');
 row('at that limit', `steering ${f(pad.steerAtLimit, 1)}°, body slip ${f(pad.slipAtLimit, 1)}°`);
 row('understeer gradient', `${f(pad.understeer, 2)}° per g`);
 row('body roll', `${f(pad.rollPerG, 2)}° per g`, '[about 3.5]');
@@ -92,7 +98,7 @@ row('full lock (key = stick)', locks.map((l) => `${f(l.key, 1)}° at ${l.kmh}`).
 const taps = (data.taps = [50, 100, 200].map((ms) => ({ ms, ...M.keyTap(200, ms) })));
 row('a tap at 200 km/h', taps.map((t) => `${t.ms} ms: ${f(Math.abs(t.heading), 2)}°`).join(', ') + `; yaw ${f(Math.max(...taps.map((t) => t.late)), 4)} rad/s 1 s on`, '[no sawing]');
 const bk = (data.brakeKey = M.brakeKey(100)), bks = (data.brakeKeySteered = M.brakeKey(100, -1));
-row('brake key, 100-0 km/h', `${f(bk.distance, 1)} m; steering held from 0.5 s: ${f(bks.distance, 1)} m, turned ${f(bks.heading, 0)}°`, '[34-39 m, steers]');
+row('brake key, 100-0 km/h', `${f(bk.distance, 1)} m; steering held from 0.5 s: ${f(bks.distance, 1)} m, turned ${f(bks.heading, 0)}°`, '[33 m or less, steers]');
 const lk = (data.launchKey = M.launchKey(0)), lkl = (data.launchKeyLock = M.launchKey(1));
 row('throttle key from rest', `${f(lk.kmh, 0)} km/h after 4 s; with full lock ${f(lkl.kmh, 0)} km/h, slide ${f(lkl.mostSlip, 1)}° beyond the turn's own`, '[no spin]');
 const hbk = (data.handbrakeKeys = [[40, 0.3], [60, 0.3], [60, 0.5], [100, 0.3]].map(([kmh, pull]) => ({ kmh, pull, ...M.handbrakeKeys(kmh, pull) })));
@@ -105,6 +111,10 @@ row('shifts in 15 s', `throttle key on and off at 60 km/h: ${hunt.keyShifts}; he
 section('Edges');
 const rail10 = (data.rail10 = M.railTouch(100, 10)), rail45 = (data.rail45 = M.railTouch(80, 45)), wall10 = (data.wall10 = M.railTouch(100, 10, CAR, EDGE.WALL));
 row('a rail touched at 10°, 100 km/h', `keeps ${f(rail10.least * 100, 0)} % (${f(rail10.kept * 100, 0)} % 0.6 s on), along the rail in ${f(rail10.parallel, 2)} s, ${rail10.impacts} impact, steered off at ${f(rail10.endKmh, 0)} km/h`, '[>= 90 %]');
+for (const [kmh, angle] of [[200, 5], [250, 8]]) {
+  const t = M.railTouch(kmh, angle);
+  row(`a rail touched at ${angle}°, ${kmh} km/h`, `keeps ${f(t.least * 100, 0)} %, along the rail in ${f(t.parallel, 2)} s`, '[>= 90 %]');
+}
 row('a wall touched at 10°, 100 km/h', `keeps ${f(wall10.least * 100, 0)} %, along it in ${f(wall10.parallel, 2)} s, ${wall10.impacts} impact`);
 row('a rail hit at 45°, 80 km/h', `keeps ${f(rail45.least * 100, 0)} %, along the rail in ${f(rail45.parallel, 2)} s, ${rail45.impacts} impacts, driven away at ${f(rail45.endKmh, 0)} km/h`);
 
@@ -116,10 +126,10 @@ if (!process.argv.includes('--no-laps')) {
     const r = M.laps(track, kind, { pace, count: 2 });
     return { kind, pace, ...r };
   };
-  const lapRows = (data.laps = [lap('auto', 1), lap('auto', 0.9), lap('auto', 0.7), lap('thumb', 1), lap('pad', 1), lap('keys', 1)]);
+  const lapRows = (data.laps = [lap('auto', 1), lap('auto', 0.9), lap('auto', 0.7), lap('thumb', 1), lap('pad', 1), lap('keys', 1), lap('hamfist', 1)]);
   for (const l of lapRows) {
-    const who = { auto: 'autopilot', thumb: 'thumb (full throttle unless braking)', pad: 'pad (analog steering and pedals)', keys: 'keys' }[l.kind];
-    row(`${who}, pace ${l.pace}`, `${f(l.best, 1)} s, ${l.impacts} impacts, body ${f(-l.off, 2)} m inside the pavement at worst, slip ${f(l.slip, 1)}° at most, stability control ${f(l.escPerLap, 1)} s a lap`);
+    const who = { auto: 'autopilot', thumb: 'thumb (full throttle unless braking)', pad: 'pad (analog steering and pedals)', keys: 'keys', hamfist: 'ham-fisted keys (flat out, full keys, slow hands)' }[l.kind];
+    row(`${who}, pace ${l.pace}`, `${f(l.best, 1)} s, ${l.impacts} impacts, body ${l.off > 0 ? `${f(l.off, 2)} m onto the kerb` : `${f(-l.off, 2)} m inside the pavement`} at worst, slip ${f(l.slip, 1)}° at most, stability control ${f(l.escPerLap, 1)} s a lap`);
   }
 }
 
