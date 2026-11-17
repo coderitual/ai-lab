@@ -2,6 +2,7 @@
 //
 //   node tools/handling.mjs            the table
 //   node tools/handling.mjs --json     the same numbers as JSON
+//   node tools/handling.mjs --no-laps  without the laps of the real road (they take most of the time)
 //
 // These are the figures of docs/spec.md's handling section: run this after changing anything in
 // src/game/vehicle/ and bring that table up to date. The targets in brackets are the build's; the same numbers are
@@ -9,6 +10,7 @@
 
 import { CAR } from '../src/game/vehicle/params.js';
 import * as M from './unit/manoeuvres.mjs';
+import { EDGE } from './unit/flatTrack.mjs';
 
 const f = (v, digits = 1) => (Number.isFinite(v) ? v.toFixed(digits) : String(v));
 const rows = [];
@@ -66,11 +68,60 @@ row('the same, assists off', `body slip ${f(powerOff.mostSlip, 1)}° at most${po
 const hb = (data.handbrake = M.handbrakeTurn(60));
 row('handbrake turn, 60 km/h, 1 s', `turned ${f(hb.turned, 0)}°, body slip ${f(hb.mostSlip, 0)}° at most, slowest ${f(hb.slowest, 0)} km/h, rear wheels ${hb.rearLocked ? 'locked' : 'NOT locked'}`);
 
+const ch = (data.characteristicSpeed = M.characteristicSpeed());
+row('characteristic speed', `${f(ch, 1)} m/s (the stability control's reference uses ${CAR.assists.esc.characteristicSpeed})`);
+const lift9 = (data.liftOff09 = M.bend(90, 0.9, (c) => { c.throttle = 0; }));
+row('lift-off at 0.9 g, 90 km/h', `radius ${f(lift9.before.radius, 0)} -> ${f(lift9.after.radius, 0)} m after 1 s, body slip ${f(lift9.mostSlip, 1)}° at most`, '[tightens, no spin]');
+const squeal = (data.squeal = [60, 110].map((kmh) => ({ kmh, ...M.squealOnset(kmh) })));
+row('tyres start to squeal at', squeal.map((q) => `${f(q.onset * 100, 0)} % of the most g at ${q.kmh} km/h`).join(', '), '[80-90 %]');
+
 section('Ride');
 const front = (data.rideFront = M.ride('front'));
 const rear = (data.rideRear = M.ride('rear'));
 row('ride frequency front / rear', `${f(front.hz, 2)} / ${f(rear.hz, 2)} Hz`, '[about 1.3 / 1.5]');
 row('damping ratio front / rear', `${f(front.dampingRatio, 2)} / ${f(rear.dampingRatio, 2)} (bump ${f(front.bump, 2)}, rebound ${f(front.rebound, 2)})`, '[0.4-0.5]');
+
+section('Keys (PlayerDriver, digital)');
+const k80 = (data.keyResponse80 = M.keyResponse(80));
+row('key held at 80 km/h', `90 % of the yaw rate in ${f(k80.rise, 2)} s, under 10 % ${f(k80.release, 2)} s after release`, '[0.30-0.45 s; under 0.35 s]');
+row('  where it settles', `${f(k80.steadyG, 2)} g at ${f(k80.steer, 1)}° of steering, yaw overshoot ${f(k80.overshoot, 0)} %`);
+const held = (data.keyHeld = [110, 140, 200].map((kmh) => ({ kmh, ...M.keyResponse(kmh) })));
+row('key held through a long bend', held.map((h) => `${h.kmh} km/h: ${f(h.steadyG, 2)} g, swings ${f(h.swing, 2)} g`).join('; '), '[steady]');
+const locks = (data.locks = [20, 40, 100, 200].map((kmh) => ({ kmh, key: M.lockAt(kmh), stick: M.lockAt(kmh, true) })));
+row('full lock (key = stick)', locks.map((l) => `${f(l.key, 1)}° at ${l.kmh}`).join(', ') + ' km/h');
+const taps = (data.taps = [50, 100, 200].map((ms) => ({ ms, ...M.keyTap(200, ms) })));
+row('a tap at 200 km/h', taps.map((t) => `${t.ms} ms: ${f(Math.abs(t.heading), 2)}°`).join(', ') + `; yaw ${f(Math.max(...taps.map((t) => t.late)), 4)} rad/s 1 s on`, '[no sawing]');
+const bk = (data.brakeKey = M.brakeKey(100)), bks = (data.brakeKeySteered = M.brakeKey(100, -1));
+row('brake key, 100-0 km/h', `${f(bk.distance, 1)} m; steering held from 0.5 s: ${f(bks.distance, 1)} m, turned ${f(bks.heading, 0)}°`, '[34-39 m, steers]');
+const lk = (data.launchKey = M.launchKey(0)), lkl = (data.launchKeyLock = M.launchKey(1));
+row('throttle key from rest', `${f(lk.kmh, 0)} km/h after 4 s; with full lock ${f(lkl.kmh, 0)} km/h, slide ${f(lkl.mostSlip, 1)}° beyond the turn's own`, '[no spin]');
+const hbk = (data.handbrakeKeys = [[40, 0.3], [60, 0.3], [60, 0.5], [100, 0.3]].map(([kmh, pull]) => ({ kmh, pull, ...M.handbrakeKeys(kmh, pull) })));
+row('handbrake with a key held', hbk.map((h) => `${h.kmh} km/h ${h.pull} s: ${f(h.turned, 0)}°`).join(', '), '[a rotation that grows with the pull]');
+
+section('Gearbox');
+const hunt = (data.gearHunt = M.gearHunt());
+row('shifts in 15 s', `throttle key on and off at 60 km/h: ${hunt.keyShifts}; held near 70 km/h down an 8 % hill by the brake: ${hunt.hillShifts}`, '[no hunting]');
+
+section('Edges');
+const rail10 = (data.rail10 = M.railTouch(100, 10)), rail45 = (data.rail45 = M.railTouch(80, 45)), wall10 = (data.wall10 = M.railTouch(100, 10, CAR, EDGE.WALL));
+row('a rail touched at 10°, 100 km/h', `keeps ${f(rail10.least * 100, 0)} % (${f(rail10.kept * 100, 0)} % 0.6 s on), along the rail in ${f(rail10.parallel, 2)} s, ${rail10.impacts} impact, steered off at ${f(rail10.endKmh, 0)} km/h`, '[>= 90 %]');
+row('a wall touched at 10°, 100 km/h', `keeps ${f(wall10.least * 100, 0)} %, along it in ${f(wall10.parallel, 2)} s, ${wall10.impacts} impact`);
+row('a rail hit at 45°, 80 km/h', `keeps ${f(rail45.least * 100, 0)} %, along the rail in ${f(rail45.parallel, 2)} s, ${rail45.impacts} impacts, driven away at ${f(rail45.endKmh, 0)} km/h`);
+
+if (!process.argv.includes('--no-laps')) {
+  section('Laps of the real road (flying laps, s)');
+  const { createTrack } = await import('../src/game/track.js');
+  const track = createTrack();
+  const lap = (kind, pace) => {
+    const r = M.laps(track, kind, { pace, count: 2 });
+    return { kind, pace, ...r };
+  };
+  const lapRows = (data.laps = [lap('auto', 1), lap('auto', 0.9), lap('auto', 0.7), lap('thumb', 1), lap('pad', 1), lap('keys', 1)]);
+  for (const l of lapRows) {
+    const who = { auto: 'autopilot', thumb: 'thumb (full throttle unless braking)', pad: 'pad (analog steering and pedals)', keys: 'keys' }[l.kind];
+    row(`${who}, pace ${l.pace}`, `${f(l.best, 1)} s, ${l.impacts} impacts, body ${f(-l.off, 2)} m inside the pavement at worst, slip ${f(l.slip, 1)}° at most, stability control ${f(l.escPerLap, 1)} s a lap`);
+  }
+}
 
 if (process.argv.includes('--json')) {
   console.log(JSON.stringify(data, null, 2));

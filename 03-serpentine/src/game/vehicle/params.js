@@ -117,6 +117,8 @@ export const CAR = {
     curvatureY: -0.6,
     /** On a loose surface the peak comes later: slip scale = 1 + looseSlip·(1 − grip). */
     looseSlip: 1.6,
+    /** wheel.skid from the combined normalised slip (1 = the peak) and the speed the patch slides at (m/s). */
+    squeal: { from: 0.35, span: 0.9, slide: 0.15, slideSpan: 0.8 },
     /** Below this speed (m/s) slip is measured against it instead of the wheel's own speed. */
     minSpeed: 0.1,
   },
@@ -173,7 +175,9 @@ export const CAR = {
     kickdownTime: 0.22,
     shiftTorque: 0.3, // fraction of torque passed in the middle of a shift
     minInterval: 0.3, // s between shifts
-    holdAfterLift: 1.5, // s the box remembers a wide throttle before it shifts up after lifting
+    holdAfterLift: 1.5, // s the box holds on to a wide throttle after lifting before it starts to forget it
+    holdAfterBrake: 2, // s it holds on to hard braking (the gear for the exit of the bend), unless the throttle opens
+    forget: 1.2, // s to forget a full pedal once the hold is over
     reverseSpeed: 11, // m/s, where reverse runs out
   },
 
@@ -201,14 +205,21 @@ export const CAR = {
     tc: { slip: 0.085, bendSlip: 0.17, learn: 5, forget: 2.5, react: 0.35 },
     esc: {
       minSpeed: 6,
-      /** Characteristic speed (m/s) of the car's understeer: what yaw rate a steering angle is taken to ask for. */
-      characteristicSpeed: 28,
+      /**
+       * Characteristic speed (m/s) of the car's understeer: what yaw rate a steering angle is taken to ask for. It is
+       * the car's own (measured by tools/handling.mjs: 38 m/s, 1.1° of steering per g in the linear range); a lower
+       * figure makes ordinary cornering look like oversteer to the stability control.
+       */
+      characteristicSpeed: 38,
+      lag: 0.12, // s, the yaw's answer to the steering, as the reference follows it
       deadband: 0.07, // rad/s of yaw-rate error let pass
+      deadbandG: 1.0, // m/s²: and no more than this much lateral acceleration
       yawGain: 17000, // N·m of correcting moment per rad/s beyond that
       slipAllowed: 0.085, // rad of body slip let pass (about 5°)
       slipGain: 52000, // N·m per rad beyond that
       slipRateGain: 9000, // N·m per rad/s of the slip angle growing
       understeerGain: 0.9, // throttle trimmed per rad/s of missing yaw rate
+      handbrakePause: 0.35, // s it stays out of the way after the handbrake is let go (the turn it made is wanted)
     },
   },
 
@@ -222,6 +233,8 @@ export const CAR = {
       { restitution: 0.08, friction: 0.6 },
     ],
     impactSpeed: 0.6, // m/s of closing speed below which a touch is not reported as an impact
+    again: 1.5, // while still against the edge, a knock is reported only if this many times harder than the last
+    apart: 0.3, // s off the edge after which the next touch is a new meeting
   },
 
   /** Car against car. */
