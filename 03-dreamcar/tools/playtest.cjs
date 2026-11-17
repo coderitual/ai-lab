@@ -1,7 +1,9 @@
 // Dev tool: the automated run-through, run before every push.
 //
-//   node tools/playtest.cjs http://localhost:4197/            (the production build: npm run preview)
-//   node tools/playtest.cjs http://localhost:5194/ split touch  only the sections whose names are given
+//   node tools/playtest.cjs http://localhost:4190/            the production build (npm run build && npm run preview)
+//   node tools/playtest.cjs http://localhost:5190/ split touch  only the sections whose names are given
+//
+// Without a URL it takes $PREVIEW_URL, or http://localhost:4190/ (vite.config.js's preview port).
 //
 // It drives the game through its real input paths (key events, pointer events, a stand-in for the gamepad
 // API, clicks on the HUD's buttons) and asks the page how the run went through window.__dreamcar (state(),
@@ -17,7 +19,7 @@
 const { chromium } = require('playwright');
 
 const argv = process.argv.slice(2);
-const BASE = (argv[0] || 'http://localhost:4197/').replace(/\/?$/, '/');
+const BASE = (argv[0] || process.env.PREVIEW_URL || 'http://localhost:4190/').replace(/\/?$/, '/');
 const ONLY = argv.slice(1);
 
 let checks = 0;
@@ -72,6 +74,12 @@ async function open(query, { w = 320, h = 180, mobile = false, storage = true, i
     ok,
     state: () => page.evaluate('window.__dreamcar.state()'),
     d0: async () => (await page.evaluate('window.__dreamcar.state()')).drivers[0],
+    /** Another address in the same page (the same storage), ready to step. */
+    async go(q) {
+      await page.goto(BASE + q, { waitUntil: 'load', timeout: 300000 });
+      await page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
+      check(`${q} loads`, await page.evaluate('!!window.__dreamcar'));
+    },
     skip: (s) => page.evaluate(`window.__dreamcar.skip(${s})`),
     advance: (s, fps = 30) => page.evaluate(`window.__dreamcar.advance(${s}, ${fps})`),
     /** Step without drawing at `fps` frames a second (the fixed step does not care how often it is asked). */
@@ -315,6 +323,81 @@ const SECTIONS = {
     const t = s.time;
     check('a three-lap total on the board', board && board[t] && board[t].best3 === d.total, `${board && board[t] && board[t].best3}`);
     await p.close('three laps');
+  },
+
+  /** One lap at each time of day in one browser (one storage), then a reload: each time keeps its own board and ghost. */
+  async board() {
+    const p = await open('?manual&q=low&nodraw', { w: 320, h: 180 });
+    const times = await p.page.evaluate('Object.keys(window.__dreamcar.times)');
+    const laps = {};
+    for (const time of times) {
+      await p.go(`?manual&q=low&auto&ap&laps=1&nodraw&time=${time}`);
+      const s = await p.until((x) => x.phase === 'results', 400, 10);
+      laps[time] = s.drivers[0].laps.map((l) => l.ms);
+      check(`a lap at ${time}`, s.time === time && laps[time].length === 1, `${s.time}: ${laps[time].join(', ')}`);
+    }
+    // a reload onto the title, as somebody coming back would see it
+    await p.go('?manual&q=low');
+    await p.page.evaluate('window.__dreamcar.game.draw = () => {}');
+    const stored = await p.page.evaluate(`JSON.parse(localStorage.getItem('dreamcar.best.v1'))`);
+    for (const time of times) {
+      const kept = stored && stored[time] ? stored[time].laps.map((l) => l.ms) : [];
+      check(`after a reload, ${time} keeps its own lap and only that`, kept.length === 1 && kept[0] === laps[time][0], `${kept.join(', ')}`);
+    }
+    for (let i = 0; i < times.length; i++) {
+      await p.page.click(`.timechoice button:nth-child(${i + 1})`);
+      await p.skip(1.5);
+      const s = await p.state();
+      const text = await p.page.evaluate(`(document.querySelector('.hud .title') || document.body).innerText`);
+      check(`the title at ${times[i]}: its ghost is there and its board shows its lap`, s.time === times[i] && s.ghost.has && text.includes(fmt(laps[times[i]][0])),
+        `${s.time}, ghost ${s.ghost.has}, looking for ${fmt(laps[times[i]][0])}`);
+    }
+    await p.close('board');
+  },
+
+  /** Laps are taken only by driving the whole lap forwards: not by backing over a line, not by jumping a sector. */
+  async lines() {
+    const p = await open('?manual&q=low&auto&laps=1&time=day', { w: 320, h: 180, gpu: false });
+    const L = await p.page.evaluate('window.__dreamcar.game.track.length');
+    await toGo(p);
+    let d = await p.d0();
+    check('the grid is behind the start line', d.s > L - 60, `s ${d.s} of ${L.toFixed(0)}`);
+    await down(p, 'KeyW');
+    let s = await p.until((x) => x.drivers[0].s > 25 && x.drivers[0].s < 500, 30, 0.5);
+    await up(p, 'KeyW');
+    d = s.drivers[0];
+    check('over the start line at go: no lap, sector 1 armed', d.laps.length === 0 && d.sector === 0, `s ${d.s}, ${d.laps.length} laps, next line ${d.sector}`);
+    const lap = d.lap;
+    await down(p, 'KeyS');
+    s = await p.until((x) => x.drivers[0].s > L - 40 && x.drivers[0].s < L - 15, 60, 0.25);
+    await up(p, 'KeyS');
+    check('reversed back over the start line', s.drivers[0].s > L - 40, `s ${s.drivers[0].s}`);
+    await p.skip(3);
+    await down(p, 'KeyW');
+    s = await p.until((x) => x.drivers[0].s > 25 && x.drivers[0].s < 500, 40, 0.5);
+    await up(p, 'KeyW');
+    d = s.drivers[0];
+    check('backing over the line and driving over it again takes no lap', d.laps.length === 0 && d.lap === lap && d.sector === 0,
+      `lap ${lap} -> ${d.lap}, ${d.laps.length} laps, next line ${d.sector}`);
+    // a jump past both sector lines (as a teleport would: farther in one step than any car goes), then the autopilot
+    // drives on over the finish line
+    await p.page.evaluate(() => {
+      const g = window.__dreamcar.game;
+      const r = g.racers[0];
+      const at = 2100;
+      const f = g.track.frameAt(at, {});
+      const pt = g.track.pointAt(at, 0);
+      r.vehicle.reset({ x: pt.x, z: pt.z, yaw: Math.atan2(f.tan.x, f.tan.z) });
+      r.driver = r.auto;
+    });
+    await p.skip(0.5);
+    s = await p.until((x) => x.drivers[0].s > 30 && x.drivers[0].s < 1000, 200, 2);
+    d = s.drivers[0];
+    check('after jumping both sector lines, crossing the finish takes no lap', d.laps.length === 0 && d.sector === 0 && s.phase === 'run',
+      `s ${d.s}, ${d.laps.length} laps, next line ${d.sector}, ${s.phase}`);
+    s = await p.until((x) => x.phase === 'results', 300, 5);
+    check('the next whole lap is taken', s.phase === 'results' && s.drivers[0].laps.length === 1, `${s.phase}, ${s.drivers[0].laps.length} laps`);
+    await p.close('lines');
   },
 
   /** No storage at all (a private window, switched off): the game runs and finishes, the board lives for the page. */
