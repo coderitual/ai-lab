@@ -28,18 +28,22 @@ import * as THREE from 'three';
  *   pixelRatio   cap on the device pixel ratio
  *   msaa         samples of the scene target (0: none, and the finished picture gets FXAA instead)
  *   blurTaps     motion blur samples per pixel, at most (0: no motion blur)
+ *   blurLength   the longest streak, as a fraction of the view's width (a streak this long needs about 1 tap
+ *                for every 4 or 5 pixels of it to look smooth rather than like a row of copies)
  *   blurInline   the motion blur is done by the last pass as it reads the scene, not by a pass of its own:
  *                one full-size target and one pass less, and the glow is made from the unblurred scene
  *   bloomLevels  levels of the bloom pyramid
  *   lens         chromatic aberration and lens ghosts are available (the Look says how much)
+ *   aoSamples    ambient occlusion samples per half-size pixel (0: no ambient occlusion whatever the Look says)
+ *   aoTurns      how many times the samples' spiral winds round the pixel (no common factor with aoSamples)
  *   probeSize    edge of a reflection probe's cube faces
  *   probeFaces   faces redrawn on a frame that redraws any
  *   probeEvery   redrawn every n-th frame
  */
 export const TIERS = {
-  low: { pixelRatio: 1.5, msaa: 0, blurTaps: 6, blurInline: true, bloomLevels: 4, lens: false, probeSize: 64, probeFaces: 1, probeEvery: 2 },
-  medium: { pixelRatio: 2, msaa: 4, blurTaps: 8, blurInline: false, bloomLevels: 5, lens: true, probeSize: 128, probeFaces: 1, probeEvery: 1 },
-  high: { pixelRatio: 2, msaa: 4, blurTaps: 14, blurInline: false, bloomLevels: 6, lens: true, probeSize: 256, probeFaces: 2, probeEvery: 1 },
+  low: { pixelRatio: 1.5, msaa: 0, blurTaps: 6, blurLength: 0.04, blurInline: true, bloomLevels: 4, lens: false, aoSamples: 0, aoTurns: 0, probeSize: 64, probeFaces: 1, probeEvery: 2 },
+  medium: { pixelRatio: 2, msaa: 4, blurTaps: 10, blurLength: 0.06, blurInline: false, bloomLevels: 5, lens: true, aoSamples: 8, aoTurns: 5, probeSize: 128, probeFaces: 1, probeEvery: 1 },
+  high: { pixelRatio: 2, msaa: 4, blurTaps: 16, blurLength: 0.075, blurInline: false, bloomLevels: 6, lens: true, aoSamples: 14, aoTurns: 9, probeSize: 256, probeFaces: 2, probeEvery: 1 },
 };
 
 /**

@@ -22,6 +22,11 @@ import { LAYOUT, TUNNEL, segmentLength } from '../src/game/trackLayout.js';
 import { EDGE, closureOf, createTrack, speedEnvelope } from '../src/game/track.js';
 
 const args = process.argv.slice(2);
+const USAGE = 'usage: node tools/trackmap.mjs out.svg [--png out.png] [--fit idA,idB]';
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(USAGE);
+  process.exit(0);
+}
 const flag = (name) => {
   const i = args.indexOf(name);
   return i < 0 ? null : args.splice(i, 2)[1];
@@ -29,8 +34,8 @@ const flag = (name) => {
 const pngPath = flag('--png');
 const fitIds = flag('--fit');
 const svgPath = args[0];
-if (!svgPath) {
-  console.error('usage: node tools/trackmap.mjs out.svg [--png out.png] [--fit idA,idB]');
+if (!svgPath || svgPath.startsWith('-') || args.length > 1) {
+  console.error(USAGE);
   process.exit(2);
 }
 
@@ -117,7 +122,19 @@ for (const sec of track.sections) {
   console.log(`  ${sec.name.padEnd(18)} ${sec.s0.toFixed(0).padStart(5)} to ${sec.s1.toFixed(0).padStart(5)}  (${len.toFixed(0)} m)`);
 }
 for (const t of track.tunnels) console.log(`  tunnel ${t.s0.toFixed(0)} to ${t.s1.toFixed(0)} (${(t.s1 - t.s0).toFixed(0)} m)`);
-for (const b of track.bridges) console.log(`  bridge ${b.s0.toFixed(0)} to ${b.s1.toFixed(0)} (${(b.s1 - b.s0).toFixed(0)} m)`);
+for (const b of track.bridges) console.log(`  bridge ${b.id} ${b.s0.toFixed(0)} to ${b.s1.toFixed(0)} (${(b.s1 - b.s0).toFixed(0)} m, ground ${b.drop} m under the middle)`);
+{
+  let most = 0;
+  for (let i = 0; i < n; i++) most = Math.max(most, Math.abs(track.bank[i]));
+  console.log(`  banking up to ${((most * 180) / Math.PI).toFixed(1)} degrees`);
+}
+const side = (v) => (v > 0 ? 'L' : 'R');
+console.log(`  kerbs ${track.kerbs.map((k) => `${k.s0.toFixed(0)}-${k.s1.toFixed(0)}${side(k.side)}`).join(' ')}`);
+console.log(`  tyre walls ${track.tyreWalls.map((k) => `${k.s0.toFixed(0)}-${k.s1.toFixed(0)}${side(k.side)}`).join(' ')}`);
+console.log(`  boards ${track.boards.map((k) => `${k.s0.toFixed(0)}-${k.s1.toFixed(0)}${side(k.side)}`).join(' ')}`);
+console.log(`  distance boards ${track.distanceBoards.map((k) => `${k.label} at ${k.s.toFixed(0)}${side(k.side)}`).join(', ')}`);
+console.log(`  marshal posts ${track.marshals.map((k) => `${k.s.toFixed(0)}${side(k.side)}`).join(' ')}`);
+console.log(`  street lamps ${track.lamps.filter((l) => l.kind === 'street').length}, tunnel lamps ${track.lamps.filter((l) => l.kind === 'tunnel').length}`);
 console.log(`  sector lines at ${track.sectors.map((s) => `${s.toFixed(0)} m (${((s / length) * 100).toFixed(0)} %)`).join(', ')}`);
 console.log('pieces:');
 {
@@ -217,7 +234,7 @@ const strips = [
     values: speed,
     unit: 3.6,
     lo: 0,
-    hi: 260,
+    hi: 300,
     step: 50,
   },
 ];
@@ -241,6 +258,11 @@ band(0, n, hw, -hw, PAVEMENT);
 const bore = hw + TUNNEL.wallOffset;
 for (const t of track.tunnels) band(Math.ceil(t.s0 / ds), Math.floor(t.s1 / ds), bore, -bore, TUNNEL_FILL);
 for (const br of track.bridges) band(Math.ceil(br.s0 / ds), Math.floor(br.s1 / ds), hw, -hw, DECK_FILL);
+for (const k of track.kerbs) {
+  const i0 = Math.ceil(k.s0 / ds);
+  const i1 = i0 + Math.floor(track.wrap(k.s1 - k.s0) / ds);
+  band(i0, i1, k.side * hw, k.side * (hw + k.width), '#d8403a');
+}
 
 // Solid edges, one line per run of the same kind.
 for (const side of [1, -1]) {
@@ -413,7 +435,7 @@ for (const st of strips) {
     text(SX(track.sections[0].s0 + (length - track.sections[0].s0) / 2), y0 + st.h + 34, 'straight', { size: 11, anchor: 'middle' });
     text(SX(top * ds), SY(maxY) - 7, `${f1(maxY)} m`, { size: 12, fill: INK, anchor: 'middle', weight: 600 });
     text(SX(track.tunnels[0].s0) + 4, y0 + 14, 'in the tunnel', { size: 11 });
-    text(SX(track.bridges[0].s0) + 4, y0 + 30, 'on the viaduct', { size: 11 });
+    for (const br of track.bridges) text(SX(br.s0) + 4, y0 + 30, `on piers (${br.id})`, { size: 11 });
     for (let k = 0; k < 2; k++) text(SX(track.sectors[k]) + 5, y0 + st.h - 8, `sector line ${k + 1}`, { size: 11 });
   }
   text(stripX0 + total, y0 + st.h + 17, 'km from the line', { size: 11, anchor: 'end', fill: MUTED });

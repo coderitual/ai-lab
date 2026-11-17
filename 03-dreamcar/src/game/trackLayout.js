@@ -18,55 +18,71 @@
 // the numbers to paste back here; the turned angles must already add up to one
 // full turn to the right (-360 degrees).
 
-/** Paved half width: two lanes and two narrow paved margins, 8.5 m in all. */
-export const HALF_WIDTH = 4.25;
-
-/** The strip of loose gravel beyond the pavement, before the verge. */
-export const SHOULDER = 0.6;
-
-/** The tunnel's bore: ceiling above the road surface, and the walls beyond the pavement's edge. */
-export const TUNNEL = { height: 5.6, wallOffset: 0.9 };
-
-/** The viaduct: parapets beyond the pavement's edge, and how far the ravine floor lies under the middle of the deck. */
-export const VIADUCT = { parapetOffset: 0.7, drop: 32 };
+/** Paved half width: three lanes, 12 m in all. */
+export const HALF_WIDTH = 6;
 
 /**
- * What stands at the side of the road. `edge`: the range of distances from the
- * pavement's edge to the solid thing (it wanders slowly inside the range);
- * `slope`: rise per metre of the verge on the way there; `far`: rise per metre
- * of the hillside beyond it (where another stretch of the road is close, the
- * builder works the real slope out from the two roads instead);
- * `verge`: what the verge is made of.
+ * The strip beyond the pavement's edge, in the pavement's own banked plane, before the verge: a kerb where
+ * `kerbs` puts one, a paved margin elsewhere.
+ */
+export const SHOULDER = 1.2;
+
+/**
+ * Kerbs: flush with the pavement at its edge, rising `rise` (m) to their outer side, with a saw-tooth along the
+ * road of `pitch` (m) that takes `tooth` of the rise away between its teeth; they ramp up over `ramp` m at each end.
+ */
+export const KERB = { rise: 0.04, tooth: 0.25, pitch: 0.9, ramp: 4 };
+
+/** The tunnel's bore: ceiling above the road surface, and the walls beyond the pavement's edge. */
+export const TUNNEL = { height: 6.4, wallOffset: 1.5 };
+
+/** Bridges: parapets beyond the pavement's edge, and the depth of the ground under a deck that does not name its own `drop`. */
+export const VIADUCT = { parapetOffset: 1.5, drop: 32 };
+
+/**
+ * What stands at the side of the road. `edge`: the range of distances from the pavement's edge to the barrier (it
+ * wanders slowly inside the range); `slope`: rise per metre of the verge on the way there; `far`: rise per metre
+ * of the hillside beyond it (where another stretch of the road is close, the builder works the real slope out
+ * from the two roads instead); `verge`: what the verge is made of; `wood`: what grows beyond the barrier
+ * ('broadleaf', 'conifer', 'mixed' or null).
  */
 export const SIDES = {
-  // the lakeside straight: wide mown verges, the water behind a low rail, a meadow up to the wood
-  shore: { kind: 'rail', edge: [8, 12], slope: -0.03, far: -0.14, verge: 'grass' },
-  meadow: { kind: 'trees', edge: [8, 12], slope: 0.02, far: 0.2, verge: 'grass' },
-  // spruce forest: trunks a few metres back on a grass verge
-  woodUp: { kind: 'trees', edge: [4, 7], slope: 0.07, far: 0.4, verge: 'grass' },
-  woodDown: { kind: 'trees', edge: [4, 7], slope: -0.05, far: -0.3, verge: 'grass' },
-  // a hillside traverse: cut rock close in on the hill side, a steel rail and the drop on the valley side
-  rock: { kind: 'rock', edge: [1.5, 3], slope: 0.2, far: 1.5, verge: 'gravel' },
-  rail: { kind: 'rail', edge: [1.2, 2], slope: -0.04, far: -0.8, verge: 'grass' },
-  // the summit: open ground falling gently away on both sides
-  open: { kind: 'rail', edge: [2.6, 4], slope: -0.03, far: -0.28, verge: 'grass' },
-  // structures: paved right up to the wall
-  wallUp: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: 0.7, verge: 'asphalt' },
-  wallDown: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: -0.45, verge: 'asphalt' },
-  parapet: { kind: 'parapet', edge: [VIADUCT.parapetOffset, VIADUCT.parapetOffset], slope: 0, far: -2.5, verge: 'asphalt' },
+  // the lakeside straight: a low concrete wall each side; the water beyond the left one, the town beyond the right
+  shore: { kind: 'wall', edge: [4, 5], slope: -0.02, far: -0.12, verge: 'grass', wood: null },
+  town: { kind: 'wall', edge: [5, 6], slope: 0.01, far: 0.08, verge: 'grass', wood: 'broadleaf' },
+  // mown grass to a steel rail, woods behind it: low down broadleaf, higher up conifers
+  lowUp: { kind: 'rail', edge: [3, 5], slope: 0.04, far: 0.3, verge: 'grass', wood: 'broadleaf' },
+  lowDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.25, verge: 'grass', wood: 'broadleaf' },
+  lowRun: { kind: 'rail', edge: [8, 10], slope: -0.02, far: -0.2, verge: 'grass', wood: 'broadleaf' },
+  midUp: { kind: 'rail', edge: [3, 5], slope: 0.05, far: 0.4, verge: 'grass', wood: 'mixed' },
+  midDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.3, verge: 'grass', wood: 'mixed' },
+  midRun: { kind: 'rail', edge: [7, 10], slope: -0.02, far: -0.25, verge: 'grass', wood: 'mixed' },
+  highUp: { kind: 'rail', edge: [3, 5], slope: 0.05, far: 0.45, verge: 'grass', wood: 'conifer' },
+  highDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.35, verge: 'grass', wood: 'conifer' },
+  highRun: { kind: 'rail', edge: [7, 10], slope: -0.02, far: -0.3, verge: 'grass', wood: 'conifer' },
+  // the open top: run-off and a rail, the ground falling away, nothing growing that would hide the view
+  open: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'grass', wood: null },
+  // the road cut into the hill: a narrow verge, then the rock face
+  rock: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null },
+  // structures: paved right up to the wall or the parapet
+  wallUp: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: 0.7, verge: 'asphalt', wood: null },
+  wallDown: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: -0.45, verge: 'asphalt', wood: null },
+  parapet: { kind: 'parapet', edge: [VIADUCT.parapetOffset, VIADUCT.parapetOffset], slope: 0, far: -2.5, verge: 'asphalt', wood: null },
 };
 
 /** The named stretches, in driving order. */
 const SECTION_NAMES = {
   straight: 'Lakeside straight',
-  sweeper: 'The sweeper',
-  esses: 'The esses',
+  sweep: 'Shore bend',
+  esses: 'Forest esses',
   tunnel: 'The tunnel',
-  viaduct: 'The viaduct',
-  hairpins: 'The hairpins',
-  summit: 'The summit',
-  descent: 'The descent',
-  hook: 'The hook',
+  viaduct: 'The sky road',
+  carousel: 'The carousel',
+  crest: 'The crest',
+  plunge: 'The plunge',
+  ledge: 'The ledge',
+  gully: 'Gully bridge',
+  sweepback: 'The long right',
 };
 
 /**
@@ -76,68 +92,63 @@ const SECTION_NAMES = {
  * @property {number} [len] length (m) of a straight
  * @property {number} [r] radius (m) of an arc: positive bends LEFT, negative RIGHT
  * @property {number} [deg] degrees the arc turns through
- * @property {number} [ease] metres over which the curvature eases in from the piece before (centred on the joint)
+ * @property {number} [ease] metres over which the curvature (and the banking) eases in from the piece before
+ *   (centred on the joint)
+ * @property {number} [bank] degrees of banking into the bend, instead of the rule's (LAYOUT.bank, bankRadius)
  * @property {number} g gradient (per cent) at the end of the piece
  * @property {Array<[number, number]>} [gk] more gradient knots inside the piece: [fraction along it, per cent]
  * @property {keyof typeof SIDES} L what stands on the left
  * @property {keyof typeof SIDES} R what stands on the right
- * @property {boolean} [tunnel] @property {boolean} [bridge]
+ * @property {boolean} [tunnel]
+ * @property {boolean} [bridge] on piers; `drop`: how far the ground lies under the middle of the deck (m)
+ * @property {number} [drop]
+ * @property {'L' | 'R'} [runoff] the side whose verge is the run-off of a fast bend (tyre wall, boards)
  */
 
 /** @type {Segment[]} */
 const SEGMENTS = [
-  // Lakeside straight (the line is a third of the way along it: the last piece of the lap is its run-up).
-  { id: 'grid', sec: 'straight', len: 235, g: 0, L: 'shore', R: 'meadow' },
+  // Lakeside straight: the line, then 250 m to the first bend (its other 450 m are the last piece of the lap).
+  { id: 'grid', sec: 'straight', len: 250, g: 0, L: 'shore', R: 'town' },
 
-  // The sweeper: fast, right, off the shore and into the trees, starting to climb.
-  { id: 'sweeper', sec: 'sweeper', r: -170, deg: 65, ease: 90, g: 3.8, L: 'woodDown', R: 'woodUp' },
+  // Shore bend: a fast banked right away from the water, starting to climb.
+  { id: 'sweep', sec: 'sweep', r: -220, deg: 80, ease: 110, bank: 9, g: 3, L: 'lowRun', R: 'lowUp', runoff: 'L' },
+  { id: 'rise', sec: 'sweep', len: 100, ease: 80, g: 5, L: 'lowDown', R: 'lowUp' },
 
-  // The esses: four bends up through the forest at 6 per cent.
-  { id: 'ess1', sec: 'esses', r: 90, deg: 45, ease: 60, g: 5.8, L: 'woodDown', R: 'woodUp' },
-  { id: 'ess2', sec: 'esses', r: -80, deg: 95, ease: 50, g: 6.0, L: 'woodDown', R: 'woodUp' },
-  { id: 'ess3', sec: 'esses', r: 95, deg: 85, ease: 50, g: 6.0, L: 'woodDown', R: 'woodUp' },
-  { id: 'ess4', sec: 'esses', r: -75, deg: 54.2, ease: 50, g: 5.8, L: 'woodDown', R: 'woodUp' },
+  // Forest esses: long bends climbing through the wood, the last one turning the road along the hillside.
+  { id: 'ess1', sec: 'esses', r: -260, deg: 55, ease: 100, bank: 8, g: 5.5, L: 'midRun', R: 'midUp', runoff: 'L' },
+  { id: 'ess2', sec: 'esses', r: 330, deg: 40, ease: 120, bank: 7, g: 5, L: 'highUp', R: 'highRun', runoff: 'R' },
+  { id: 'ess3', sec: 'esses', r: -240, deg: 65, ease: 120, bank: 9, g: 4, L: 'highRun', R: 'highUp', runoff: 'L' },
 
-  // The tunnel: a rock cutting funnels the road into a bore through the spur.
-  { id: 'cutting', sec: 'tunnel', len: 55, ease: 40, g: 2.8, L: 'rock', R: 'rock' },
-  { id: 'tunnel', sec: 'tunnel', r: -430, deg: 33.3, ease: 50, g: 2.9, L: 'wallDown', R: 'wallUp', tunnel: true },
+  // The tunnel: a rock cutting, then the bore through the spur, bending gently right.
+  { id: 'cutting', sec: 'tunnel', len: 70, ease: 70, g: 3.5, L: 'rock', R: 'rock' },
+  { id: 'tunnel', sec: 'tunnel', r: -1000, deg: 20, ease: 60, g: 3, L: 'wallDown', R: 'wallUp', tunnel: true },
+  { id: 'mouth', sec: 'tunnel', len: 177.7441, ease: 50, g: 3.5, L: 'rock', R: 'rock' },
 
-  // The viaduct: out onto a ledge, then across the ravine.
-  { id: 'ledge', sec: 'viaduct', len: 70, ease: 50, g: 3.0, L: 'rail', R: 'rock' },
-  { id: 'viaduct', sec: 'viaduct', len: 150, g: 2.8, L: 'parapet', R: 'parapet', bridge: true },
+  // The sky road: out of the mountain onto piers, a long banked left across the valley.
+  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapet', bridge: true, drop: 42 },
 
-  // The hairpins: right, left, right, each leg stacked above the last. The arcs are in two halves because the
-  // hill changes sides half way round: what was the rock face on the way in is the drop on the way out.
-  { id: 'ramp', sec: 'hairpins', len: 125, g: 8.6, L: 'rail', R: 'rock' },
-  { id: 'hp1a', sec: 'hairpins', r: -20, deg: 90, ease: 24, g: 5.9, L: 'rail', R: 'rock' },
-  { id: 'hp1b', sec: 'hairpins', r: -20, deg: 90, ease: 0, g: 6.1, L: 'rock', R: 'rail' },
-  { id: 'leg1', sec: 'hairpins', len: 85, ease: 24, g: 7.0, gk: [[0.5, 9.2]], L: 'rock', R: 'rail' },
-  { id: 'hp2a', sec: 'hairpins', r: 22, deg: 90, ease: 24, g: 5.9, L: 'rock', R: 'rail' },
-  { id: 'hp2b', sec: 'hairpins', r: 22, deg: 90, ease: 0, g: 6.1, L: 'rail', R: 'rock' },
-  { id: 'leg2', sec: 'hairpins', len: 85, ease: 24, g: 7.0, gk: [[0.5, 9.2]], L: 'rail', R: 'rock' },
-  { id: 'hp3a', sec: 'hairpins', r: -19, deg: 90, ease: 24, g: 5.9, L: 'rail', R: 'rock' },
-  { id: 'hp3b', sec: 'hairpins', r: -19, deg: 90, ease: 0, g: 6.1, L: 'rock', R: 'rail' },
-  { id: 'exit', sec: 'hairpins', len: 70, ease: 24, g: 7.0, gk: [[0.5, 9.0]], L: 'rock', R: 'rail' },
+  // The carousel: a climb along the far side, then a right round the spur, the slow corner of the lap.
+  { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 6, L: 'highDown', R: 'rock' },
+  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'highRun', R: 'rock', runoff: 'L' },
 
-  // The summit: a long left over the crest, in the open.
-  { id: 'crest', sec: 'summit', r: 130, deg: 105, ease: 50, g: -6.5, gk: [[0.42, 0]], L: 'open', R: 'open' },
+  // The crest: up over the top in the open, the lake far below.
+  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'open', R: 'open' },
 
-  // The descent: sweepers down the east face, rock on the right, the valley on the left.
-  { id: 'fall1', sec: 'descent', len: 50, ease: 50, g: -7.85, L: 'rail', R: 'rock' },
-  { id: 'sweep1', sec: 'descent', r: -170, deg: 85, ease: 50, g: -7.85, L: 'rail', R: 'rock' },
-  { id: 'fall2', sec: 'descent', len: 132.7382, ease: 50, g: -7.85, L: 'rail', R: 'rock' },
-  { id: 'sweep2', sec: 'descent', r: 120, deg: 90, ease: 50, g: -7.85, L: 'rail', R: 'rock' },
-  { id: 'fall3', sec: 'descent', len: 73.3016, ease: 50, g: -7.85, L: 'rail', R: 'rock' },
-  { id: 'sweep3', sec: 'descent', r: -90, deg: 77.5, ease: 50, g: -7.85, L: 'rail', R: 'rock' },
-  { id: 'fall4', sec: 'descent', len: 100, ease: 50, g: -7.35, L: 'rail', R: 'rock' },
+  // The plunge: 8 per cent down into a compression.
+  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'highDown', R: 'highUp' },
 
-  // The hook: a right-hander that keeps tightening, then the chute back to the shore.
-  { id: 'hook1', sec: 'hook', r: -90, deg: 30, ease: 40, g: -7, L: 'rail', R: 'rock' },
-  { id: 'hook2', sec: 'hook', r: -55, deg: 30, ease: 24, g: -6.5, L: 'rail', R: 'rock' },
-  { id: 'hook3', sec: 'hook', r: -35, deg: 35, ease: 18, g: -6, L: 'rail', R: 'rock' },
-  { id: 'chute', sec: 'hook', len: 80, ease: 24, g: 0, gk: [[0.5, -3]], L: 'rail', R: 'woodUp' },
+  // The ledge: fast downhill sweepers, rock on one side and a rail and the drop on the other.
+  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 10, g: -7.5, gk: [[0.3, -7.5]], L: 'rock', R: 'midRun', runoff: 'R' },
+  { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: -7.5, L: 'midRun', R: 'rock', runoff: 'L' },
 
-  { id: 'finish', sec: 'straight', len: 105, g: 0, L: 'shore', R: 'meadow' },
+  // Gully bridge: straight across a gully on piers.
+  { id: 'gully', sec: 'gully', len: 337.0834, ease: 100, g: -8, L: 'parapet', R: 'parapet', bridge: true, drop: 26 },
+
+  // The long right: down to the shore and onto the straight.
+  { id: 'approach', sec: 'sweepback', len: 100, ease: 60, g: -7.8, L: 'lowDown', R: 'lowUp' },
+  { id: 'back', sec: 'sweepback', r: -300, deg: 90, ease: 140, bank: 9, g: 0, gk: [[0.78, -6.5]], L: 'lowRun', R: 'lowUp', runoff: 'L' },
+
+  { id: 'finish', sec: 'straight', len: 450, ease: 140, g: 0, L: 'shore', R: 'town' },
 ];
 
 /** Length of one piece of the plan (m). @param {Segment} seg */
@@ -152,21 +163,19 @@ export const LAYOUT = {
   start: { x: 0, y: 0, z: 0, yaw: 90 },
   segments: SEGMENTS,
   sides: SIDES,
-  /** Banking into the bends: full `bank` (degrees) for a bend much tighter than `bankRadius`. */
-  bank: 5,
-  bankRadius: 55,
-  /**
-   * Sector lines: [piece id, fraction along it]. The third line is the start/finish line. The first is the joint
-   * where the viaduct's deck begins, not the tunnel's mouth 70 m before it: by day the picture is still opening up
-   * there, and a gap flashed on the screen in that second would not be read.
-   */
+  /** Banking into the bends by rule: `bank` degrees times tanh(bankRadius / radius); a piece may name its own. */
+  bank: 9,
+  bankRadius: 250,
+  /** Sector lines: [piece id, fraction along it], at about thirds of the lap. The third line is the start/finish line. */
   sectors: [
-    ['viaduct', 0],
-    ['crest', 0.42],
+    ['mouth', 0.3],
+    ['ledge1', 0.1],
   ],
-  /** Street lamps stand along these pieces; tunnel lamps hang in rows along every tunnel. */
-  streetLamps: { pieces: ['finish', 'grid'], spacing: 35, height: 8 },
+  /** Street lamps stand along these pieces, alternating sides; tunnel lamps hang in rows along every tunnel. */
+  streetLamps: { pieces: ['finish', 'grid'], spacing: 30, height: 9 },
   tunnelLamps: { spacing: 12, drop: 0.55, inset: 0.45 },
+  /** Kerbs: on the inside of every bend tighter than `inside` metres from entry to exit, and on the outside at the exit of every bend tighter than `outside`. */
+  kerbs: { inside: 800, outside: 500, exit: 0.4, width: SHOULDER },
   /** The lake's surface (the straight runs along its shore at y = 0). */
   lakeLevel: -1.8,
 };

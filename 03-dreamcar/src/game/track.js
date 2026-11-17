@@ -23,13 +23,16 @@
 // Pure JavaScript: runs in Node as well as in the browser.
 
 import { Vector3 } from 'three';
-import { LAYOUT, TUNNEL, VIADUCT, sectionsOf, segmentLength } from './trackLayout.js';
+import { KERB, LAYOUT, TUNNEL, VIADUCT, sectionsOf, segmentLength } from './trackLayout.js';
 
-/** What a wheel can stand on. */
-export const SURFACE = { ASPHALT: 0, SHOULDER: 1, GRASS: 2, GRAVEL: 3 };
+/** What a wheel can stand on. SHOULDER is the paved margin beyond the edge line where there is no kerb. */
+export const SURFACE = { ASPHALT: 0, SHOULDER: 1, GRASS: 2, GRAVEL: 3, KERB: 4 };
 
 /** Base grip of each SURFACE relative to dry asphalt, indexed by SURFACE. */
-export const GRIP = [1, 0.75, 0.55, 0.6];
+export const GRIP = [1, 0.85, 0.55, 0.6, 0.9];
+
+/** What grows beyond the barrier (Track.woodAt). */
+const WOODS = [null, 'broadleaf', 'conifer', 'mixed'];
 
 /** What the solid edge of the corridor is. */
 export const EDGE = { RAIL: 0, ROCK: 1, WALL: 2, PARAPET: 3, TREES: 4 };
@@ -72,10 +75,13 @@ export function planOf(layout) {
   const starts = new Float64Array(n + 1);
   const k = new Float64Array(n);
   const ease = new Float64Array(n);
+  const bank = new Float64Array(n);
   let turn = 0;
   for (let i = 0; i < n; i++) {
     const len = segmentLength(segs[i]);
     k[i] = segs[i].r ? 1 / segs[i].r : 0;
+    // banking (rad, + = left edge higher): the piece's own figure into the bend, or the rule's
+    bank[i] = segs[i].bank != null ? -Math.sign(k[i]) * segs[i].bank * DEG : -(layout.bank ?? 0) * DEG * Math.tanh(k[i] * (layout.bankRadius ?? 1));
     ease[i] = segs[i].ease ?? 0;
     starts[i + 1] = starts[i] + len;
     turn += k[i] * len;
@@ -104,16 +110,20 @@ export function planOf(layout) {
     return lo;
   }
 
-  /** Curvature (1/m, + = left) at distance s: the piece's own, eased towards its neighbours near its ends. */
-  function curvatureAt(s) {
+  /** A per-piece value at distance s: the piece's own, eased towards its neighbours over the eases at its ends. */
+  function easedAt(values, s) {
     const i = pieceAt(s);
     const prev = (i + n - 1) % n;
     const next = (i + 1) % n;
-    let c = k[i];
-    if (ease[i] > 0) c += (k[prev] - k[i]) * (1 - smooth(0.5 + (s - starts[i]) / ease[i]));
-    if (ease[next] > 0) c += (k[next] - k[i]) * (1 - smooth(0.5 + (starts[i + 1] - s) / ease[next]));
+    let c = values[i];
+    if (ease[i] > 0) c += (values[prev] - values[i]) * (1 - smooth(0.5 + (s - starts[i]) / ease[i]));
+    if (ease[next] > 0) c += (values[next] - values[i]) * (1 - smooth(0.5 + (starts[i + 1] - s) / ease[next]));
     return c;
   }
+  /** Curvature (1/m, + = left) at distance s: the piece's own, eased towards its neighbours near its ends. */
+  const curvatureAt = (s) => easedAt(k, s);
+  /** Banking (rad, + = left edge higher) at distance s, eased in step with the curvature. */
+  const bankAt = (s) => easedAt(bank, s);
 
   /** Distance of a point given as [piece id, fraction along it]. */
   function at(id, u = 0) {
@@ -122,7 +132,7 @@ export function planOf(layout) {
     return starts[i] + (starts[i + 1] - starts[i]) * u;
   }
 
-  return { n, starts, k, ease, length, turn, pieceAt, curvatureAt, at };
+  return { n, starts, k, ease, length, turn, pieceAt, curvatureAt, bankAt, at };
 }
 
 /**
@@ -320,10 +330,10 @@ function layHeight(track, plan) {
 }
 
 /** Banking into the bends, and the frame at every sample: tangent, left (tilted by the banking), normal. */
-function layFrames(track) {
-  const { count: n, ds, layout } = track;
+function layFrames(track, plan) {
+  const { count: n, ds } = track;
   const bank = new Float64Array(n);
-  for (let i = 0; i < n; i++) bank[i] = -layout.bank * DEG * Math.tanh(track.curvature[i] * layout.bankRadius);
+  for (let i = 0; i < n; i++) bank[i] = plan.bankAt(i * ds);
   roundOff(bank, Math.round(BANK_ROUND / ds));
   for (let i = 0; i < n; i++) {
     const fx = track._fx[i];
@@ -362,7 +372,7 @@ function layStructures(track, plan) {
   for (let i = 0; i < segs.length; i++) {
     const range = { s0: plan.starts[i], s1: plan.starts[i + 1] };
     if (segs[i].tunnel) track.tunnels.push(range);
-    if (segs[i].bridge) track.bridges.push({ ...range, drop: VIADUCT.drop });
+    if (segs[i].bridge) track.bridges.push({ ...range, drop: segs[i].drop ?? VIADUCT.drop, id: segs[i].id });
   }
   for (let i = 0; i < n; i++) {
     const s = i * ds;
@@ -385,8 +395,8 @@ function layCorridor(track, plan) {
   const { count: n, ds, layout } = track;
   const segs = layout.segments;
   const sides = [
-    { key: 'L', edge: track.edgeL, kind: track.kindL, verge: track.vergeL, slope: track.slopeL, phase: 0.6 },
-    { key: 'R', edge: track.edgeR, kind: track.kindR, verge: track.vergeR, slope: track.slopeR, phase: 2.9 },
+    { key: 'L', edge: track.edgeL, kind: track.kindL, verge: track.vergeL, slope: track.slopeL, wood: track._woodL, phase: 0.6 },
+    { key: 'R', edge: track.edgeR, kind: track.kindR, verge: track.vergeR, slope: track.slopeR, wood: track._woodR, phase: 2.9 },
   ];
   const far = [new Float64Array(n), new Float64Array(n)];
   for (let side = 0; side < 2; side++) {
@@ -406,6 +416,7 @@ function layCorridor(track, plan) {
       far[side][i] = preset.far;
       out.kind[i] = KIND[preset.kind];
       out.verge[i] = VERGE[preset.verge];
+      out.wood[i] = Math.max(0, WOODS.indexOf(preset.wood ?? null));
     }
     // Narrow first (so the rounding that follows cannot push an edge out beyond what its preset allows, and the
     // tunnel's walls stay exactly where they are), then limit the rate, then round the corners.
@@ -553,6 +564,111 @@ function placeFurniture(track, plan) {
   track.sectors = layout.sectors.map(([id, u]) => plan.at(id, u));
 }
 
+/** True where s is in a tunnel or on a bridge (where nothing stands beside the pavement but the walls). */
+function onStructure(track, s) {
+  for (const r of track.tunnels) if (track.delta(r.s0, s) >= 0 && track.delta(s, r.s1) >= 0) return true;
+  return track._onBridge(track.wrap(s));
+}
+
+/** Ranges [s0, s1] of the lap (s1 may be past the line) less any part on a structure, merged per side. */
+function clipRanges(track, list) {
+  const out = [];
+  for (const r of list) {
+    let a = null;
+    for (let s = r.s0; s <= r.s1 + 1e-6; s += 1) {
+      const free = !onStructure(track, s);
+      if (free && a === null) a = s;
+      if ((!free || s + 1 > r.s1 + 1e-6) && a !== null) {
+        const b = free ? s : s - 1;
+        if (b - a > 25) out.push({ ...r, s0: a, s1: b });
+        a = null;
+      }
+    }
+  }
+  out.sort((p, q) => p.side - q.side || p.s0 - q.s0);
+  const merged = [];
+  for (const r of out) {
+    const last = merged[merged.length - 1];
+    if (last && last.side === r.side && r.s0 <= last.s1 + 10) last.s1 = Math.max(last.s1, r.s1);
+    else merged.push({ ...r });
+  }
+  for (const r of merged) {
+    r.s0 = track.wrap(r.s0);
+    r.s1 = track.wrap(r.s1);
+  }
+  return merged.sort((p, q) => p.s0 - q.s0);
+}
+
+/**
+ * Kerbs, and the dressing of a circuit: where it goes, as data (nothing here is drawn). Kerbs are part of the
+ * course (profile() and surfaceAt() return them); everything else stands at or beyond the barrier.
+ */
+function layCircuit(track, plan) {
+  const { layout, count: n, ds } = track;
+  const segs = layout.segments;
+  const rule = layout.kerbs;
+  const kerbs = [];
+  const tyres = [];
+  const boards = [];
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    if (!seg.r) continue;
+    const r = Math.abs(seg.r);
+    const inside = seg.r > 0 ? 1 : -1;
+    const s0 = plan.starts[i];
+    const s1 = plan.starts[i + 1];
+    const easeIn = (seg.ease ?? 0) / 2;
+    const easeOut = (segs[(i + 1) % segs.length].ease ?? 0) / 2;
+    if (r <= rule.inside) kerbs.push({ s0: s0 - easeIn * 0.5, s1: s1 + easeOut * 0.5, side: inside, width: rule.width });
+    if (r <= rule.outside) kerbs.push({ s0: s1 - (s1 - s0) * rule.exit, s1: s1 + easeOut, side: -inside, width: rule.width });
+    if (seg.runoff) {
+      const side = seg.runoff === 'L' ? 1 : -1;
+      if (r <= 450) tyres.push({ s0: s0 + (s1 - s0) * 0.35, s1: s1 + easeOut * 0.5, side });
+      boards.push({ s0: s0 + (s1 - s0) * 0.15, s1: s1 - (s1 - s0) * 0.1, side });
+    }
+  }
+  track.kerbs = clipRanges(track, kerbs);
+  // per sample, how much kerb stands there on each side (0..1, ramped over a few metres at each end)
+  for (const k of track.kerbs) {
+    const arr = k.side > 0 ? track._kerbL : track._kerbR;
+    const len = track.wrap(k.s1 - k.s0);
+    for (let d = 0; d <= len; d += ds) {
+      const i = Math.round(track.wrap(k.s0 + d) / ds) % n;
+      arr[i] = Math.max(arr[i], smooth(Math.min(d, len - d) / KERB.ramp));
+    }
+  }
+  /** Distance from the centre line to stand something `inset` m in front of the barrier on one side at s. */
+  const front = (s, side, inset) => side * (track.edgeAt(s, side) - inset);
+  track.tyreWalls = clipRanges(track, tyres).map((t) => ({ ...t, lat: front(t.s0, t.side, 0.9), depth: 1.2 }));
+  // boards: on the outside of the run-off bends, and along the low walls of the straight
+  const straight = track.sections[0];
+  for (const side of [1, -1]) boards.push({ s0: straight.s0 + 40, s1: straight.s1 + track.length - 30, side });
+  track.boards = clipRanges(track, boards).map((b) => ({ ...b, lat: front(b.s0, b.side, 0.25), height: 1.1 }));
+  // distance boards before the slow corner: the tightest piece of the lap, on the outside of its approach
+  let slow = 0;
+  for (let i = 1; i < segs.length; i++) if (segs[i].r && (!segs[slow].r || Math.abs(segs[i].r) < Math.abs(segs[slow].r))) slow = i;
+  const turnIn = plan.starts[slow] - (segs[slow].ease ?? 0) / 2;
+  const outside = segs[slow].r > 0 ? -1 : 1;
+  track.distanceBoards = [300, 200, 100].map((d) => {
+    const s = track.wrap(turnIn - d);
+    // on a bridge there is no verge: the board hangs on the parapet's outside
+    const bridge = track._onBridge(s);
+    return { s, side: outside, lat: bridge ? outside * (track.edgeAt(s, outside) + 0.5) : front(s, outside, 0.6), label: String(d), bridge };
+  });
+  // marshal posts: one every 400 m or so, on the side with the wider verge, behind the barrier
+  track.marshals = [];
+  const posts = Math.round(track.length / 400);
+  for (let k = 0; k < posts; k++) {
+    let s = ((k + 0.5) * track.length) / posts;
+    for (let tries = 0; tries < 20 && onStructure(track, s); tries++) s = track.wrap(s + 20);
+    if (onStructure(track, s)) continue;
+    const side = track.edgeAt(s, 1) >= track.edgeAt(s, -1) ? 1 : -1;
+    track.marshals.push({ s, side, lat: side * (track.edgeAt(s, side) + 2.5) });
+  }
+  // the start gantry spans the road at the line, its feet just beyond the walls
+  track.gantry = { s: 0, latL: track.edgeAt(0, 1) + 0.7, latR: -(track.edgeAt(0, -1) + 0.7) };
+}
+
 /**
  * @typedef {object} Frame
  * @property {Vector3} pos @property {Vector3} tan @property {Vector3} left @property {Vector3} up
@@ -615,6 +731,10 @@ export class Track {
     this._fx = new Float32Array(n);
     this._fz = new Float32Array(n);
     this._pave = layout.halfWidth + layout.shoulder;
+    this._woodL = new Uint8Array(n);
+    this._woodR = new Uint8Array(n);
+    this._kerbL = new Float32Array(n);
+    this._kerbR = new Float32Array(n);
 
     /** @type {Array<{ s0: number, s1: number }>} the bore, portal to portal (its ceiling is TUNNEL.height above the road) */
     this.tunnels = [];
@@ -624,6 +744,18 @@ export class Track {
     this.lamps = [];
     /** Sector lines (m from the start/finish line); the third line is the start/finish line itself. */
     this.sectors = [];
+    /** @type {Array<{ s0: number, s1: number, side: number, width: number }>} kerbs: part of the course (see the header) */
+    this.kerbs = [];
+    /** @type {Array<{ s0: number, s1: number, side: number, lat: number, depth: number }>} tyre walls in front of the barrier */
+    this.tyreWalls = [];
+    /** @type {Array<{ s0: number, s1: number, side: number, lat: number, height: number }>} runs of trackside boards, facing the road */
+    this.boards = [];
+    /** @type {Array<{ s: number, side: number, lat: number, label: string, bridge: boolean }>} distance boards before the slow corner */
+    this.distanceBoards = [];
+    /** @type {Array<{ s: number, side: number, lat: number }>} marshal posts, behind the barrier */
+    this.marshals = [];
+    /** The start gantry: across the road at s, its feet at latL and latR. */
+    this.gantry = { s: 0, latL: 0, latR: 0 };
     /** The centre line's bounding box on the map. */
     this.bounds = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
     /** Distance of [piece id, fraction along it] from the start/finish line: `track.at('viaduct', 0.5)`. */
@@ -635,12 +767,33 @@ export class Track {
 
     layCentreLine(this, plan);
     layHeight(this, plan);
-    layFrames(this);
+    layFrames(this, plan);
     layStructures(this, plan);
     const far = layCorridor(this, plan);
     buildGrid(this);
     shapeHillside(this, far);
     placeFurniture(this, plan);
+    layCircuit(this, plan);
+  }
+
+  /**
+   * What grows beyond the barrier on one side (+1 left, -1 right) at s: 'broadleaf', 'conifer', 'mixed', or null
+   * (nothing: rock, a structure, the lake, the open top).
+   * @param {number} s @param {number} side
+   * @returns {'broadleaf' | 'conifer' | 'mixed' | null}
+   */
+  woodAt(s, side) {
+    const i = Math.round(this.wrap(s) / this.ds) % this.count;
+    return /** @type {any} */ (WOODS[(side > 0 ? this._woodL : this._woodR)[i]]);
+  }
+
+  /** How much kerb stands at s on one side (0 none, 1 a full kerb; it ramps up over a few metres at each end). */
+  kerbAt(s, side) {
+    const f = this.wrap(s) / this.ds;
+    const a = Math.floor(f) % this.count;
+    const b = (a + 1) % this.count;
+    const k = side > 0 ? this._kerbL : this._kerbR;
+    return k[a] + (k[b] - k[a]) * (f - Math.floor(f));
   }
 
   /** s brought into 0 <= s < length. */
@@ -911,10 +1064,51 @@ export class Track {
     return /** @type {Frame} */ (out);
   }
 
+  /**
+   * The kerb's height above the pavement's plane at (s, lat), into KERB_OUT with its rate of change across (per metre
+   * of |lat|, outwards) and along (per metre of s). Zero away from kerbs.
+   */
+  _kerb(s, lat) {
+    const a = Math.abs(lat);
+    KERB_OUT.h = 0;
+    KERB_OUT.across = 0;
+    KERB_OUT.along = 0;
+    if (a <= this.halfWidth) return KERB_OUT;
+    const f = this.wrap(s) / this.ds;
+    const i = Math.floor(f) % this.count;
+    const j = i + 1 === this.count ? 0 : i + 1;
+    const arr = lat > 0 ? this._kerbL : this._kerbR;
+    const kb = arr[i] + (arr[j] - arr[i]) * (f - Math.floor(f));
+    if (kb <= 0) return KERB_OUT;
+    const rise = KERB.rise * kb;
+    const dkb = (KERB.rise * (arr[j] - arr[i])) / this.ds;
+    // beyond the kerb the verge starts at its top, so the ground has no step there
+    if (a > this._pave) {
+      KERB_OUT.h = rise;
+      KERB_OUT.along = dkb;
+      return KERB_OUT;
+    }
+    const w = this._pave - this.halfWidth;
+    const t = (a - this.halfWidth) / w;
+    // the teeth: a triangle wave along the road (continuous, so a wheel rolls over them), strongest across the
+    // middle of the kerb and gone at both its sides, so it meets the road and the verge without a step
+    const g = this.wrap(s) / KERB.pitch;
+    const ph = g - Math.floor(g);
+    const tri = 1 - Math.abs(2 * ph - 1);
+    const dtri = (ph < 0.5 ? 2 : -2) / KERB.pitch;
+    const bump = Math.sin(Math.PI * t);
+    const shape = 1 - KERB.tooth * (1 - tri) * bump;
+    KERB_OUT.h = rise * t * shape;
+    KERB_OUT.across = (rise * (shape - t * KERB.tooth * (1 - tri) * Math.PI * Math.cos(Math.PI * t))) / w;
+    KERB_OUT.along = dkb * t * shape + rise * t * KERB.tooth * bump * dtri;
+    return KERB_OUT;
+  }
+
   /** What is underfoot at `lat`, given the distances and verges at the nearer sample. */
   _surfaceKind(i, lat, edge) {
     const a = Math.abs(lat);
     if (a <= this.halfWidth) return SURFACE.ASPHALT;
+    if (a <= this._pave && (lat > 0 ? this._kerbL : this._kerbR)[i] > 0.5) return SURFACE.KERB;
     const verge = lat > 0 ? this.vergeL[i] : this.vergeR[i];
     // Beyond the solid edge it is the hillside: scree where the verge was gravel, grass elsewhere.
     if (a > edge) return verge === SURFACE.GRAVEL ? SURFACE.GRAVEL : SURFACE.GRASS;
@@ -944,7 +1138,7 @@ export class Track {
     const sinb = this._read(this.ly, seg, u);
     const slope = a > this._pave ? this._read(left ? this.slopeL : this.slopeR, seg, u) : 0;
     const far = a > edge ? this._read(left ? this.farSlopeL : this.farSlopeR, seg, u) : 0;
-    out.y = HEIGHT.y + crossSection(lat, this._pave, edge, sinb, slope, far);
+    out.y = HEIGHT.y + crossSection(lat, this._pave, edge, sinb, slope, far) + this._kerb(s, lat).h;
     out.surface = this._surfaceKind(u < 0.5 ? seg : b, lat, edge);
     return /** @type {any} */ (out);
   }
@@ -982,12 +1176,14 @@ export class Track {
     // The slope of the ground on the map: along the road (stretched or squeezed by the bend at this offset)
     // and across it.
     const k = this.curvature[seg] + (this.curvature[b] - this.curvature[seg]) * u;
-    const along = (HEIGHT.grade + crossSection(lat, pave, edge, spot.dsinb, dslope, 0)) / Math.max(0.2, 1 - k * lat * spot.cosb);
-    const across = beyond ? 0 : crossSlope(lat, pave, edge, spot.sinb, slope, 0) / spot.cosb;
+    const sHere = (seg + u) * this.ds;
+    const kerb = this._kerb(sHere, lat);
+    const along = (HEIGHT.grade + crossSection(lat, pave, edge, spot.dsinb, dslope, 0) + kerb.along) / Math.max(0.2, 1 - k * lat * spot.cosb);
+    const across = beyond ? 0 : (crossSlope(lat, pave, edge, spot.sinb, slope, 0) + Math.sign(lat) * kerb.across) / spot.cosb;
     const nx = -along * spot.fx - across * spot.fz;
     const nz = -along * spot.fz + across * spot.fx;
     const inv = 1 / Math.hypot(nx, 1, nz);
-    out.y = HEIGHT.y + crossSection(lat, pave, edge, spot.sinb, slope, 0);
+    out.y = HEIGHT.y + crossSection(lat, pave, edge, spot.sinb, slope, 0) + kerb.h;
     out.nx = nx * inv;
     out.ny = inv;
     out.nz = nz * inv;
@@ -1054,9 +1250,10 @@ export class Track {
 }
 
 /** The grid: metres behind the line of the first slot, metres between rows, metres either side of the centre line. */
-const GRID = { first: 6, pitch: 8, lat: 1.9 };
+const GRID = { first: 6, pitch: 8, lat: 2.6 };
 const HEIGHT = { y: 0, grade: 0 };
 const READ = { d: 0 };
+const KERB_OUT = { h: 0, across: 0, along: 0 };
 const SCRATCH = new Vector3();
 
 /**
@@ -1069,15 +1266,22 @@ export function createTrack(layout = LAYOUT) {
 
 /**
  * The fastest a car could possibly be going at each sample: a generous envelope (more grip, power and brakes than
- * the car has), for judging crests and for anything that wants to know where the road is fast.
+ * the car has), for judging crests and for anything that wants to know where the road is fast. The banking is
+ * counted: a bend banked into by angle b allows v^2 = g r (mu + tan b) / (1 - mu tan b).
  * @param {Track} track
  * @param {{ top?: number, lateral?: number, accel?: number, brake?: number }} [limits] m/s and m/s^2
  * @returns {Float32Array} m/s per sample
  */
-export function speedEnvelope(track, { top = 70, lateral = 1.3 * G, accel = 6, brake = 13 } = {}) {
+export function speedEnvelope(track, { top = 82, lateral = 1.35 * G, accel = 6, brake = 13 } = {}) {
   const n = track.count;
   const v = new Float32Array(n);
-  for (let i = 0; i < n; i++) v[i] = Math.min(top, Math.sqrt(lateral / Math.max(1e-6, Math.abs(track.curvature[i]))));
+  const mu = lateral / G;
+  for (let i = 0; i < n; i++) {
+    const k = Math.abs(track.curvature[i]);
+    const into = Math.tan(-Math.sign(track.curvature[i]) * track.bank[i]);
+    const grip = (mu + into) / Math.max(0.2, 1 - mu * into);
+    v[i] = Math.min(top, Math.sqrt((G * grip) / Math.max(1e-6, k)));
+  }
   for (let i = 1; i < 2 * n; i++) {
     v[i % n] = Math.min(v[i % n], Math.sqrt(v[(i - 1) % n] ** 2 + 2 * accel * track.ds));
   }
