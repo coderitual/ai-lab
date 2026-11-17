@@ -15,6 +15,7 @@
 //   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
 //   groundCover.js  grass, bushes and rocks along the verges and under the trees
 //   forest.js       the trees (treeGeometry.js, forestTextures.js), planted from the Track and the ground
+//   studs.js        lit road studs on the lines through the bends and the tunnel
 //   structures.js  what people built: lamps, tunnel, viaduct, rails, posts and chevrons, the start
 //
 // Three rules the parts keep between them:
@@ -42,6 +43,7 @@ import { SHADOW, createSun } from './sun.js';
 import { createRoad } from './road.js';
 import { createRockFaces } from './rock.js';
 import { createStructures } from './structures.js';
+import { createStuds } from './studs.js';
 import { ROW_STEP, createTerrain } from './terrain.js';
 import { PlanarMirror } from '../../engine/PlanarMirror.js';
 
@@ -128,8 +130,10 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   lap('far');
   const structures = createStructures({ track, terrain, caps, tier, atmosphere });
   lap('structures');
+  const studs = createStuds({ track, caps });
+  lap('studs');
 
-  scene.add(terrain.group, road.group, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(studs.points, terrain.group, road.group, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -169,7 +173,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     atmosphere,
     terrain,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, terrain: terrain.stats, structures: structures.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
+    stats: { ms, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -197,6 +201,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       forest.setTime(time);
       far.setTime(time);
       structures.setTime(time);
+      studs.setTime(time);
       return time;
     },
 
@@ -214,6 +219,9 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       road.setBeams(beams);
       structures.prepareView(camera, focus, beams);
       atmosphere.prepareView(camera);
+      renderer.getDrawingBufferSize(drawing);
+      const viewHeight = Math.min(drawing.y, drawing.x / (camera.aspect || 1));
+      studs.prepareView(camera, viewHeight);
       // The environment map and the fill are the open sky's light. It does not follow the car into the tunnel
       // (the sun is kept out by its shadow map; these two have none).
       const open = skyOver(camera, focus);
@@ -227,8 +235,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
           track.frameAt(s, mirrorFrame);
           track.pointAt(s, lat, mirrorPoint);
           mirror.uniforms.uMirrorPlane.value.set(mirrorFrame.up.x, mirrorFrame.up.y, mirrorFrame.up.z, -mirrorFrame.up.dot(mirrorPoint));
-          renderer.getDrawingBufferSize(drawing);
-          mirror.render(scene, camera, mirrorPoint, mirrorFrame.up, mirrorHidden, Math.min(drawing.y, drawing.x / camera.aspect));
+          mirror.render(scene, camera, mirrorPoint, mirrorFrame.up, mirrorHidden, viewHeight);
         } else mirror.uniforms.uMirrorOn.value = 0;
       }
     },
@@ -274,6 +281,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       lake.dispose();
       rock.dispose();
       structures.dispose();
+      studs.dispose();
       groundMaterial.dispose();
       mirror?.dispose();
     },

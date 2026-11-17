@@ -23,7 +23,7 @@ const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;
 
 /** The beams of every car, shared by all retro-reflective materials. */
-const uniforms = {
+export const RETRO_UNIFORMS = {
   uRetroPos: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, -1e4, 0)) },
   uRetroDir: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, 0, 1)) },
   uRetroPower: { value: Array.from({ length: BEAMS }, () => new THREE.Vector2()) },
@@ -34,10 +34,10 @@ export function setRetroBeams(beams) {
   for (let i = 0; i < BEAMS; i++) {
     const b = beams?.[i];
     if (b) {
-      uniforms.uRetroPos.value[i].copy(b.pos);
-      uniforms.uRetroDir.value[i].copy(b.dir).normalize();
-      uniforms.uRetroPower.value[i].set(2 * LAMP_LOW * b.low, 2 * LAMP_HIGH * b.high);
-    } else uniforms.uRetroPower.value[i].set(0, 0);
+      RETRO_UNIFORMS.uRetroPos.value[i].copy(b.pos);
+      RETRO_UNIFORMS.uRetroDir.value[i].copy(b.dir).normalize();
+      RETRO_UNIFORMS.uRetroPower.value[i].set(2 * LAMP_LOW * b.low, 2 * LAMP_HIGH * b.high);
+    } else RETRO_UNIFORMS.uRetroPower.value[i].set(0, 0);
   }
 }
 
@@ -46,7 +46,7 @@ export function setRetroBeams(beams) {
  * colour. A low beam is dark above a cut-off just under the horizontal (kicked up on the right), keeping a few per
  * cent of glare above it; main beam is the same picture tilted up 3.5 degrees.
  */
-const RETRO_GLSL = /* glsl */ `
+export const RETRO_GLSL = /* glsl */ `
 uniform vec3 uRetroPos[${BEAMS}];
 uniform vec3 uRetroDir[${BEAMS}];
 uniform vec2 uRetroPower[${BEAMS}];
@@ -95,7 +95,7 @@ float retroReturn(vec3 P, vec3 N) {
  */
 export function retroReflective(material, gain = 1) {
   return extend(material, `retro${gain}`, (shader) => {
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, RETRO_UNIFORMS);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vRetroWorld;')
       .replace(

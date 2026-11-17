@@ -200,7 +200,8 @@ export const TIMES = {
     // the night sky lays only about a tenth of the moon's light on the ground; this keeps the moon's shadows
     // from being holes
     ambient: { sky: [0.45, 0.6, 1.0], ground: [0.3, 0.36, 0.5], intensity: 0.003 },
-    fog: { color: [0.001, 0.0015, 0.0027], sun: [0.0007, 0.0009, 0.0013], sunLobe: 4, density: 0.00042, heightFalloff: 0.011 },
+    // (look lane: the haze halved, the far ranges were pale grey behind black hills; reference B's are near black)
+    fog: { color: [0.0005, 0.00072, 0.0013], sun: [0.0004, 0.0005, 0.0008], sunLobe: 4, density: 0.00042, heightFalloff: 0.011 },
     // four stops above day (look lane: was five; at 32 the moonlit land read as dusk and everything that faces a head
     // lamp within 30 m burnt to white; reference B is darker, its lights brighter against it)
     exposure: 18,
