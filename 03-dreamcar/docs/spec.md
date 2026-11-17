@@ -192,9 +192,9 @@ key lock at speed do not spin the car.
 
 | | keyboard (solo) | split screen | gamepad (standard mapping) | touch |
 | --- | --- | --- | --- | --- |
-| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | automatic throttle; pull the thumb down to brake, or a second finger |
-| steer | A D or ← → | A D and ← → | left stick | the first finger is a stick where it lands: 62 px for full lock |
-| handbrake | Space | Space, right Shift | A | |
+| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | Throttle auto (default): the car drives while the steering thumb is down and 0.4 s after, not while the brake or DRIFT is held; Throttle manual: the GAS button (88 px, centre 64 px from the right, 56 px from the bottom). Brake: a finger anywhere in the right 45 % of the view (held at a standstill it reverses) |
+| steer | A D or ← → | A D and ← → | left stick | the left 55 % of the view: the first finger there is a stick where it lands, sideways only, 96 px for full lock, curve power 1.15, its origin trailing beyond that; a second finger there is ignored |
+| handbrake | Space | Space, right Shift | A or RB | the DRIFT button (76 px, centre 64 px from the right, 150 px from the bottom), held |
 | camera | C | C, `.` | Y | button |
 | look back | B (held) | B, `,` | X | |
 | put back | R | R, `/` | B | button |
@@ -206,9 +206,14 @@ key lock at speed do not spin the car.
 | start, menus | Enter, Tab | | A, d-pad | tap |
 
 Each driver reads whichever of their devices was used last. On a tablet in
-split screen each half of the screen is one driver's touch zone. Every button
-can be reached by Tab and Enter, or a pad's d-pad and A; touch targets are at
-least 44 px.
+split screen each half of the screen is one driver's touch zone, with its own
+steering part, brake part and buttons. The DRIFT and GAS buttons stand inside
+the safe area; Input (`TOUCH` in `src/engine/Input.js`) finds them by the
+same numbers the HUD draws them with. On the first run on a touch screen the
+zones are named (STEER, BRAKE, and the DRIFT button) for the first 3 s of the
+race clock, then never again (`dreamcar.zones.v1`). Every button can be
+reached by Tab and Enter, or a pad's d-pad and A; DRIFT and GAS are at least
+64 px, the four small buttons 44 px.
 
 ## Cameras
 
@@ -216,6 +221,7 @@ least 44 px.
 
 | | |
 | --- | --- |
+| in a slide | the camera keeps nearer the way the car is going (from 0.6 to 0.9 of the angle between heading and travel as `vehicle.drift` rises, taken up at 4 /s, let go at 1.5 /s), so the car is seen yawed and the road ahead stays in view; the lens opens up to 4° |
 | chase (default) | 5.4 m behind the car's origin, dropping back 1.5 m more as the speed signal rises from 70 to 270 km/h (time constant 0.6 s); lens 58° to 72° top to bottom on 16:9; horizon 37 % and the car's middle 60 % of the way down; at least 22° of sky above the horizon on every shape of screen; rolls with 40 % of the banking; swings round at 3.4 /s; shake from 200 km/h, on kerbs and the verge, and on impacts |
 | narrower than 4:3 | keeps 4:3's width of view, backs off up to 1.25x, horizon at 30 % |
 | far chase | 9.5 m (+1.8), 54° to 66° |
@@ -243,7 +249,8 @@ unit per view:
 - bottom right: the speed in large figures (km/h or mph), a rev arc, the
   gear, the ABS / TC / ESC lamps;
 - bottom left: a small map (can be hidden);
-- over the road above the car, only while it slides: a drift readout (the angle and a running score; `Hud.setDrift`), and on touch screens a place under the right thumb for round thumb buttons (`Hud.addThumbButton`). Both exist in the HUD; nothing in `Game.js` calls them yet, so neither shows (checked in the source at this head);
+- just above the speed, only while the car slides 12° or more: the slide's angle and its running score (`vehicle.slide`; `Hud.setDrift`), fading out a second after the slide ends; the best slide of the run is on the results;
+- touch screens: DRIFT (and GAS with the throttle on manual) under the right thumb; the speed steps 116 px left of them;
 - touch screens: four small buttons together (camera, high beam, put back,
   pause);
 - the best-laps board on the title, the pause sheet and the results only.
@@ -254,8 +261,10 @@ measurement; `stats().hudWrites`).
 ## Options
 
 On the title and the pause sheet: quality (auto, low, medium, high; applied
-by reloading the page), sound on or off, time of day, units (km/h, mph), the
-map shown or hidden.
+by reloading the page), sound on or off, time of day, driving help (Full,
+Sport, Off: `ASSISTS` in config.js, applied at once to every car and to every
+car made later), Throttle (auto or manual; shown on touch screens), units
+(km/h, mph), the map shown or hidden.
 
 ## URL parameters
 
@@ -378,6 +387,9 @@ stereo picture. Sound starts on the first touch or key (the browsers' rule).
 | `dreamcar.quality` | the chosen tier |
 | `dreamcar.units` | km/h or mph |
 | `dreamcar.map` | the map on or off |
+| `dreamcar.assists` | the driving help: full, sport or off |
+| `dreamcar.throttle` | the touch throttle: auto or manual |
+| `dreamcar.zones.v1` | the touch zones have been named once |
 | `dreamcar.muted` | sound off |
 | `dreamcar.hinted.v1` | the first-run hint has been shown |
 
