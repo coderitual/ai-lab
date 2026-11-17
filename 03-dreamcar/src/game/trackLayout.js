@@ -52,6 +52,9 @@ export const SIDES = {
   town: { kind: 'wall', edge: [5, 6], slope: 0.01, far: 0.08, verge: 'grass', wood: 'broadleaf' },
   // the land side of the straight away from the pit lane: bright mown grass to a steel rail, nothing tall (frame D1)
   paddock: { kind: 'rail', edge: [6, 8], slope: 0.01, far: 0.08, verge: 'grass', wood: null },
+  // beyond the pit exit: mown grass to a steel rail and, close behind it, the maples that wall the start (the
+  // run-up to the line stays open paddock so that the massif and the sun stand clear over the straight)
+  grove: { kind: 'rail', edge: [5, 6], slope: 0.01, far: 0.08, verge: 'grass', wood: 'broadleaf' },
   // mown grass to a steel rail, woods behind it: low down broadleaf, higher up conifers
   lowUp: { kind: 'rail', edge: [3, 5], slope: 0.04, far: 0.3, verge: 'grass', wood: 'broadleaf' },
   lowDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.25, verge: 'grass', wood: 'broadleaf' },
@@ -112,7 +115,7 @@ const SEGMENTS = [
   // Lakeside straight: the line, then 250 m to the first bend (its other 450 m are the last piece of the lap).
   // (the land side is the pit wall only along the pit lane, about 110 m before the line to 40 m after it)
   { id: 'grid', sec: 'straight', len: 40, g: 0, L: 'shore', R: 'town' },
-  { id: 'gridRun', sec: 'straight', len: 210, g: 0, L: 'shore', R: 'paddock' },
+  { id: 'gridRun', sec: 'straight', len: 210, g: 0, L: 'shore', R: 'grove' },
 
   // Shore bend: a fast banked right away from the water, starting to climb.
   { id: 'sweep', sec: 'sweep', r: -220, deg: 80, ease: 110, bank: 9, g: 3, L: 'lowRun', R: 'lowUp', runoff: 'L' },
