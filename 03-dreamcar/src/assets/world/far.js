@@ -47,12 +47,15 @@ const MASSIF = {
   // main peak 17 left at 19, a greater shoulder further left (25 and more by 40 left), 9 under the day sun (3 right)
   // and lower beyond
   profile: [
-    [-75, 2.5], [-40, 3.5], [-22, 4.5], [-10, 7], [-3, 9], [3, 10.5], [8, 13], [12, 15.5], [15, 18], [17, 19],
-    [20, 17], [23, 17.5], [28, 21], [34, 24], [40, 26.5], [52, 28], [70, 24], [95, 12],
+    // (round three: read off D1 from its camera, 22 degrees left of the road, lens 46 degrees, horizon 3.6 below
+    // the frame's centre) a great shoulder climbing out of the frame's left edge, a saddle at 40 left, the main
+    // pyramid at 15 left (58 % across the frame) nearly as high, then the ridge falling to the right under the sun
+    [-75, 3], [-40, 6], [-25, 8], [-15, 10], [-9, 11.6], [-2, 13], [5, 17], [10, 20.5], [15, 23.6], [19, 21.5],
+    [26, 20.6], [33, 18], [40, 17], [46, 19], [50, 21], [56, 26], [64, 29], [80, 24], [95, 12],
   ],
   // (round three: the angles of the table times this; set from the D1 camera's still beside the frame, where the
   // main peak stood too low)
-  lift: 1.15,
+  lift: 1.0,
   right: -75, // the field's ends, degrees left of the heading
   left: 95,
   near: 2600, // the foot's distance from the start line, at least (m)
@@ -283,7 +286,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const crestR = MASSIF.crest * (1 + 0.12 * (crestNoise.fbm(o * 0.06 + 3, 0.7, 3) - 0.5));
         // (the jag is smooth and only touches the top of the face: a jag that changed from column to column tilted
         // whole columns of the face and striped it like a curtain in a raking light)
-        const jag = 0.05 * (crestNoise.fbm(o * 0.35 + 1, 2.3, 3) - 0.5);
+        const jag = 0.1 * (crestNoise.ridged(o * 0.22 + 1, 2.3, 3) - 0.5) + 0.03 * (crestNoise.ridged(o * 0.9 + 4, 1.1, 2) - 0.5);
         const crestH = eyeY + crestR * Math.tan(profile(o) * MASSIF.lift * DEG);
         // gullies across the face (about one per 1.5 degrees, i.e. 150 m), wandering, deeper low on the face
         const along = (o * DEG * crestR) / 160;
@@ -378,8 +381,9 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const forest = smoothstep(treeLine + 60, treeLine - 80, y) * (1 - 0.7 * steep);
         const scree = smoothstep(0.6, 0.85, up) * (1 - forest) * smoothstep(treeLine - 50, treeLine + 250, y);
         const stain = 0.85 + 0.3 * crestNoise.fbm(x / 160, z / 260, 3);
-        const lime = [0.21 * stain, 0.207 * stain, 0.2 * stain];
-        const scr = [0.25, 0.245, 0.235];
+        // (round three: pale limestone, darker in the gullies and on the ledges)
+        const lime = [0.3 * stain, 0.297 * stain, 0.29 * stain];
+        const scr = [0.34, 0.33, 0.31];
         const green = [0.035, 0.05, 0.026];
         const c = lime.map((l, k) => l * (1 - scree) + scr[k] * scree);
         for (let k = 0; k < 3; k++) col[p * 3 + k] = c[k] * (1 - forest) + green[k] * forest;

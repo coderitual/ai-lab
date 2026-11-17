@@ -170,8 +170,8 @@ export const TIMES = {
     name: 'day',
     sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 7.5 },
     sky: {
-      zenith: [0.16, 0.32, 0.72],
-      horizon: [0.5, 0.62, 0.8],
+      zenith: [0.22, 0.38, 0.78],
+      horizon: [0.55, 0.66, 0.8],
       falloff: 0.15,
       phase: 0.4,
       // (look lane: the aureole, `tight`, was 7: now a white-hot halo about four times the disc's radius, which is
@@ -183,15 +183,15 @@ export const TIMES = {
       stars: 0,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      clouds: { cover: 0.4, wisps: 0.35, lit: 0.22, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.45, wisps: 0.35, lit: 0.26, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
     },
     // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
     // (round three) the drawn sky was raised to the frames' brightness; its light on the scene is kept where it was
-    env: { intensity: 0.56 },
+    env: { intensity: 0.72 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
-    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.1 },
-    fog: { color: [0.3, 0.42, 0.65], sun: [0.16, 0.1, 0.05], sunLobe: 16, density: 0.0001, heightFalloff: 0.011, air: 0.00006 },
+    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.16 },
+    fog: { color: [0.26, 0.35, 0.52], sun: [0.06, 0.04, 0.02], sunLobe: 16, density: 0.0001, heightFalloff: 0.011, air: 0.00006 },
     exposure: 0.66,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
