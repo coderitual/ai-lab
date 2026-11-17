@@ -75,12 +75,15 @@ const CAST_REACH = 160;
  * @param {object} track @param {ReturnType<typeof planeNoise>} noise @param {number} s
  */
 export function turnedAt(track, noise, s) {
-  // the start: the grid and the straight behind the line have turned; past the line it turns green again before the
-  // straight's end, so that the wood ahead of the first bend is the green of a sunlit day
+  // the start: from the pit lane to some 220 m past the line the wood has turned (D4's wall); by the first bend it is
+  // green again, the sunlit, back-lit wood of D1's middle distance
   const d = track.delta(0, s);
-  const start = d < 0 ? 1 - smoothstep(380, 560, -d) : 1 - smoothstep(50, 170, d);
-  const groups = smoothstep(0.55, 0.72, noise.fbm(s / 140, 7.1, 2));
-  return Math.min(1, 0.85 * start + 0.6 * groups + 0.06);
+  const start = d < 0 ? 1 - smoothstep(150, 400, -d) : 1 - smoothstep(220, 330, d);
+  // groups here and there along the lap, but none in the ledge's first bend (D3's wood is green)
+  const ledge = track.sections?.find((x) => x.id === 'ledge');
+  const green = ledge ? smoothstep(-40, 0, track.delta(ledge.s0, s)) * (1 - smoothstep(280, 340, track.delta(ledge.s0, s))) : 0;
+  const groups = smoothstep(0.55, 0.72, noise.fbm(s / 140, 7.1, 2)) * (1 - green);
+  return Math.min(1, 0.85 * start + 0.6 * groups + 0.06 * (1 - green));
 }
 
 /**
@@ -173,6 +176,10 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   }
 
   const lakeLevel = terrain.lake.level;
+  let nearMix = 'mixed';
+  const ledge = track.sections?.find((x) => x.id === 'ledge');
+  /** In the ledge's first bend (D3's place). */
+  const ledgeAt = (s) => !!ledge && track.delta(ledge.s0, s) > -30 && track.delta(ledge.s0, s) < 320;
   const BROAD = [SPECIES.indexOf('maple'), SPECIES.indexOf('lime'), SPECIES.indexOf('birch')];
   const NEEDLE = [SPECIES.indexOf('spruce'), SPECIES.indexOf('fir'), SPECIES.indexOf('larch')];
   /** A species for a tree of this mix at this height (the road's edge has more birch). */
@@ -224,13 +231,15 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         if (!free(point.x, point.z, r === 0 ? 2.6 : 3.0)) continue;
         const y = terrain.heightAt(point.x, point.z);
         if (y < lakeLevel + 0.5) continue;
-        addTree(point.x, y - 0.15, point.z, pickSpecies(wood.mix, y, r === 0, wood.turned), { road: true, turned: wood.turned, inside: row.inside });
+        // (in D3's bend the trees over the road are big ones)
+        addTree(point.x, y - 0.15, point.z, pickSpecies(wood.mix, y, r === 0, wood.turned), { road: true, turned: wood.turned, inside: row.inside, young: ledgeAt(s) ? 1.45 : 1 });
       }
     });
   }
-  // THE START: along the straight a wall of turned crowns on the land side, tall and close, three rows deep with the
-  // wood behind; on the lake side a looser row where there is ground. (The straight is the Track's section
-  // `straight`; which side is the land is the side the Track says is wooded.)
+  // THE START: where the Track says the straight's side is wooded and the wood has turned (behind the pits and past
+  // the pit exit), a wall of turned crowns, tall and close, rows deep, rising behind whatever stands at the road.
+  // Nowhere else on the straight: the lake side and the paddock before the pits stay open, so that the massif shows.
+  // (The straight is the Track's section `straight`.)
   const straight = track.sections?.find((x) => x.id === 'straight');
   if (straight) {
     const MAPLE = SPECIES.indexOf('maple');
@@ -241,29 +250,45 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     // most of it maples; a lime or a birch here and there; a dark fir or two among them
     const startWood = (r) => (r < 0.88 ? MAPLE : r < 0.92 ? LIME : r < 0.94 ? BIRCH : FIR);
     for (const side of [1, -1]) {
-      const land = !!woodAt(track, noise, straight.s0 + span / 2, side);
-      const rows = land
-        ? [
+      const rows = [
             { off: [0.2, 1.4], step: [2.6, 3.4], r: 2.2 },
             { off: [3.6, 5.6], step: [2.8, 3.8], r: 2.4 },
             { off: [7.5, 10.5], step: [3.0, 4.2], r: 2.6 },
-          ]
-        : [{ off: [0.5, 4], step: [9, 16], r: 4 }];
+            // and deeper, so that behind whatever stands at the road (the pits, the stand) the crowns rise as a wall
+            { off: [12, 16], step: [3.0, 4.2], r: 2.8 },
+            { off: [18, 24], step: [3.2, 4.6], r: 3.0 },
+            { off: [26, 34], step: [3.4, 4.8], r: 3.0 },
+          ];
       for (const row of rows) {
         let hint = -1;
         for (let d = plantRng.range(0, 2); d < span; d += plantRng.range(row.step[0], row.step[1])) {
           const s = (straight.s0 + d) % track.length;
           // (only where the wood has turned: the far end of the straight is the ordinary wood)
           const turned = turnedAt(track, noise, s);
-          if (turned < 0.5) continue;
+          if (turned < 0.5 || !woodAt(track, noise, s, side)) continue;
           track.pointAt(s, side * (track.edgeAt(s, side) + BARRIER_CLEAR + plantRng.range(row.off[0], row.off[1])), point);
           if (blocked(point.x, point.z, 0, hint)) continue;
           hint = spot.index;
           if (!free(point.x, point.z, row.r)) continue;
           const y = terrain.heightAt(point.x, point.z);
           if (y < lakeLevel + 0.4) continue;
-          addTree(point.x, y - 0.15, point.z, startWood(plantRng.next()), { road: true, turned, inside: land ? 0.3 : 0.1, young: land ? 1.2 : 1 });
+          addTree(point.x, y - 0.15, point.z, startWood(plantRng.next()), { road: true, turned, inside: 0.3, young: 1.25 + 0.012 * Math.min(30, row.off[0]) });
         }
+      }
+    }
+  }
+
+  // D1: at the near end of the lake side's run of boards along the straight, one or two tall dark trees behind the
+  // first board (the only trees on that side)
+  if (straight) {
+    const run = (track.boards ?? []).filter((b) => b.side > 0 && track.delta(straight.s0, b.s0) >= 0 && track.delta(straight.s0, b.s0) < 200).sort((a, b) => track.delta(straight.s0, a.s0) - track.delta(straight.s0, b.s0))[0];
+    if (run) {
+      for (let k = 0; k < 2; k++) {
+        const s = (run.s0 + track.length + k * 7 - 4) % track.length;
+        track.pointAt(s, track.edgeAt(s, 1) + 3.5 + k * 2.5, point);
+        const y = terrain.heightAt(point.x, point.z);
+        if (y < lakeLevel + 0.3 || keepOut(point.x, point.z) || !free(point.x, point.z, 2)) continue;
+        addTree(point.x, y - 0.15, point.z, SPECIES.indexOf(k ? 'fir' : 'spruce'), { road: true, turned: 0, inside: 0.1, young: 1.1 });
       }
     }
   }
@@ -301,11 +326,22 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       const pz = z + plantRng.range(-0.45, 0.45) * LATTICE;
       const roll = plantRng.next();
       const rank = plantRng.next();
+      // (the cheap test first: start-up time)
+      if (rank > T.keep) continue;
       const f = terrain.forestAt(px, pz);
       // dense where the forest is, a few strays at its edges and on the meadows
       if (roll > Math.min(0.92, f * 1.15) && roll > 0.015) continue;
-      if (rank > T.keep) continue;
       if (blocked(px, pz, 2.5)) continue;
+      // where the Track says nothing grows beside the road, the mass of the forest keeps its distance too (the view
+      // over the valley at the ledge stays open)
+      {
+        const side = spot.lat >= 0 ? 1 : -1;
+        const beyond = Math.abs(spot.lat) - track.edgeAt(spot.s, side);
+        const wood = woodAt(track, noise, spot.s, side);
+        if (!wood && beyond < (ledgeAt(spot.s) ? 140 : 30)) continue;
+        // near the road the mass of the forest is of the road's own kind of wood
+        nearMix = wood && beyond < 90 ? wood.mix : 'mixed';
+      }
       const y = terrain.heightAt(px, pz);
       if (y < lakeLevel + 1) continue;
       // the tree line: thinning above 75 m, a few stragglers higher up
@@ -316,7 +352,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       // the turned share of the road's nearest point, fading with the distance from it
       const away = Math.max(0, Math.abs(spot.lat) - track.edgeAt(spot.s, spot.lat >= 0 ? 1 : -1));
       const turned = turnedAt(track, noise, spot.s) * Math.exp(-away / 140) + 0.05;
-      addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies('mixed', y, false), { road: false, turned, inside: 0.75 });
+      addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies(nearMix, y, false, turned), { road: false, turned, inside: 0.75 });
     }
   }
   lap('plant');

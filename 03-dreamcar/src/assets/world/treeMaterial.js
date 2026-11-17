@@ -119,7 +119,7 @@ vec3 treeCrown = vec3( 0.0, 0.0, 1.0 );      // the crown's own normal, view spa
 const CROWN_TONE = /* glsl */ `
 vec3 crownTone( float lit, float turn ) {
   vec3 shade = mix( vec3( 0.78, 0.92, 1.12 ), vec3( 1.12, 0.8, 0.62 ), turn );
-  vec3 light = mix( vec3( 1.12, 1.06, 0.78 ), vec3( 1.0, 0.93, 0.8 ), turn );
+  vec3 light = mix( vec3( 1.12, 1.06, 0.78 ), vec3( 1.0, 0.84, 0.62 ), turn );
   return mix( shade, light, smoothstep( 0.2, 0.95, lit ) );
 }
 `;
