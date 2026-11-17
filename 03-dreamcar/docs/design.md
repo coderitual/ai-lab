@@ -274,21 +274,26 @@ about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
   hundreds of times brighter than paint), camera and object motion blur with
   the car held sharp, a slight vignette and grain. No effect that is not also
   on a real camera.
-- **Day** (references D1, A): the sun 20° above the horizon, 26° left of the
-  start straight's heading, out over the lake (lighting.js `towards(116, 20)`):
-  the straight is driven into the light, shadows fall long towards the camera
-  and everything is rim-lit. A deep blue sky, pale and bright at the horizon,
-  with small lit cumulus (grey-blue bases, silver rims near the sun); a compact
-  sun with a soft aureole; dry asphalt. Sunlit level ground gets about 2.6 from
-  the sun against about 0.5 of sky and fill in the shade (some 2.5 to 3 stops,
-  the shade blue). Haze only with distance (hundreds of metres), bluer towards
-  the horizon, warmer towards the sun. A limestone massif (far.js: nine steep
-  summits with gullies, its own baked sun shadows) stands ahead and to the
-  right of the straight, back-lit, blue-grey in its own shade. Exposure for
-  sunlit asphalt, closing by about 2.5 stops inside the tunnel and recovering
-  over a second on the way out.
+- **Day** (references D1, A; the owner: "the whole exact screenshot"): the
+  sun 16° above the horizon, 3° right of the start straight's heading, i.e.
+  straight down the road (lighting.js `PLACES`, turned to the Track's heading
+  by `placeLights`): the chase view drives into it, its glare lies along the
+  asphalt, shadows fall straight back and a little left. A deep blue sky, pale
+  and bright at the horizon, with small lit cumulus (grey-blue bases, silver
+  rims near the sun); a compact sun with a soft aureole; dry asphalt. Sunlit
+  level ground gets about 2.1 from the sun against about 0.5 of sky and fill
+  in the shade (some 2 to 2.5 stops at this height, the shade blue);
+  exposure 0.85. Haze in two layers: the valley haze (hundreds of metres)
+  and a thin air with a 1.4 km scale height that lifts and blues the far
+  land kilometres away, warmer towards the sun. A limestone massif (far.js)
+  fills the background, composed as D1 seen from the start line: its main
+  peak 17° left of the road at about 19°, a greater shoulder over 23° by 30°
+  left, the ridge about 9° under the sun and lower beyond; back-lit,
+  blue-grey in its own shade, gullies down its face, forest and scree on its
+  lower third. Exposure for sunlit asphalt, closing by about 2.5 stops inside
+  the tunnel and recovering over a second on the way out.
 - **Night:** a three-quarter moon low ahead and a little left of the start
-  straight (17° up, beside the massif, which stands as a silhouette with
+  straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
   65 m with a sharp cut-off rising to the right, high beam about 150 m; LED
   daytime running lamps always on; tail lamps red with a hot core; brake lamps
@@ -313,8 +318,8 @@ about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
   glow on the haze above it, a radio mast's red lamps and a hamlet high on
   the slope beyond (from which stretches of the new circuit it is in the frame
   has not been checked yet).
-- **Dusk is golden hour** (references D4, D2): the sun 3.5° up at bearing
-  215, out over the lake behind the left shoulder of a car on the start
+- **Dusk is golden hour** (references D4, D2): the sun 3.5° up, 125° left
+  of the start straight's heading, out over the lake behind the left shoulder of a car on the start
   straight. Its orange light crosses the straight almost level, so whatever
   stands on the lake side throws shadows 15 to 20 m long over the grid while
   the trees, the gantry and the buildings on the land side, and the massif,

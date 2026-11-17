@@ -32,7 +32,7 @@
 import * as THREE from 'three';
 import { createAtmosphere } from './atmosphere.js';
 import { createEnvironment } from './environment.js';
-import { TIMES } from './lighting.js';
+import { TIMES, placeLights } from './lighting.js';
 import { createGroundMaterial } from './groundMaterial.js';
 import { createLake } from './lake.js';
 import { createFar } from './far.js';
@@ -103,6 +103,11 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     ms[name] = Math.round(now - clock);
     clock = now;
   };
+  // (sky lane) the sun and the moon stand where they do relative to the start straight: turn them to its heading
+  {
+    const line = track.frameAt(0, {});
+    placeLights(Math.atan2(line.tan.x, line.tan.z) / (Math.PI / 180));
+  }
   const atmosphere = createAtmosphere(caps);
   const sky = createSky({ tier, rng: rng.fork('sky'), atmosphere });
   lap('sky');

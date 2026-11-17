@@ -274,20 +274,30 @@ Every field is optional and neutral when missing (`NEUTRAL_LOOK`).
 | `splitHighlights` | the highlights' colour, multipliers | [1, 1, 1] |
 | `splitBalance` | display brightness neither touches | 0.5 |
 
-Values tried on the stills and recommended (to be set in lighting.js by its
-owner):
+The Looks lighting.js holds (sky lane; "dusk" is golden hour; day judged
+beside D1 and A, golden hour beside D4 and D2, night beside B):
 
-| | day | dusk | night |
+| | day | dusk (golden hour) | night |
 | --- | --- | --- | --- |
-| `ao` | 0.8 (fades out on sunlit surfaces brighter than white anyway) | 1.0 | 0.9 |
+| `contrast` | 1.18 | 1.12 | 1.12 |
+| `saturation` | 1.12 | 1.12 | 0.94 |
+| `tint` | [1.0, 0.99, 0.965] | [1.03, 1.0, 0.95] | [0.95, 0.985, 1.05] |
+| `lift` | [0.0004, 0.0006, 0.001] | none | [0.0006, 0.0009, 0.0018] |
+| `vignette` | 0.28 | 0.28 | 0.32 |
+| `chroma` | 0.0012 | 0.001 | 0.0012 |
+| `grain` | 0.5 | 0.6 | 1.2 |
+| `bloom` | 0.05 | 0.09 | 0.15 |
+| `halo` | 0 | 0.05 | 0.15 |
+| `ghosts` | 0.0003 (faint: D1 shows glare and glints, not rings) | 0.0003 | 0 |
+| `glare` | 0.015 (more greys the whole sky round the sun) | 0.03 | 0 |
+| `flare` | the sun, light 1.0, reach 0.6, sky 0.3 | the low sun, light 0.6, reach 0.5, sky 0.1 | none |
 | `star` | 0.02 (sun glints on paint and glass) | 0.015 | 0.015 |
-| `halo` | 0 | 0.1 | 0.15 |
-| `splitShadows` | none | [1.1, 0.98, 0.92] | none |
-| `splitHighlights` | none | [0.9, 1.02, 1.15] | none |
-| `splitBalance` | | 0.45 | |
-| `ghosts` | 0 to 0.002 (D1 shows glare and glints, not rings) | 0 | 0 |
+| `ao` | 0.8 (fades out on sunlit surfaces brighter than white anyway) | 1.0 | 0.9 |
+| split toning | none | none | none |
 
-The dusk split toning moves the measured road from (65, 56, 69) to
+Split toning tried for the old wet violet dusk: `splitShadows`
+[1.1, 0.98, 0.92], `splitHighlights` [0.9, 1.02, 1.15], `splitBalance` 0.45.
+For that old dusk, the split toning moved the measured road from (65, 56, 69) to
 (67, 56, 67) and the top of the sky a little toward blue: the reference's road
 is (78, 68, 74), less blue than ours, and its sky top (150, 145, 168) more. It
 is a small correction; most of the sky's difference is the sky's own colour.
