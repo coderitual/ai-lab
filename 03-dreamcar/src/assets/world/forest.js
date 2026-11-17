@@ -176,6 +176,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   }
 
   const lakeLevel = terrain.lake.level;
+  let nearMix = 'mixed';
   const ledge = track.sections?.find((x) => x.id === 'ledge');
   /** In the ledge's first bend (D3's place). */
   const ledgeAt = (s) => !!ledge && track.delta(ledge.s0, s) > -30 && track.delta(ledge.s0, s) < 320;
@@ -230,7 +231,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         if (!free(point.x, point.z, r === 0 ? 2.6 : 3.0)) continue;
         const y = terrain.heightAt(point.x, point.z);
         if (y < lakeLevel + 0.5) continue;
-        addTree(point.x, y - 0.15, point.z, pickSpecies(wood.mix, y, r === 0, wood.turned), { road: true, turned: wood.turned, inside: row.inside });
+        // (in D3's bend the trees over the road are big ones)
+        addTree(point.x, y - 0.15, point.z, pickSpecies(wood.mix, y, r === 0, wood.turned), { road: true, turned: wood.turned, inside: row.inside, young: ledgeAt(s) ? 1.45 : 1 });
       }
     });
   }
@@ -324,17 +326,21 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       const pz = z + plantRng.range(-0.45, 0.45) * LATTICE;
       const roll = plantRng.next();
       const rank = plantRng.next();
+      // (the cheap test first: start-up time)
+      if (rank > T.keep) continue;
       const f = terrain.forestAt(px, pz);
       // dense where the forest is, a few strays at its edges and on the meadows
       if (roll > Math.min(0.92, f * 1.15) && roll > 0.015) continue;
-      if (rank > T.keep) continue;
       if (blocked(px, pz, 2.5)) continue;
       // where the Track says nothing grows beside the road, the mass of the forest keeps its distance too (the view
       // over the valley at the ledge stays open)
       {
         const side = spot.lat >= 0 ? 1 : -1;
         const beyond = Math.abs(spot.lat) - track.edgeAt(spot.s, side);
-        if (!woodAt(track, noise, spot.s, side) && beyond < (ledgeAt(spot.s) ? 140 : 30)) continue;
+        const wood = woodAt(track, noise, spot.s, side);
+        if (!wood && beyond < (ledgeAt(spot.s) ? 140 : 30)) continue;
+        // near the road the mass of the forest is of the road's own kind of wood
+        nearMix = wood && beyond < 90 ? wood.mix : 'mixed';
       }
       const y = terrain.heightAt(px, pz);
       if (y < lakeLevel + 1) continue;
@@ -346,7 +352,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       // the turned share of the road's nearest point, fading with the distance from it
       const away = Math.max(0, Math.abs(spot.lat) - track.edgeAt(spot.s, spot.lat >= 0 ? 1 : -1));
       const turned = turnedAt(track, noise, spot.s) * Math.exp(-away / 140) + 0.05;
-      addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies('mixed', y, false), { road: false, turned, inside: 0.75 });
+      addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies(nearMix, y, false, turned), { road: false, turned, inside: 0.75 });
     }
   }
   lap('plant');

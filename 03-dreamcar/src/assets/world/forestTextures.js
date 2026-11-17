@@ -574,7 +574,7 @@ function paintMass(ctx, rng, px, { colours, shape, size, leaves, wood }) {
 
 /** Fallen leaves on the ground: a patch, dense in its middle, thinning to nothing at its edge. */
 function paintLitter(ctx, rng, px) {
-  for (let k = 0; k < 900; k++) {
+  for (let k = 0; k < 600; k++) {
     const a = rng.range(0, Math.PI * 2);
     const r = 0.44 * Math.pow(rng.next(), 0.7);
     if (rng.next() < r / 0.44 - 0.35) continue;
@@ -589,7 +589,7 @@ function paintLitter(ctx, rng, px) {
 /** The wood's floor: grass, moss and low herbs in a patch that thins out at its edge. */
 function paintFloor(ctx, rng, px) {
   ctx.lineCap = 'round';
-  for (let k = 0; k < 2600; k++) {
+  for (let k = 0; k < 1300; k++) {
     const a = rng.range(0, Math.PI * 2);
     const r = 0.45 * Math.pow(rng.next(), 0.6);
     if (rng.next() < r / 0.45 - 0.4) continue;
@@ -668,8 +668,8 @@ export function createFoliageAtlas(tile, rng, anisotropy = 4) {
     [TILE.MAPLE]: (r) => paintCluster(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.085, leaves: 270, wood: 'rgb(60,44,36)' }),
     [TILE.LIME]: (r) => paintCluster(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.065, leaves: 440, wood: 'rgb(56,46,40)' }),
     [TILE.TWIG]: (r) => paintTwig(ctx, r, px),
-    [TILE.MAPLE_MASS]: (r) => paintMass(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.05, leaves: 1500, wood: 'rgb(60,44,36)' }),
-    [TILE.LIME_MASS]: (r) => paintMass(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.042, leaves: 1900, wood: 'rgb(56,46,40)' }),
+    [TILE.MAPLE_MASS]: (r) => paintMass(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.05, leaves: 1000, wood: 'rgb(60,44,36)' }),
+    [TILE.LIME_MASS]: (r) => paintMass(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.042, leaves: 1200, wood: 'rgb(56,46,40)' }),
     [TILE.LITTER]: (r) => paintLitter(ctx, r, px),
     [TILE.FLOOR]: (r) => paintFloor(ctx, r, px),
   };
