@@ -297,29 +297,33 @@ with a short `advance` after loading.
   by `placeLights`): the chase view drives into it, its glare lies along the
   asphalt, shadows fall straight back and a little left. A deep blue sky, pale
   and bright at the horizon, with small lit cumulus (grey-blue bases, silver
-  rims near the sun); a compact sun with a soft aureole; dry asphalt. Sunlit
-  level ground gets about 2.1 from the sun against about 0.6 of sky and fill
-  in the shade (some 2 to 2.5 stops at this height, the shade blue);
-  exposure 0.72. Haze in two layers: the valley haze (hundreds of metres)
+  rims near the sun); a compact sun with a soft aureole; dry asphalt. The
+  drawn sky is as bright as the frames' (pale blue, paling to the horizon);
+  its light on the scene is set apart (`env.intensity` 0.72, fill 0.16), so
+  that the shade stays open: sunlit level ground about 2.1 from the sun
+  against about 0.8 of sky and fill (some 1.5 to 2 stops; D1's shaded
+  mid-tones measured: p10 38 against the frame's 40); exposure 0.66. Haze in two layers: the valley haze (hundreds of metres)
   and a thin air with a 1.4 km scale height that lifts and blues the far
   land kilometres away, warmer towards the sun. A limestone massif (far.js)
-  fills the background, composed as D1 seen from the start line: its main
-  peak 17° left of the road at about 19°, a greater shoulder over 23° by 30°
-  left, the ridge about 9° under the sun and lower beyond; back-lit,
+  fills the background, its skyline read off D1 from D1's camera: a great
+  shoulder climbing out of the frame's left edge (26° and more beyond 56°
+  left of the road), a saddle at 40° left (17°), the main pyramid at 15° left
+  (23.6°), the ridge falling to 13° under the sun and lower beyond; back-lit,
   blue-grey in its own shade, gullies down its face, forest and scree on its
   lower third. Exposure for sunlit asphalt, closing by about 2.5 stops inside
   the tunnel and recovering over a second on the way out.
 - **Day has the sun in it.** Heading into the low sun it blooms into a soft
   glare, faint lens ghosts lie across the frame (medium and high), the sky
   stays blue up to it and the road shines towards the light.
-- **Dusk is golden hour** (references D4, D2): the sun 3.5° up, 125° left
+- **Dusk is golden hour** (references D4, D2), late: the sun 2° up, 125° left
   of the start straight's heading, out over the lake behind the left shoulder of a car on the start
   straight. Its orange light crosses the straight almost level, so whatever
-  stands on the lake side throws shadows 15 to 20 m long over the grid while
+  stands on the lake side throws shadows 25 to 30 m long over the grid while
   the trees, the gantry and the buildings on the land side, and the massif,
-  stand in full orange light. The sky runs from pale gold towards the sun
-  through a rose belt to blue overhead, with clouds lit from below that the
-  paint mirrors. Dry. Lamps and windows are coming on.
+  stand in red-orange light. The sky is a warm haze low down deepening to a
+  dusky blue-violet overhead, with clouds lit from below that the paint
+  mirrors; the fill is low (env 0.7 of a dim sky, exposure 4.5), so the lit
+  crowns and the lamps carry the picture. Dry. Lamps and windows are on.
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
