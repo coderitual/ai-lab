@@ -31,8 +31,12 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
   that way.
 - It is an original game. Other games may be looked at for what quality looks
   like, never copied (names, characters, courses, art, HUD).
-- The sea is defined once (`src/engine/waves.js`) and used by both the shaders
-  and the physics. Never give one of them its own copy.
+- The sea is defined once (`src/engine/waves.js`: its settings, and tables
+  made from them at load by `src/engine/ocean.js`) and read by both the
+  shaders and the physics. Never give one of them its own copy. What the
+  boats ride must be the same on every machine: only what is drawn and not
+  ridden may differ between phones and desktops. After changing `SEA`, run
+  `node tools/sea.mjs` and bring `docs/spec.md` section 3 up to date.
 - Hull dimensions live in two places that must agree: the model
   (`src/assets/boat/lines.js`) and what the physics and effects assume
   (`HULL` in `src/game/config.js`).

@@ -27,6 +27,7 @@ while a test is running against the preview.
 | `tools/soundtest.cjs URL [dir]` | Renders the soundtrack offline and looks for every cue: moment, side, level. 16 checks. With `dir`, keeps the WAV files. |
 | `tools/nettest.cjs URL [dir] [--only=a\|b\|c\|d]` | Online play between pages of one browser: A the whole two-player flow, B a slow lossy link, C real time, D four players. 61 checks. |
 | `tools/screenshots.cjs` | Regenerates every picture in the README and these documents. `--list`, `--only a,b`. |
+| `tools/sea.mjs [--phone]` | The sea in numbers, in Node (no browser): the tables and what they cost, what a float meets in the open and in the lee, how much of the surface is breaking, that it loops and tiles exactly (the tables in [spec.md](spec.md#3-the-sea)). |
 | `tools/handling.cjs [URL]` | Scripted helm on a calm sea: carve, drift, recovery, powerslide, flick. Prints slip angles, speeds and turn radii (the table in [spec.md](spec.md#4-the-boat)). |
 | `tools/capture.cjs` | Stills (`--at 9,24`) or a frame-accurate recording (`--from --seconds --fps`), optionally with sound (`--sound --mp4 file`). `--drive` lets bots drive for the players. |
 | `tools/shot.cjs` | One screenshot of any URL (used with `viewer.html`). |
@@ -67,9 +68,15 @@ waves, `manual` stops the loop (step with `__viewer.frames(n)`).
 
 With the scripts above, in headless Chromium on software WebGL.
 
-- **Solo.** A full three-lap bot race (about 2 min 30 s, no missed marks, no
-  boat outside the floats, hulls in the water except for the tenth of the
-  time they are in the air). Handling on a calm sea by scripted helm
+- **The sea**, by `tools/sea.mjs` in Node: it is as high as the spec says,
+  what the boats ride repeats exactly after its period and its tile, and the
+  tables take a third of a second to make on the development machine. In the
+  viewer, the white on open water stays between 5 and 7% of the surface and
+  changes smoothly from one stored frame of the tables to the next.
+- **Solo.** A full three-lap race driven by the autopilot and the bots
+  (about 2 min 40 s, laps of 50 to 56 s, no missed marks, no boat reset, the
+  player's boat in the air an eighth of the time, once for over two
+  seconds). Handling on a calm sea by scripted helm
   (`tools/handling.cjs`): carve at half lock, drift at full lock, recovery
   on release, powerslide under brake (the figures are in
   [spec.md](spec.md#4-the-boat)).
@@ -104,6 +111,16 @@ With the scripts above, in headless Chromium on software WebGL.
 - **Real Safari/WebKit and real phones.** Only Chromium was available. The
   game is written for iPhone Safari (WebGL 2, pointer events, audio started
   from a tap), but none of that has been seen on a device.
+- **The sea on a device.** Its tables are made at load (a third of a second
+  on the development machine; a phone's time is unknown), take about 17 MB of
+  memory and as much again on the graphics card, and are read as half-float
+  3D textures with linear filtering: part of WebGL 2, but never seen working
+  on a phone or in Safari. That the shader and the physics read the same
+  water is seen in every picture (hulls and marks sit in it) but has not
+  been measured point for point.
+- **Whether the big sea is fun.** Every figure about racing on it comes from
+  the autopilot and the bots. Marks can be hidden behind a crest for a
+  moment; nobody has yet steered through that by hand.
 - **Frame rate on a device.** A frame is several passes and a costly water
   shader. Everything expensive is scaled down on phones and given up when
   frames run long, but what a given phone actually manages is not known.

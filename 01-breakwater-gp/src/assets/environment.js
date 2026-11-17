@@ -93,7 +93,7 @@ export function createEnvironment(engine, { waterSegments = 256, shadows = true 
     /** Call every rendered frame. */
     update(time, camera, focusX = camera.position.x, focusZ = camera.position.z) {
       sky.material.uniforms.uTime.value = time;
-      updateWaveUniforms(time, camera.position.y);
+      updateWaveUniforms(time);
       water.userData.follow(focusX, focusZ);
     },
   };

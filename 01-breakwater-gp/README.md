@@ -22,9 +22,11 @@ keyboard, or online with up to four players and no game server.
 
 ## What is in it
 
-- **A sea you can read.** One set of waves drives both the picture and the
-  physics, so the crest you see is the crest that launches you. Rough on the
-  ocean side of the island, calmer in its lee.
+- **A big sea you can read.** Thousands of waves made from a wind spectrum
+  when the game loads: hills of water four to six metres high on the ocean
+  side of the island, peaked and breaking at the top, half that in its lee.
+  The same tables drive the picture and the physics, so the crest you see is
+  the crest that launches you.
 - **Race boats modelled and painted in code**: tunnel-hull catamarans, each
   team's to its own design, with numbers and lettering, a driver under glass,
   twin outboards that swing with the helm.

@@ -34,32 +34,82 @@ where to take it next. For exact numbers see [spec.md](spec.md).
 
 **Problem.** If the water you see and the water the physics uses differ, the
 boat floats above troughs and ploughs through crests, and the player cannot
-read the sea.
+read the sea. And a sea added up from a dozen hand-picked sine waves, however
+they are tuned, looks like a dozen sine waves: big seas need thousands.
 
-**Trick.** The sea is defined once, as a table of trochoidal waves and an
-amplitude field (`engine/waves.js`). That module emits the same maths twice:
-as GLSL (`WAVE_GLSL`, used by the ocean's vertex and fragment shaders) and as
-JavaScript (`sampleSurface`, used by buoyancy, floating props, the camera
-floor, and spray hitting the water). The wave table is uploaded as uniforms;
-nothing is duplicated by hand.
+**Trick.** The sea is a *spectrum*: how much energy the wind has put into
+waves of each length and direction. Tessendorf's method ("Simulating Ocean
+Water") turns one into a surface with an inverse Fourier transform, a few
+thousand wave trains at a time, and gives each wave a sideways pull toward
+its crest, which is what makes crests peaked and troughs flat. Games that are
+known for their seas do this on the graphics card every frame. A browser
+game that also has to ride the waves on the CPU, on a phone, cannot afford
+that, and does not need to:
 
-- Trochoidal waves move water sideways as well as up. To ask "how high is the
-  water *at* (x, z)?" the CPU first has to find which bit of water has been
-  pushed there: three fixed-point iterations, which is plenty at these
-  steepnesses.
-- A second tier of short, steep chop (under 8 cm) is drawn by the GPU only. It
-  makes the surface look sharp and confused, and leaving it out of the physics
-  cannot be felt.
+- **Round every frequency and the sea loops.** If each wave makes a whole
+  number of cycles in some period, the whole surface repeats exactly after
+  it. So one period is made once, when the game loads, as a stack of frames
+  (`engine/ocean.js`; the transform is forty lines in `engine/fft.js`), and
+  the sea becomes a table looked up at (x, z, time). It takes a third of a
+  second to make.
+- **The shader and the hull read the same table.** The graphics card gets it
+  as 3D textures (two across the water, the third through time, wrapping in
+  all three, so it tiles and loops with no code at all). `sampleSurface` reads
+  the very arrays the textures were filled from, with the same linear
+  blending, for buoyancy, floating props, the camera's floor and spray
+  hitting the water. Nothing is evaluated twice in two languages any more.
+- **Several tables, so the repeat does not show.** One tile fine enough for
+  ripples and big enough for swell would be enormous. Three tables each take
+  a band of wavelengths, on tiles of 360, 72 and 14.4 m with periods of 64,
+  31 and 7.9 s, none of which divides another. The boats ride the first two;
+  the third is chop a hand high that is only drawn.
+- **Seeded, so it is the same sea everywhere.** The random sizes and phases
+  of the waves come from a fixed seed, and the tables the boats ride are the
+  same size on a phone as on a desktop. Online, two machines only have to
+  agree on the time.
+- **Its past is free.** Because the whole period exists, "what was this
+  crest doing three seconds ago" can be worked out while the tables are made
+  and stored beside the rest (see the foam in section 3).
+- The waves move water sideways as well as up. To ask "how high is the water
+  *at* (x, z)?" the CPU first has to find which bit of water has been pushed
+  there: six fixed-point steps, each correcting four fifths of the miss.
+  (Three plain steps, enough for a gentle sea, left the answer 12 cm out one
+  time in a hundred on this one; correcting by the whole miss overshoots near
+  a crest that is about to fold.)
 - The amplitude field (calm in the island's lee and near shores) is evaluated
   by the same function on both sides.
+- The size of the sea is asked for by its significant height and set by
+  measurement: the tables are scaled so that four standard deviations of the
+  surface come to that. `node tools/sea.mjs` prints what a float in it meets.
 
-**Limits.** The sum is evaluated per sample, so cost grows with the number of
-waves times the number of samples: five samples per boat, 120 times a second,
-six waves is nothing; a hundred waves would not be. Waves do not refract round
+**Where it comes from.** The owner asked for waves like those of Sea of
+Thieves. What is public about that ocean (a short talk abstract and other
+people's breakdowns of it) says it is of this family: a Tessendorf spectrum
+transformed on the graphics card, with the sideways "choppiness" offsets,
+foam where the surface folds over, and the water's colour brightened toward
+the peaks of the waves. No numbers were published, and none are borrowed:
+every figure in [spec.md](spec.md#3-the-sea) is measured on this sea. The
+looping tables, the bands and the foam's memory are this game's own answer to
+running in a browser. Nothing of that game's look, world or interface is
+copied.
+
+**Limits.** The sea repeats: what the boats ride every 360 m and every 33
+minutes, the look of it every 64 s on the largest waves, and from high up
+the tile can be made out. Rounding the frequencies also leaves the biggest
+waves only two beats to keep (every wave from 89 to 151 m turns either seven
+or eight times in the 64 s), which a camera that stands still for a minute
+could notice and a boat at speed cannot. Places differ for good: a float in one spot sees
+waves a fifth higher than one a hundred metres off, for ever. Between frames
+the table is blended in a straight line, which takes up to a tenth off the
+height of the shortest waves in each band midway between two frames. Where the surface folds right
+over (3% of the open sea) the mesh passes through itself; foam covers it.
+The physics takes the surface's slope from the height alone, so at a sharp
+crest it is a little gentler than what is drawn. Waves do not refract round
 the island or break on the beach.
 
-**Next.** A wave that steepens and breaks on the shallow side; wind gusts that
-modulate the chop; a course-specific wave table (see [ideas.md](ideas.md)).
+**Next.** A sea per course and per weather (the settings are seven numbers);
+wind gusts that move across it; a wave that steepens and breaks on the
+shallow side (see [ideas.md](ideas.md)).
 
 ## 2. An ocean that reaches the horizon
 
@@ -73,10 +123,12 @@ does not move; a `uCenter` uniform slides the pattern so that its dense middle
 sits under the view's boat, and the waves are evaluated in world space, so
 nothing swims.
 
-A wave is only displaced where the mesh has about five vertices per
-wavelength (`setWaveMeshDensity`). Further out it fades from the geometry and
-lives on in the per-pixel normals, which are computed analytically from the
-same wave table rather than from the mesh.
+A table of waves is only displaced where the mesh has a few vertices to the
+shortest of them (`setWaveMeshDensity`): on the desktop's mesh, the chop out
+to about 12 m, the middle band to 60 m, the long waves to 490 m. Further out each fades from the
+geometry and lives on in the per-pixel normals, which are read from the same
+tables rather than taken from the mesh, until it is too fine for that as well
+(36, 120 and 430 m): past there the far sea is flat water with ripples.
 
 **Limits.** In split screen the mesh is re-centred per view, which is why each
 view is drawn in its own pass. The centre fan has many thin triangles.
@@ -92,8 +144,8 @@ depth buffer read.
 - **Light through the wave.** Water glows where there is little of it between
   the sun and your eye: the top of a wave, a crest that is bunching up, a
   steep face turned toward you, and most of all when you look toward the sun.
-  Each of those is a cheap term from the wave height, the Jacobian of the
-  displacement (how much the surface is being squeezed) and two dot products;
+  Each of those is a cheap term from the wave height, how hard the surface is
+  being squeezed there (which the sea's tables carry) and two dot products;
   together they read as translucency.
 - **Caustics made the way they are made** (`makeCausticTexture` in
   `assets/textures.js`). A grid of rays is bent by the slopes of a periodic
@@ -114,13 +166,21 @@ depth buffer read.
   smeared streaks; squeezed by 1.4 instead of 2.3, and a quarter stronger, they read as small
   sharp facets, each catching the sky or the sun on its own.
 - **Foam that lingers.** Foam belongs where a crest broke a moment ago, not
-  where the crest is now. Rather than simulate it, the shader asks the wave
-  function how hard the swell was bunching up here *now and 0.9, 1.9 and 3.1
-  seconds ago* (the waves are a closed formula, so the past is free) and keeps
-  the strongest, fading with age. The result trails behind the moving crest.
-  A noise pattern cut by that mask gives lacy threads over a veil of aerated
-  water. Short chop makes whitecaps of its own, where the Jacobian of all
-  the waves together says the surface is folding (`1 − J` above 0.36).
+  only where the crest is now. Big-budget oceans keep it in a texture that is
+  blurred and faded every frame. Here the sea's tables already hold the whole
+  period, so the same memory is worked out once, when they are made: going
+  round the frames, each point keeps the greater of how hard it is being
+  squeezed now and what it (and, a little, its neighbours) remembered a frame
+  ago, fading to a third every three seconds. The shader reads that as one
+  more channel. The result trails down the back of the moving wave; a noise
+  pattern cut by it gives lacy threads over a veil of aerated water. Where a
+  crest is breaking this moment the water is white right through, and short
+  chop makes whitecaps of its own, where the Jacobian of all the waves
+  together says the surface is folding.
+- **Whitecaps that do not stop at sixty metres.** The middle band of waves is
+  too fine to shade beyond 120 m, and it carries half of what makes foam. So
+  where it has faded, the long waves count for about twice as much, and the
+  far sea keeps its white horses.
 - **Glitter at constant size.** Sun sparkle comes from a normal-map lookup
   whose scale is chosen per pixel from `log2(distance)`, blended between the
   two nearest octaves, so facets stay a few pixels across from the bow to the
@@ -559,7 +619,10 @@ per frame. Anything timed by the wall clock is useless there.
 - **Staged photographs** (`tools/screenshots.cjs`). For the pictures in these
   documents the script places the game's own camera relative to a boat, hides
   the HUD, and asks for one more draw. Times and cameras are in a table at the
-  top of the script.
+  top of the script. A camera's height is given above the water under the
+  boat; on a sea this size the water where the camera stands can be metres
+  higher, so the script asks the game (`__bw.waterAt`) and keeps the lens
+  clear of it.
 - **CSS animations are stepped too.** Banners animate on the wall clock; the
   capture tool pauses them and advances them a frame at a time.
 - **Two pages, stepped in turn**, play an online race with simulated lag,

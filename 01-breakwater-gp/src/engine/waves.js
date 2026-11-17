@@ -2,67 +2,57 @@
 // of the ocean) and the CPU (buoyancy for crafts and buoys), so what you see
 // is what the physics rides on.
 //
-// The surface is a sum of trochoidal (Gerstner) waves:
-//   P.xz = p + Σ dir_i * H_i * cos(θ_i)
-//   P.y  =     Σ      A_i * sin(θ_i)        θ_i = k_i * dot(dir_i, p) - ω_i t + φ_i
+// The surface is made from a wave spectrum when the game loads (engine/ocean.js):
+// a few "cascades", each a table of where the water is over one tile of sea for
+// one period of time, repeating exactly in both. A point of the surface is
+//   P.xz = p + CHOP * Σ sideways_c(p, t)
+//   P.y  =            Σ height_c(p, t)
 // scaled by a slowly varying "amplitude field" that calms the water in the lee
-// of the main island and close to any shore.
+// of the main island and close to any shore. The shaders read the tables as 3D
+// textures; sampleSurface() below reads the same numbers from the arrays they
+// were uploaded from.
 //
-// Two tiers:
-//   - PHYSICS waves: the swell and chop that carry the crafts (CPU + GPU).
-//   - DETAIL waves: short, steep chop that only the GPU draws. It is under
-//     ten centimetres high, so leaving it out of the physics goes unnoticed,
-//     but it gives the surface its sharp, confused look.
+// Two tiers: the long cascades carry the crafts (CPU + GPU); the shortest one
+// is chop a hand high that only the GPU draws.
 
 import * as THREE from 'three';
 import { DEG, smoothstep } from './math.js';
+import { addCascade, makeOcean } from './ocean.js';
 
-const G = 9.81;
 const coarsePointer = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
-// dir: travel direction in degrees (0 = +X, 90 = +Z), len: wavelength (m),
-// amp: amplitude (m), steep: horizontal sharpening (1 = physical trochoid).
-const PHYSICS_DEFS = [
-  { dir: 218, len: 76.0, amp: 1.35, steep: 1.18 }, // main ocean swell
-  { dir: 250, len: 47.0, amp: 0.85, steep: 1.18 },
-  { dir: 188, len: 29.0, amp: 0.5, steep: 1.2 },
-  { dir: 290, len: 17.0, amp: 0.23, steep: 1.2 }, // wind chop
-  { dir: 150, len: 10.5, amp: 0.105, steep: 1.2 },
-  { dir: 325, len: 6.2, amp: 0.045, steep: 1.1 },
-];
-const DETAIL_DEFS = [
-  { dir: 238, len: 4.3, amp: 0.072, steep: 1.15 },
-  { dir: 172, len: 3.3, amp: 0.056, steep: 1.15 },
-  { dir: 281, len: 2.6, amp: 0.047, steep: 1.1 },
-  { dir: 199, len: 2.05, amp: 0.034, steep: 1.1 },
-  { dir: 318, len: 1.6, amp: 0.024, steep: 1.0 },
-  { dir: 133, len: 1.25, amp: 0.017, steep: 1.0 },
-].slice(0, coarsePointer ? 4 : 6); // phones draw a little less
-
-const build = (w, i) => {
-  const k = (Math.PI * 2) / w.len;
-  return {
-    dx: Math.cos(w.dir * DEG),
-    dz: Math.sin(w.dir * DEG),
-    k,
-    omega: Math.sqrt(G * k), // deep-water dispersion
-    amp: w.amp,
-    hAmp: w.amp * w.steep,
-    phase: i * 1.7 + 0.4,
-    len: w.len,
-  };
+/** The sea that is made at load. Lengths in metres, times in seconds. */
+export const SEA = {
+  /** Significant wave height of the open sea: about the mean height, trough to crest, of the highest third of the waves. */
+  height: 7.0,
+  /** The wavelength that carries the most energy. */
+  peakLength: 115,
+  /** How peaked the spectrum is round it, and how fast energy falls off toward shorter waves (see makeOcean). */
+  sharpness: 2.8,
+  tail: 4.5,
+  /** Where the waves run toward (degrees: 0 = +X, 90 = +Z). */
+  dir: 218,
+  /** How far each wave pulls the water toward its crest (0 = smooth swell; past about 1.5 crests start to fold over). */
+  chop: 1.4,
+  seed: 5,
+  // Each cascade: the side of its tile, its grid, the time after which it repeats, how many frames of that are
+  // kept, the wavelengths it carries [shortest, longest), whether the physics rides it, how far out the mesh can
+  // still carry it (as a multiple of the mesh's fineness, see setWaveMeshDensity) and how far out it is shaded.
+  // (Tiles and periods are chosen not to divide one another, so the whole repeats only after a very long way and time.)
+  // What the boats ride is the same table on every machine; only the chop that is drawn and not felt is coarser on phones.
+  cascades: [
+    { size: 360, n: 64, period: 64, frames: 128, band: [22.5, 361], physics: true, carry: 82, shade: 430 },
+    { size: 72, n: 64, period: 31, frames: 128, band: [4.5, 22.5], physics: true, carry: 10, shade: 120 },
+    { size: 14.4, n: coarsePointer ? 32 : 64, period: 7.9, frames: coarsePointer ? 48 : 80, band: [coarsePointer ? 1.8 : 0.9, 4.5], physics: false, carry: 2, shade: 36 },
+  ],
 };
+const CASCADES = SEA.cascades.length;
 
-/** The waves the physics rides on. */
-export const waves = PHYSICS_DEFS.map(build);
-const detailWaves = DETAIL_DEFS.map((w, i) => build(w, i + PHYSICS_DEFS.length));
-const allWaves = [...waves, ...detailWaves];
-
-export const PHYSICS_WAVES = waves.length;
-export const WAVE_COUNT = allWaves.length;
 export const ISLAND_COUNT = 6;
 /** Rough crest-to-trough range of the open sea (m), for height-based shading. */
-export const SEA_HEIGHT = 2 * Math.sqrt(waves.reduce((s, w) => s + w.amp * w.amp, 0)) * 1.25;
+export const SEA_HEIGHT = SEA.height * 0.875;
+/** The direction the swell runs toward (unit vector in x, z). */
+export const SWELL_DIR = { x: Math.cos(SEA.dir * DEG), z: Math.sin(SEA.dir * DEG) };
 
 /** Mutable sea configuration shared with the shaders. */
 export const sea = {
@@ -76,29 +66,70 @@ export const sea = {
   islands: [],
 };
 
+// ------------------------------------------------------------------ the sea
+
+let ocean = null;
+/** The tables (made the first time anything asks). */
+function theOcean() {
+  if (!ocean) ocean = makeOcean({ height: SEA.height, peakLength: SEA.peakLength, sharpness: SEA.sharpness, tail: SEA.tail, dir: SEA.dir * DEG, seed: SEA.seed, cascades: SEA.cascades });
+  return ocean;
+}
+
 // ---------------------------------------------------------------- uniforms
 
 const FAR = 1e6;
 
 export const waveUniforms = {
-  uWaveA: { value: allWaves.map((w) => new THREE.Vector4(w.dx, w.dz, w.k, w.omega)) },
-  // amp, horizontal amp, phase, geometric LOD fade distance (see setWaveMeshDensity)
-  uWaveB: { value: allWaves.map((w) => new THREE.Vector4(w.amp, w.hAmp, w.phase, w.len * 6.0)) },
-  // shading fade distance per wave (updated from camera height)
-  uWaveC: { value: allWaves.map((w) => Math.sqrt(1700 * w.len)) },
+  // per cascade: 1 / tile side, where in its period it is now (0..1), 1 / period, choppiness
+  uSeaA: { value: SEA.cascades.map((c) => new THREE.Vector4(1 / c.size, 0, 1 / c.period, SEA.chop)) },
+  // per cascade: how far out the mesh still carries it, how far out it is shaded
+  uSeaB: { value: SEA.cascades.map((c) => new THREE.Vector4(c.carry * 6, c.shade, 0, 0)) },
   uWaveTime: { value: 0 },
   uIslands: { value: Array.from({ length: ISLAND_COUNT }, () => new THREE.Vector3(FAR, FAR, 0)) },
   uShelter: { value: new THREE.Vector4(sea.shelterDirX, sea.shelterDirZ, sea.shelterCalm, sea.scale) },
 };
+for (let i = 0; i < CASCADES; i++) {
+  waveUniforms[`uSeaDisp${i}`] = { value: null };
+  waveUniforms[`uSeaDeriv${i}`] = { value: null };
+}
+
+function table(data, n, frames) {
+  const half = new Uint16Array(data.length);
+  for (let i = 0; i < data.length; i++) half[i] = THREE.DataUtils.toHalfFloat(data[i]);
+  const tex = new THREE.Data3DTexture(half, n, n, frames);
+  tex.format = THREE.RGBAFormat;
+  tex.type = THREE.HalfFloatType;
+  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+  tex.wrapS = tex.wrapT = tex.wrapR = THREE.RepeatWrapping;
+  tex.unpackAlignment = 1;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+let uploaded = false;
+/**
+ * Hand the sea to the graphics card (once): each cascade as two 3D textures, x and z across the tile and time through
+ * its period. What only the shaders need is then let go of; the physics keeps what it rides on.
+ */
+export function prepareSeaTextures() {
+  if (uploaded) return;
+  uploaded = true;
+  theOcean().cascades.forEach((c, i) => {
+    waveUniforms[`uSeaDisp${i}`].value = table(c.disp, c.n, c.frames);
+    waveUniforms[`uSeaDeriv${i}`].value = table(c.deriv, c.n, c.frames);
+    c.deriv = null;
+    if (!SEA.cascades[i].physics) c.disp = null;
+  });
+}
 
 /**
  * Tell the waves how fine the ocean mesh is (angular segments of the radial
- * grid). A wave is only displaced where the mesh has ~5 vertices per
- * wavelength; further out it lives on in the per-pixel normals.
+ * grid). A cascade is only displaced where the mesh has a few vertices to each of its
+ * waves; further out it lives on in the per-pixel normals.
  */
 export function setWaveMeshDensity(segments) {
   const k = segments / 32;
-  waveUniforms.uWaveB.value.forEach((v, i) => (v.w = allWaves[i].len * k));
+  waveUniforms.uSeaB.value.forEach((v, i) => (v.x = SEA.cascades[i].carry * k));
 }
 
 /** Register the island circles (also used for shallow-water tint and shore foam). */
@@ -111,24 +142,29 @@ export function setSeaIslands(list) {
   });
 }
 
-/** Push time + tunables to the GPU. `cameraHeight` adapts shading LOD. */
-export function updateWaveUniforms(time, cameraHeight = 3) {
+/** Push time + tunables to the GPU. */
+export function updateWaveUniforms(time) {
   waveUniforms.uWaveTime.value = time;
   waveUniforms.uShelter.value.set(sea.shelterDirX, sea.shelterDirZ, sea.shelterCalm, sea.scale);
-  const h = Math.max(cameraHeight, 1.5);
-  const c = waveUniforms.uWaveC.value;
-  for (let i = 0; i < WAVE_COUNT; i++) c[i] = Math.sqrt(570 * h * allWaves[i].len);
+  waveUniforms.uSeaA.value.forEach((v, i) => {
+    const c = SEA.cascades[i];
+    // (frame f of a table is the sea at f / frames of its period, and sits at (f + 0.5) / frames of the texture)
+    v.y = (((time / c.period) % 1) + 1) % 1 + 0.5 / c.frames;
+    v.w = SEA.chop;
+  });
 }
 
 // -------------------------------------------------------------------- GLSL
 
+const each = (line) => SEA.cascades.map((_, i) => line.replaceAll('#', String(i))).join('\n');
+
 export const WAVE_GLSL = /* glsl */ `
-#define WAVE_COUNT ${WAVE_COUNT}
-#define SWELL_COUNT 4
 #define ISLAND_COUNT ${ISLAND_COUNT}
-uniform vec4 uWaveA[WAVE_COUNT];
-uniform vec4 uWaveB[WAVE_COUNT];
-uniform float uWaveC[WAVE_COUNT];
+#define FAR_FOAM 0.95
+${each('uniform highp sampler3D uSeaDisp#;    // xyz: sideways x, height, sideways z (for unit choppiness); w: squeeze lately')}
+${each('uniform highp sampler3D uSeaDeriv#;   // xy: slopes of the height; z: squeeze; w: fold (see engine/ocean.js)')}
+uniform vec4 uSeaA[${CASCADES}];
+uniform vec4 uSeaB[${CASCADES}];
 uniform float uWaveTime;
 uniform vec3 uIslands[ISLAND_COUNT];
 uniform vec4 uShelter;
@@ -144,7 +180,7 @@ float shoreDistance(vec2 p) {
 
 // Wave height multiplier: calmer close to land and in the island's lee.
 float waveAmpFromShore(vec2 p, float shore) {
-  float a = 0.3 + 0.7 * smoothstep(0.0, 55.0, shore);
+  float a = 0.2 + 0.8 * smoothstep(0.0, 70.0, shore);
   a *= mix(1.0, uShelter.z, smoothstep(-110.0, 150.0, dot(p, uShelter.xy)));
   return a * uShelter.w;
 }
@@ -153,63 +189,57 @@ float waveAmpField(vec2 p) {
   return waveAmpFromShore(p, shoreDistance(p));
 }
 
-// Displacement of the undisplaced surface point p. Waves too short for the
+// Displacement of the undisplaced surface point p. Cascades whose waves are too short for the
 // mesh resolution at distance "dist" are faded out.
 vec3 waveDisplace(vec2 p, float ampScale, float dist) {
   vec3 d = vec3(0.0);
-  for (int i = 0; i < WAVE_COUNT; i++) {
-    vec4 A = uWaveA[i];
-    vec4 B = uWaveB[i];
-    float f = 1.0 - smoothstep(B.w * 0.55, B.w, dist);
-    float th = A.z * dot(A.xy, p) - A.w * uWaveTime + B.z;
-    d.xz += A.xy * (B.y * cos(th) * f);
-    d.y += B.x * sin(th) * f;
-  }
+  float f;
+${each(`  f = 1.0 - smoothstep(uSeaB[#].x * 0.55, uSeaB[#].x, dist);
+  if (f > 0.0) d += textureLod(uSeaDisp#, vec3(p * uSeaA[#].x, uSeaA[#].y), 0.0).xyz * f;`)}
+  d.xz *= uSeaA[0].w;
   return d * ampScale;
 }
 
-// Analytic normal + Jacobian (small where the surface bunches up at crests).
-void waveNormal(vec2 p, float ampScale, float dist, out vec3 n, out float jac) {
+// What the surface is doing at p:
+//   n      its normal
+//   jac    its Jacobian: how much the sideways motion has squeezed it (1 = not at all, 0 = to nothing: folding over)
+//   squeeze, lately   how hard the waves that carry foam are squeezing it now (0 = not, towards 1 = breaking), and
+//                     the most they have in the last few seconds, faded: what a crest leaves behind
+// Cascades too fine to show at distance "dist" are faded out. (Where the shorter of the waves that carry foam have
+// faded, the longest count for what both did, about twice as much, so that the far sea keeps its whitecaps.)
+void waveSurface(vec2 p, float ampScale, float dist, out vec3 n, out float jac, out float squeeze, out float lately) {
   vec2 slope = vec2(0.0);
-  float ny = 0.0;
-  float jxx = 0.0;
-  float jzz = 0.0;
-  float jxz = 0.0;
-  for (int i = 0; i < WAVE_COUNT; i++) {
-    vec4 A = uWaveA[i];
-    vec4 B = uWaveB[i];
-    float f = (1.0 - smoothstep(uWaveC[i] * 0.5, uWaveC[i], dist)) * ampScale;
-    float th = A.z * dot(A.xy, p) - A.w * uWaveTime + B.z;
-    float c = cos(th);
-    float s = sin(th);
-    float ka = A.z * B.x * f;
-    float kh = A.z * B.y * f;
-    slope += A.xy * (ka * c);
-    ny += kh * s;
-    jxx += kh * A.x * A.x * s;
-    jzz += kh * A.y * A.y * s;
-    jxz += kh * A.x * A.y * s;
-  }
-  n = normalize(vec3(-slope.x, 1.0 - ny, -slope.y));
-  jac = (1.0 - jxx) * (1.0 - jzz) - jxz * jxz;
-}
-
-// How hard the big swells were bunching up at p, "lag" seconds ago
-// (0 = flat, towards 1 = breaking). Used to leave foam behind passing crests.
-float swellCrest(vec2 p, float ampScale, float lag, float steepen) {
-  float jxx = 0.0;
-  float jzz = 0.0;
-  float jxz = 0.0;
-  for (int i = 0; i < SWELL_COUNT; i++) {
-    vec4 A = uWaveA[i];
-    vec4 B = uWaveB[i];
-    float s = sin(A.z * dot(A.xy, p) - A.w * (uWaveTime - lag) + B.z);
-    float kh = A.z * B.y * ampScale * steepen;
-    jxx += kh * A.x * A.x * s;
-    jzz += kh * A.y * A.y * s;
-    jxz += kh * A.x * A.y * s;
-  }
-  return 1.0 - ((1.0 - jxx) * (1.0 - jzz) - jxz * jxz);
+  float fold = 0.0;
+  float fine = 0.0;
+  squeeze = 0.0;
+  lately = 0.0;
+  float f;
+  vec3 q;
+  vec4 g;
+${SEA.cascades
+  .map((c, i) =>
+    `  f = 1.0 - smoothstep(uSeaB[#].y * 0.5, uSeaB[#].y, dist);${
+      c.physics && i > 0
+        ? `
+  squeeze *= 1.0 + FAR_FOAM * (1.0 - f);
+  lately *= 1.0 + FAR_FOAM * (1.0 - f);`
+        : ''
+    }
+  if (f > 0.0) {
+    q = vec3(p * uSeaA[#].x, uSeaA[#].y);
+    g = textureLod(uSeaDeriv#, q, 0.0);
+    slope += g.xy * f;
+    fold += g.w * f * f;
+    ${c.physics ? `squeeze += g.z * f;\n    lately += textureLod(uSeaDisp#, q, 0.0).w * f;` : `fine += g.z * f;`}
+  }`.replaceAll('#', String(i)),
+  )
+  .join('\n')}
+  float k = ampScale * uSeaA[0].w;
+  squeeze *= k;
+  lately *= k;
+  fine = squeeze + fine * k;
+  jac = 1.0 - fine + k * k * fold;
+  n = normalize(vec3(-slope.x * ampScale, max(1.0 - fine, 0.15), -slope.y * ampScale));
 }
 `;
 
@@ -229,10 +259,19 @@ function shoreDistance(x, z) {
 
 /** Same field as waveAmpField() in GLSL. */
 export function waveAmpField(x, z) {
-  let a = 0.3 + 0.7 * smoothstep(0, 55, shoreDistance(x, z));
+  let a = 0.2 + 0.8 * smoothstep(0, 70, shoreDistance(x, z));
   const s = x * sea.shelterDirX + z * sea.shelterDirZ;
   a *= 1 + (sea.shelterCalm - 1) * smoothstep(-110, 150, s);
   return a * sea.scale;
+}
+
+const _at = { dx: 0, dy: 0, dz: 0, vy: 0, sx: 0, sz: 0 };
+/** What the cascades the physics rides add up to at the undisplaced point (x, z). */
+function carried(x, z, t) {
+  _at.dx = _at.dy = _at.dz = _at.vy = _at.sx = _at.sz = 0;
+  const cascades = theOcean().cascades;
+  for (let i = 0; i < CASCADES; i++) if (SEA.cascades[i].physics) addCascade(cascades[i], x, z, t, 1, _at);
+  return _at;
 }
 
 /**
@@ -242,48 +281,27 @@ export function waveAmpField(x, z) {
  * handy for anything that should drift with the water, like foam).
  */
 export function sampleSurface(x, z, t, out) {
-  // Invert the horizontal displacement with a few fixed-point iterations.
+  // Which bit of water is at (x, z) now? Guess that it is the one that belongs there, see where that one has been
+  // pushed to, and correct by most of the miss; six times. (Most of it, not all: near a crest that is about to fold
+  // over, correcting by the whole miss overshoots. This lands within 6 cm of the right water 99 times in 100.)
   let amp = waveAmpField(x, z);
   let px = x;
   let pz = z;
-  for (let it = 0; it < 3; it++) {
-    let ox = 0;
-    let oz = 0;
-    for (let i = 0; i < PHYSICS_WAVES; i++) {
-      const w = waves[i];
-      const c = Math.cos(w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase);
-      ox += w.dx * w.hAmp * c;
-      oz += w.dz * w.hAmp * c;
-    }
-    px = x - ox * amp;
-    pz = z - oz * amp;
+  for (let it = 0; it < 6; it++) {
+    const at = carried(px, pz, t);
+    px += (x - at.dx * SEA.chop * amp - px) * 0.8;
+    pz += (z - at.dz * SEA.chop * amp - pz) * 0.8;
   }
   amp = waveAmpField(px, pz);
-  let y = 0;
-  let sx = 0;
-  let sz = 0;
-  let ny = 0;
-  let vy = 0;
-  for (let i = 0; i < PHYSICS_WAVES; i++) {
-    const w = waves[i];
-    const th = w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase;
-    const s = Math.sin(th);
-    const c = Math.cos(th);
-    y += w.amp * s;
-    sx += w.dx * w.k * w.amp * c;
-    sz += w.dz * w.k * w.amp * c;
-    ny += w.k * w.hAmp * s;
-    vy -= w.amp * w.omega * c;
-  }
-  const nxr = -sx * amp;
-  const nyr = 1 - ny * amp;
-  const nzr = -sz * amp;
-  const inv = 1 / Math.sqrt(nxr * nxr + nyr * nyr + nzr * nzr);
-  out.y = y * amp;
+  const at = carried(px, pz, t);
+  const nxr = -at.sx * amp;
+  const nzr = -at.sz * amp;
+  const inv = 1 / Math.sqrt(nxr * nxr + 1 + nzr * nzr);
+  out.y = at.dy * amp;
   out.nx = nxr * inv;
-  out.ny = nyr * inv;
+  out.ny = inv;
   out.nz = nzr * inv;
-  out.vy = vy * amp;
+  out.vy = at.vy * amp;
   out.px = px;
   out.pz = pz;
   return out;

@@ -35,7 +35,9 @@ src/
   viewer.js          dev-only asset viewer (viewer.html)
   engine/            knows nothing about this particular game
     Engine.js          renderer, resize, fixed-step loop, adaptive quality
-    waves.js           the sea: wave table, GLSL for it, the same maths in JS
+    waves.js           the sea: its settings, GLSL that reads it, the same lookup in JS
+    ocean.js           the sea's tables, made from a wave spectrum at load
+    fft.js             the Fourier transform that makes them
     ChaseCamera.js     chase and orbit camera
     Input.js           keyboard and touch
     Audio.js           synthesised sound
@@ -98,43 +100,87 @@ Conventions used everywhere:
 
 ## 3. The sea
 
-The surface is a sum of trochoidal (Gerstner) waves:
+The surface is made from a wave spectrum when the game loads
+(`engine/ocean.js`, from the settings `SEA` in `engine/waves.js`), by the
+method of Tessendorf's "Simulating Ocean Water": a grid of wave trains of
+every length and from a spread of directions, each with a random size drawn
+round the energy the spectrum gives it, summed by an inverse Fourier
+transform (`engine/fft.js`). Each wave moves the water toward its crest as
+well as up and down:
 
 ```
-P.xz = p + Σ dir_i · H_i · cos θ_i        θ_i = k_i (dir_i · p) − ω_i t + φ_i
-P.y  =     Σ       A_i · sin θ_i          k = 2π / length,  ω = √(g k),  g = 9.81
+P.xz = p + chop · A(p) · Σ sideways_c(p, t)
+P.y  =            A(p) · Σ height_c(p, t)
 ```
 
-`H = A × steep`; phase `φ_i = 1.7 i + 0.4`. Directions are degrees from +X
-toward +Z.
+Every wave's frequency is rounded to a whole number of cycles per period, so
+each table repeats exactly in time as well as across its tile, and one period
+of it is kept as a stack of frames. `A` is the amplitude field below.
 
-Waves the boats ride (CPU and GPU):
+| `SEA` | | |
+| --- | --- | --- |
+| `height` | 7.0 m | significant wave height of the open sea (four times the standard deviation of the surface) |
+| `peakLength` | 115 m | the wavelength that carries the most energy |
+| `sharpness` | 2.8 | how peaked the spectrum is round it (the JONSWAP form) |
+| `tail` | 4.5 | energy falls off as frequency to minus this (5 is what is measured at sea; less makes the short waves bigger) |
+| `dir` | 218° | where the waves run toward (degrees from +X toward +Z); spread round it as cos^2s of half the angle: s = 16 at the peak, less (a wider fan) for waves longer or shorter than that |
+| `chop` | 1.4 | how far each wave pulls the water toward its crest |
+| `seed` | 5 | the random numbers: the sea is the same on every machine |
 
-| dir | length | amplitude | steep | |
-| --- | --- | --- | --- | --- |
-| 218° | 76 | 1.35 | 1.18 | main swell |
-| 250° | 47 | 0.85 | 1.18 | |
-| 188° | 29 | 0.5 | 1.2 | |
-| 290° | 17 | 0.23 | 1.2 | wind chop |
-| 150° | 10.5 | 0.105 | 1.2 | |
-| 325° | 6.2 | 0.045 | 1.1 | |
+Three tables ("cascades"), each for its own band of wavelengths:
 
-Waves only the GPU draws (six on desktop, the first four on phones):
-lengths 4.3, 3.3, 2.6, 2.05, 1.6, 1.25 m; amplitudes 0.072 … 0.017 m.
+| tile | grid | repeats after | frames | wavelengths | significant height | |
+| --- | --- | --- | --- | --- | --- | --- |
+| 360 m | 64 × 64 (5.6 m apart) | 64 s | 128 | 22.5 to 361 m | 6.8 m | ridden and drawn |
+| 72 m | 64 × 64 (1.1 m) | 31 s | 128 | 4.5 to 22.5 m | 1.55 m | ridden and drawn |
+| 14.4 m | 64 × 64 (0.23 m); phones 32 × 32 | 7.9 s | 80; phones 48 | 0.9 to 4.5 m; phones from 1.8 m | 0.37 m | drawn only |
+
+What the boats ride is the same on every machine and repeats every 1984 s
+and every 360 m. Each table holds, for every frame and grid point: the
+sideways motion and the height; the height's two slopes; "squeeze" (how fast
+the sideways motion is drawing the surface together) and "fold" (the
+second-order part of the same), from which the surface's Jacobian is
+`1 − chop·squeeze + chop²·fold` (1 untouched, 0 folding over); and "squeeze
+lately", the most that point has been squeezed in the last few seconds,
+spreading to its neighbours and fading to a third every 3 s. The graphics
+card gets each table as two half-float 3D textures (x, z, time), read with
+linear filtering and wrapping in all three.
+
+Measured by `node tools/sea.mjs` (floats at sixteen places for two minutes
+each, read through `sampleSurface`):
+
+| | open sea | the lee |
+| --- | --- | --- |
+| significant height | 6.8 m (4.7 to 8.0 m from place to place) | 3.3 m |
+| waves, trough to crest: average | 4.3 m | 2.1 m |
+| highest third | 6.5 m | 3.2 m |
+| biggest | 10.2 m | 4.8 m |
+| a wave every | 6.5 s | 6.6 s |
+| surface between | −6.0 and +5.4 m | −2.6 and +2.8 m |
+| steepest slope | 0.84 | 0.46 |
+
+About 3% of the open sea's surface is folded over at any moment. Making the
+tables takes about 0.33 s on the development machine; 16.8 MB stays in
+memory for the physics and 22 MB goes to the graphics card (17.6 MB on
+phones).
 
 Every amplitude is scaled by a field that depends on place:
 
 - **Shelter.** Along the direction 225°, amplitude falls smoothly from 1 on
   the open side to **0.5** in the lee (`smoothstep(−110, 150)` of the distance
   along that direction).
-- **Shores.** Within 55 m of an island's shore circle the amplitude falls to
-  0.3 of its value.
+- **Shores.** Within 70 m of an island's shore circle the amplitude falls to
+  0.2 of its value.
 - **`sea.scale`**: a global multiplier (`?sea=`), 1 by default.
 
 `sampleSurface(x, z, t)` returns height, normal, vertical speed and the
-undisplaced coordinates for a point. Trochoidal waves move the water sideways
-as well as up and down, so it first finds which bit of water is at (x, z) now
-(three fixed-point iterations) and reports the height of that.
+undisplaced coordinates for a point, from the two tables the boats ride
+(linear between grid points and between frames, as the graphics card reads
+them). The waves move the water sideways, so it first finds which bit of
+water is at (x, z) now (six fixed-point steps, each correcting 0.8 of the
+miss: within 6 cm of the right water 99 times in 100, and within 3 cm of its
+height) and reports the height of that. A call takes about a microsecond on
+the development machine.
 
 ## 4. The boat
 
@@ -202,10 +248,10 @@ What that gives, measured on a calm sea from about 100 km/h by
 
 | helm | result |
 | --- | --- |
-| half lock, 3 s | a clean carve: 6° of slip, 69 m radius, no speed lost |
-| full lock, 3 s | a drift: 20° of slip after 1 s, 34° after 3 s, 102 → 80 km/h, radius closing from 42 m to 33 m |
+| half lock, 3 s | a clean carve: 6° of slip, 70 m radius, no speed lost |
+| full lock, 3 s | a drift: 19° of slip after 1 s, 33° after 3 s, 102 → 79 km/h, radius closing from 42 m to 31 m |
 | then let go | slip back to 15° in half a second and to nothing within a second and a half |
-| full lock and brake, 0.9 s | a tight powerslide: 34° of slip, 105 → 61 km/h, 18 m radius |
+| full lock and brake, 0.9 s | a tight powerslide: 32° of slip, 105 → 59 km/h, 16 m radius |
 | flick one way, then the other | 15° of slip one way, 18° the other, speed kept |
 
 **Trim.** On the water the bows are asked up `0.055 rad × throttle` while
@@ -264,7 +310,7 @@ Catmull–Rom curve through ten points at angle/radius (degrees, metres)
   three masses. The lighthouse islet has two small crags and 16 boulders. All
   of it stands on ground no boat can reach: it is scenery, and nothing in the
   physics knows it is there. The eight sea stacks are crags of two or three
-  blocks, set half a metre into the still sea and going on 5 m below that;
+  blocks, set half a metre into the still sea and going on 10 m below that;
   each is hit as a circle fitted to its own outline at the height of a hull
   (the mean of how far the rock reaches in 24 directions), so what bounces a
   boat is where the rock is.
@@ -557,7 +603,8 @@ embeds that cannot open direct connections) and `data-play-url` (where the
 full game lives).
 
 `window.__bw`: `game`, `advance(seconds, fps = 60)` (step and draw),
-`skip(seconds)` (step without drawing, then draw once).
+`skip(seconds)` (step without drawing, then draw once), `waterAt(x, z)` (how
+high the sea stands there now).
 
 Viewer: `viewer.html?asset=sea|craft|crafts|world&az&el&dist&tx&ty&tz&fov`,
 plus `team`, `flat`, `sea`, `t`, `spin`, `manual` (then `__viewer.frames(n)`).

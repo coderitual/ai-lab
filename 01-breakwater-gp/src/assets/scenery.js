@@ -17,8 +17,8 @@ const lit = (opts = {}) => withSkyFog(new THREE.MeshStandardMaterial({ vertexCol
  * A sea stack: a small crag (see rocks.js) standing in the water. Its foot is at y = 0, and it goes on `root` metres
  * below that, so that the deepest trough never shows its underside.
  */
-export function rockGeometry(seed, radius, tallness = 1.3, root = 5) {
-  return crag(seed, { radius: radius * 1.3, height: radius * tallness * 1.6, blocks: tallness > 1.45 ? 3 : 2, moss: 0.45, wet: radius * 0.34 + 0.5, root, detail: 2 });
+export function rockGeometry(seed, radius, tallness = 1.3, root = 10) {
+  return crag(seed, { radius: radius * 1.3, height: radius * tallness * 1.6, blocks: tallness > 1.45 ? 3 : 2, moss: 0.45, wet: radius * 0.34 + 1.6, root, detail: 2 });
 }
 
 /** How far below the still waterline a stack's foot is set. */
