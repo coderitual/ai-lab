@@ -635,7 +635,7 @@ function layCircuit(track, plan) {
     const s1 = plan.starts[i + 1];
     const easeIn = (seg.ease ?? 0) / 2;
     const easeOut = (segs[(i + 1) % segs.length].ease ?? 0) / 2;
-    if (r <= rule.inside) kerbs.push({ s0: s0 - easeIn * 0.5, s1: s1 + easeOut * 0.5, side: inside, width: rule.width });
+    if (r <= rule.inside && seg.kerb !== false) kerbs.push({ s0: s0 - easeIn * 0.5, s1: s1 + easeOut * 0.5, side: inside, width: rule.width });
     if (r <= rule.outside) kerbs.push({ s0: s1 - (s1 - s0) * rule.exit, s1: s1 + easeOut, side: -inside, width: rule.width });
     if (seg.runoff) {
       const side = seg.runoff === 'L' ? 1 : -1;

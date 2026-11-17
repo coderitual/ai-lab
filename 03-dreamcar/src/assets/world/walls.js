@@ -22,15 +22,17 @@ import * as THREE from 'three';
 import { EDGE, levelFrame, runsOf, stripGeometry } from './furniture.js';
 import { extend } from './shading.js';
 
+/** The wall's top above the ground at the edge (m): whatever stands on the wall stands on this. */
+export const WALL_TOP = 0.93;
 /** The wall seen end on, the road to the left: [out from the edge, up from the ground at the edge] (m). */
 const PROFILE = [
   [0, -0.3],
-  [0, 0.88],
-  [0, 0.88],
-  [0.04, 0.93],
-  [0.04, 0.93],
-  [0.3, 0.93],
-  [0.3, 0.93],
+  [0, WALL_TOP - 0.05],
+  [0, WALL_TOP - 0.05],
+  [0.04, WALL_TOP],
+  [0.04, WALL_TOP],
+  [0.3, WALL_TOP],
+  [0.3, WALL_TOP],
   [0.32, -0.3],
 ];
 /** Length of one precast block (m). */

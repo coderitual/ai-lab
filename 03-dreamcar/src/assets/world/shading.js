@@ -33,6 +33,13 @@ export function selectBake(name) {
 export const WET_UNIFORMS = { uWet: { value: 0 } };
 
 /**
+ * (road and environment lane) What the tunnel's lit lining looks like from the road, as a radiance: the tunnel sets
+ * it from its own lamps and paint, and the asphalt under that roof mirrors it at a glancing angle (road.js), as it
+ * mirrors the sky outside.
+ */
+export const BORE_UNIFORMS = { uBoreGlow: { value: new THREE.Vector3() } };
+
+/**
  * Adds an edit to a material's shader, after whatever edits it already has, and gives it a cache key of its own.
  * @template {THREE.Material} T
  * @param {T} material @param {string} key

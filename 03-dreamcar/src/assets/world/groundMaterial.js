@@ -104,10 +104,10 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
       .replace('#include <map_fragment>', GROUND_COLOR)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = groundRoughness;')
       .replace('#include <normal_fragment_maps>', GROUND_NORMAL)
-      // blades of grass have next to no sheen: the sky's blue must not wash the green out (rock and earth keep theirs)
+      // blades and crowns have next to no sheen (groundSheen): neither the sky's blue nor the low sun's glare on them
       .replace(
         '#include <lights_physical_fragment>',
-        '#include <lights_physical_fragment>\nmaterial.specularColor *= 1.0 - 0.8 * groundGrass;\nmaterial.specularColorBlended *= 1.0 - 0.8 * groundGrass;\nmaterial.specularF90 *= 1.0 - 0.8 * groundGrass;',
+        '#include <lights_physical_fragment>\nmaterial.specularColor *= groundSheen;\nmaterial.specularColorBlended *= groundSheen;\nmaterial.specularF90 *= groundSheen;',
       );
   });
   withBake(material);
@@ -149,6 +149,7 @@ varying vec3 vGroundNormal;
 float groundRoughness;
 vec3 groundThrough;  // what the grass here lets through (0 where it is not grass)
 float groundGrass;   // how much of this pixel is blades of grass
+float groundSheen;   // how much of a plain rough surface's sheen it keeps (blades and crowns: next to none)
 vec3 groundBump;   // world-space tilt of the normal from the detail
 
 // the detail texture on the ground: from above where it is level, from the side on steep faces
@@ -263,7 +264,7 @@ if ( gVerge > 0.0 ) {
     vec2 fp = mat2( 0.92, 0.39, -0.39, 0.92 ) * vGroundPos.xz / vec2( 130.0, 75.0 );
     vec2 fc = floor( fp );
     float fh = fract( sin( dot( fc, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
-    vec3 crop = fh < 0.35 ? vec3( 0.05, 0.085, 0.025 ) : fh < 0.6 ? vec3( 0.075, 0.09, 0.03 ) : fh < 0.85 ? vec3( 0.04, 0.065, 0.02 ) : vec3( 0.085, 0.08, 0.045 );
+    vec3 crop = fh < 0.35 ? vec3( 0.04, 0.07, 0.02 ) : fh < 0.6 ? vec3( 0.055, 0.075, 0.024 ) : fh < 0.85 ? vec3( 0.032, 0.055, 0.017 ) : vec3( 0.06, 0.066, 0.03 );
     vec2 fe = min( fract( fp ), 1.0 - fract( fp ) ) * vec2( 130.0, 75.0 );
     float fAa = fwidth( vGroundPos.x ) + fwidth( vGroundPos.z ) + 0.5;
     float hedge = 1.0 - smoothstep( 2.0, 2.0 + fAa, min( fe.x, fe.y ) );
@@ -286,6 +287,9 @@ gAlbedo = mix( gAlbedo, gScreeCol, gScree );
 gAlbedo = mix( gAlbedo, gRockCol, gRock );
 gAlbedo = mix( gAlbedo, gSnowCol, gSnow );
 diffuseColor.rgb *= gAlbedo;
+// Seen against a low sun a plain rough surface glares (its Fresnel term goes to one at a grazing angle): rock and
+// stones do, a little; turf and tree crowns do not (the far land under the massif stood as a white band in the haze)
+groundSheen = 1.0 - 0.85 * max( groundGrass, gForest * ( 1.0 - gRock ) ) - 0.5 * gVergeEarth;
 groundRoughness = mix( mix( 1.0, 0.92, gScree ), 0.82, gRock );
 groundRoughness = mix( groundRoughness, 0.55, gSnow );
 `;

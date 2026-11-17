@@ -842,7 +842,14 @@ const FOOT = 0.8;
         bake[v * 4 + 3] = marchSun(x, z, h0, dirs[2], 4000);
         const hx = (heights[j * m + Math.min(m - 1, i + 1)] - heights[j * m + Math.max(0, i - 1)]) / (2 * FAR_CELL);
         const hz = (heights[Math.min(m - 1, j + 1) * m + i] - heights[Math.max(0, j - 1) * m + i]) / (2 * FAR_CELL);
-        mask[v * 2] = forestOf(x, z, heights[v], 1 - 1 / Math.hypot(hx, 1, hz), null, 0, 0);
+        // the far land is wooded but for its steep faces and what lies above the tree line: the near wood's own
+        // patches grown together (seen through the haze under the massif, open land read as a pale band)
+        const steep = 1 - 1 / Math.hypot(hx, 1, hz);
+        const wooded =
+          heights[v] < lakeLevel + 0.6
+            ? 0
+            : smoothstep(0.1, 0.26, noise.fbm(x / 230 + 11, z / 230, 4)) * (1 - smoothstep(330, 420, heights[v])) * (1 - smoothstep(0.55, 0.8, steep));
+        mask[v * 2] = Math.max(forestOf(x, z, heights[v], steep, null, 0, 0), wooded);
       }
     }
     const index = [];
