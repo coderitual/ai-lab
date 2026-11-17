@@ -575,7 +575,7 @@ export class CameraRig {
       // the camera stands at yaw + PI + base and looks back at the car
       const look = yaw + base;
       const off = Math.abs(Math.abs(angleDiff(look, sunBearing)) - pick('sunBeside'));
-      const s = -off + (Math.abs(base) > Math.PI / 2 ? o.frontBias : 0);
+      const s = -off + (Math.abs(base) > Math.PI / 2 ? pick('frontBias') : 0);
       if (s > score) {
         score = s;
         best = base;
