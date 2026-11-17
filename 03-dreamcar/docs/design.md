@@ -102,7 +102,7 @@ dark, fine racing asphalt with a polished, darker racing line and rubber in
 the bends and the braking zones (corridor.js), runs of surfacing of different
 ages with joints, the paver's seams 2 m either side of the middle, a few
 patches and sealed cracks, tyre marks before the carousel (roadHistory.js);
-its markings are a solid white line inside each edge (0.15 m), the start line
+its markings are a solid white line inside each edge (0.2 m), the start line
 and twelve grid boxes from `track.grid`, nothing else. A second, anisotropic
 specular lobe stretched along the line of sight lays the low sun's glare on it
 as a long streak (`ASPHALT_SHEEN`). The kerbs (kerbs.js) are red and white

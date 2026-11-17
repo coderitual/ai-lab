@@ -64,7 +64,7 @@ import { BIG_TILE, ROUGH_GAIN, VARIANCE_GAIN, roadTextures } from './roadTexture
 import { WET_UNIFORMS, extend, withBake } from './shading.js';
 
 /** The edge line: its width (m), its outer edge on the pavement's edge. */
-const EDGE_LINE = 0.15;
+const EDGE_LINE = 0.2;
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /** The glare lobe (ASPHALT_SHEEN): its GGX alpha along the line of sight and across it, and its weight. */
@@ -613,7 +613,7 @@ rAge = clamp( rAge + ( rBig2.r - 0.5 ) * 0.22, 0.0, 1.0 );
 rAge = mix( rAge, ftTone * 0.5, ftFresh );
 float rWorn = mix( 0.3, 1.0, rAge );
 // new: binder over everything, black. Old: the binder weathered grey and worn off the stones' tops.
-vec3 rCol = mix( vec3( 0.04, 0.04, 0.042 ), vec3( 0.112, 0.109, 0.103 ), rAge );
+vec3 rCol = mix( vec3( 0.032, 0.032, 0.034 ), vec3( 0.088, 0.086, 0.082 ), rAge );
 rCol *= 1.0 + ( rAgg.r - 0.5 ) * mix( 0.45, 1.5, rAge );
 rCol *= ( 0.86 + 0.28 * rBig.r ) * ( 0.92 + 0.16 * rBig2.r ) * ( 0.92 + 0.16 * rMottle );
 rCol *= 1.0 - 0.2 * rTracks * rWorn;
