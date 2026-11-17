@@ -3,10 +3,14 @@
 // tree of the forest is one of the variants, scaled to its own height, turned,
 // leaned and tinted.
 //
-// The season is late autumn: spruce and fir stay dark, the larches are gold,
-// birch, maple and lime have turned. A species' `tint` multiplies the foliage
-// atlas (painted at a middling brightness) down to what its leaves really send
-// back; `warm` is how far single trees stray along the yellow-to-red axis.
+// The season is early autumn: most broadleaves are still green (each tree its
+// own green), maples and some limes have turned and stand in groups (most of
+// them round the start), birches are yellowing, larches are still green-gold,
+// spruce and fir are dark. A tree's colour is its species' `green` tint mixed
+// towards one of its `autumn` tints by how far it has turned (forest.js asks
+// the place how much of the wood has turned; `turns` is how readily this
+// species follows). The tints multiply the foliage atlas, whose broadleaf
+// tiles are painted nearly grey (forestTextures.js).
 
 import { BARK, TILE } from './forestTextures.js';
 
@@ -14,18 +18,18 @@ import { BARK, TILE } from './forestTextures.js';
 export const SPECIES = ['spruce', 'fir', 'larch', 'birch', 'maple', 'lime'];
 
 /**
- * Per species: the height range of grown trees (m); `tint` linear multiplier of the atlas colour; `warm` [lo, hi]
- * the range of a tree's own shift towards red (+) or yellow-green (-); `value` [lo, hi] its brightness spread;
- * `lean` the largest lean (rad); `through` how much light its foliage lets through (0..1); `gloss` how smooth its
- * leaves are when dry (the roughness is 1 - gloss).
+ * Per species: the height range of grown trees (m); `green` the linear multiplier of the atlas colour in summer
+ * leaf; `autumn` the tints a turned tree takes (one per tree, mixed); `turns` how readily it turns (0..1) where the
+ * wood has turned; `value` [lo, hi] a tree's own brightness spread; `hue` how far its green strays towards yellow
+ * (+) or blue (-); `lean` the largest lean (rad); `through` how much light its foliage lets through (0..1).
  */
 export const SPECIES_DATA = {
-  spruce: { height: [15, 30], tint: [0.4, 0.5, 0.46], warm: [-0.25, 0.25], value: [0.78, 1.15], lean: 0.05, through: 0.3, gloss: 0.42 },
-  fir: { height: [13, 25], tint: [0.34, 0.47, 0.4], warm: [-0.3, 0.1], value: [0.8, 1.1], lean: 0.04, through: 0.25, gloss: 0.45 },
-  larch: { height: [14, 26], tint: [0.9, 0.74, 0.42], warm: [-0.35, 0.4], value: [0.8, 1.15], lean: 0.07, through: 0.75, gloss: 0.3 },
-  birch: { height: [10, 19], tint: [0.86, 0.8, 0.5], warm: [-0.5, 0.3], value: [0.85, 1.15], lean: 0.13, through: 0.9, gloss: 0.36 },
-  maple: { height: [9, 16], tint: [0.9, 0.72, 0.5], warm: [-0.75, 0.9], value: [0.82, 1.12], lean: 0.08, through: 1.0, gloss: 0.4 },
-  lime: { height: [12, 21], tint: [0.84, 0.76, 0.48], warm: [-0.7, 0.55], value: [0.82, 1.12], lean: 0.06, through: 0.95, gloss: 0.38 },
+  spruce: { height: [15, 30], green: [0.36, 0.5, 0.42], autumn: [], turns: 0, value: [0.8, 1.12], hue: 0.15, lean: 0.05, through: 0.3 },
+  fir: { height: [13, 25], green: [0.3, 0.46, 0.36], autumn: [], turns: 0, value: [0.82, 1.1], hue: 0.1, lean: 0.04, through: 0.25 },
+  larch: { height: [14, 26], green: [0.4, 0.66, 0.3], autumn: [[0.95, 0.78, 0.3]], turns: 0.35, value: [0.85, 1.15], hue: 0.3, lean: 0.07, through: 0.75 },
+  birch: { height: [10, 19], green: [0.42, 0.66, 0.16], autumn: [[1.0, 0.86, 0.22], [0.92, 0.74, 0.16]], turns: 0.55, value: [0.88, 1.15], hue: 0.4, lean: 0.13, through: 0.9 },
+  maple: { height: [9, 16], green: [0.34, 0.6, 0.12], autumn: [[1.1, 0.42, 0.06], [1.05, 0.62, 0.08], [0.95, 0.2, 0.06], [1.05, 0.8, 0.14]], turns: 1, value: [0.85, 1.12], hue: 0.35, lean: 0.08, through: 1.0 },
+  lime: { height: [12, 21], green: [0.36, 0.62, 0.14], autumn: [[1.05, 0.82, 0.16], [1.0, 0.64, 0.1]], turns: 0.45, value: [0.85, 1.12], hue: 0.3, lean: 0.06, through: 0.95 },
 };
 
 /**
@@ -114,8 +118,10 @@ export const VARIANTS = [
       side: 0.42,
       up: [0, 0.1, -0.05, -0.25],
       gnarl: 0.16,
-      clusters: 4,
-      leaf: [0.95, 1.5],
+      shoots: [3, 3, 2],
+      clusters: 11,
+      clump: 0.9,
+      leaf: [0.9, 1.4],
       hang: true,
     },
   },
@@ -135,14 +141,16 @@ export const VARIANTS = [
       crown: { cy: 0.62, ry: 0.385, rx: 4.9 },
       levels: 3,
       forks: [4, 3, 3],
-      leader: [0, 0.3, 0.3],
-      spread: [0.72, 0.62, 0.7],
-      ratio: [1.55, 0.6, 0.62],
+      leader: [1, 0.4, 0.3],
+      spread: [0.62, 0.7, 0.75],
+      ratio: [1.45, 0.6, 0.62],
       side: 1,
-      up: [0, 0.22, 0.16, 0.1],
+      up: [0, 0.18, 0.1, 0.05],
       gnarl: 0.2,
-      clusters: 7,
-      leaf: [0.95, 1.4],
+      shoots: [0, 3, 2],
+      clusters: 14,
+      clump: 1.1,
+      leaf: [0.8, 1.15],
       hang: false,
     },
   },
@@ -162,14 +170,16 @@ export const VARIANTS = [
       crown: { cy: 0.6, ry: 0.4, rx: 5.6 },
       levels: 3,
       forks: [2, 3, 3],
-      leader: [0, 0.2, 0.2],
-      spread: [0.5, 0.75, 0.75],
+      leader: [0, 0.4, 0.3],
+      spread: [0.45, 0.75, 0.8],
       ratio: [2.6, 0.58, 0.62],
       side: 1,
-      up: [0, 0.14, 0.12, 0.06],
+      up: [0, 0.1, 0.08, 0.03],
       gnarl: 0.26,
-      clusters: 7,
-      leaf: [1.0, 1.45],
+      shoots: [0, 4, 2],
+      clusters: 14,
+      clump: 1.2,
+      leaf: [0.8, 1.2],
       hang: false,
     },
   },
@@ -190,13 +200,15 @@ export const VARIANTS = [
       levels: 3,
       forks: [4, 3, 3],
       leader: [1, 0.8, 0.4],
-      spread: [0.95, 0.7, 0.7],
-      ratio: [0.85, 0.66, 0.62],
+      spread: [1.0, 0.8, 0.75],
+      ratio: [1.05, 0.72, 0.66],
       side: 1,
       up: [0, 0.2, 0.14, 0.08],
       gnarl: 0.15,
-      clusters: 7,
-      leaf: [0.9, 1.3],
+      shoots: [0, 3, 3],
+      clusters: 13,
+      clump: 1.25,
+      leaf: [0.8, 1.1],
       hang: false,
     },
   },

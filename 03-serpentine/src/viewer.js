@@ -195,6 +195,22 @@ const ASSETS = {
     return made;
   },
   /**
+   * (trees lane) One tree of the forest, standing where the asset stands: tree=<variant name> (spruce-a, spruce-b,
+   * fir-a, larch-a, birch-a, maple-a, maple-b, lime-a), turn=0..1 how far it has turned, tone=N which of its autumn
+   * colours, lod=full|reduced|impostor. alone=1 hides the rest of the forest.
+   */
+  tree() {
+    const found = world.forest.specimen(query.get('tree') || 'maple-a', {
+      turned: number('turn', 0),
+      lod: query.get('lod') || 'full',
+      autumn: number('tone', 0),
+    });
+    stand.add(found.mesh, found.caster);
+    if (query.get('alone') === '1') world.forest.group.visible = false;
+    document.title = `tree ${query.get('tree') || 'maple-a'}: ${found.triangles.join(' / ')} triangles`;
+    return { tree: found, box: found.box, view: { az: 0, el: 6, dist: found.box.half.y * 4.2, fov: 40 } };
+  },
+  /**
    * The wheels alone: a front one ahead (z +0.42) and a rear one behind (z -0.42), standing on the road with their
    * centres on the stand's x = 0. Its own parameters: side=left|right (which way the outer faces look: +X or -X),
    * only=front|rear, and the pose: steer (degrees), spin (degrees), travel (m), omega (rad/s).

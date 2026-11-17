@@ -24,10 +24,11 @@
 //    its foot (more at the top), each branch swings with its own phase, the
 //    tips of fronds and leaves flutter, and gusts travel across the forest.
 //  COVERAGE. Where the scene target is multisampled the foliage's alpha becomes
-//    coverage (soft, stable edges at any distance); where it is not, a cut
-//    with a little dither. The dissolve between levels of detail is a
-//    screen-door pattern, complementary between the two levels that swap, and
-//    switched off (uFade) in the passes that draw only one level.
+//    coverage (soft, stable edges at any distance), and two levels of detail
+//    that swap cross-fade by coverage (aTint.a: the share of it each shows).
+//    Where it is not (the low tier), a plain cut against the atlas's
+//    coverage-preserving mips and a hard swap. Never a hashed or dithered
+//    pattern: under the motion blur it would smear into noise.
 //  WET. After rain the bark is darker and both bark and leaves are smoother:
 //    a sheen under the lamps and the evening sky.
 //
@@ -41,10 +42,21 @@ import { ALPHA_CUT } from './forestTextures.js';
 import { extend, withBake } from './shading.js';
 import { SWAY_MAX } from './treeGeometry.js';
 
-/** The screen-door dissolve: aTint.a >= 0 shows that share of the pixels, < 0 shows the pixels the other level leaves out. */
-const DISSOLVE = /* glsl */ `
-  float ign = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) );
-  if ( uFade > 0.5 && ( vTint.a >= 0.0 ? ign >= vTint.a : ign < 1.0 + vTint.a ) ) discard;
+/**
+ * After the alpha test: the share of its coverage this level of detail shows (|aTint.a|), by coverage where the
+ * target is multisampled, else all or nothing.
+ */
+const FADE = /* glsl */ `
+#include <alphatest_fragment>
+{
+  float share = abs( vTint.a );
+  #ifdef ALPHA_TO_COVERAGE
+    diffuseColor.a *= share;
+    if ( diffuseColor.a <= 0.0 ) discard;
+  #else
+    if ( share < 0.5 ) discard;
+  #endif
+}
 `;
 
 /** Declarations the wind needs (vertex stage). */
@@ -90,7 +102,6 @@ const WIND_VERTEX = /* glsl */ `
 const TREE_PARS = /* glsl */ `
 varying vec4 vTint;
 uniform float uWet;
-uniform float uFade;
 float treeBark = 0.0;      // 1 on bark
 float treeThrough = 0.0;   // how much light comes through from behind
 float treeGloss = 1.0;     // what is left of the speculars
@@ -165,22 +176,15 @@ const BARK_NORMAL = /* glsl */ `
   }
 `;
 
-/** The foliage cut where alpha cannot become coverage: a cut that wavers by a pixel pattern, so edges are not stairs. */
-const DITHERED_CUT = /* glsl */ `
-#ifdef USE_ALPHATEST
-  if ( diffuseColor.a < alphaTest + ( fract( 52.9829189 * fract( dot( gl_FragCoord.yx, vec2( 0.06711056, 0.00583715 ) ) ) ) - 0.5 ) * 0.3 ) discard;
-#endif
-`;
-
 /**
  * @typedef {object} TreeUniforms shared by every material here
  * @property {{ value: number }} uTime @property {{ value: THREE.Vector4 }} uWind
- * @property {{ value: number }} uWet @property {{ value: number }} uFade
+ * @property {{ value: number }} uWet
  */
 
 /** @returns {TreeUniforms} */
 export function createTreeUniforms() {
-  return { uTime: { value: 0 }, uWind: { value: new THREE.Vector4(0.8, 0.6, 1, 0) }, uWet: { value: 0 }, uFade: { value: 1 } };
+  return { uTime: { value: 0 }, uWind: { value: new THREE.Vector4(0.8, 0.6, 1, 0) }, uWet: { value: 0 } };
 }
 
 /**
@@ -200,17 +204,16 @@ export function treeMaterial({ foliage, bark, barkNormal, atmosphere, uniforms, 
   extend(material, `tree-${wind ? 'w' : 's'}${coverage ? 'c' : 'd'}`, (shader) => {
     Object.assign(shader.uniforms, uniforms, own);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nattribute vec4 aShade;\nattribute vec4 aTint;\nattribute vec2 aPlace;\nvarying vec4 vShade;\nvarying vec4 vTint;\n${WIND_PARS}`)
-      .replace('#include <begin_vertex>', `#include <begin_vertex>\nvShade = aShade;\nvTint = aTint;\n${wind ? WIND_VERTEX : ''}`)
+      .replace('#include <common>', `#include <common>\nattribute vec4 aShade;\nattribute vec4 aTint;\nattribute vec2 aPlace;\nvarying vec4 vShade;\nvarying vec4 vTint;\nvarying float vTurn;\n${WIND_PARS}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\nvShade = aShade;\nvTint = aTint;\nvTurn = aPlace.y;\n${wind ? WIND_VERTEX : ''}`)
       // inside the wood the lower part of a tree stands in the others' shade: less of the sky, less of the sun
       .replace('#include <project_vertex>', `vBake *= mix( 1.0 - 0.8 * aPlace.x, 1.0, smoothstep( 1.5, 9.0, position.y ) );\n#include <project_vertex>`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec4 vShade;\nuniform sampler2D uBark;\nuniform sampler2D uBarkN;\n${TREE_PARS}`)
+      .replace('#include <common>', `#include <common>\nvarying vec4 vShade;\nvarying float vTurn;\nuniform sampler2D uBark;\nuniform sampler2D uBarkN;\n${TREE_PARS}`)
       .replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${TREE_LIGHT}`)
       .replace(
         '#include <map_fragment>',
         /* glsl */ `{
-  ${DISSOLVE}
   treeBark = step( 0.75, vShade.y );
   vec4 tex;
   if ( treeBark > 0.5 ) {
@@ -219,9 +222,11 @@ export function treeMaterial({ foliage, bark, barkNormal, atmosphere, uniforms, 
     treeGloss = 0.7;
   } else {
     tex = texture2D( map, vMapUv );
-    // where on the old-to-new, green-to-red scale this part of the crown lies
+    // where on its own scale this part of the crown lies: a green crown strays a little towards yellow (new
+    // growth, the sunny side) or blue-green; a turned one far along from gold to red
     float h = ( vShade.z - 0.5 ) * 2.0;
-    vec3 tint = vTint.rgb * vec3( 1.0 + 0.16 * h, 1.0 - 0.1 * h, 1.0 - 0.24 * h ) * ( 1.0 + 0.08 * h );
+    vec3 shift = mix( vec3( 0.1, 0.05, -0.2 ), vec3( 0.12, -0.3, -0.4 ), vTurn );
+    vec3 tint = vTint.rgb * max( vec3( 0.2 ), 1.0 + shift * h ) * ( 1.0 + 0.1 * h );
     // (a dead twig keeps its own colour)
     tex.rgb *= mix( tint, vec3( 0.55 ), step( 0.25, vShade.y ) );
     treeThrough = vShade.w;
@@ -245,7 +250,7 @@ vec3 nonPerturbedNormal = normal;`,
       )
       .replace('#include <lights_fragment_maps>', `${TREE_GLOW}\n#include <lights_fragment_maps>`)
       .replace('#include <aomap_fragment>', '#include <aomap_fragment>\nreflectedLight.indirectSpecular *= treeGloss;');
-    if (!coverage) shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', DITHERED_CUT);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', FADE);
   });
   return atmosphere.patch(material);
 }
@@ -290,7 +295,9 @@ varying vec3 vImpY;
         /* glsl */ `vec3 transformed;
 vTint = aTint;
 {
-  mat3 im = mat3( instanceMatrix );
+  // the tree's frame in the world (the mesh may stand in a parent of its own)
+  mat4 wm = modelMatrix * instanceMatrix;
+  mat3 im = mat3( wm );
   vec3 ax = normalize( im[ 0 ] );
   vec3 ay = normalize( im[ 1 ] );
   vec3 az = normalize( im[ 2 ] );
@@ -298,7 +305,7 @@ vTint = aTint;
   vec4 runs = uImpB[ iv ];
   vec4 box = uImpC[ iv ];
   // towards the eye from the middle of the tree, in the tree's own frame
-  vec3 toEye = isOrthographic ? vec3( viewMatrix[ 0 ][ 2 ], viewMatrix[ 1 ][ 2 ], viewMatrix[ 2 ][ 2 ] ) : cameraPosition - ( instanceMatrix[ 3 ].xyz + im[ 1 ] * ( 0.5 * box.z ) );
+  vec3 toEye = isOrthographic ? vec3( viewMatrix[ 0 ][ 2 ], viewMatrix[ 1 ][ 2 ], viewMatrix[ 2 ][ 2 ] ) : cameraPosition - ( wm[ 3 ].xyz + im[ 1 ] * ( 0.5 * box.z ) );
   vec3 e = normalize( vec3( dot( toEye, ax ), dot( toEye, ay ), dot( toEye, az ) ) );
   vec2 level = normalize( e.xz + vec2( 0.0, 1.0e-5 ) );
   // the card stands on the tree's axis, square to the eye's level direction
@@ -326,7 +333,6 @@ vTint = aTint;
       .replace(
         '#include <map_fragment>',
         /* glsl */ `{
-  ${DISSOLVE}
   int iv = int( vImpCell.z + 0.5 );
   vec4 cells = uImpA[ iv ];
   float perRow = uImpB[ iv ].x;
@@ -372,6 +378,7 @@ vTint = aTint;
 }
 ${TREE_BACK}`,
       )
+      .replace('#include <alphatest_fragment>', FADE)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix( mix( 0.66, 0.4, uWet ), mix( 0.92, 0.55, uWet ), treeBark );')
       .replace(
         '#include <normal_fragment_begin>',
@@ -389,10 +396,10 @@ vec3 nonPerturbedNormal = normal;`,
 
 /**
  * What the trees are drawn with into a shadow map: the same wind, the foliage's holes, solid bark.
- * @param {TreeUniforms} uniforms @param {boolean} wind
+ * @param {TreeUniforms} uniforms @param {boolean} wind @param {THREE.Texture} foliage the foliage atlas
  */
-export function treeDepthMaterial(uniforms, wind) {
-  const material = new THREE.MeshDepthMaterial();
+export function treeDepthMaterial(uniforms, wind, foliage) {
+  const material = new THREE.MeshDepthMaterial({ map: foliage, alphaTest: ALPHA_CUT, side: THREE.DoubleSide });
   material.name = 'tree-depth';
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -465,7 +472,6 @@ vTint = aTint;
         '#include <map_fragment>',
         /* glsl */ `#include <map_fragment>
 {
-  ${DISSOLVE}
   diffuseColor.rgb *= mix( vTint.rgb, vec3( 1.0 ), vShade.y ) * vShade.x;
   treeThrough = ${through.toFixed(2)} * ( 1.0 - vShade.y );
   treeGloss = 0.3 + 0.5 * uWet;
@@ -477,7 +483,7 @@ ${TREE_BACK}`,
     // the normal its vertices carry is the ground's (or the plant's as a whole), the same on both sides of a card
     if (map) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `${NORMAL_BEGIN}\ntreeCrown = normal;`);
     else shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\ntreeCrown = normal;');
-    if (map && !coverage) shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', DITHERED_CUT);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', FADE);
   });
   return atmosphere.patch(material);
 }

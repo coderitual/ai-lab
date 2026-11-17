@@ -613,6 +613,22 @@ export function createFoliageAtlas(tile, rng, anisotropy = 4) {
     regions.push([col * tile, row * tile, (col + 1) * tile, (row + 1) * tile]);
   }
   const pixels = ctx.getImageData(0, 0, width, height).data;
+  // The broadleaves' tiles keep only their light and a hint of their hue: the tree's tint (treeSpecies.js) gives
+  // them their colour, green or turned, so one picture serves a green lime and a red maple.
+  for (const k of [TILE.BIRCH, TILE.MAPLE, TILE.LIME]) {
+    const x0 = (k % TILE_COLS) * tile;
+    const y0 = Math.floor(k / TILE_COLS) * tile;
+    for (let y = y0; y < y0 + tile; y++) {
+      for (let x = x0; x < x0 + tile; x++) {
+        const o = (y * width + x) * 4;
+        if (!pixels[o + 3]) continue;
+        const lum = 0.3 * pixels[o] + 0.59 * pixels[o + 1] + 0.11 * pixels[o + 2];
+        // (a little lifted: the tint, not the picture, says how dark the leaves are)
+        const v = Math.min(235, lum * 1.25);
+        for (let c = 0; c < 3; c++) pixels[o + c] = Math.max(0, Math.min(255, Math.round(v + 0.18 * (pixels[o + c] - lum))));
+      }
+    }
+  }
   const { levels } = alphaMips(pixels, width, height, { regions });
   return { texture: chainTexture(levels, { anisotropy }), bytes: chainBytes(levels), width, height };
 }

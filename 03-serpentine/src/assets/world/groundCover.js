@@ -12,7 +12,7 @@
 // only.
 
 import * as THREE from 'three';
-import { plantMaterial } from './forest.js';
+import { plantMaterial } from './treeMaterial.js';
 import { planeNoise } from './shading.js';
 
 const SURFACE_GRASS = 2;
@@ -340,8 +340,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
     }
   }
 
-  const coverMaterial = plantMaterial({ map: texture, atmosphere, uniforms, wind: { height: 1, sway: 0.04, tip: 0.0 }, facing: 0 });
-  const rockMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, facing: 0, flat: true });
+  const coverMaterial = plantMaterial({ map: texture, atmosphere, uniforms, wind: { height: 1, sway: 0.04 } });
+  const rockMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, flat: true });
   const parts = [];
   if (grassItems.length) parts.push(scatter({ geometry: cards(2, 1, 1, 0.02, 0.48), material: coverMaterial, items: grassItems, reach: T.grassReach, name: 'cover-grass', group }));
   if (bushItems.length) parts.push(scatter({ geometry: cards(3, 1, 1, 0.52, 0.98), material: coverMaterial, items: bushItems, reach: T.bushReach, name: 'cover-bushes', group }));

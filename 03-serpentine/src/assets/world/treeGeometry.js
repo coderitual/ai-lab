@@ -370,8 +370,9 @@ function coniferMesh(variant, sk, rng, full, barkSize, through) {
     const tip = pts[pts.length - 1];
     const hue = (u) => 0.3 + 0.45 * u;
 
-    if (!full) {
-      // the whole bough as one bent card with its edges hanging, wide enough for its side fronds
+    {
+      // the whole bough as one bent card with its edges hanging, wide enough for its side fronds (on the full tree,
+      // too, under its fronds: the mass of the bough, which the fronds alone are too fine to give)
       const line = [along(pts, 0.06), along(pts, 0.55), mad(tip, tipDir, P.frond * 0.55 * scaleL)];
       const big = L > 1.3;
       ribbon(b, {
@@ -388,18 +389,18 @@ function coniferMesh(variant, sk, rng, full, barkSize, through) {
         phase: br.phase,
         flutter: 1,
       });
-      if (P.curtain > 0 && L > 1.5) {
+      if (!full && P.curtain > 0 && L > 1.5) {
         const drop = P.curtain * (0.55 + 0.45 * (1 - t)) * Math.min(1, L / 2.5);
         const a = along(pts, 0.3);
         curtain(b, { a, c: tip, drop, lean: norm([Math.cos(br.az) * 0.12, -1, Math.sin(br.az) * 0.12]), tile: variant.hangTile, normalAt, ao: [aoAt(a) * 0.9, aoAt(tip) * 0.7], hue: [0.35, 0.6], through, sway: [swayAt(0.3), swayAt(1)], phase: br.phase, flutter: 1 });
       }
-      continue;
+      if (!full) continue;
     }
 
     // the branch's own wood
     if (L > 0.9) tube(b, pts, br.radii, { sides: 3, bark: variant.bark, barkSize, run: 0.6, ao: (i) => 0.5 + 0.1 * i, sway: (i) => [swayAt(i / (pts.length - 1)), br.phase] });
     // side fronds, left and right in turn, swept forward and hanging a little
-    const count = Math.max(1, Math.min(6, Math.round(L / 0.5)));
+    const count = Math.max(2, Math.min(9, Math.round(L / 0.36)));
     for (let k = 0; k < count; k++) {
       const u = 0.26 + (0.68 * (k + 0.5)) / count;
       const base = along(pts, u);
@@ -550,7 +551,10 @@ function broadleafSkeleton(P, rng) {
       const count = last ? P.clusters : Math.round(P.clusters / 3);
       for (let k = 0; k < count; k++) {
         const u = last ? 0.3 + 0.7 * Math.pow((k + rng.next()) / count, 0.8) : rng.range(0.45, 1);
-        const at = along(pts, u);
+        // a leaf mass, not a row: clusters stand round the limb in a clump of their own (P.clump m), more of them
+        // towards its end
+        const r = (P.clump ?? 0) * Math.sqrt(rng.next()) * (0.5 + 0.5 * u);
+        const at = mad(along(pts, u), norm([rng.range(-1, 1), rng.range(-0.6, 1), rng.range(-1, 1)]), r);
         const tan = tangentAt(pts, u);
         const out = norm(sub(at, c));
         // a cluster leans away from its limb, out of the crown and a little up
@@ -577,7 +581,7 @@ function broadleafMesh(variant, sk, rng, full, barkSize, through) {
   const depth = (p) => Math.sqrt(((p[0] - c[0]) / rx) ** 2 + ((p[1] - c[1]) / ry) ** 2 + ((p[2] - c[2]) / rx) ** 2);
   const normalAt = (p) => norm([(p[0] - c[0]) / (rx * rx), (p[1] - c[1]) / (ry * ry) + 0.035, (p[2] - c[2]) / (rx * rx)]);
   /** Dark in the middle of the crown and on its underside, light on its outside and top. */
-  const aoAt = (p) => (0.34 + 0.66 * smooth(0.3, 1.0, depth(p))) * (0.72 + 0.28 * smooth(-0.7, 0.5, (p[1] - c[1]) / ry));
+  const aoAt = (p) => (0.18 + 0.82 * Math.pow(smooth(0.35, 1.02, depth(p)), 1.4)) * (0.55 + 0.45 * smooth(-0.8, 0.45, (p[1] - c[1]) / ry));
   const sides = full ? [8, 6, 4, 3, 3] : [6, 4, 3, 3, 3];
 
   for (const limb of sk.limbs) {
