@@ -223,8 +223,23 @@ a few seconds it is offered).
 ## How it should feel
 
 - **Grip first, then a warning, then a slide.** Tyres squeal before they let
-  go. Lifting off tightens the line; too much throttle in second gear steps
-  the tail out and the stability control catches most of it.
+  go, and what is left beyond the limit is nine tenths of the grip, not a
+  cliff. Lifting off tightens the line.
+- **It turns in the moment it is asked, at any speed.** A key, a stick or a
+  thumb reaches nine tenths of its turn in about a fifth of a second at 80 and
+  at 250 km/h without darting: the lock shrinks with speed, and at speed the
+  rear wheels steer a little with the fronts.
+- **Arcade, with the look of the real thing: the car can be slid.** Thrown
+  into a bend on the brake or off the throttle with the steering hard over,
+  with a dab of handbrake, or booted out of a slow corner, the tail steps out.
+  The slide holds on the throttle for as long as the driver steers into the
+  bend (the steering picks the line; the front wheels are turned to where the
+  car is going for them), keeps its speed, and comes back in about a second
+  when the steering is let go, without a swing the other way. Three levels of
+  help (`ASSISTS` in `src/game/config.js`): **Full**, the default and what a
+  phone gets, holds about 20 degrees and cannot be spun short of insisting;
+  **Sport** holds 25 to 35 degrees and still catches the car; **Off** is the
+  bare car with ABS.
 - **Weight.** The nose dives under braking and lifts under power; the body
   leans on the outside wheels; kerbs and the verge come through the springs.
 - **Speed is seen, not only read.** The lens widens, the camera drops back,
