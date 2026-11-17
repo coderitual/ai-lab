@@ -68,6 +68,23 @@ export const HUD = {
   hintDistance: 25,
 };
 
+/**
+ * Assist levels (the options sheet chooses one; `default` is the one a new player gets). Each sets the car
+ * (Vehicle.setAssists: abs, tc, esc; `slip`: the body slip in rad the car may slide to before it is caught; `escYaw`:
+ * whether the stability control minds the yaw rate while the car slides on purpose; `hold`: 0..1 the slide help;
+ * `open`: how much of `slip` the help holds a slide at with the throttle wide open; `rotate`: 0..1 of the rotation a lift or a brake at turn-in is given;
+ * `tcSlip`, `slideSlip`: the wheel spin the traction control allows, and in a slide) and the hands (PlayerDriver: `catch`, the
+ * opposite lock given for the driver per rad of rear slide, per device).
+ */
+export const ASSISTS = {
+  default: 'road',
+  levels: {
+    road: { name: 'Road', abs: true, tc: true, esc: true, slip: 0.35, escYaw: true, hold: 1, open: 0.5, rotate: 0.2, tcSlip: 0.15, slideSlip: 0.3, catch: { keys: 1, thumb: 1, pad: 0.45 } },
+    sport: { name: 'Sport', abs: true, tc: true, esc: true, slip: 0.8, escYaw: false, hold: 1, open: 1, rotate: 1, tcSlip: 0.3, slideSlip: 0.6, catch: { keys: 0.8, thumb: 0.8, pad: 0.3 } },
+    off: { name: 'Off', abs: true, tc: false, esc: false, slip: null, escYaw: true, hold: 0, rotate: 0, tcSlip: null, slideSlip: null, catch: { keys: 0, thumb: 0, pad: 0 } },
+  },
+};
+
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */
 export const DRIVERS = [
   { paint: 'silver', plate: 'K1 DOMI', keys: 'wasd', bias: 2.2 },

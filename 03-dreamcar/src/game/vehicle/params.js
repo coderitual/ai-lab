@@ -227,6 +227,21 @@ export const CAR = {
     },
   },
 
+  /**
+   * The slide help (used by the assist levels that ask for it: ASSISTS in game/config.js). In body-slip angles (rad)
+   * and yaw accelerations (rad/s² per rad, per rad/s). While the car is sideways (from `from`, fully at `full`) the
+   * slide it is asked for is maxSlip (or the level's) times base + throttle·t + steer·(steering into the bend); the
+   * body is turned towards it at `hold` per rad of difference and `damp` per rad/s of growth; beyond the level's angle
+   * `catch` and `catchDamp` take over. Never more than `most`.
+   */
+  drift: { minSpeed: 6, from: 0.06, full: 0.12, maxSlip: 0.6, base: 0.15, throttle: 0.75, steer: 0.4, hold: 6, damp: 3, catch: 25, catchDamp: 8, most: 6,
+    /** A lift (throttle dropped by liftGain⁻¹, remembered liftMemory s) or the brake above rotateG of cornering, above rotateFrom m/s: rad/s² of rotation. */
+    liftGain: 3, liftMemory: 0.5, rotate: 3, rotateG: 0.55, rotateFrom: 12,
+    /** s for which a slide that swings through straight is closed instead of helped, and how hard (per rad/s, at most). */
+    snapMemory: 1.2, snapDamp: 12, snapMost: 14,
+    /** m/s above which a level's slide angle narrows in proportion to the speed. */
+    slipSpeed: 35 },
+
   edges: {
     /** Per EDGE kind in game/track.js (rail, rock, wall, parapet, trees): bounce and sliding friction. */
     kinds: [

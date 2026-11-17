@@ -10,6 +10,8 @@
 
 import { CAR } from '../src/game/vehicle/params.js';
 import * as M from './unit/manoeuvres.mjs';
+import * as D from './unit/drift.mjs';
+import { ASSISTS } from '../src/game/config.js';
 import { EDGE } from './unit/flatTrack.mjs';
 
 const f = (v, digits = 1) => (Number.isFinite(v) ? v.toFixed(digits) : String(v));
@@ -81,6 +83,27 @@ row('lift-off at 0.9 g, 90 km/h', `radius ${f(lift9.before.radius, 0)} -> ${f(li
 const squeal = (data.squeal = [60, 110].map((kmh) => ({ kmh, ...M.squealOnset(kmh) })));
 row('tyres start to squeal at', squeal.map((q) => `${f(q.onset * 100, 0)} % of the most g at ${q.kmh} km/h`).join(', '), '[80-90 %]');
 
+section('Hands and drifting (tools/unit/drift.mjs)');
+{
+  for (const kind of ['keys', 'thumb', 'pad']) {
+    const r = [80, 160, 250].map((k) => D.response(kind, k));
+    row(`steering response, ${kind}`, r.map((x, i) => `${[80, 160, 250][i]}: ${f(x.rise, 2)} s (+${f(x.overshoot, 0)} %)`).join(', '), 'time to 90 % of the yaw');
+  }
+  const L = ASSISTS.levels;
+  data.drift = {};
+  for (const name of Object.keys(L)) {
+    const level = L[name];
+    const lift = D.inBend(140, 150, (c) => { c.throttle = 0; }, { level });
+    const dab = D.inBend(140, 150, (c, t) => { c.throttle = 0; c.brake = t < 0.4 ? 0.6 : 0; }, { level });
+    const hb = [90, 140].map((k) => D.handbrakePull(k, 0.4, { level }));
+    const held = ['keys', 'thumb', 'pad'].map((device) => D.driftHold(name === 'road' ? 12 : 25, { level, device, start: 'power', kmh: 60 }));
+    data.drift[name] = { lift: lift.mostSlip, dab: dab.mostSlip, hb: hb.map((x) => x.mostSlip), held: held.map((x) => x.best) };
+    row(`[${L[name].name}] lift / brake dab at turn-in, 150 m at 140`, `${f(Math.abs(lift.mostSlip))}° / ${f(Math.abs(dab.mostSlip))}°`);
+    row(`[${L[name].name}] handbrake 0.4 s at 90 / 140 km/h`, hb.map((x) => `${f(Math.abs(x.mostSlip))}°${x.spun ? ' spun' : ''}`).join(' / '));
+    row(`[${L[name].name}] power slide held at ${name === 'road' ? 12 : 25}°`, held.map((x, i) => `${['keys', 'thumb', 'pad'][i]} ${f(x.best)} s${x.spun ? ' spun' : ''}`).join(', '));
+  }
+}
+
 section('Ride');
 const front = (data.rideFront = M.ride('front'));
 const rear = (data.rideRear = M.ride('rear'));
@@ -126,9 +149,9 @@ if (!process.argv.includes('--no-laps')) {
     const r = M.laps(track, kind, { pace, count: 2 });
     return { kind, pace, ...r };
   };
-  const lapRows = (data.laps = [lap('auto', 1), lap('auto', 0.9), lap('auto', 0.7), lap('thumb', 1), lap('pad', 1), lap('keys', 1), lap('hamfist', 1)]);
+  const lapRows = (data.laps = [lap('auto', 1), lap('auto', 0.9), lap('auto', 0.7), lap('thumb', 1), lap('pad', 1), lap('keys', 1), lap('hamfist', 1), lap('human-thumb', 1), lap('human-pad', 1)]);
   for (const l of lapRows) {
-    const who = { auto: 'autopilot', thumb: 'thumb (full throttle unless braking)', pad: 'pad (analog steering and pedals)', keys: 'keys', hamfist: 'ham-fisted keys (flat out, full keys, slow hands)' }[l.kind];
+    const who = { auto: 'autopilot', thumb: 'thumb (full throttle unless braking)', pad: 'pad (analog steering and pedals)', keys: 'keys', hamfist: 'ham-fisted keys (flat out, full keys, slow hands)', 'human-thumb': 'a person\'s thumb (0.15 s, 15 cm/s, shake)', 'human-pad': 'a person on a pad (the same limits)' }[l.kind];
     row(`${who}, pace ${l.pace}`, `${f(l.best, 1)} s, ${l.impacts} impacts, body ${l.off > 0 ? `${f(l.off, 2)} m onto the kerb` : `${f(-l.off, 2)} m inside the pavement`} at worst, slip ${f(l.slip, 1)}° at most, stability control ${f(l.escPerLap, 1)} s a lap`);
   }
 }

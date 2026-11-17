@@ -10,6 +10,7 @@
 // pull forwards from it), then steers at a point on that line a little way ahead and holds the speed. It is
 // what ?ap runs, what the tests lap with and what takes the car home after the flag.
 
+import { ASSISTS } from './config.js';
 import { CAR } from './vehicle/params.js';
 
 const G = 9.81;
@@ -26,13 +27,19 @@ const STEER_GRIP = 12.3;
  */
 const STEER_SLIP_SLOW = 0.08;
 const STEER_SLIP_FAST = 0.058;
+/** Analog steering: extra power of the curve at speed, and the time (s) it is smoothed over at speed. */
+const ANALOG_EXPO = 0.6;
+/** The analog input (-1..1) that asks for `share` (-1..1) of the lock allowed at this speed: the inverse of the curve. */
+export function analogFor(vehicle, share) {
+  const fast = clamp01(Math.abs(vehicle.speed) / 60);
+  return Math.sign(share) * Math.abs(share) ** (1 / (1 + ANALOG_EXPO * fast));
+}
+const ANALOG_SMOOTH = 0;
 /** Slip angle of the rear axle (rad) inside which the car is cornering, not sliding: about the rear tyres' peak. */
 const REAR_SLIDE = 0.075;
-/** Counter-steer the hand on the wheel gives (rad of steering per rad of rear slide beyond REAR_SLIDE), keys only. */
-const CATCH = 0.75;
 
 /** The most steering (rad at the road wheels) worth having at the car's present speed. */
-function steerLimit(vehicle) {
+export function steerLimit(vehicle) {
   const p = vehicle.params;
   const speed = Math.abs(vehicle.speed);
   const fast = clamp01((speed - 8) / 42);
@@ -63,6 +70,15 @@ function rearSlide(vehicle) {
   return angle - clamp(angle, -REAR_SLIDE, REAR_SLIDE);
 }
 
+/**
+ * The driver's steering (rad, + = left) with the opposite lock the help gives: added to steering into the bend (it
+ * lessens it), but no more than the larger of the two when the driver is already countering (it never doubles it).
+ */
+function withCatch(angle, help, roomLeft, roomRight) {
+  const out = angle * help > 0 ? (Math.abs(help) > Math.abs(angle) ? help : angle) : angle + help;
+  return clamp(out, -roomRight, roomLeft);
+}
+
 /** A person on this machine. */
 export class PlayerDriver {
   /**
@@ -72,6 +88,10 @@ export class PlayerDriver {
    */
   constructor(input, scheme = 'all', zone = null) {
     this.input = input;
+    /** The assist level (ASSISTS.levels): how much opposite lock the hands are given, per device. */
+    this.level = ASSISTS.levels[ASSISTS.default];
+    /** The device the last input came from: 'keys', 'pad' or 'thumb'. */
+    this.device = 'keys';
     this.scheme = scheme;
     this.zone = zone;
     this._raw = { steer: 0, throttle: 0, brake: 0, handbrake: 0, analog: false };
@@ -100,14 +120,26 @@ export class PlayerDriver {
     const roomRight = Math.min(lock, base + Math.max(0, -slide));
     const want = clamp(+raw.steer || 0, -1, 1);
     const handbrake = raw.handbrake ? 1 : 0;
+    // which hands these are: Input says 'touch' for a thumb on the glass and 'pad' for a stick; a stand-in that only
+    // says analog is a pad
+    this.device = raw.analog ? (raw.device === 'touch' ? 'thumb' : 'pad') : 'keys';
+    // the opposite lock given for the driver while the tail is out: it turns the front wheels towards where the car
+    // is going, so that letting go of the steering catches a slide
+    const help = this.level?.catch?.[this.device] ?? 0;
     // while the handbrake is pulled the hands let the tail come round; they are back on the wheel a moment after
     this._hand = handbrake ? 1 : Math.max(0, this._hand - dt / 0.25);
     let angle; // rad at the road wheels, + = left
     if (raw.analog) {
-      this._steer = this._wheel = want;
+      // a stick or a thumb: finer near the centre the faster the car goes (the same travel asks for less of the
+      // lock), and smoothed a little at speed, so that a hand's shake and its lag do not set the car weaving
+      const fine = Math.sign(want) * Math.abs(want) ** (1 + ANALOG_EXPO * fast);
+      this._steer += (fine - this._steer) * (1 - Math.exp(-dt / (ANALOG_SMOOTH * fast + 1e-3)));
+      this._wheel = this._steer;
+      const shaped = this._steer;
       this._throttle = clamp01(+raw.throttle || 0);
       this._brake = clamp01(+raw.brake || 0);
-      angle = -want * (want < 0 ? roomLeft : roomRight);
+      angle = -shaped * (shaped < 0 ? roomLeft : roomRight);
+      angle = withCatch(angle, help * slide * (1 - this._hand), roomLeft, roomRight);
     } else {
       // a key: wind the wheel on, quicker when it is being reversed, and let it run back when released
       const reversing = want !== 0 && this._steer * want < 0;
@@ -120,7 +152,7 @@ export class PlayerDriver {
       this._brake += clamp((raw.brake > 0.5 ? 1 : 0) - this._brake, -dt / 0.08, dt / 0.1);
       angle = -this._wheel * (this._wheel < 0 ? roomLeft : roomRight);
       // and a hand on the wheel that turns into a slide without being told
-      angle = clamp(angle + CATCH * slide * (1 - this._hand), -roomRight, roomLeft);
+      angle = withCatch(angle, help * slide * (1 - this._hand), roomLeft, roomRight);
     }
     out.steer = clamp(-angle / lock, -1, 1);
     out.throttle = this._throttle;
