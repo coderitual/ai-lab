@@ -18,7 +18,7 @@
  * Outer dimensions and hard points of the body (W206 saloon, AMG Line).
  *
  * The AMG Line bumpers make the car 42 mm longer than the 4.751 m usually quoted (835 + 2865 + 1093), and
- * its staggered 18-inch wheels (7.5J ET40 front, 8.5J ET52 rear) give tracks of 1.590 / 1.579 m, not the
+ * its staggered wheels (7.5J ET40 front, 8.5J ET52 rear, as measured on the 18-inch ones) give tracks of 1.590 / 1.579 m, not the
  * 1.582 / 1.594 m of the base wheels. Photographs of the car agree: nose at +2.27, tail at -2.53.
  */
 export const DIMS = {
@@ -42,10 +42,14 @@ export const STATIONS = {
   tail: -DIMS.wheelbase / 2 - DIMS.rearOverhang,
 };
 
-/** Tyres: 225/45 R18 front, 245/40 R18 rear. */
+/**
+ * Tyres: 225/40 R19 front, 255/35 R19 rear. The daylight photographs from ahead and to the side show the rim's
+ * outer edge at 0.78 to 0.79 of the tyre's diameter, which an 18-inch wheel under a 45 or 40 profile (0.74) cannot
+ * give: these are the 19-inch wheels. The sizes are this model's 19-inch staggered fitment [E].
+ */
 export const TYRES = {
-  front: { width: 0.225, aspect: 0.45, rim: 18 * 0.0254, radius: (18 * 0.0254) / 2 + 0.225 * 0.45 },
-  rear: { width: 0.245, aspect: 0.4, rim: 18 * 0.0254, radius: (18 * 0.0254) / 2 + 0.245 * 0.4 },
+  front: { width: 0.225, aspect: 0.4, rim: 19 * 0.0254, radius: (19 * 0.0254) / 2 + 0.225 * 0.4 },
+  rear: { width: 0.255, aspect: 0.35, rim: 19 * 0.0254, radius: (19 * 0.0254) / 2 + 0.255 * 0.35 },
 };
 
 /**

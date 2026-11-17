@@ -19,6 +19,9 @@
 //   lights=off|drl|low|high|brake|all    the car's lamps (default: what the time of day asks for); or a list of
 //                  setLights names, each at full strength: lights=tail,reverse,indicatorL
 //   s=120          track distance to stand at (default: the first grid slot)
+//   carq=medium    the car's own tier, if not the page's (q=low&carq=high: a quick world, a fine car)
+//   sun=0          the sun off (its light, not the sky): the flat light of an overcast day, for staging the
+//                  owner's daylight photographs. ev=N: N stops more exposure (sun=0 alone adds 2)
 //
 // The camera. All positions are in the frame of the thing looked at, which
 // for the car is car space: origin on the ground midway between the axles,
@@ -90,16 +93,17 @@ import { LIGHTS } from './game/config.js';
 import { createTrack } from './game/track.js';
 
 const params = parseParams();
+const query = new URLSearchParams(location.search);
 // the world needs a time of day (the game picks its own default); the viewer shows its asset by day unless told
 if (!params.time) params.time = 'day';
 const given = params.viewer;
 // the world mode's own parameters (see "The world" above)
-const query = new URLSearchParams(location.search);
 const number = (key, fallback) => (Number.isFinite(parseFloat(query.get(key))) ? parseFloat(query.get(key)) : fallback);
 
 const engine = new Engine(document.getElementById('app'), { manual: params.manual, pixelRatio: params.dpr });
 const caps = probeCaps(engine.renderer, { ldr: params.ldr });
 const tier = params.quality ?? caps.tier;
+const carTier = TIERS[query.get('carq')] ? query.get('carq') : tier;
 engine.setMaxPixelRatio(TIERS[tier].pixelRatio);
 const pipeline = new FramePipeline(engine.renderer, caps, { tier, post: params.post });
 const track = createTrack();
@@ -150,14 +154,14 @@ function lampPreset(name) {
  */
 const ASSETS = {
   car() {
-    const car = createCar({ paint: params.paint ?? undefined, plate: params.plate ?? undefined, tier, caps, ghost: query.get('ghost') === '1' });
+    const car = createCar({ paint: params.paint ?? undefined, plate: params.plate ?? undefined, tier: carTier, caps, ghost: query.get('ghost') === '1' });
     car.setLights(lampPreset(given.lights));
     car.setReflections({ cube: null, sky: 1 });
     stand.add(car.object);
     // its contact shadow lies on the road, and its reflection probe (probe=0: none) is redrawn whole every frame
     world.scene.add(car.shadow);
     car.poseShadow(stand.position, new THREE.Vector3(0, 1, 0), stand.rotation.y, 1);
-    const probe = params.probe ? new ReflectionProbe(engine.renderer, number('probesize', TIERS[tier].probeSize)) : null;
+    const probe = params.probe ? new ReflectionProbe(engine.renderer, number('probesize', TIERS[carTier].probeSize)) : null;
     if (probe) car.setReflections({ cube: probe.texture, sky: 1 });
     // mirror=1: the paint as a plain mirror, to read the body's surfaces in the reflections (with stripes=1)
     if (query.get('mirror') === '1') {
@@ -431,7 +435,10 @@ engine.onResize(() => {
 engine.onContextRestored(() => world.restore());
 engine.onUpdate = (dt, simTime) => world.update(dt, simTime);
 engine.onRender = placeCamera;
+const sunOff = query.get('sun') === '0';
+const extraStops = number('ev', sunOff ? 2 : 0);
 engine.onDraw = () => {
+  if (sunOff) world.scene.traverse((o) => { if (o.isDirectionalLight) o.intensity = 0; });
   if (Number.isFinite(view.focus)) track.pointAt(view.focus, view.lat, focus);
   else stand.getWorldPosition(focus);
   world.prepareView(camera, focus, beams);
@@ -443,7 +450,10 @@ engine.onDraw = () => {
     const at = asset.car.box.center.clone().applyMatrix4(stand.matrixWorld);
     asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...world.probeHidden].filter(Boolean), 6);
   }
+  const exposure = frame.exposure;
+  frame.exposure *= 2 ** extraStops;
   pipeline.render(world.scene, camera, rect, frame);
+  frame.exposure = exposure;
 };
 
 /**

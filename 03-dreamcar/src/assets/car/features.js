@@ -187,15 +187,22 @@ export const HEAD_LENS = [[0.5, 0.688, 2.105], [0.53, 0.713, 2.047], [0.6, 0.728
   [0.815, 0.748, 1.722], [0.86, 0.715, 1.69], [0.84, 0.672, 1.76], [0.79, 0.63, 1.85], [0.73, 0.602, 1.925],
   [0.66, 0.592, 1.985], [0.59, 0.602, 2.04], [0.53, 0.635, 2.085], [0.5, 0.665, 2.105]];
 /**
- * The tail lamp's lens (6.2), left, from the inner tip along the upper edge. The sheet's lower edge sagged 15 mm
- * below the straight diagonal the photographs show, and its inner end was a point where the lamp is blunt
- * (car-rear34-full): straightened, and the inner end kept 25 mm high.
+ * The tail lamp's lens (6.2), left: the upper edge from the inner tip to the outer end (the first TAIL_UPPER
+ * points, x rising), then down round the outer end and back along the lower edge. Redrawn from the daylight
+ * photograph straight on the tail (camera fitted to the plate, the star, the screen's corners and the trims,
+ * the outline cut back onto the lamp's own surface): the inner tip is 45 mm further in than the sheet had it,
+ * the upper edge rises 60 mm to the outer end, and the outer end is the lamp's tallest part, a rounded end
+ * 0.2 high wrapping round the corner, with the lower edge running nearly level beneath it (the sheet's lamp
+ * was deepest in the middle and pointed at the outer end).
  */
-export const TAIL_LENS = [[0.37, 0.866, -2.45], [0.42, 0.876, -2.435], [0.47, 0.884, -2.42], [0.52, 0.891, -2.381], [0.58, 0.898, -2.325],
-  [0.64, 0.904, -2.267], [0.7, 0.908, -2.197], [0.76, 0.91, -2.116], [0.8, 0.908, -2.06], [0.83, 0.898, -2.015],
-  [0.842, 0.878, -1.993], [0.83, 0.856, -2.015], [0.8, 0.834, -2.06], [0.76, 0.808, -2.116], [0.71, 0.778, -2.183],
-  [0.66, 0.752, -2.25], [0.61, 0.76, -2.292], [0.56, 0.777, -2.35], [0.51, 0.794, -2.389], [0.465, 0.81, -2.421],
-  [0.42, 0.828, -2.435], [0.38, 0.842, -2.447]];
+export const TAIL_LENS = [[0.325, 0.86, -2.452], [0.385, 0.876, -2.445], [0.45, 0.887, -2.428], [0.52, 0.896, -2.385],
+  [0.6, 0.904, -2.305], [0.68, 0.913, -2.222], [0.75, 0.924, -2.13], [0.79, 0.926, -2.075], [0.822, 0.914, -2.03],
+  [0.84, 0.89, -2.002], [0.848, 0.85, -1.99],
+  [0.846, 0.805, -1.993], [0.835, 0.765, -2.008], [0.81, 0.735, -2.045], [0.77, 0.722, -2.1], [0.71, 0.732, -2.19],
+  [0.64, 0.75, -2.27], [0.57, 0.772, -2.335], [0.5, 0.797, -2.398], [0.43, 0.822, -2.435], [0.37, 0.842, -2.45],
+  [0.338, 0.852, -2.452]];
+/** How many of TAIL_LENS's points are its upper edge. */
+export const TAIL_UPPER = 11;
 /** The grille's opening (5.1), left half, clockwise from the middle of the upper edge seen from the front. */
 export const GRILLE_HALF = [[0, 0.71, 2.2675], [0.15, 0.708, 2.262], [0.3, 0.7, 2.246], [0.4, 0.686, 2.231], [0.47, 0.66, 2.207],
   [0.515, 0.615, 2.189], [0.535, 0.56, 2.178], [0.525, 0.515, 2.178], [0.49, 0.487, 2.186], [0.42, 0.472, 2.207],
@@ -273,7 +280,7 @@ export function buildFeatures() {
   line('bonnet', 'top', { n: 0.25, y: [0.6, 1.1], z: [0.7, 2.4] }, smooth(P('top', top([[2.13, 0], [2.125, 0.15], [2.11, 0.3], [2.085, 0.42],
     [2.047, 0.53], [1.92, 0.64], [1.776, 0.75], [1.6, 0.765], [1.4325, 0.77], [1.2, 0.77], [1.0, 0.762], [0.795, 0.75]])), false));
   line('bootSide', 'top', { n: 0.3, y: [0.8, 1.2], z: [-2.4, -1.85] }, smooth(P('top', top([[-2.3, 0.6], [-2.1, 0.63], [-1.93, 0.66]])), false));
-  line('bootRear', 'rear', { n: 0.3, z: [-2.7, -2.15] }, smooth(P('rear', face([[0.6, 0.9], [0.525, 0.797], [0.46, 0.72], [0.36, 0.66], [0.2, 0.615], [0, 0.602]])), false));
+  line('bootRear', 'rear', { n: 0.3, z: [-2.7, -2.15] }, smooth(P('rear', face([[0.606, 0.902], [0.561, 0.776], [0.535, 0.725], [0.5, 0.672], [0.44, 0.628], [0.34, 0.602], [0.2, 0.594], [0, 0.592]])), false));
   line('roofSeam', 'top', { n: 0.6, y: [1.3, 1.6] }, straight(P('top', top([[-0.62, 0.47], [-0.62, 0]]))));
 
   // ---- small things on the rear bumper (6.4): the red reflectors, the black slits of the corner outlets

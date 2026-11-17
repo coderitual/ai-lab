@@ -1,4 +1,4 @@
-// One corner of the car: the tyre, the 18-inch five-twin-spoke wheel (black
+// One corner of the car: the tyre, the 19-inch five-twin-spoke wheel (black
 // with machined faces), and the brake behind it.
 //
 // The wheel's face is drawn once, as a plan: the outlines of the bright faces
@@ -35,6 +35,13 @@ import { TYRE_MARK as MARK, TYRE_REPEAT, TYRE_TREAD_V, FINISH, createCoverTextur
  * the ruler: a circle of radius 0.243 fixes the camera, then widths are read in the wheel's plane and depths from
  * parallax, +/- 1.5 mm and +/- 3 mm), [E] estimated.
  */
+/**
+ * The plan below was measured as an 18-inch wheel (its rim's edge, 0.2432, the ruler). The car's wheels are 19-inch
+ * (spec.js, from the daylight photographs): the face, the barrel and the brake are built from the plan and then
+ * scaled by this in the wheel's plane; the tyre's bead follows.
+ */
+export const RIM_SCALE = TYRES.front.rim / (18 * 0.0254);
+
 export const WHEEL = {
   pairs: 5,
   /** Outer edge of the rim, where the tyre begins [M]; the lip's bright flat; the edge of the black step inside it. */
@@ -53,9 +60,10 @@ export const WHEEL = {
    * edges of the black pocket between the bars.
    */
   at: 0.222,
-  edgeHalf: 0.021,
+  // (car2: the daylight close views show bright bars nearly twice as wide as first measured, the pocket narrower)
+  edgeHalf: 0.026,
   edgeTaper: 0.1146,
-  slotHalf: 0.0117,
+  slotHalf: 0.0085,
   slotTaper: 0.0521,
   /** The pocket ends here; from there to the rim the two bars are one bright head [M]. */
   slotEnd: 0.232,
@@ -926,16 +934,16 @@ function buildTyre(detail, tyre, lip) {
   const radius = tyre.radius;
   const treadHalf = tyre.width * 0.435;
   const bulge = Math.max(tyre.width / 2, lip + 0.0035);
-  const middle = WHEEL.edge + 0.5 * (radius - WHEEL.edge);
+  const middle = WHEEL.edge * RIM_SCALE + 0.5 * (radius - WHEEL.edge * RIM_SCALE);
   const crown = 0.0045;
   // the outer sidewall from the bead to the edge of the tread: the rim protector, a dip, the bulge, the shoulder
   const wall = new THREE.CatmullRomCurve3(
     [
-      [lip - 0.004, WHEEL.edge + 0.0002],
-      [lip + 0.001, 0.2462],
-      [lip + 0.0036, 0.25],
-      [lip + 0.0034, 0.2535],
-      [lip + 0.0016, 0.258],
+      [lip - 0.004, (WHEEL.edge + 0.0002) * RIM_SCALE],
+      [lip + 0.001, 0.2462 * RIM_SCALE],
+      [lip + 0.0036, 0.25 * RIM_SCALE],
+      [lip + 0.0034, 0.2535 * RIM_SCALE],
+      [lip + 0.0016, 0.258 * RIM_SCALE],
       [bulge, middle],
       [bulge - 0.0035, radius - 0.03],
       [bulge - 0.01, radius - 0.017],
@@ -1246,8 +1254,8 @@ function buildGeometry(tier, front) {
 
 /**
  * @param {object} options
- * @param {boolean} options.front a front wheel (225/45 R18 on 7.5J, the larger disc, the caliper ahead of the axle)
- *   or a rear one (245/40 R18 on 8.5J, the caliper behind)
+ * @param {boolean} options.front a front wheel (225/40 R19, the larger disc, the caliper ahead of the axle)
+ *   or a rear one (255/35 R19, the caliper behind)
  * @param {boolean} options.left on the car's left (its outer face looks to +X) or its right (to -X)
  * @param {'low'|'medium'|'high'} [options.tier]
  * @param {import('../../engine/caps.js').Caps} [options.caps]
@@ -1314,10 +1322,13 @@ export function createWheel({ front, left, tier = 'high', caps = null }) {
   const turned = new THREE.Group();
   if (!left) turned.rotation.y = Math.PI;
   const fixed = new THREE.Mesh(geometry.fixed, fixedMaterial);
-  if (!left) fixed.scale.x = -1;
+  // the plan is an 18-inch wheel's: grown in its own plane to the car's 19 inches (the tyre is built to size)
+  fixed.scale.set(left ? 1 : -1, RIM_SCALE, RIM_SCALE);
   const tyreMesh = new THREE.Mesh(geometry.tyre, tyreMaterial);
   const spokes = new THREE.Mesh(geometry.spokes, spokeMaterial);
   const shell = new THREE.Mesh(geometry.shell, shellMaterial);
+  spokes.scale.set(1, RIM_SCALE, RIM_SCALE);
+  shell.scale.set(1, RIM_SCALE, RIM_SCALE);
   fixed.castShadow = tyreMesh.castShadow = true;
   fixed.receiveShadow = tyreMesh.receiveShadow = spokes.receiveShadow = shell.receiveShadow = true;
   // Both are blended and both write depth. They are drawn before every other blended thing (glass, smoke), which
