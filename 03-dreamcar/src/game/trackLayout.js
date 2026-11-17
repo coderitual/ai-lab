@@ -67,6 +67,10 @@ export const SIDES = {
   highRun: { kind: 'rail', edge: [7, 10], slope: -0.02, far: -0.3, verge: 'grass', wood: 'conifer' },
   // the open top: run-off and a rail, the ground falling away, nothing growing that would hide the view
   open: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'grass', wood: null },
+  // the ledge's first bend: a low wall with boards on both sides; on the inside the ground falls away to the valley
+  // and the view is open, on the outside a wooded bank rises close behind the wall (broadleaves, back-lit by day)
+  balcony: { kind: 'wall', edge: [3, 4], slope: -0.03, far: -0.35, verge: 'grass', wood: null },
+  bank: { kind: 'wall', edge: [3.5, 5], slope: 0.07, far: 0.45, verge: 'grass', wood: 'broadleaf' },
   // the road cut into the hill: a narrow verge, then the rock face
   rock: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null },
   // structures: paved right up to the wall or the parapet
@@ -144,8 +148,9 @@ const SEGMENTS = [
   // The plunge: 8 per cent down into a compression.
   { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'highDown', R: 'highUp' },
 
-  // The ledge: fast downhill sweepers, rock on one side and a rail and the drop on the other.
-  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 10, g: -7.5, gk: [[0.3, -7.5]], L: 'rock', R: 'midRun', runoff: 'R' },
+  // The ledge: fast downhill sweepers along the hillside. The first, a left, has the valley open on its inside over
+  // a low wall and a wooded bank on its outside; the second, a right, runs under rock with a rail and the drop outside.
+  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 10, g: -7.5, gk: [[0.3, -7.5]], L: 'balcony', R: 'bank', runoff: 'R' },
   { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: -7.5, L: 'midRun', R: 'rock', runoff: 'L' },
 
   // Gully bridge: straight across a gully on piers.
