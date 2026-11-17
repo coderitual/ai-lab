@@ -28,7 +28,7 @@ export const SPLIT_PAN = 0.7;
 
 /** Linear gains of the parts into a car's bus, and of the cues into the master. Tuned by tools/soundtest.cjs. */
 const MIX = {
-  engine: 0.45,
+  engine: 0.41,
   breath: 0.16,
   whistle: 0.12,
   wind: 0.55,
@@ -94,7 +94,7 @@ const EDGES = [
 /** A sliding tyre: the squeal and a partial above it into gain 0, the rougher band into gain 1. */
 const TYRE_BANDS = [
   { type: 'bandpass', freq: 1000, q: 16, out: 0 },
-  { type: 'bandpass', freq: 1500, q: 20, out: 0, level: 0.35 },
+  { type: 'bandpass', freq: 1350, q: 24, out: 0, level: 0.35 },
   { type: 'bandpass', freq: 700, q: 3, out: 1 },
 ];
 
@@ -426,7 +426,7 @@ class CarVoice {
       // the harder the tyre is worked the lower it sings
       const pitch = (1070 - 330 * smoothstep(0.05, 0.9, this.skid)) * (1 + 0.04 * this.index);
       p.freqs[0].to(pitch, t, 0.06);
-      p.freqs[1].to(pitch * 1.47, t, 0.06);
+      p.freqs[1].to(pitch * 1.35, t, 0.06);
       p.gains[0].to(mix.squeal * sing, t, 0.03);
       p.freqs[2].to(lerp(700, 1500, g.scrub), t, 0.08);
       p.qs[2].to(lerp(3, 0.5, g.scrub), t, 0.08);
