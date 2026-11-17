@@ -37,9 +37,9 @@ const EDGE_TREES = 4;
 
 /** Per tier: near detail out to (m), the far cards out to (m), share of the general forest kept, atlas size. */
 const TIER = {
-  low: { near: 55, far: 480, keep: 0.45, atlas: 512 },
-  medium: { near: 80, far: 800, keep: 0.8, atlas: 1024 },
-  high: { near: 100, far: 1100, keep: 1, atlas: 1024 },
+  low: { near: 42, far: 480, keep: 0.45, atlas: 512, casters: 1.0 },
+  medium: { near: 75, far: 800, keep: 0.8, atlas: 1024, casters: 1.15 },
+  high: { near: 85, far: 1100, keep: 1, atlas: 1024, casters: 1.15 },
 };
 /** Width of the band over which near and far dissolve into each other (m). */
 const BLEND = 8;
@@ -50,13 +50,87 @@ const CELL = 64;
 
 /** Linear albedo (before the texture, which is pale: about 0.5 on average) per species, and its spread. */
 const TINT = {
-  spruce: [0.085, 0.15, 0.12],
-  fir: [0.08, 0.15, 0.085],
+  spruce: [0.07, 0.12, 0.11],
+  fir: [0.065, 0.125, 0.08],
   larch: [0.34, 0.21, 0.06],
   birch: [0.3, 0.25, 0.06],
 };
 /** Height range (m) per species. */
 const HEIGHT = { spruce: [14, 28], fir: [12, 24], larch: [14, 24], birch: [10, 18] };
+
+const NORMAL_BEGIN = THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', '');
+
+/**
+ * The material of everything that grows (and of the rocks among it): a standard material whose instances carry
+ * aTint (rgb: the albedo foliage is tinted to; a: the screen-door fade, see prepareView) and aBake (the ground's baked
+ * light where it stands), and whose vertices carry aShade (x: occlusion, y: 1 where the texture's own colour is
+ * kept, as bark). Shared by forest.js and groundCover.js.
+ * @param {object} o
+ * @param {THREE.Texture|null} o.map
+ * @param {import('./atmosphere.js').Atmosphere} o.atmosphere
+ * @param {{ uTime: { value: number }, uWind: { value: THREE.Vector2 } }} o.uniforms the clock and the wind
+ * @param {{ height: number, sway: number, tip: number }|null} o.wind height over which the whole plant sways (m),
+ *   how far its top goes (m), how far the tips of its branches flutter (m); null: still
+ * @param {number} o.facing 0..1 how far the foliage's normal leans towards the eye
+ * @param {boolean} [o.flat] faceted (the rocks)
+ */
+export function plantMaterial({ map, atmosphere, uniforms, wind, facing, flat = false }) {
+  const material = withBake(
+    new THREE.MeshStandardMaterial({
+      map,
+      alphaTest: map ? 0.42 : 0,
+      side: map ? THREE.DoubleSide : THREE.FrontSide,
+      roughness: 0.92,
+      metalness: 0,
+      flatShading: flat,
+    }),
+  );
+  if (wind) material.defines = { PLANT_WIND: 1, WIND_H: wind.height.toFixed(2), WIND_SWAY: wind.sway.toFixed(3), WIND_TIP: wind.tip.toFixed(3) };
+  extend(material, `plant-${facing}`, (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nattribute vec2 aShade;\nattribute vec4 aTint;\nvarying vec2 vShade;\nvarying vec4 vTint;\nuniform float uTime;\nuniform vec2 uWind;',
+      )
+      .replace(
+        '#include <begin_vertex>',
+        /* glsl */ `#include <begin_vertex>
+vShade = aShade;
+vTint = aTint;
+#if defined( PLANT_WIND ) && defined( USE_INSTANCING )
+{
+  float ph = dot( instanceMatrix[3].xz, vec2( 0.37, 0.71 ) );
+  float h = max( position.y, 0.0 ) / WIND_H;
+  float sway = sin( uTime * 0.83 + ph ) * 0.6 + sin( uTime * 2.1 + ph * 1.7 ) * 0.25;
+  float tip = ( 1.0 - aShade.y ) * smoothstep( 0.0, 3.0, length( position.xz ) + 3.0 * h * step( WIND_H, 2.0 ) );
+  transformed.xz += uWind * ( h * h * sway * WIND_SWAY + tip * sin( uTime * 3.3 + ph + position.y * 1.3 ) * WIND_TIP );
+}
+#endif`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vShade;\nvarying vec4 vTint;')
+      .replace(
+        '#include <map_fragment>',
+        /* glsl */ `#include <map_fragment>
+{
+  // the screen-door dissolve between the two levels of detail, and with distance
+  float ign = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) );
+  if ( vTint.a >= 0.0 ? ign >= vTint.a : ign < 1.0 + vTint.a ) discard;
+  diffuseColor.rgb *= mix( vTint.rgb, vec3( 1.0 ), vShade.y ) * vShade.x;
+}`,
+      );
+    if (map) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <normal_fragment_begin>',
+        // the part of a crown one sees faces one: the normal leans towards the eye (more for the far cards, which
+        // are flat pictures of a whole tree), so a tree with the sun behind it is dark and one facing it lit
+        `${NORMAL_BEGIN}\nnormal = normalize( mix( normal, normalize( vViewPosition ), ${facing.toFixed(2)} * ( 1.0 - vShade.y ) ) );`,
+      );
+    }
+  });
+  return atmosphere.patch(material);
+}
 
 /**
  * @param {object} options
@@ -265,55 +339,7 @@ export function createForest({ track, terrain, tier, rng, atmosphere, shadow }) 
   // ---------------------------------------------------------------- material and meshes
   const atlas = createForestAtlas(T.atlas, rng.fork('atlas'));
   const uniforms = { uTime: { value: 0 }, uWind: { value: new THREE.Vector2(0.8, 0.6) } };
-  const NORMAL_BEGIN = THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', '');
-  const makeMaterial = (wind) => {
-    const material = withBake(
-      new THREE.MeshStandardMaterial({ map: atlas, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.92, metalness: 0 }),
-    );
-    if (wind) material.defines = { TREE_WIND: 1 };
-    extend(material, 'tree', (shader) => {
-      Object.assign(shader.uniforms, uniforms);
-      shader.vertexShader = shader.vertexShader
-        .replace(
-          '#include <common>',
-          '#include <common>\nattribute vec2 aShade;\nattribute vec4 aTint;\nvarying vec2 vShade;\nvarying vec4 vTint;\nuniform float uTime;\nuniform vec2 uWind;',
-        )
-        .replace(
-          '#include <begin_vertex>',
-          /* glsl */ `#include <begin_vertex>
-vShade = aShade;
-vTint = aTint;
-#if defined( TREE_WIND ) && defined( USE_INSTANCING )
-{
-  float ph = dot( instanceMatrix[3].xz, vec2( 0.37, 0.71 ) );
-  float h = max( position.y, 0.0 ) / 20.0;
-  float sway = sin( uTime * 0.83 + ph ) * 0.6 + sin( uTime * 2.1 + ph * 1.7 ) * 0.25;
-  float tip = ( 1.0 - aShade.y ) * smoothstep( 0.5, 3.0, length( position.xz ) );
-  transformed.xz += uWind * ( h * h * sway * 0.07 + tip * sin( uTime * 3.3 + ph + position.y * 1.3 ) * 0.025 );
-}
-#endif`,
-        );
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vShade;\nvarying vec4 vTint;')
-        .replace(
-          '#include <map_fragment>',
-          /* glsl */ `#include <map_fragment>
-{
-  // the screen-door dissolve between the two levels of detail, and of the far cards with distance
-  float ign = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) );
-  if ( vTint.a >= 0.0 ? ign >= vTint.a : ign < 1.0 + vTint.a ) discard;
-  diffuseColor.rgb *= mix( vTint.rgb, vec3( 1.0 ), vShade.y ) * vShade.x;
-}`,
-        )
-        .replace(
-          '#include <normal_fragment_begin>',
-          // the part of a crown one sees faces one: the normal leans towards the eye (more for the far cards, which
-          // are flat pictures of a whole tree), so a tree with the sun behind it is dark and one facing it lit
-          `${NORMAL_BEGIN}\nnormal = normalize( mix( normal, normalize( vViewPosition ), ${wind ? '0.45' : '0.75'} * ( 1.0 - vShade.y ) ) );`,
-        );
-    });
-    return atmosphere.patch(material);
-  };
+  const makeMaterial = (wind) => plantMaterial({ map: atlas, atmosphere, uniforms, wind: wind ? { height: 20, sway: 0.07, tip: 0.025 } : null, facing: wind ? 0.45 : 0.75 });
   const nearMaterial = makeMaterial(true);
   const farMaterial = makeMaterial(false);
   const depthMaterial = new THREE.MeshDepthMaterial({ map: atlas, alphaTest: 0.42, side: THREE.DoubleSide });
@@ -355,7 +381,8 @@ vTint = aTint;
   const projView = new THREE.Matrix4();
   const sphere = new THREE.Sphere();
   const eye = new THREE.Vector3();
-  const shadowR = shadow.reach * 1.5;
+  // trees cast into the sun's shadow square round the car (the square's half side times this; its corners are left)
+  const shadowR = shadow.reach * T.casters;
   const counts = { near: 0, far: 0, nearTriangles: 0, farTriangles: 0 };
   const nearTris = SPECIES.map((name) => nearMeshes[SPECIES.indexOf(name)].geometry.index.count / 3);
   const farTris = SPECIES.map((name) => farMeshes[SPECIES.indexOf(name)].geometry.index.count / 3);
@@ -437,6 +464,7 @@ vTint = aTint;
 
   return {
     group,
+    uniforms,
     prepareView,
     update(dt, simTime) {
       uniforms.uTime.value = simTime;

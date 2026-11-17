@@ -407,7 +407,8 @@ export function createTerrain({ track, tier, rng, material, lights }) {
       const kinds = lat > 0 ? track.kindL : track.kindR;
       if (kinds[Math.round(wrap(s) / ds) % n] === EDGE_TREES) f = smoothstep(0.5, 3, d) * (1 - smoothstep(90, 150, d));
     }
-    const patch = smoothstep(0.42, 0.6, noise.fbm(x / 230 + 11, z / 230, 4));
+    // (the forest stage: more of the valley sides wooded, so no slope reads as a bare dune)
+    const patch = smoothstep(0.35, 0.52, noise.fbm(x / 230 + 11, z / 230, 4));
     f = Math.max(f, patch * (1 - smoothstep(170, 230, y)) * (s === null || d > 12 ? 1 : 0));
     return f * (1 - smoothstep(0.55, 0.8, slope));
   }

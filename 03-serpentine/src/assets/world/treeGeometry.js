@@ -29,8 +29,8 @@ export const SPECIES = ['spruce', 'fir', 'birch', 'larch'];
 const SHAPES = {
   // crownBase: share of H below the lowest live branches; R: the widest branch (m); whorls; per: branches per whorl;
   // rise and droop: how a branch climbs at first and then hangs (per metre of its length)
-  spruce: { H: 20, trunk: 0.3, crownBase: 0.08, R: 3.0, whorls: 17, per: 6, rise: 0.25, droop: 0.6, power: 0.95, core: 0.28 },
-  fir: { H: 18, trunk: 0.27, crownBase: 0.1, R: 2.5, whorls: 16, per: 6, rise: 0.12, droop: 0.25, power: 0.7, core: 0.3 },
+  spruce: { H: 20, trunk: 0.3, crownBase: 0.08, R: 3.0, whorls: 17, per: 6, rise: 0.25, droop: 0.6, power: 0.95, core: 0.22 },
+  fir: { H: 18, trunk: 0.27, crownBase: 0.1, R: 2.5, whorls: 16, per: 6, rise: 0.12, droop: 0.25, power: 0.7, core: 0.24 },
   larch: { H: 18, trunk: 0.26, crownBase: 0.2, R: 2.6, whorls: 13, per: 5, rise: 0.4, droop: 0.8, power: 0.9, core: 0.15 },
   birch: { H: 15, trunk: 0.16 },
 };
@@ -135,7 +135,7 @@ function branch(b, { y, a, len, rise, droop, width, fold, region, heightShare, c
     const half = width * 0.5 * (0.55 + 0.45 * Math.sin(Math.PI * Math.min(1, 0.15 + t)));
     const drop = fold * half;
     // the crown's normal here: out from the trunk and up, more up near the top of the tree
-    const up = 0.45 + 0.6 * heightShare;
+    const up = 0.25 + 0.5 * heightShare;
     const ao = (0.5 + 0.5 * Math.pow(t, 0.8)) * (0.7 + 0.3 * heightShare);
     const u = lerp(u0, u1, Math.min(1, t));
     const row = [];
@@ -166,7 +166,7 @@ function branch(b, { y, a, len, rise, droop, width, fold, region, heightShare, c
     const bz = dz * len;
     const by = y + len * (rise - droop);
     const drop = hang * len;
-    const up = 0.45 + 0.6 * heightShare;
+    const up = 0.25 + 0.5 * heightShare;
     const ao = 0.75 * (0.6 + 0.4 * heightShare);
     // the picture turned on its side: its stem along the top edge
     const vm = (v0 + v1) / 2;
@@ -268,7 +268,7 @@ function farTree(name) {
         [H, v0],
       ]) {
         const ao = y > 0 ? 1 : 0.55;
-        col.push(b.vertex(dx * R * s, y, dz * R * s, dx * s * 0.8, 0.55, dz * s * 0.8 + (s === 0 ? 0 : 0), u, v, ao, 0));
+        col.push(b.vertex(dx * R * s, y, dz * R * s, dx * s * 0.8, 0.3, dz * s * 0.8, u, v, ao, 0));
       }
       cols.push(col);
     }

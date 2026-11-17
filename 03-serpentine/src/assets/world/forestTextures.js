@@ -4,7 +4,7 @@
 // Foliage is drawn pale (the tree's colour is its instance tint times this):
 //   FROND    a spruce twig seen from above: a stem, side shoots, needles; alpha
 //   LEAVES   a spray of small leaves (birch); alpha
-//   MASS     needles packed solid, for the core of a crown; opaque
+//   MASS     needles packed nearly solid, for the core of a crown; alpha
 //   SIL      a whole tree's silhouette per species, for the far level of detail; alpha
 // Bark is drawn in its own colour (not tinted):
 //   BARK     grey-brown, flaking in plates (spruce, fir, larch)
@@ -31,7 +31,7 @@ export const ATLAS = {
   ],
 };
 
-const grey = (l, g = 1.04, b = 0.96) => `rgb(${Math.round(255 * Math.min(1, l))},${Math.round(255 * Math.min(1, l * g))},${Math.round(255 * Math.min(1, l * b))})`;
+const grey = (l, g = 1.0, b = 0.97) => `rgb(${Math.round(255 * Math.min(1, l))},${Math.round(255 * Math.min(1, l * g))},${Math.round(255 * Math.min(1, l * b))})`;
 
 /**
  * @param {number} size atlas edge in texels
@@ -56,37 +56,41 @@ export function createForestAtlas(size, rng) {
     const envelope = (t) => 0.46 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.92 + 0.04)), 0.7) * (1 - 0.25 * t);
     const needle = (x, y, angle, len, l) => {
       ctx.strokeStyle = grey(l);
-      ctx.lineWidth = 2.2 * px;
+      ctx.lineWidth = 2 * px;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
       ctx.stroke();
     };
-    // side shoots, both sides, with needles along them
-    for (let t = 0.03; t < 0.97; t += 0.022 + rng.next() * 0.014) {
+    // second-order twigs, irregular, crossing one another, under the needles
+    const twigs = [];
+    for (let t = 0.03; t < 0.97; t += 0.03 + rng.next() * 0.03) {
       for (const side of [-1, 1]) {
-        const reach = envelope(t) * h * rng.range(0.8, 1.05);
-        const x0 = u0 + t * w;
-        const a = side * rng.range(0.55, 0.85);
-        const len = reach / Math.sin(Math.abs(a));
-        const ex = x0 + Math.cos(a) * Math.min(len, w * 0.3);
-        const ey = cy + side * reach;
-        const steps = Math.max(5, Math.round(reach / (3.5 * px)));
-        for (let k = 0; k <= steps; k++) {
-          const f = k / steps;
-          const x = x0 + (ex - x0) * f;
-          const y = cy + (ey - cy) * f;
-          const nl = (9 + 6 * (1 - f)) * px * rng.range(0.8, 1.2);
-          const l = rng.range(0.62, 0.95) * (0.8 + 0.2 * f);
-          needle(x, y, a * 0.3 - 0.7 + rng.range(-0.3, 0.3), nl, l);
-          needle(x, y, a * 0.3 + 0.7 + rng.range(-0.3, 0.3), nl, l * 0.9);
-        }
-        ctx.strokeStyle = grey(0.5, 0.95, 0.85);
-        ctx.lineWidth = 1.6 * px;
-        ctx.beginPath();
-        ctx.moveTo(x0, cy);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
+        const reach = envelope(t) * h * rng.range(0.55, 1.05);
+        const a = side * rng.range(0.4, 0.95);
+        twigs.push([u0 + t * w, cy, u0 + t * w + Math.cos(a) * reach * 0.9, cy + side * reach]);
+      }
+    }
+    ctx.strokeStyle = grey(0.28, 1, 0.95);
+    ctx.lineWidth = 1.4 * px;
+    for (const [x0, y0, x1, y1] of twigs) {
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+    }
+    // the needles: a dense, uneven mass of short strokes along the twigs, darker deep in the branch and near the
+    // stem, the odd tuft standing out past the rest
+    for (const [x0, y0, x1, y1] of twigs) {
+      const n = Math.round(Math.hypot(x1 - x0, y1 - y0) / (1.6 * px));
+      for (let k = 0; k < n; k++) {
+        const f = rng.next();
+        const x = x0 + (x1 - x0) * f + rng.range(-4, 4) * px;
+        const y = y0 + (y1 - y0) * f + rng.range(-4, 4) * px;
+        const along = Math.atan2(y1 - y0, x1 - x0);
+        const out = Math.abs(y - cy) / (h * 0.5);
+        const l = rng.range(0.38, 1) * (0.55 + 0.45 * out) * (rng.next() < 0.08 ? 0.5 : 1);
+        needle(x, y, along + rng.sign() * rng.range(0.5, 1.2), rng.range(5, 10) * px, l);
       }
     }
     // needles on the stem itself, then the stem
@@ -161,10 +165,9 @@ export function createForestAtlas(size, rng) {
   // ---- packed needles, opaque and darker (the inside of a crown)
   {
     const [u0, v0, u1, v1] = ATLAS.MASS;
-    ctx.fillStyle = grey(0.32);
-    ctx.fillRect(u0, v0, u1 - u0, v1 - v0);
-    ctx.lineWidth = 2 * px;
-    for (let k = 0; k < 2600; k++) {
+    // not quite solid: the alpha test leaves small holes, so the core never shows as a slab
+    ctx.lineWidth = 2.4 * px;
+    for (let k = 0; k < 3400; k++) {
       const x = u0 + rng.next() * (u1 - u0);
       const y = v0 + rng.next() * (v1 - v0);
       const a = rng.range(0, Math.PI * 2);
