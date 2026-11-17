@@ -88,7 +88,8 @@ function cards(n, w, h, u0, u1) {
       [-1, h, u0, 0, 1],
     ]) {
       pos.push(dx * s, y, dz * s);
-      nor.push(dx * s * 0.6, 1, dz * s * 0.6);
+      // lit like the ground it grows from
+      nor.push(dx * s * 0.15, 1, dz * s * 0.15);
       uv.push(u, v);
       shade.push(ao, 0);
     }
@@ -287,10 +288,10 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         if (g.surface >= 0 && g.surface !== SURFACE_GRASS) continue;
         track.pointAt(s + r.range(-0.3, 0.3), lat, point);
         if (!ownStretch(s, point.x, point.z)) continue;
-        const h = r.range(0.25, 0.6);
-        const v = r.range(0.75, 1.2);
+        const h = r.range(0.2, 0.45);
+        const v = r.range(0.9, 1.35);
         const dry = r.next();
-        grassItems.push(make(point.x, g.y - 0.03, point.z, r.range(0, Math.PI), [h * 1.2, h, h * 1.2], [(0.07 + 0.08 * dry) * v, (0.1 + 0.03 * dry) * v, 0.035 * v], h));
+        grassItems.push(make(point.x, g.y - 0.03, point.z, r.range(0, Math.PI), [h * 2.2, h, h * 2.2], [(0.035 + 0.05 * dry) * v, (0.07 + 0.025 * dry) * v, 0.022 * v], h));
       }
     }
     if (T.bushes) {
@@ -339,7 +340,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
     }
   }
 
-  const coverMaterial = plantMaterial({ map: texture, atmosphere, uniforms, wind: { height: 1, sway: 0.04, tip: 0.0 }, facing: 0.3 });
+  const coverMaterial = plantMaterial({ map: texture, atmosphere, uniforms, wind: { height: 1, sway: 0.04, tip: 0.0 }, facing: 0 });
   const rockMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, facing: 0, flat: true });
   const parts = [];
   if (grassItems.length) parts.push(scatter({ geometry: cards(2, 1, 1, 0.02, 0.48), material: coverMaterial, items: grassItems, reach: T.grassReach, name: 'cover-grass', group }));

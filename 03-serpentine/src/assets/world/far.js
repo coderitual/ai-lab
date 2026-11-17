@@ -72,7 +72,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   const mountains = [];
   let mountainTriangles = 0;
   RINGS.forEach((ring, layer) => {
-    const cols = lowTier ? Math.round(ring.cols * 0.6) : ring.cols;
+    const cols = lowTier ? Math.round(ring.cols * 0.4) : ring.cols;
     const pos = new Float32Array((cols + 1) * (ROWS + 1) * 3);
     const col = new Float32Array((cols + 1) * (ROWS + 1) * 3);
     const circumference = 2 * Math.PI * ring.r;

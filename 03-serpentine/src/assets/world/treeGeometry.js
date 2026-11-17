@@ -180,8 +180,8 @@ function branch(b, { y, a, len, rise, droop, width, fold, region, heightShare, c
 }
 
 /** A conifer at its template height. */
-function conifer(name, rng) {
-  const p = SHAPES[name];
+function conifer(name, rng, low) {
+  const p = low ? { ...SHAPES[name], whorls: Math.round(SHAPES[name].whorls * 0.65), per: SHAPES[name].per - 1 } : SHAPES[name];
   const b = new Builder();
   const H = p.H;
   trunk(b, { r0: p.trunk, top: H * 0.96 });
@@ -202,11 +202,11 @@ function conifer(name, rng) {
         len,
         rise: p.rise + 0.5 * t * t,
         droop: p.droop * (1 - 0.6 * t),
-        width: len * (name === 'larch' ? 0.7 : 1.05),
-        fold: 0.6,
+        width: len * (name === 'larch' ? 0.75 : 1.2),
+        fold: 0.85,
         region: ATLAS.FROND,
         heightShare: t,
-        hang: name === 'fir' ? 0.18 : name === 'larch' ? 0.45 : 0.32,
+        hang: low ? 0 : name === 'fir' ? 0.22 : name === 'larch' ? 0.5 : 0.45,
       });
     }
     a += 2.39996; // the next whorl turned by the golden angle
@@ -281,13 +281,14 @@ function farTree(name) {
 
 /**
  * @param {import('../../engine/rng.js').Rng} rng
+ * @param {boolean} [low] fewer, wider-spaced branches and no hanging branchlets (the low tier)
  * @returns {Record<string, { near: THREE.BufferGeometry, far: THREE.BufferGeometry }>}
  */
-export function createTreeGeometries(rng) {
+export function createTreeGeometries(rng, low = false) {
   const out = {};
   for (const name of SPECIES) {
     const r = rng.fork(name);
-    out[name] = { near: name === 'birch' ? birch(r) : conifer(name, r), far: farTree(name) };
+    out[name] = { near: name === 'birch' ? birch(r) : conifer(name, r, low), far: farTree(name) };
   }
   return out;
 }
