@@ -14,8 +14,8 @@
 //   - The frame pipeline multiplies by `exposure` and applies the tone curve,
 //     which leaves 0.18 at middle grey.
 // By day (sky lane) the flat ground gets about 2.1 from the sun (7.5 on a surface facing it, times the sine of 16
-// degrees) and about 0.5 from the sky and the fill: some 2.6 in all, and the exposure (0.85) puts sunlit asphalt a
-// little over middle grey; in open shade the ground is a little over 2 stops down and blue.
+// degrees) and about 0.6 from the sky and the fill: some 2.7 in all, and the exposure (0.72) puts sunlit asphalt a
+// little under white's knee; in open shade the ground is a little over 2 stops down and blue.
 //
 // NIGHT is not day tinted blue. Its light really is a few hundred times
 // weaker and the exposure opens five stops (x32) to look at it. Lamps do not
@@ -186,17 +186,17 @@ export const TIMES = {
       clouds: { cover: 0.4, wisps: 0.15, lit: 0.22, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
     },
     // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
-    env: { intensity: 0.55 },
+    env: { intensity: 0.7 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
     ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.04 },
-    fog: { color: [0.3, 0.44, 0.7], sun: [0.16, 0.1, 0.05], sunLobe: 16, density: 0.0002, heightFalloff: 0.011, air: 0.00009 },
-    exposure: 0.85,
+    fog: { color: [0.22, 0.33, 0.56], sun: [0.16, 0.1, 0.05], sunLobe: 16, density: 0.0001, heightFalloff: 0.011, air: 0.00006 },
+    exposure: 0.72,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.18, saturation: 1.12, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015, ao: 0.8, star: 0.02 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.18, saturation: 1.04, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015, ao: 0.8, star: 0.02 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
