@@ -164,6 +164,18 @@ The coat's roughness of 0.03 reads mip 0 of cubes up to about 670 texels; a
 1024 cube would need `clearcoatRoughness` 0.02 to show more than a 512 one.
 `probesize=N` in the viewer tries any size.
 
+Two guards on every probe read (`REFLECTIONS` in `materials.js`):
+
+- `carSane`: a texel that is not a number, or overflowed half float, is
+  replaced by the sky's radiance. At night the probe held NaN (written by the
+  road's asphalt shader where the road is seen exactly edge on from the probe;
+  see below), the mips spread it, and the paint sampled it: black here, a
+  screen-filling white bloom on other GPUs.
+- `carGround`: a reflected ray that meets the road within 20 m is turned into
+  the direction from the probe (the middle of the car's box) to that point: a
+  parallax correction for the road's plane, which the middle of the car
+  otherwise sees at the wrong size and place.
+
 ### The glass
 
 The glass and the lenses are the skin again, drawn after the paint at the
@@ -334,7 +346,9 @@ the side intake's inner detail; the shape of the mirror's foot.
 
 ## What each tier costs
 
-Measured in the viewer, one page at a time (headless Chromium on a 4-core
+Re-measured after the corrections against the daylight photographs (counts
+unchanged: the lamp units and the wheel keep their sizes; the mirror is the
+same mesh larger). Measured in the viewer, one page at a time (headless Chromium on a 4-core
 machine, software WebGL, other renders running beside it; build time is
 `car.stats.buildMs`: everything from `createCar()` to the returned handle,
 shader compilation not included):
@@ -358,6 +372,17 @@ them), the tyres' marking, the wheels' clear coat and turned faces.
 
 Most visible first:
 
+- **NaN in the probe at night** comes from the road (`assets/world/road.js`,
+  the bump's gradient divides by `sign(det)`); the car is guarded against it,
+  but the road's reflection in the paint is lost where it happens.
+- **Pink on the boot lid under lit red start lamps** (seen when the car stood
+  right under the gantry): the lamps' radiance (about 45 times white by day) is
+  spread by the paint's rough metal layer into a broad highlight. Energy-
+  correct for that radiance; switching the lamps off changed the lid by 3 % in
+  the grid view. Seen from above, the glass roof shows each lamp as a small
+  crisp red dot, as it should.
+- **Wheels at speed** are an even grey disc (the blur shells' average); the
+  brake discs are plain where the car's are drilled.
 - **The mirror image is only as sharp as the probe.** With the run's 256
   cube the flat of a door or the bonnet shows the wood as soft shapes; see
   the table above for what the title orbit should use.
