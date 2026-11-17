@@ -47,7 +47,7 @@ function corner(spec) {
     /** Anti-roll bar as a force per metre of difference between the two wheels of the axle. */
     antiRoll: (spec.front ? TUNE.antiRoll.front : TUNE.antiRoll.rear) / (track * track),
     inertia: spec.front ? 1.5 : 1.7, // kg·m², wheel, tyre, disc and half shaft
-    /** Front tyres are 225 wide, rear 245: a little more grip at the back. */
+    /** Front tyres are 225 wide, rear 255: a little more grip at the back. */
     grip: spec.front ? 1 : 1.03,
     /**
      * How late the sideways force peaks, against the tyre's own figure. The front axle gives (steering, bushes) and
@@ -247,12 +247,22 @@ export const CAR = {
     /** The front tyres' own peak (rad): the steering into the bend that counts as all of it; and how much of it says the slide is wanted. */
     frontSlip: 0.15,
     intoFull: 0.2,
-    /** s for "the driver is steering into the bend" to come and to go: a slide is wanted that long after the steering is let go. */
+    /** s for "the driver is steering into the bend" to come and to go: a slide is wanted that long after the steering is let go (so a key tapped to hold a line keeps it). */
     stayRise: 0.1,
-    stayFall: 0.5,
+    stayFall: 0.9,
+    stayAgainst: 2, // and this many times faster again with the steering turned against the slide
+    lockSpare: 0.03, // rad of steering lock a held slide leaves in hand
+    /**
+     * A slide held on the throttle loses no more than `lose` and gains no more than `gain` (m/s²); with the
+     * steering hard over (beyond hardFrom of the front tyres' peak) up to `loseHard`, and it gains nothing.
+     */
+    lose: 0.8,
+    gain: 0.2,
+    loseHard: 3.5,
+    hardFrom: 0.6,
     /** The body is turned towards the angle asked for at `hold` per rad; a slide may grow at `damp` and come back at `dampClose` per rad/s. */
-    hold: 7,
-    damp: 3.5,
+    hold: 12,
+    damp: 4.5,
     dampClose: 11,
     /** The most the hand turns the car: letting the tail out, bringing it back, and catching it (rad/s²). */
     most: 5,
@@ -268,21 +278,19 @@ export const CAR = {
     snapMemory: 1.2,
     snapDamp: 14,
     /**
-     * Asking for a slide: a lift (the throttle dropped by 1 / liftGain against its mean over liftMemory s) or the
-     * brake (beyond kickBrake, for its first dabTime s) while cornering beyond kickG (fully kickSpan above) with
-     * the steering hard over: the front wheels turned beyond kickInto of the slip their grip peaks at (fully
-     * kickIntoSpan beyond), which is more than a tidy line ever asks for; or the handbrake. The kick fades over
-     * kickTime s.
+     * Asking for a slide: off the throttle (below kickLift of it) or on the brake (fully from kickBrake) while
+     * cornering beyond kickG (fully kickSpan above) with the steering hard over: the front wheels turned beyond
+     * kickInto of the slip their grip peaks at (fully kickIntoSpan beyond); or the handbrake. Once the tail is out
+     * the kick fades over kickTime s: the slide then lives on the throttle.
      */
-    liftGain: 3,
-    liftMemory: 0.5,
-    kickBrake: 0.15,
-    dabTime: 0.6,
+    kickLift: 0.25,
+    kickBrake: 0.3,
     kickG: 0.5,
     kickSpan: 0.3,
-    kickInto: 0.7,
-    kickIntoSpan: 0.25,
+    kickInto: 0.5,
+    kickIntoSpan: 0.2,
     kickTime: 0.8,
+    kickHold: 14, // rad/s² per rad: how much more briskly a kick lets the tail out than the throttle does
     /** m/s above which a level's slide angle narrows in proportion to the speed. */
     slipSpeed: 35,
     /** The most wheelspin (slip ratio) the traction control adds in a slide, however far sideways. */

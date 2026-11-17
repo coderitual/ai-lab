@@ -249,7 +249,7 @@ export function driftLaps(track, device, drifts, { level = ASSISTS.levels[ASSIST
 
 /** The three bends the slides are promised in (pieces of the layout), each with a way of throwing the car in. */
 export const BENDS = [
-  { id: 'sweep', start: 'brake', lead: 30 },
-  { id: 'carousel', start: 'handbrake', lead: 25 },
-  { id: 'back', start: 'lift', lead: 30 },
+  { id: 'sweep', start: 'brake', lead: 0 },
+  { id: 'carousel', start: 'handbrake', lead: 0 },
+  { id: 'back', start: 'lift', lead: 0 },
 ];

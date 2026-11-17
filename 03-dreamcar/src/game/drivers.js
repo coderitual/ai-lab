@@ -119,9 +119,10 @@ export class PlayerDriver {
     const travel = vehicle.frontAngle || 0; // rad, + = the front of the car is going to the left of where it points
     const caught = help * sliding * travel;
     // the driver's own steering has the lock for the speed into the bend; the other way, whatever of the opposite
-    // lock the help leaves to them, and of the lock for the speed beyond it only what the help does not already do
-    // (a key pressed against a slide the help has caught says no more than letting go does: it never doubles it)
-    const counter = base * (1 - help * sliding) + (1 - help) * sliding * Math.abs(travel);
+    // lock the help leaves to them, and beyond where the car is going only a part of the lock for the speed (the
+    // help has already caught the slide: steering against it as well asks the car to straighten sooner, no more)
+    const beyond = HANDS[this.device].counter;
+    const counter = base * (1 - help * sliding * (1 - beyond)) + (1 - help) * sliding * Math.abs(travel);
     // (into the bend, measured from where the car is going, the lock that matters is the front tyres' own peak)
     const inward = base + (HANDS.slideLock - base) * help * sliding;
     const roomLeft = travel > 0 ? counter : inward;

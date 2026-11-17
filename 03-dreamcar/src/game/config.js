@@ -76,8 +76,7 @@ export const HUD = {
  * hidden hand: with it a slide can be asked for (handbrake, a lift or a dab of the brake while cornering hard, power
  * in a low gear), holds on the throttle at up to `slip` rad for as long as the driver steers into the bend, comes
  * back when the steering is let go, and is caught beyond that angle; `liftKick`, `brakeKick`, `handKick`: how much
- * of `slip` each way of asking lets the tail out by itself (0..1); `relief`: the share of the speed a slide scrubs
- * off that is given back while the throttle is open; `tcSlip`: the wheelspin (slip ratio) the traction control
+ * of `slip` each way of asking lets the tail out by itself (0..1); `tcSlip`: the wheelspin (slip ratio) the traction control
  * allows; `spin`: what it adds in a slide, per unit of the tangent of the slide's angle (about 1 lets the rear
  * tyres push the car along as hard as they hold it across).
  * For the hands: `catch`, per device, the share of the opposite lock that is put on for the driver in a slide
@@ -86,9 +85,9 @@ export const HUD = {
 export const ASSISTS = {
   default: 'full',
   levels: {
-    full: { name: 'Full', abs: true, tc: true, esc: true, hold: 1, slip: 0.3, liftKick: 0.45, brakeKick: 0.6, handKick: 1, relief: 0.5, tcSlip: 0.12, spin: 1.1, catch: { keys: 1, thumb: 1, pad: 0.85 } },
-    sport: { name: 'Sport', abs: true, tc: true, esc: true, hold: 1, slip: 0.7, liftKick: 0.6, brakeKick: 0.75, handKick: 1, relief: 0.5, tcSlip: 0.2, spin: 1.2, catch: { keys: 1, thumb: 1, pad: 0.5 } },
-    off: { name: 'Off', abs: true, tc: false, esc: false, hold: 0, slip: 0, liftKick: 0, brakeKick: 0, handKick: 0, relief: 0, tcSlip: null, spin: 0, catch: { keys: 0, thumb: 0, pad: 0 } },
+    full: { name: 'Full', abs: true, tc: true, esc: true, hold: 1, slip: 0.27, liftKick: 0.45, brakeKick: 0.6, handKick: 1, tcSlip: 0.12, spin: 1.1, catch: { keys: 1, thumb: 1, pad: 1 } },
+    sport: { name: 'Sport', abs: true, tc: true, esc: true, hold: 1, slip: 0.7, liftKick: 0.6, brakeKick: 0.75, handKick: 1, tcSlip: 0.2, spin: 1.2, catch: { keys: 1, thumb: 1, pad: 1 } },
+    off: { name: 'Off', abs: true, tc: false, esc: false, hold: 0, slip: 0, liftKick: 0, brakeKick: 0, handKick: 0, tcSlip: null, spin: 0, catch: { keys: 0, thumb: 0, pad: 0 } },
   },
 };
 
@@ -110,7 +109,7 @@ export const HANDS = {
      * A steering key winds the wheel to the lock for the speed in `on` s and lets it run back in `off` s; pressed
      * against the way the wheel is turned it works `reverse` times as fast; the hands follow with `lag` s.
      */
-    on: [0.13, 0.26],
+    on: [0.13, 0.24],
     off: [0.1, 0.16],
     reverse: 2.5,
     lag: 0.04,
@@ -120,11 +119,13 @@ export const HANDS = {
      */
     throttle: { tap: 0.6, rise: 0.05, hold: 0.25, off: 0.06 },
     brake: { tap: 0.5, rise: 0.05, hold: 0.25, off: 0.07 },
+    /** In a slide the help has caught, steering against it turns the wheels this share of the lock for the speed beyond where the car is going. */
+    counter: 0.5,
   },
-  /** A stick: the power added to its curve (finer near the centre), and its smoothing (s). */
-  pad: { expo: [0, 0.5], lag: [0.02, 0.09] },
+  /** A stick: the power added to its curve (finer near the centre), its smoothing (s), and `counter` as for keys. */
+  pad: { expo: [0, 0.5], lag: [0.02, 0.09], counter: 0.6 },
   /** A thumb on the glass: the same. */
-  thumb: { expo: [0, 0.4], lag: [0.03, 0.1] },
+  thumb: { expo: [0, 0.4], lag: [0.03, 0.1], counter: 0.5 },
 };
 
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */

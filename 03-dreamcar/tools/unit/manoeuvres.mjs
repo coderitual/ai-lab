@@ -6,6 +6,7 @@
 // the body a velocity to start a manoeuvre at speed or to kick the springs.
 
 import { AutoDriver, PlayerDriver, analogFor, steerLimit } from '../../src/game/drivers.js';
+import { HANDS } from '../../src/game/config.js';
 import { Vehicle } from '../../src/game/vehicle/Vehicle.js';
 import { CAR } from '../../src/game/vehicle/params.js';
 import { createCurve, secant } from '../../src/game/vehicle/tyre.js';
@@ -591,7 +592,7 @@ export function characteristicSpeed(params, speed = 30) {
   const angle = 0.3 / speed;
   c.steer = -angle / car.params.steering.lock;
   hold(car, speed, 4, c);
-  const gain = yawRate(car) / angle;
+  const gain = yawRate(car) / (angle * (1 - car.rearShare(speed))); // (per radian of the fronts' angle less the rear wheels' share)
   return speed / Math.sqrt(speed / (car.params.wheelbase * gain) - 1);
 }
 
@@ -772,6 +773,22 @@ export const HUMAN = {
   frontG: 0.62,
   /** How much of the racing line's offset from the middle of the road a person keeps to while sliding. */
   slideLine: 0.6,
+  /** In a slide: below this share of the front grip the person dabs the steering (to `dab`) to keep the slide lit, and below `against` steers against it. */
+  keepAlive: 0.3,
+  dab: 0.3,
+  against: -0.5,
+  /** In a slide the person corrects their steering by what the car is doing (per g of error, per s), and arrives at a bend to be slid at this share of the tidy pace. */
+  trim: 1.5,
+  slidePace: 0.97,
+  /** In a slide they mean, the least steering into the bend they keep on (of a full input) while there is room inside. */
+  keepIn: 0.25,
+  /** Throwing the car in: the steering goes hard over this long (s) before the lift, the brake or the handbrake. */
+  turnIn: 0.2,
+  /** A slide the person did not ask for, beyond this angle (rad): they lift. */
+  unmeant: 0.2,
+  /** In a slide the person steers by the road over this many seconds of travel ahead, and lets the slide go this many seconds before the bend ends. */
+  slidePreview: 0.9,
+  letGo: 1.0,
 };
 
 const frontCurve = createCurve(CAR.tyre.shapeY, CAR.tyre.curvatureY);
@@ -800,6 +817,8 @@ function slipFor(y) {
  */
 export function humanDriver(track, device = 'thumb', params = CAR, human = HUMAN, drifts = null) {
   const auto = new AutoDriver(track, { pace: human.pace ?? 1, params });
+  // (a bend to be slid through is arrived at a little slower than the tidy line would take it: the slide needs the room)
+  const slow = drifts && drifts.length ? new AutoDriver(track, { pace: (human.pace ?? 1) * human.slidePace, params }) : auto;
   const input = fakeInput();
   const player = new PlayerDriver(input);
   const wish = controls();
@@ -809,7 +828,7 @@ export function humanDriver(track, device = 'thumb', params = CAR, human = HUMAN
   const dev = human[device];
   const zones = (drifts || []).map((d) => ({ lead: 25, start: 'handbrake', ...d, s0: track.at(d.id, 0), s1: track.at(d.id, 1), state: 'before', t0: 0 }));
   for (const z of zones) z.way = Math.sign(track.curvature[Math.floor(track.wrap((z.s0 + z.s1) / 2) / track.ds) % n]) || 1; // + = a left-hander
-  let at = 0, t = 0, pos = 0, key = 0, held = 1;
+  let at = 0, t = 0, pos = 0, key = 0, held = 1, trim = 0, lastGoing = 0;
   let ghost = null;
   const me = {
     player, input, zones, device,
@@ -824,18 +843,32 @@ export function humanDriver(track, device = 'thumb', params = CAR, human = HUMAN
       ghost.yaw = car.yaw + car.angularVelocity.y * ahead;
       ghost.s = car.s + car.speed * ahead;
       ghost.lat = car.lat;
-      auto.drive(ghost, dt, wish); // (its pedals are the person's judgement of speed; its steering is not used)
+      // how fast: the autopilot's plan for where the car will be in a moment, held with the pedals as it does
+      const soon = Math.floor(track.wrap(ghost.s + car.speed * 0.12) / track.ds) % n;
+      let plan = auto;
+      for (const z of zones) if (track.delta(car.s, z.s0) < z.lead + 250 && track.delta(car.s, z.s1) > 0) plan = slow;
+      const error = plan.speed[soon] - car.speed;
+      const planned = plan.accel[soon];
+      wish.throttle = wish.brake = 0;
+      if (error < -0.3 || planned < -1.5) {
+        wish.brake = Math.max(0, Math.min(1, Math.max(0, -planned) / 10.5 + Math.max(0, -error) * 0.22));
+        if (error > 1) wish.brake = 0;
+      }
+      if (wish.brake === 0) wish.throttle = Math.max(0, Math.min(1, error * 0.6 + (planned > 0.5 ? 0.5 : 0.12) + 0.004 * car.speed));
       const v = Math.max(3, Math.hypot(car.velocity.x, car.velocity.z));
       const going = Math.atan2(car.velocity.x, car.velocity.z) + car.angularVelocity.y * ahead; // the way the car is travelling
       const sin = Math.sin(going), cos = Math.cos(going);
       const sliding = car.drift || 0;
-      // aim at the line a little way ahead (in a slide, at a line nearer the middle: the car needs the room)
+      // the sideways g the car is making now (+ = to the left), as the person feels and sees it
+      let turned = Math.atan2(car.velocity.x, car.velocity.z) - lastGoing;
+      turned -= Math.round(turned / (2 * Math.PI)) * 2 * Math.PI;
+      lastGoing = Math.atan2(car.velocity.x, car.velocity.z);
+      const making = ((turned / dt) * v) / G;
+      // aim at the line a little way ahead (in a slide, further ahead and at a line nearer the middle: the car needs the room)
       const reach = Math.max(7, Math.min(28, 5 + 0.32 * v));
       const f = track.wrap(ghost.s + reach) / track.ds;
       const a = Math.floor(f) % n, b = (a + 1) % n, u = f - Math.floor(f);
-      const keep = 1 - (1 - human.slideLine) * (me.zone ? sliding : 0);
-      const ax = track.px[a] + track.lx[a] * auto.lat[a] * keep, az = track.pz[a] + track.lz[a] * auto.lat[a] * keep;
-      const bx = track.px[b] + track.lx[b] * auto.lat[b] * keep, bz = track.pz[b] + track.lz[b] * auto.lat[b] * keep;
+      const ax = auto.x[a], az = auto.z[a], bx = auto.x[b], bz = auto.z[b];
       const dx = ax + (bx - ax) * u - ghost.position.x, dz = az + (bz - az) * u - ghost.position.z;
       const left = dx * cos - dz * sin;
       const bend = (2 * left) / Math.max(dx * dx + dz * dz, 1); // the curvature of the path that gets there (1/m, + = left)
@@ -845,38 +878,62 @@ export function humanDriver(track, device = 'thumb', params = CAR, human = HUMAN
       const angle = (Math.atan(p.wheelbase * bend) * (1 + ratio * ratio)) / (1 - car.rearShare(v));
       let share = Math.max(-1, Math.min(1, angle / Math.max(0.005, steerLimit(car)))); // + = left
       let throttle = wish.throttle, brake = wish.brake, handbrake = 0;
-      if (sliding > 0 && me.zone) {
-        // in a slide meant: the steering into the bend whose front grip, on top of what the tail gives, makes that bend
-        const side = car.slideAngle < 0 ? -1 : 1; // + = the tail is out to the left (a right-hander)
-        const wanted = (-side * bend * v * v) / G; // g towards the inside
-        const into = slipFor((wanted - human.rearG) / human.frontG);
-        share += (-side * into - share) * sliding;
-      }
-
-      // the bends to be taken sideways
+      // the bends to be taken sideways: where the person is with each
       me.zone = null;
+      let letGo = false;
       for (const z of zones) {
         const before = track.delta(car.s, z.s0);
+        const left_ = track.delta(car.s, z.s1); // m of the bend still to come
         if (z.state === 'before' && before < z.lead && before > -10) {
           z.state = 'kick';
           z.t0 = t;
-        } else if (z.state !== 'before' && track.delta(car.s, z.s1) < -30) z.state = 'before';
+        } else if (z.state !== 'before' && left_ < -60) z.state = 'before';
         if (z.state === 'kick') {
+          me.zone = z;
           const since = t - z.t0;
-          const length = z.start === 'handbrake' ? 0.3 : z.start === 'power' ? 1 : 0.45;
-          share = z.way; // hard over, into the bend
-          throttle = z.start === 'power' ? 1 : 0;
+          const length = z.start === 'handbrake' ? human.turnIn + 0.3 : 1.1;
+          if (since >= length || (since > human.turnIn && sliding > 0.6)) z.state = 'hold';
+        } else if (z.state === 'hold') {
+          me.zone = z;
+          // (the bend is nearly done: let the slide go in time for the car to be straight where the road is)
+          if (left_ < v * human.letGo) z.state = 'exit';
+        } else if (z.state === 'exit') {
+          me.zone = z;
+          letGo = true;
+          if (sliding < 0.2 || left_ < -40) z.state = 'done';
+        }
+      }
+      const z = me.zone;
+      if (z && z.state === 'kick') {
+        // thrown in: the steering hard over into the bend, and a moment later (the car turning) the kick
+        const kicking = t - z.t0 > human.turnIn;
+        share = z.way;
+        if (z.start === 'power') {
+          throttle = 1;
+          brake = 0;
+        } else if (kicking) {
+          throttle = 0;
           brake = z.start === 'brake' ? 0.7 : 0;
           handbrake = z.start === 'handbrake' ? 1 : 0;
-          if (since >= length || (z.start === 'power' && sliding > 0.6)) z.state = 'hold';
         }
-        if (z.state === 'hold' && track.delta(car.s, z.s1) > 0) {
-          me.zone = z;
-          // keep it lit: the throttle down unless the car is plainly too fast for what is coming
-          if (brake < 0.3) {
-            throttle = 1;
-            brake = 0;
-          }
+      } else if (z) {
+        // In the slide the person steers as ever, at the line ahead (steering into the bend tightens the line and
+        // holds the slide, easing it widens the line, letting go ends the slide), and keeps the throttle down
+        // unless the car is plainly too fast for what is coming. Near the end of the bend they let the slide go.
+        // (someone who means to slide keeps a little steering in for as long as the road leaves room inside)
+        const room = track.halfWidth - 1.6 - car.lat * z.way; // m between the car and the inside edge of the pavement
+        if (!letGo && sliding > 0.3 && room > 0) share = z.way * Math.max(share * z.way, human.keepIn * Math.min(1, room / 1.5));
+        if (letGo) share = z.way * Math.min(0, share * z.way);
+        if (sliding > 0.3 && error > -3) {
+          throttle = 1;
+          brake = 0;
+        }
+      } else {
+        trim = 0;
+        // a slide that was not meant: a person lifts and eases the steering, and the car comes back
+        if (sliding > 0.5 && Math.abs(car.slideAngle) > human.unmeant) {
+          throttle = 0;
+          share *= 0.3;
         }
       }
 
