@@ -61,7 +61,7 @@ import { ROW_STEP, createTerrain } from './terrain.js';
  *   car is in the tunnel. A view drawn without it has last view's shadows.
  * @property {(n: number) => void} setStartLights the gantry's countdown lamps, 0..5 lit
  * @property {THREE.Object3D[]} probeHidden what to hide while a reflection probe is drawn
- * @property {number} wetness 0..1 road wetness (a hook for weather)
+ * @property {number} wetness 0..1 road wetness: the time of day's (lighting.js), unless ?wet= or a setter overrides it
  * @property {import('./atmosphere.js').Atmosphere} atmosphere the haze; `atmosphere.patch(material)` makes a
  *   material of one's own fade into it
  * @property {() => void} refresh apply the numbers of lighting.js again after they were changed by hand
@@ -124,6 +124,12 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
+  /** A wetness given by hand (?wet=, or world.wetness set), which the time of day no longer changes. */
+  let wetOverride = params.wet;
+  const setWetness = (value) => {
+    wetness = Math.min(1, Math.max(0, value));
+    road.setWetness(wetness);
+  };
   let startLights = 0;
   /** The Track sample each camera's car was last found at: the next search starts there. */
   const hints = new WeakMap();
@@ -155,6 +161,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       atmosphere.setTime(time);
       sky.setTime(time);
       selectBake(name);
+      // the road's wetness follows the time of day unless ?wet= (or whoever set world.wetness) says otherwise
+      if (wetOverride == null) setWetness(time.wetness ?? 0);
 
       const { ambient, sky: dome } = time;
       const above = ambient.sky.map((v) => v * ambient.intensity);
@@ -210,8 +218,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       return wetness;
     },
     set wetness(value) {
-      wetness = Math.min(1, Math.max(0, value));
-      road.setWetness(wetness);
+      wetOverride = value;
+      setWetness(value);
     },
 
     refresh() {
@@ -242,7 +250,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     },
   };
 
-  world.wetness = params.wet;
+  if (wetOverride != null) setWetness(wetOverride);
   environment.build();
   lap('environment');
   world.setTime(params.time);

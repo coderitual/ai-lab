@@ -42,6 +42,7 @@
 //
 // The world (asset=world). The camera does not circle anything: it stands on the real road.
 //   s, lat         where: track distance from the start line and metres left of the centre line (default 0, 0)
+//   clat           the camera's own lat, if not lat (a car at lat seen from beside its track)
 //   h              the camera's height above the road (default 1.45, the chase camera's)
 //   look, pitch    degrees it is turned off the road's direction (positive: to the left) and above the horizontal
 //   fov            the lens, top to bottom (default 50)
@@ -199,6 +200,8 @@ const ASSETS = {
 const road = {
   s: given.s ?? 0,
   lat: number('lat', 0),
+  /** The camera's own lateral place (metres left of the centre line), if not `lat` (look lane: the B-match view). */
+  clat: number('clat', null),
   // a car or the cards are looked at from where the chase camera would be
   back: number('back', query.get('car') === '1' || query.has('card') ? 5.7 : 0),
   h: number('h', 1.45),
