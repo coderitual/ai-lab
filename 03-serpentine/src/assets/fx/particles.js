@@ -18,10 +18,10 @@ import * as THREE from 'three';
 
 /** What each kind does: drag (1/s), fall (m/s2, + = down), rise (m/s, buoyancy), opacity, albedo, streak. */
 export const KINDS = {
-  smoke: { id: 0, drag: 1.6, fall: 0, rise: 0.55, opacity: 0.32, color: [0.82, 0.82, 0.84] },
+  smoke: { id: 0, drag: 1.8, fall: 0, rise: 0.18, opacity: 0.22, color: [0.82, 0.82, 0.84] },
   dust: { id: 1, drag: 2.2, fall: 0.25, rise: 0.15, opacity: 0.4, color: [0.55, 0.47, 0.36] },
   stone: { id: 2, drag: 0.4, fall: 9.81, rise: 0, opacity: 1, color: [0.18, 0.16, 0.14] },
-  spray: { id: 3, drag: 2.4, fall: 0.5, rise: 0.12, opacity: 0.3, color: [0.85, 0.87, 0.9] },
+  spray: { id: 3, drag: 2.6, fall: 0.6, rise: 0.04, opacity: 0.16, color: [0.85, 0.87, 0.9] },
   spark: { id: 4, drag: 1.2, fall: 9.81, rise: 0, opacity: 1, color: [1.0, 0.55, 0.18] },
 };
 const KIND_LIST = Object.values(KINDS);
