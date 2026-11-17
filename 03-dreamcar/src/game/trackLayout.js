@@ -132,10 +132,10 @@ const SEGMENTS = [
   { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'highRun', R: 'rock', runoff: 'L' },
 
   // The crest: up over the top in the open, the lake far below.
-  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.8, 3]], L: 'open', R: 'open' },
+  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'open', R: 'open' },
 
   // The plunge: 8 per cent down into a compression.
-  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.12, -8], [0.72, -8]], L: 'highDown', R: 'highUp' },
+  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'highDown', R: 'highUp' },
 
   // The ledge: fast downhill sweepers, rock on one side and a rail and the drop on the other.
   { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 10, g: -7.5, gk: [[0.3, -7.5]], L: 'rock', R: 'midRun', runoff: 'R' },

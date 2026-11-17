@@ -646,6 +646,7 @@ export function railTouch(kmh, angle, params, kind = EDGE.RAIL) {
 export function lapDriver(track, kind, pace = 0.9, bias = 0, params = CAR) {
   const auto = new AutoDriver(track, { pace, bias, params });
   if (kind === 'auto') return auto;
+  if (kind === 'hamfist') return hamfistDriver(track, params);
   const input = fakeInput();
   const player = new PlayerDriver(input);
   const probe = new PlayerDriver(fakeInput());
@@ -683,6 +684,71 @@ export function lapDriver(track, kind, pace = 0.9, bias = 0, params = CAR) {
   };
 }
 
+/**
+ * Full key lock held at a speed (km/h), throttle key held too, then let go: a ham-fisted keyboard driver at speed.
+ * How far the car slid (body slip, degrees), whether it spun (turned more than 120 degrees relative to its path), and
+ * the speed it kept.
+ */
+export function fullLockAt(kmh, seconds = 3, params, way = 1) {
+  const input = fakeInput();
+  const driver = new PlayerDriver(input);
+  const car = makeCar(params);
+  const c = cruise(car, kmh / KMH);
+  let mostSlip = 0, spun = false;
+  const heading0 = Math.atan2(car.velocity.x, car.velocity.z);
+  let turned = 0, lastHeading = heading0;
+  for (let i = 0; i < (seconds + 2) * 120; i++) {
+    Object.assign(input.state, { analog: false, steer: i < seconds * 120 ? way : 0, throttle: 1, brake: 0 });
+    driver.drive(car, DT, c);
+    car.step(DT, c);
+    if (car.speed > 5) mostSlip = Math.max(mostSlip, Math.abs(bodySlip(car)));
+    const h = Math.atan2(car.velocity.x, car.velocity.z);
+    let d = h - lastHeading;
+    d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI;
+    turned += d;
+    lastHeading = h;
+    if (mostSlip > 120) spun = true;
+  }
+  return { mostSlip, spun, kmh: car.speed * KMH, turned: turned * DEG };
+}
+
+/**
+ * A ham-fisted keyboard driver: the throttle key always down unless the autopilot would brake, and then the brake
+ * key instead (never a lift, never a feathered pedal); the steering keys pressed and let go to follow where the
+ * autopilot points, but sloppily: twice the slack of the 'keys' driver and no key changed more often than a hand can
+ * (HAND seconds).
+ */
+const HAND = 0.12;
+export function hamfistDriver(track, params = CAR) {
+  const auto = new AutoDriver(track, { pace: 1, params });
+  const input = fakeInput();
+  const player = new PlayerDriver(input);
+  const wish = controls();
+  let key = 0;
+  let held = 0;
+  return {
+    drive(car, dt, out) {
+      auto.drive(car, dt, wish);
+      const lock = car.params.steering.lock;
+      const angle = -wish.steer * lock; // + = left
+      const now = -(out.steer || 0) * lock;
+      const band = 0.008 + 0.2 * Math.abs(angle);
+      let want = key;
+      if (angle - now > band) want = -1;
+      else if (angle - now < -band) want = 1;
+      else if (Math.abs(angle) < 0.01 || Math.sign(-key) !== Math.sign(angle)) want = 0;
+      held += dt;
+      if (want !== key && held >= HAND) {
+        key = want;
+        held = 0;
+      }
+      const brake = wish.brake > 0.15;
+      Object.assign(input.state, { analog: false, steer: key, throttle: brake ? 0 : 1, brake: brake ? 1 : 0, handbrake: 0 });
+      return player.drive(car, dt, out);
+    },
+  };
+}
+
 /** Laps from the grid: the flying lap times (the run to the line and the first lap from rest are left out) and what happened. */
 export function laps(track, kind, { pace = 0.9, count = 2, bias = 0, slot = 0, params = CAR } = {}) {
   const driver = lapDriver(track, kind, pace, bias, params);
@@ -690,7 +756,7 @@ export function laps(track, kind, { pace = 0.9, count = 2, bias = 0, slot = 0, p
   car.reset(track.grid(slot, {}));
   const c = controls();
   const times = [];
-  let t = 0, started = 0, last = car.s, impacts = 0, off = -Infinity, slip = 0, escTime = 0, finite = true;
+  let t = 0, started = 0, last = car.s, impacts = 0, off = -Infinity, slip = 0, escTime = 0, finite = true, minLoad = Infinity, minLoadAt = 0;
   while (times.length < count + 2 && t < 400 * (count + 2)) {
     driver.drive(car, DT, c);
     car.step(DT, c);
@@ -702,6 +768,13 @@ export function laps(track, kind, { pace = 0.9, count = 2, bias = 0, slot = 0, p
       off = Math.max(off, Math.abs(car.lat) + car.params.box.halfWidth - track.halfWidth);
       if (car.speed > 8) slip = Math.max(slip, Math.abs(bodySlip(car)));
       if (car.assists.esc > 0.1) escTime += DT;
+      for (const w of car.wheels) {
+        const f = w.load / w._spec.staticLoad;
+        if (f < minLoad) {
+          minLoad = f;
+          minLoadAt = car.s;
+        }
+      }
     }
     if (car.s < last - track.length / 2) {
       times.push(t - started);
@@ -710,5 +783,5 @@ export function laps(track, kind, { pace = 0.9, count = 2, bias = 0, slot = 0, p
     last = car.s;
   }
   const flying = times.slice(2);
-  return { times: flying, best: Math.min(...flying), impacts, off, slip, escPerLap: escTime / Math.max(1, times.length - 1), finite };
+  return { times: flying, best: Math.min(...flying), impacts, off, slip, escPerLap: escTime / Math.max(1, times.length - 1), finite, minLoad, minLoadAt };
 }

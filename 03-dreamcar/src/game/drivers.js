@@ -17,11 +17,11 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /** Lateral acceleration (m/s²) a full steering input may ask for, by the path alone. */
-const STEER_GRIP = 9.3;
+const STEER_GRIP = 12.3;
 /**
  * What full lock adds to the angle the path needs (rad at the road wheels), at low and at high speed: the front
  * tyres' slip angle and the car's understeer at the limit. With it a full input puts the car at the peak of its
- * cornering (0.97 to 0.99 g on dry asphalt, measured in tools/handling.mjs) and not past it, where the front axle
+ * cornering (about 1.25 g on dry asphalt, measured in tools/handling.mjs) and not past it, where the front axle
  * has no more to give, the yaw is barely damped at speed and the car only plods wider.
  */
 const STEER_SLIP_SLOW = 0.08;
@@ -192,6 +192,23 @@ function racingLine(track, half) {
   return lat;
 }
 
+/** What the autopilot takes the car to have at full pace (m/s²): across, braking, and drive from the rear tyres. */
+const LATERAL = 11.2;
+const BRAKING = 11;
+const TRACTION = 7.5;
+/** Samples ahead over which a crest's speed is already kept. */
+const CREST_AHEAD = 50;
+/** How much of the banking's help the autopilot counts on. */
+const BANK_CREDIT = 0.5;
+
+/** The engine's most power (W), from its torque curve. */
+function peakPower(p) {
+  const t = p.engine.torque;
+  let most = 0;
+  for (let i = 0; i < t.length; i += 2) most = Math.max(most, (t[i + 1] * t[i] * Math.PI) / 30);
+  return most;
+}
+
 /** An autopilot. */
 export class AutoDriver {
   /**
@@ -235,11 +252,14 @@ export class AutoDriver {
     const { track, params: p } = this;
     const n = track.count;
     const grip2 = this.pace * this.pace;
-    const lateral = 9.0 * grip2; // m/s² across
-    const braking = 8.6 * grip2;
-    const traction = 5.6 * grip2;
+    const lateral = LATERAL * grip2; // m/s² across, on the level and with no help from the air
+    const braking = BRAKING * grip2;
+    const traction = TRACTION * grip2;
     const top = p.topSpeed * Math.min(1, 0.4 + 0.6 * this.pace) - 0.5;
-    const power = 0.86 * 190000 * p.gearbox.efficiency * Math.min(1, grip2 + 0.1);
+    const power = 0.86 * peakPower(p) * p.gearbox.efficiency * Math.min(1, grip2 + 0.1);
+    // the air presses the car down: grip grows with the square of the speed by this much per (m/s)²
+    const aero = (0.5 * p.aero.airDensity * (p.aero.downforceArea ?? 0)) / (p.mass * G);
+    const banking = track.bank || new Float64Array(n);
     const drag = (v) => (0.5 * p.aero.airDensity * p.aero.dragArea * v * v) / p.mass + 0.014 * G;
     const at = (i) => ((i % n) + n) % n;
     const bend = new Float64Array(n);
@@ -261,9 +281,27 @@ export class AutoDriver {
     for (let i = 0; i < n; i++) {
       // the worst of the bend just here, so that a kink is seen coming
       const k = Math.max(bend[at(i - 2)], bend[i], bend[at(i + 2)]);
-      const cornering = Math.sqrt(lateral / Math.max(1e-6, k + (lateral * crest[i]) / G));
-      const light = crest[i] > 1e-6 ? Math.sqrt((0.45 * G) / crest[i]) : Infinity; // keep half the weight on the wheels
-      v[i] = Math.min(top, cornering, light);
+      // a bend banked into by b allows v² k = (a + g tan b) / (1 - (a / g) tan b), a growing with the downforce
+      // (counted at BANK_CREDIT of its worth: the tyres lose grip as the banking loads them, and the line is not
+      // the centre line the banking was laid on)
+      const into = BANK_CREDIT * Math.tan(-Math.sign(track.curvature[i]) * banking[i]);
+      let cornering = Math.sqrt(lateral / Math.max(1e-6, k + (lateral * crest[i]) / G));
+      for (let it = 0; it < 3; it++) {
+        const a = lateral * (1 + aero * cornering * cornering);
+        const reach = (a + G * into) / Math.max(0.3, 1 - (a / G) * into);
+        cornering = Math.sqrt(reach / Math.max(1e-6, k + (a * crest[i]) / G));
+      }
+      v[i] = Math.min(top, cornering);
+    }
+    // over a crest keep about half the weight on the wheels, and be at that speed before it begins: braking on a
+    // crest unloads the rear tyres just when they are lightest
+    for (let i = 0; i < n; i++) {
+      let light = Infinity;
+      for (let j = 0; j <= CREST_AHEAD; j++) {
+        const c = crest[at(i + j)];
+        if (c > 1e-6) light = Math.min(light, Math.sqrt((0.45 * G) / c));
+      }
+      v[i] = Math.min(v[i], light);
     }
     const share = (speed, k, most) => most * Math.sqrt(Math.max(0.08, 1 - ((speed * speed * k) / lateral) ** 2));
     // backwards: no faster here than can be shed before what comes next

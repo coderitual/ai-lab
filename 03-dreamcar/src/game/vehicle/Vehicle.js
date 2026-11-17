@@ -115,6 +115,7 @@ export class Vehicle {
     this._massLat = 0.25 / (this._invMass + p.com.y * p.com.y * this._invIz);
     this._massLong = 0.25 / (this._invMass + p.com.y * p.com.y * this._invIx);
     this._dragK = 0.5 * p.aero.airDensity * p.aero.dragArea;
+    this._liftK = 0.5 * p.aero.airDensity * (p.aero.downforceArea ?? 0);
     // body axes in world space, refreshed from the quaternion
     this._lx = 1; this._ly = 0; this._lz = 0;
     this._ux = 0; this._uy = 1; this._uz = 0;
@@ -310,7 +311,7 @@ export class Vehicle {
     else {
       const e = a.esc;
       const ratio = vLong / e.characteristicSpeed;
-      const holds = (0.95 * p.gravity * this._grip) / vLong; // no more yaw than the road can hold
+      const holds = (e.holdG * p.gravity * this._grip) / vLong; // no more yaw than the road can hold (banking and the air help)
       // what the steering asks for, as the car would answer it: through the car's own understeer and with the lag
       // its yaw takes to build (a reference without the lag reads every quick release of a key as oversteer)
       const asked = clamp((vLong * steer) / (p.wheelbase * (1 + ratio * ratio)), -holds, holds);
@@ -450,7 +451,10 @@ export class Vehicle {
     }
     this._grip = grounded ? grip / grounded : 1;
 
-    let Fx = 0, Fy = -p.mass * p.gravity, Fz = 0;
+    // downforce, pressing the body onto its wheels at the centre of mass, in step with how many of them are on the
+    // road (a car that has left the ground is not sucked back down)
+    const down = this._liftK * (v.x * v.x + v.y * v.y + v.z * v.z) * grounded * 0.25;
+    let Fx = -this._ux * down, Fy = -p.mass * p.gravity - this._uy * down, Fz = -this._uz * down;
     let Tx = 0, Ty = 0, Tz = 0;
     for (let i = 0; i < 4; i++) {
       const w = wheels[i];
