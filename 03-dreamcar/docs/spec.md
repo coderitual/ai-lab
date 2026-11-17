@@ -69,7 +69,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | trackside boards | 11 runs, both walls of the straight included |
 | distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel |
 | marshal posts | 12 |
-| start gantry | across the line, feet at 11.5 m left and 12.4 m right of the centre line |
+| start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |
 | street lamps | 23, 9 m high, every 30.4 m on alternating sides along the whole straight |
 | tunnel lamps | 29 rows of two, every 12 m |
 | sector lines | s = 1881.8 m (37 %, just out of the tunnel) and 3420.0 m (67 %, the start of the ledge); the third is the line |

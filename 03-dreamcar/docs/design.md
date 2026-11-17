@@ -277,7 +277,7 @@ needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
 day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 78.8 s) and
-`?photo=d4` (the grid at golden hour, t 6.6 s, just after the lights go out: the lamps show green); a name
+`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green); a name
 brings its own moment of the autopilot's run and its time of day unless the
 address gives `t` or `time`, and also works on the handle
 (`__dreamcar.photo('d1')`). The camera moves with the car, so the engine's
