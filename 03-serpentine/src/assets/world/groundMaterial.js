@@ -85,6 +85,8 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
     uDetailN: { value: detailNormal },
     uRockN: { value: rockNormal },
     uLarge: { value: large },
+    /** (look lane) the snow's albedo, times this: 1 by day; low at night, when the moonlit peaks read as dusk */
+    uSnowLight: { value: 1 },
   };
 
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
@@ -107,6 +109,10 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
   atmosphere.patch(material);
   return {
     material,
+    /** @param {{ name: string }} time */
+    setTime(time) {
+      uniforms.uSnowLight.value = time.name === 'night' ? 0.25 : 1;
+    },
     textures: [detail, detailNormal, rockNormal, large],
     dispose() {
       material.dispose();
@@ -120,6 +126,7 @@ uniform sampler2D uDetail;
 uniform sampler2D uDetailN;
 uniform sampler2D uRockN;
 uniform sampler2D uLarge;
+uniform float uSnowLight;
 varying vec2 vMask;
 varying vec3 vGroundPos;
 varying vec3 vGroundNormal;
@@ -163,7 +170,7 @@ vec3 gForestCol = mix( gFloor, gCanopy, smoothstep( 120.0, 400.0, gDist ) );
 vec3 gScreeCol = vec3( 0.17, 0.162, 0.145 ) * ( 0.6 + 0.8 * gDet.b );
 vec4 gDetRock = mix( vec4( 0.5 ), groundSample( uDetail, vGroundPos, gN, ${(DETAIL_SCALE * 2.7).toFixed(2)} ), 0.4 + 0.6 * gFade );
 vec3 gRockCol = mix( vec3( 0.15, 0.14, 0.125 ), vec3( 0.12, 0.118, 0.112 ), gLarge.g ) * ( 0.62 + 0.45 * gDetRock.g + 0.2 * gDet.g );
-vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r );
+vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 
 vec3 gAlbedo = gGrass;
 gAlbedo = mix( gAlbedo, gForestCol, gForest );

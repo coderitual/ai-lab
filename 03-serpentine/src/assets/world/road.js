@@ -95,6 +95,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, mi
     const road = new Float32Array(count * 3);
     const along = new Float32Array(count * 3);
     const bake = new Float32Array(count * 3);
+    const open = new Float32Array(count);
     for (let r = 0; r < list.length; r++) {
       const i = list[r] % n;
       const s = list[r] * ds;
@@ -115,6 +116,8 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, mi
         road[v * 3 + 2] = lats[k] > 0 ? (pavedL ? 1 : 0) : pavedR ? 1 : 0;
         frame.tan.toArray(along, v * 3);
         terrain.bakeAt(pt.x, pt.z, bake, v * 3);
+        // how much sky is over it: rain does not reach far into the tunnel
+        open[v] = track.sky ? track.sky[i] : 1;
       }
     }
     const index = [];
@@ -130,6 +133,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, mi
     geometry.setAttribute('aRoad', new THREE.BufferAttribute(road, 3));
     geometry.setAttribute('aAlong', new THREE.BufferAttribute(along, 3));
     geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+    geometry.setAttribute('aOpen', new THREE.BufferAttribute(open, 1));
     geometry.setIndex(index);
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
@@ -226,11 +230,11 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, mi
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute vec3 aRoad;\nattribute vec3 aAlong;\nvarying vec3 vRoad;\nvarying vec3 vRoadWorld;\nvarying vec3 vAlong;\nvarying vec3 vRoadNormal;',
+        '#include <common>\nattribute vec3 aRoad;\nattribute vec3 aAlong;\nattribute float aOpen;\nvarying float vOpen;\nvarying float vRoadEye;\nvarying vec3 vRoad;\nvarying vec3 vRoadWorld;\nvarying vec3 vAlong;\nvarying vec3 vRoadNormal;',
       )
       .replace(
         '#include <begin_vertex>',
-        '#include <begin_vertex>\nvRoad = aRoad;\nvAlong = aAlong;\nvRoadWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\nvRoadNormal = normalize( mat3( modelMatrix ) * objectNormal );',
+        '#include <begin_vertex>\nvOpen = aOpen;\nvRoadEye = abs( abs( projectionMatrix[ 1 ][ 1 ] ) - 1.0 ) < 1.0e-3 && abs( abs( projectionMatrix[ 0 ][ 0 ] ) - 1.0 ) < 1.0e-3 ? 0.0 : 1.0;\nvRoad = aRoad;\nvAlong = aAlong;\nvRoadWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\nvRoadNormal = normalize( mat3( modelMatrix ) * objectNormal );',
       );
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${ASPHALT_PARS}`)
@@ -298,6 +302,9 @@ varying vec3 vRoad;
 varying vec3 vRoadWorld;
 varying vec3 vAlong;
 varying vec3 vRoadNormal;
+varying float vOpen;
+varying float vRoadEye; // 0 in a reflection probe's cube face (retro.js says why)
+float roadWet;
 #ifdef ROAD_MIRROR
 uniform sampler2D uMirrorTex;
 uniform mat4 uMirrorMatrix;
@@ -414,15 +421,17 @@ roadPaint *= smoothstep( 0.2, 0.42, rWear ) * ( 1.0 - 0.8 * rPatch );
 rCol = mix( rCol, vec3( 0.62, 0.62, 0.6 ) * ( 0.9 + 0.1 * rSpeck ), roadPaint );
 rRough = mix( rRough, 0.55, roadPaint );
 
+// ---- water (dry under the tunnel's roof, wet again towards its portals):
+roadWet = uWet * smoothstep( 0.05, 0.6, vOpen );
 // ---- water: the asphalt darkens and smooths, and water stands in the ruts and the low spots. The puddles are
 // broken: their rims follow the aggregate, so they read as patches of mirror among wet stone, not as a lake.
 float rLow = rBig.a * 0.62 + 0.18 * rBig2.a + 0.32 * rTracks * rOnRoad - 0.15 * roadGravel;
 float rRag = 0.1 * ( rAgg.g - 0.5 ) + 0.06 * ( rAgg2.r - 0.5 ) * roadFade;
-float rLevel = 0.93 - 0.42 * uWet;
-roadPuddle = smoothstep( rLevel, rLevel + 0.025, rLow + rRag ) * step( 0.02, uWet ) * ( 1.0 - 0.7 * roadPaint );
-rCol *= mix( 1.0, mix( 0.42, 0.8, roadPaint ), uWet );
+float rLevel = 0.93 - 0.42 * roadWet;
+roadPuddle = smoothstep( rLevel, rLevel + 0.025, rLow + rRag ) * step( 0.02, roadWet ) * ( 1.0 - 0.7 * roadPaint );
+rCol *= mix( 1.0, mix( 0.42, 0.8, roadPaint ), roadWet );
 // a wet film fills the texture: what was rough becomes a satin that smears reflections, the polished tracks glossy
-rRough = mix( rRough, 0.1 + 0.28 * rRough * rRough, uWet );
+rRough = mix( rRough, 0.1 + 0.28 * rRough * rRough, roadWet );
 rCol = mix( rCol, rCol * 0.6, roadPuddle );
 rRough = mix( rRough, 0.03, roadPuddle );
 
@@ -447,9 +456,10 @@ const ASPHALT_NORMAL = /* glsl */ `
 
 const ASPHALT_MIRROR = /* glsl */ `
 #ifdef ROAD_MIRROR
-if ( uMirrorOn > 0.5 ) {
+// (not in a reflection probe's faces: the mirror's picture belongs to the view's own eye)
+if ( uMirrorOn > 0.5 && vRoadEye > 0.5 ) {
   // how much of a mirror this point is: the puddles fully, the wet film by how wet and smooth, the gravel hardly
-  float mWet = clamp( roadPuddle + uWet * ( 1.0 - roadGravel * 0.8 ) * ( 1.15 - roadRoughness ), 0.0, 1.0 );
+  float mWet = clamp( roadPuddle + roadWet * ( 1.0 - roadGravel * 0.8 ) * ( 1.15 - roadRoughness ), 0.0, 1.0 );
   // only near the plane the mirror was drawn for
   float mOff = abs( dot( vRoadWorld, uMirrorPlane.xyz ) + uMirrorPlane.w );
   mWet *= 1.0 - smoothstep( 0.4, 2.5, mOff );
@@ -498,7 +508,7 @@ const ASPHALT_BEADS = /* glsl */ `
     float a = acos( clamp( dot( l, toEye ), -1.0, 1.0 ) );
     retro += e * exp( -a * a / 0.018 );
   }
-  totalEmissiveRadiance += roadPaint * 0.9 * retro * vec3( 1.0, 0.98, 0.93 );
+  totalEmissiveRadiance += roadPaint * 0.9 * retro * vRoadEye * vec3( 1.0, 0.98, 0.93 );
 
   // The head lamps' pool. Lit at a glancing angle, asphalt sends much of the light back the way it came (each stone
   // shades the next; its lit faces look back at the lamp): a driver sees the road ahead brighter than its cosine
@@ -523,6 +533,6 @@ const ASPHALT_BEADS = /* glsl */ `
     float back = exp( -pow( acos( clamp( dot( l, toEye ), -1.0, 1.0 ) ), 2.0 ) / 0.09 );
     pool += e * back;
   }
-  totalEmissiveRadiance += pool * diffuseColor.rgb * ( 0.6 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
+  totalEmissiveRadiance += vRoadEye * pool * diffuseColor.rgb * ( 0.6 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
 }
 `;

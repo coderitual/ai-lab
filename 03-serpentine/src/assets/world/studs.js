@@ -121,6 +121,7 @@ uniform vec3 uColors[3];
 varying vec3 vColor;
 ${RETRO_GLSL}
 void main() {
+  vRetroEye = RETRO_EYE_FROM_PROJECTION;
   vec4 w = modelMatrix * vec4(position, 1.0);
   vec4 v = viewMatrix * w;
   gl_Position = projectionMatrix * v;

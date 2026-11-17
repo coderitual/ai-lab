@@ -202,6 +202,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       far.setTime(time);
       structures.setTime(time);
       studs.setTime(time);
+      groundMaterial.setTime(time);
       return time;
     },
 

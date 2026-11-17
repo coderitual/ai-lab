@@ -497,7 +497,7 @@ void main() {
       const night = time.name === 'night';
       // (look lane) the far ranges by moonlight: snow under a three-quarter moon read as dusk at the night's exposure;
       // reference B's far hills are near black, so they are let down to a dim silhouette
-      for (const mesh of mountains) mesh.material.color.setScalar(night ? 0.35 : 1);
+      for (const mesh of mountains) mesh.material.color.setScalar(night ? 0.15 : 1);
       // the mist: lit from above by the sun or moon and the sky, albedo about 0.8
       const e = time.sun.intensity * Math.max(0.1, time.sun.dir[1]) + Math.PI * (0.7 * time.sky.zenith[1] + 0.3 * time.sky.horizon[1]) * 1.2;
       const s = (0.8 * e) / Math.PI;
