@@ -211,7 +211,10 @@ export const CAMERA = {
     across: 0.2,
     down: 0.56,
     tallDown: 0.3,
-    times: { day: { sunBeside: 2.1 }, dusk: { sunBeside: 0.9 } },
+    // by day the sun stands down the straight: the rear three-quarter view that looks 0.75 rad off it shows the
+    // gantry, the boards and the autumn trees behind a car whose paint mirrors the sky; at golden hour the sun is
+    // over the lake behind the car: the view with it almost behind the camera lights the flank and the paint
+    times: { day: { sunBeside: 0.75, frontBias: 0 }, dusk: { sunBeside: 2.9, frontBias: 0 } },
   },
   /** The orbit behind the results: blended in from the chase view over `blend` s while the car rolls home; framed
    * clear of the results panel the same way as the title (the panel is on the right). */
