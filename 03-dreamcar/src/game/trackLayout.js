@@ -50,6 +50,8 @@ export const SIDES = {
   // the lakeside straight: a low concrete wall each side; the water beyond the left one, the town beyond the right
   shore: { kind: 'wall', edge: [4, 5], slope: -0.02, far: -0.12, verge: 'grass', wood: null },
   town: { kind: 'wall', edge: [5, 6], slope: 0.01, far: 0.08, verge: 'grass', wood: 'broadleaf' },
+  // the land side of the straight away from the pit lane: bright mown grass to a steel rail, nothing tall (frame D1)
+  paddock: { kind: 'rail', edge: [6, 8], slope: 0.01, far: 0.08, verge: 'grass', wood: null },
   // mown grass to a steel rail, woods behind it: low down broadleaf, higher up conifers
   lowUp: { kind: 'rail', edge: [3, 5], slope: 0.04, far: 0.3, verge: 'grass', wood: 'broadleaf' },
   lowDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.25, verge: 'grass', wood: 'broadleaf' },
@@ -108,7 +110,9 @@ const SECTION_NAMES = {
 /** @type {Segment[]} */
 const SEGMENTS = [
   // Lakeside straight: the line, then 250 m to the first bend (its other 450 m are the last piece of the lap).
-  { id: 'grid', sec: 'straight', len: 250, g: 0, L: 'shore', R: 'town' },
+  // (the land side is the pit wall only along the pit lane, about 110 m before the line to 40 m after it)
+  { id: 'grid', sec: 'straight', len: 40, g: 0, L: 'shore', R: 'town' },
+  { id: 'gridRun', sec: 'straight', len: 210, g: 0, L: 'shore', R: 'paddock' },
 
   // Shore bend: a fast banked right away from the water, starting to climb.
   { id: 'sweep', sec: 'sweep', r: -220, deg: 80, ease: 110, bank: 9, g: 3, L: 'lowRun', R: 'lowUp', runoff: 'L' },
@@ -148,7 +152,8 @@ const SEGMENTS = [
   { id: 'approach', sec: 'sweepback', len: 100, ease: 60, g: -7.8, L: 'lowDown', R: 'lowUp' },
   { id: 'back', sec: 'sweepback', r: -300, deg: 90, ease: 140, bank: 9, g: 0, gk: [[0.78, -6.5]], L: 'lowRun', R: 'lowUp', runoff: 'L' },
 
-  { id: 'finish', sec: 'straight', len: 450, ease: 140, g: 0, L: 'shore', R: 'town' },
+  { id: 'finish', sec: 'straight', len: 340, ease: 140, g: 0, L: 'shore', R: 'paddock' },
+  { id: 'pitIn', sec: 'straight', len: 110, g: 0, L: 'shore', R: 'town' },
 ];
 
 /** Length of one piece of the plan (m). @param {Segment} seg */
@@ -172,7 +177,7 @@ export const LAYOUT = {
     ['ledge1', 0.1],
   ],
   /** Street lamps stand along these pieces, alternating sides; tunnel lamps hang in rows along every tunnel. */
-  streetLamps: { pieces: ['finish', 'grid'], spacing: 30, height: 9 },
+  streetLamps: { pieces: ['finish', 'pitIn', 'grid', 'gridRun'], spacing: 30, height: 9 },
   tunnelLamps: { spacing: 12, drop: 0.55, inset: 0.45 },
   /** Kerbs: on the inside of every bend tighter than `inside` metres from entry to exit, and on the outside at the exit of every bend tighter than `outside`. */
   kerbs: { inside: 800, outside: 500, exit: 0.4, width: SHOULDER },
