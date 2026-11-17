@@ -32,8 +32,8 @@ import { TIMES } from './lighting.js';
 /** The rings: distance from the middle of the course (m), the ridge's height range (m), columns round. */
 const RINGS = [
   { r: 10500, lo: 1500, hi: 2700, cols: 540, scale: 2600, seed: 3 },
-  { r: 7600, lo: 1000, hi: 1900, cols: 600, scale: 1800, seed: 7 },
-  { r: 5300, lo: 650, hi: 1250, cols: 640, scale: 1300, seed: 11 },
+  { r: 7600, lo: 700, hi: 1400, cols: 600, scale: 1800, seed: 7 },
+  { r: 5300, lo: 350, hi: 800, cols: 640, scale: 1300, seed: 11 },
 ];
 const ROWS = 14;
 const DEG = Math.PI / 180;
@@ -52,9 +52,9 @@ const MASSIF = {
   ],
   right: -75, // the field's ends, degrees left of the heading
   left: 95,
-  near: 3200, // the foot's distance from the start line, at least (m)
+  near: 2600, // the foot's distance from the start line, at least (m)
   clear: 900, // and its distance beyond the course's bounds
-  crest: 6400, // the crest's distance (m)
+  crest: 5200, // the crest's distance (m)
   depth: 6200, // from the foot to the far edge
   cols: { low: 170, medium: 420, high: 560 },
   rows: { low: 50, medium: 110, high: 150 },
@@ -159,7 +159,8 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       const broad = noise.fbm(u * 0.35 + ring.seed * 3, v * 0.35, 3);
       const h = ring.lo + (ring.hi - ring.lo) * Math.min(1, Math.max(0, 0.15 + 1.1 * ridge * (0.5 + broad)));
       // (sky lane) the near rings stand aside where the massif is: they would be in front of it but drawn behind
-      const aside = layer === 0 ? 0 : inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a));
+      // (all of them, round two: the farthest showed over the massif's low right-hand ridge as pale hills)
+      const aside = smoothstep(0.3, 0.6, inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a)));
       heights.push(h * (1 - aside) - 300 * aside);
     }
     for (let i = 0; i <= cols; i++) {
@@ -185,8 +186,12 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const wood = 1 - smoothstep(treeLine - 60, treeLine + 60, y);
         const snow = layer === 0 ? smoothstep(0.7 * ring.hi, 0.85 * ring.hi, y) * smoothstep(0.45, 0.8, 1 - gully) * 0.8 : 0;
         const rock = 0.15 + 0.06 * gully + 0.03 * noise.fbm(i * 0.3, j * 0.7, 2);
-        const canopy = 0.032 + 0.012 * noise.fbm(i * 0.21 + layer, j * 0.5, 2);
-        const base = [rock, rock * 0.97, rock * 0.92].map((c, k) => c * (1 - wood) + canopy * [1.0, 1.45, 0.8][k] * wood);
+        const canopy = 0.03 + 0.012 * noise.fbm(i * 0.21 + layer, j * 0.5, 2);
+        // clearings and fields low down, the odd pale crag breaking through the wood
+        const field = smoothstep(0.62, 0.72, noise.fbm(i * 0.11 + layer * 3, j * 0.2 + 7, 3)) * (1 - smoothstep(150, 450, y));
+        const crag = smoothstep(0.7, 0.8, noise.fbm(i * 0.37 + 11, j * 0.6 + layer, 2)) * smoothstep(250, 600, y) * wood;
+        const green = [canopy, canopy * 1.45, canopy * 0.8].map((c, k) => c * (1 - field) + [0.07, 0.09, 0.04][k] * field);
+        const base = [rock, rock * 0.97, rock * 0.92].map((c, k) => c * (1 - wood) + (green[k] * (1 - crag) + c * crag) * wood);
         col[v * 3] = base[0] + (0.72 - base[0]) * snow;
         col[v * 3 + 1] = base[1] + (0.75 - base[1]) * snow;
         col[v * 3 + 2] = base[2] + (0.8 - base[2]) * snow;
@@ -347,14 +352,16 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       }
       return open;
     };
-    const bake = new Float32Array(n * 3);
+    // (w: the golden hour's low sun, the channel shading.js reads at dusk)
+    const bake = new Float32Array(n * 4);
     for (let p = 0; p < n; p++) {
       const x = pos[p * 3], y = pos[p * 3 + 1], z = pos[p * 3 + 2];
-      bake[p * 3] = lit(x, y, z, TIMES.day.sun.dir);
-      bake[p * 3 + 1] = lit(x, y, z, TIMES.night.sun.dir);
-      bake[p * 3 + 2] = 0.55 + 0.45 * geometry.attributes.normal.getY(p);
+      bake[p * 4] = lit(x, y, z, TIMES.day.sun.dir);
+      bake[p * 4 + 1] = lit(x, y, z, TIMES.night.sun.dir);
+      bake[p * 4 + 2] = 0.55 + 0.45 * geometry.attributes.normal.getY(p);
+      bake[p * 4 + 3] = TIMES.dusk ? lit(x, y, z, TIMES.dusk.sun.dir) : 1;
     }
-    geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+    geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 4));
     // Colour by height and slope: forest up to a ragged tree line, scrub and pale scree above it on the gentler
     // ground, bare limestone on the steep faces and the crests, darker in the gullies.
     const nrm = geometry.attributes.normal;
