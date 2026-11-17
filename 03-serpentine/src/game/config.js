@@ -58,8 +58,8 @@ export const HUD = {
 
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */
 export const DRIVERS = [
-  { paint: 'silver', plate: 'AI LAB03', keys: 'wasd', bias: 1.4 },
-  { paint: 'graphite', plate: 'AI LAB04', keys: 'arrows', bias: -1.4 },
+  { paint: 'silver', plate: 'K1 DOMI', keys: 'wasd', bias: 1.4 },
+  { paint: 'graphite', plate: 'K2 DOMI', keys: 'arrows', bias: -1.4 },
 ];
 
 /** Every view's lens. */

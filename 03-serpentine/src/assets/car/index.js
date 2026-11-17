@@ -56,7 +56,7 @@ function coarseIndex(samples, arch) {
 /**
  * @param {{ paint?: string, plate?: string, tier?: 'low'|'medium'|'high', caps?: object, ghost?: boolean }} [options]
  */
-export function createCar({ paint = 'silver', plate = 'AI LAB03', tier = 'high', caps, ghost = false } = {}) {
+export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', caps, ghost = false } = {}) {
   const t0 = performance.now();
   const object = new THREE.Group();
   object.name = ghost ? 'ghost car' : 'car';
