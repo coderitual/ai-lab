@@ -7,7 +7,8 @@
 // level of its middle, then VIEWS from above at ELEVATION. Two atlases share
 // the layout: COLOUR (the leaves' and the bark's own colour, untinted, with
 // the crown's occlusion, and alpha where the tree is) and SHAPE (the normal in
-// the tree's own frame as rgb, and 1 where it is foliage, 0 where it is bark).
+// the tree's own frame as rgb, and in alpha 0 where it is bark, 0.4 to 1 where
+// it is foliage, by how much light gets into the crown there).
 // So the card is lit by the same code, the same sun, sky and lamps as the
 // tree, at every time of day, and takes the same per-tree tint.
 //
@@ -52,7 +53,8 @@ void main() {
   // a dead twig keeps its own, greyer colour
   if ( ! bark && vShade.y > 0.25 ) c.rgb *= 0.55;
   if ( uPass < 0.5 ) gl_FragColor = vec4( c.rgb * mix( 1.0, vShade.x, 0.9 ), 1.0 );
-  else gl_FragColor = vec4( normalize( vN ) * 0.5 + 0.5, bark ? 0.0 : 1.0 );
+  // (alpha: 0 bark, else 0.4 + 0.6 * the light inside the crown, which the card's tint follows)
+  else gl_FragColor = vec4( normalize( vN ) * 0.5 + 0.5, bark ? 0.0 : 0.4 + 0.6 * vShade.x );
 }`;
 
 /**

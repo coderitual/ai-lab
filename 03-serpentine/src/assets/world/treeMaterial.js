@@ -110,6 +110,20 @@ vec3 treeBump = vec3( 0.0, 0.0, 1.0 );       // the bark's relief, or the impost
 vec3 treeCrown = vec3( 0.0, 0.0, 1.0 );      // the crown's own normal, view space
 `;
 
+
+/**
+ * Light and shade inside a crown carry its colour: in its shade a green crown goes towards a deep blue-green and a
+ * turned one towards rust; where the light reaches it, towards yellow-green or pale gold. `lit` 0..1 is how much
+ * light gets in there (aShade.x), `turn` how far the tree has turned.
+ */
+const CROWN_TONE = /* glsl */ `
+vec3 crownTone( float lit, float turn ) {
+  vec3 shade = mix( vec3( 0.78, 0.92, 1.12 ), vec3( 1.18, 0.7, 0.5 ), turn );
+  vec3 light = mix( vec3( 1.12, 1.06, 0.78 ), vec3( 0.94, 1.14, 1.45 ), turn );
+  return mix( shade, light, smoothstep( 0.2, 0.95, lit ) );
+}
+`;
+
 /** Wraps the standard material's light function: the same light, plus what comes through the leaves. */
 const TREE_LIGHT = /* glsl */ `
 void RE_Direct_Tree( const in IncidentLight directLight, const in vec3 geometryPosition, const in vec3 geometryNormal, const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal, const in PhysicalMaterial material, inout ReflectedLight reflectedLight ) {
@@ -117,7 +131,7 @@ void RE_Direct_Tree( const in IncidentLight directLight, const in vec3 geometryP
   if ( treeThrough > 0.0 ) {
     float nl = dot( treeCrown, directLight.direction );
     // a crown is not a wall: light gets a little way round it and into it
-    float wrap = clamp( ( nl + 0.7 ) / 1.7, 0.0, 1.0 ) - 0.59 * clamp( nl, 0.0, 1.0 );
+    float wrap = clamp( ( nl + 0.5 ) / 1.5, 0.0, 1.0 ) - 0.667 * clamp( nl, 0.0, 1.0 );
     // and the eye that looks towards the light sees it through the leaves, most where the crown is thin
     float behind = pow( clamp( dot( geometryViewDir, - directLight.direction ), 0.0, 1.0 ), 3.0 );
     float rim = 1.0 - abs( dot( treeCrown, geometryViewDir ) );
@@ -140,7 +154,7 @@ if ( treeThrough > 0.0 ) {
   #endif
   #ifdef USE_ENVMAP
   // the sky behind the crown, and the sky above it, seen through the leaves
-  reflectedLight.indirectDiffuse += ( getIBLIrradiance( - geometryViewDir ) * ( 0.3 + 0.7 * glowRim * glowRim ) + 0.35 * getIBLIrradiance( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz ) ) * treeBack * ( treeThrough * 1.0 * RECIPROCAL_PI );
+  reflectedLight.indirectDiffuse += ( getIBLIrradiance( - geometryViewDir ) * ( 0.3 + 0.7 * glowRim * glowRim ) + 0.12 * getIBLIrradiance( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz ) ) * treeBack * ( treeThrough * 1.0 * RECIPROCAL_PI );
   #endif
 }
 reflectedLight.directSpecular *= treeGloss;
@@ -210,7 +224,7 @@ export function treeMaterial({ foliage, bark, barkNormal, atmosphere, uniforms, 
       // inside the wood the lower part of a tree stands in the others' shade: less of the sky, less of the sun
       .replace('#include <project_vertex>', `vBake *= mix( 1.0 - 0.8 * aPlace.x, 1.0, smoothstep( 1.5, 9.0, position.y ) );\n#include <project_vertex>`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec4 vShade;\nvarying float vTurn;\nuniform sampler2D uBark;\nuniform sampler2D uBarkN;\n${TREE_PARS}`)
+      .replace('#include <common>', `#include <common>\nvarying vec4 vShade;\nvarying float vTurn;\n${CROWN_TONE}\nuniform sampler2D uBark;\nuniform sampler2D uBarkN;\n${TREE_PARS}`)
       .replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${TREE_LIGHT}`)
       .replace(
         '#include <map_fragment>',
@@ -227,14 +241,14 @@ export function treeMaterial({ foliage, bark, barkNormal, atmosphere, uniforms, 
     // growth, the sunny side) or blue-green; a turned one far along from gold to red
     float h = ( vShade.z - 0.5 ) * 2.0;
     vec3 shift = mix( vec3( 0.1, 0.05, -0.2 ), vec3( 0.12, -0.3, -0.4 ), vTurn );
-    vec3 tint = vTint.rgb * max( vec3( 0.2 ), 1.0 + shift * h ) * ( 1.0 + 0.1 * h );
+    vec3 tint = vTint.rgb * max( vec3( 0.2 ), 1.0 + shift * h ) * ( 1.0 + 0.1 * h ) * crownTone( vShade.x, vTurn );
     // (a dead twig keeps its own colour)
     tex.rgb *= mix( tint, vec3( 0.55 ), step( 0.25, vShade.y ) );
     treeThrough = vShade.w;
     treeGloss = vShade.x * ( 0.35 + 0.65 * uWet );
   }
   diffuseColor *= tex;
-  diffuseColor.rgb *= mix( 1.0, vShade.x, 0.9 );
+  diffuseColor.rgb *= mix( 1.0, pow( vShade.x, 1.3 ), 0.92 );
 }
 ${TREE_BACK}`,
       )
@@ -325,16 +339,17 @@ export function impostorMaterial({ atlas, atmosphere, uniforms, coverage }) {
   extend(material, `tree-imp-${coverage ? 'c' : 'd'}`, (shader) => {
     Object.assign(shader.uniforms, uniforms, own);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nattribute vec4 aTint;\nattribute vec2 aPlace;\nattribute vec4 aImp;\nvarying vec4 vTint;\n${IMP_PARS}`)
+      .replace('#include <common>', `#include <common>\nattribute vec4 aTint;\nattribute vec2 aPlace;\nattribute vec4 aImp;\nvarying vec4 vTint;\nvarying float vTurn;\n${IMP_PARS}`)
       .replace(
         '#include <begin_vertex>',
         /* glsl */ `vec3 transformed;
 vTint = aTint;
+vTurn = aPlace.y;
 ${IMP_CARD}`,
       )
       .replace('#include <project_vertex>', `vBake *= mix( 1.0 - 0.8 * aPlace.x, 1.0, smoothstep( 1.5, 9.0, transformed.y ) );\n#include <project_vertex>`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform sampler2D uImpColor;\nuniform sampler2D uImpNormal;\nuniform vec2 uImpInset;\n${IMP_PARS}\n${TREE_PARS}`)
+      .replace('#include <common>', `#include <common>\nuniform sampler2D uImpColor;\nuniform sampler2D uImpNormal;\nuniform vec2 uImpInset;\nvarying float vTurn;\n${CROWN_TONE}\n${IMP_PARS}\n${TREE_PARS}`)
       .replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${TREE_LIGHT}`)
       .replace(
         '#include <map_fragment>',
@@ -375,11 +390,14 @@ ${IMP_CARD}`,
   #else
     if ( colour.a < 0.45 ) discard;
   #endif
+  // the shape atlas's alpha: 0 bark, else 0.4 + 0.6 * the light inside the crown there
+  float leaf = smoothstep( 0.1, 0.35, shape.a );
+  float lit = clamp( ( shape.a - 0.4 ) / 0.6, 0.0, 1.0 );
   treeBump = shape.xyz * 2.0 - 1.0;
-  treeThrough = shape.a * vImpCell.w;
-  treeGloss = shape.a * 0.75 * ( 0.35 + 0.65 * uWet ) + ( 1.0 - shape.a ) * 0.7;
-  treeBark = 1.0 - shape.a;
-  diffuseColor.rgb *= colour.rgb * mix( vec3( 1.0 ), vTint.rgb, shape.a );
+  treeThrough = leaf * vImpCell.w;
+  treeGloss = leaf * 0.75 * ( 0.35 + 0.65 * uWet ) + ( 1.0 - leaf ) * 0.7;
+  treeBark = 1.0 - leaf;
+  diffuseColor.rgb *= colour.rgb * mix( vec3( 1.0 ), vTint.rgb * crownTone( lit, vTurn ), leaf );
   diffuseColor.a = colour.a;
 }
 ${TREE_BACK}`,

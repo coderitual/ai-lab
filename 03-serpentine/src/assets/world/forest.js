@@ -55,9 +55,9 @@ export const CASTER_LAYER = 3;
  * foliage tile and bark tile (texels), impostor picture (texels), whether trees cast shadow.
  */
 const TIER = {
-  low: { full: 0, reduced: 60, far: 650, keep: 0.5, tile: 256, bark: 128, cell: 64, casters: false },
-  medium: { full: 42, reduced: 105, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 128, casters: true },
-  high: { full: 65, reduced: 160, far: 1200, keep: 1, tile: 512, bark: 256, cell: 128, casters: true },
+  low: { full: 0, reduced: 60, far: 650, keep: 0.5, tile: 256, bark: 128, cell: 96, casters: false },
+  medium: { full: 34, reduced: 95, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 160, casters: true },
+  high: { full: 50, reduced: 130, far: 1200, keep: 1, tile: 512, bark: 256, cell: 192, casters: true },
 };
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
 const BLEND = 8;

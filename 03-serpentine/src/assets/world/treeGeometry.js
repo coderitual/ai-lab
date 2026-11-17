@@ -610,10 +610,10 @@ function broadleafMesh(variant, sk, rng, full, barkSize, through) {
       const mid = along(pts, 0.6);
       const dir = norm(add(tangentAt(pts, 0.7), scale(norm(sub(mid, c)), 0.4)));
       const size = limb.clusters.reduce((s, k) => s + k.size, 0) / limb.clusters.length;
-      const big = size * (limb.last ? 2.3 : 1.7) + (P.clump ?? 0) * 0.8;
+      const big = size * (limb.last ? 1.75 : 1.4) + (P.clump ?? 0) * 0.6;
       const hue = limb.clusters.reduce((s, k) => s + k.hue, 0) / limb.clusters.length;
       const base = mad(mid, dir, -big * 0.35);
-      const cards = limb.last ? 3 : 1;
+      const cards = limb.last ? 4 : 1;
       for (let k = 0; k < cards; k++) {
         if (P.hang) {
           const h = norm(turn([dir[0], 0, dir[2]], [0, 1, 0], k * 1.05 + r.range(-0.3, 0.3)));

@@ -594,8 +594,8 @@ export function createFoliageAtlas(tile, rng, anisotropy = 4) {
       }),
     [TILE.LARCH]: (r) => paintLarch(ctx, r, px),
     [TILE.BIRCH]: (r) => paintBirch(ctx, r, px),
-    [TILE.MAPLE]: (r) => paintCluster(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.2, leaves: 64, wood: 'rgb(60,44,36)' }),
-    [TILE.LIME]: (r) => paintCluster(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.135, leaves: 110, wood: 'rgb(56,46,40)' }),
+    [TILE.MAPLE]: (r) => paintCluster(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.115, leaves: 190, wood: 'rgb(60,44,36)' }),
+    [TILE.LIME]: (r) => paintCluster(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.085, leaves: 260, wood: 'rgb(56,46,40)' }),
     [TILE.TWIG]: (r) => paintTwig(ctx, r, px),
   };
   const regions = [];
