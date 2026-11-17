@@ -247,6 +247,18 @@ export class ViewHud {
     };
     this.tell.high.el.innerHTML = `<svg viewBox="0 0 24 24" role="img" aria-label="${TEXT.lamps.high}">${ICONS.lights}</svg>`;
 
+    // the drift readout (designed, not yet wired: the HANDLING lane's slide angle and score feed setDrift): over
+    // the road above the car, only while the car slides beyond about 15 degrees, fading out after
+    this.drift = cell('div', 'drift', el);
+    this.driftAngle = cell('span', 'angle', this.drift.el, '0°');
+    this.driftScore = cell('span', 'score', this.drift.el, '0');
+    this._driftOn = false;
+
+    // under the right thumb (touch only): a place for thumb buttons such as a handbrake or drift button; empty and
+    // hidden until something is put in it (addThumbButton)
+    this.thumbs = cell('div', 'thumbs', el);
+    this.thumbs.show(false);
+
     // the buttons: camera, lights, reset, pause, small and together (at a desk only pause shows)
     this.touchCol = cell('div', 'touchcol', el);
     iconButton(this.touchCol.el, 'camera', TEXT.buttons.camera, () => act('camera', index));
@@ -429,6 +441,35 @@ export class ViewHud {
   /** @param {{ abs: boolean, tc: boolean, esc: boolean, hand: boolean, high: boolean }} on */
   setTells(on) {
     for (const k in this.tell) this.tell[k].flag('on', on[k]);
+  }
+
+  /**
+   * The drift readout: the slide angle (degrees) and the running score; `on` while the car slides beyond the
+   * threshold. It fades out (CSS) when `on` goes false.
+   */
+  setDrift(angle, score, on) {
+    this.drift.flag('on', on);
+    if (!on && !this._driftOn) return;
+    this._driftOn = on;
+    this.driftAngle.text(`${Math.round(Math.abs(angle))}°`);
+    this.driftScore.text(Math.round(score));
+  }
+
+  /**
+   * A button under the right thumb (touch): a large round target. `onDown` / `onUp` for a held control (a
+   * handbrake), so it reports presses rather than clicks. Returns the element.
+   */
+  addThumbButton(name, label, onDown, onUp) {
+    const b = make('button', `thumb ${name}`, this.thumbs.el, label);
+    b.type = 'button';
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onDown();
+    });
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(type, () => onUp && onUp());
+    this.thumbs.show(true);
+    return b;
   }
 
   setWarn(wrongWay) {
