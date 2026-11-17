@@ -69,20 +69,62 @@ export const HUD = {
 };
 
 /**
- * Assist levels (the options sheet chooses one; `default` is the one a new player gets). Each sets the car
- * (Vehicle.setAssists: abs, tc, esc; `slip`: the body slip in rad the car may slide to before it is caught; `escYaw`:
- * whether the stability control minds the yaw rate while the car slides on purpose; `hold`: 0..1 the slide help;
- * `open`: how much of `slip` the help holds a slide at with the throttle wide open; `rotate`: 0..1 of the rotation a lift or a brake at turn-in is given;
- * `tcSlip`, `slideSlip`: the wheel spin the traction control allows, and in a slide) and the hands (PlayerDriver: `catch`, the
- * opposite lock given for the driver per rad of rear slide, per device).
+ * Assist levels: how much the car helps (the options sheet chooses one; `default` is what a new player and a phone
+ * get). `Vehicle.setAssists(ASSISTS.levels[id])` applies one; the hands (PlayerDriver) read it from the car.
+ *
+ * For the car: `abs`, `tc`, `esc` switch the three controls; `hold` (0 or 1) the slide help, an arcade car's
+ * hidden hand: with it a slide can be asked for (handbrake, a lift or a dab of the brake while cornering hard, power
+ * in a low gear), holds on the throttle at up to `slip` rad for as long as the driver steers into the bend, comes
+ * back when the steering is let go, and is caught beyond that angle; `liftKick`, `brakeKick`, `handKick`: how much
+ * of `slip` each way of asking lets the tail out by itself (0..1); `relief`: the share of the speed a slide scrubs
+ * off that is given back while the throttle is open; `tcSlip`: the wheelspin (slip ratio) the traction control
+ * allows; `spin`: what it adds in a slide, per unit of the tangent of the slide's angle (about 1 lets the rear
+ * tyres push the car along as hard as they hold it across).
+ * For the hands: `catch`, per device, the share of the opposite lock that is put on for the driver in a slide
+ * (the front wheels turned to where the car is going: 1 = all of it, so letting go of the steering ends the slide).
  */
 export const ASSISTS = {
-  default: 'road',
+  default: 'full',
   levels: {
-    road: { name: 'Road', abs: true, tc: true, esc: true, slip: 0.35, escYaw: true, hold: 1, open: 0.5, rotate: 0.2, tcSlip: 0.15, slideSlip: 0.3, catch: { keys: 1, thumb: 1, pad: 0.45 } },
-    sport: { name: 'Sport', abs: true, tc: true, esc: true, slip: 0.8, escYaw: false, hold: 1, open: 1, rotate: 1, tcSlip: 0.3, slideSlip: 0.6, catch: { keys: 0.8, thumb: 0.8, pad: 0.3 } },
-    off: { name: 'Off', abs: true, tc: false, esc: false, slip: null, escYaw: true, hold: 0, rotate: 0, tcSlip: null, slideSlip: null, catch: { keys: 0, thumb: 0, pad: 0 } },
+    full: { name: 'Full', abs: true, tc: true, esc: true, hold: 1, slip: 0.3, liftKick: 0.45, brakeKick: 0.6, handKick: 1, relief: 0.5, tcSlip: 0.12, spin: 1.1, catch: { keys: 1, thumb: 1, pad: 0.85 } },
+    sport: { name: 'Sport', abs: true, tc: true, esc: true, hold: 1, slip: 0.7, liftKick: 0.6, brakeKick: 0.75, handKick: 1, relief: 0.5, tcSlip: 0.2, spin: 1.2, catch: { keys: 1, thumb: 1, pad: 0.5 } },
+    off: { name: 'Off', abs: true, tc: false, esc: false, hold: 0, slip: 0, liftKick: 0, brakeKick: 0, handKick: 0, relief: 0, tcSlip: null, spin: 0, catch: { keys: 0, thumb: 0, pad: 0 } },
   },
+};
+
+/**
+ * The hands (PlayerDriver): how each device's steering and pedals become the car's, each device as if it were the
+ * only one. Times in seconds; a pair is [standing still, at `fastSpeed` m/s and above].
+ */
+export const HANDS = {
+  fastSpeed: 60,
+  /** s after the handbrake is let go before the opposite lock is given again (the turn it made is wanted). */
+  handTime: 0.25,
+  /**
+   * In a slide the steering is measured from where the car is going: a full input turns the front wheels this far
+   * (rad) into the bend from there, which is where their grip peaks.
+   */
+  slideLock: 0.15,
+  keys: {
+    /**
+     * A steering key winds the wheel to the lock for the speed in `on` s and lets it run back in `off` s; pressed
+     * against the way the wheel is turned it works `reverse` times as fast; the hands follow with `lag` s.
+     */
+    on: [0.13, 0.26],
+    off: [0.1, 0.16],
+    reverse: 2.5,
+    lag: 0.04,
+    /**
+     * A pedal key gives `tap` of the pedal within `rise` s and the rest over `hold` s more if it is held; let go, the
+     * pedal is up in `off` s. So a tap is a dab and a hold is the floor.
+     */
+    throttle: { tap: 0.6, rise: 0.05, hold: 0.25, off: 0.06 },
+    brake: { tap: 0.5, rise: 0.05, hold: 0.25, off: 0.07 },
+  },
+  /** A stick: the power added to its curve (finer near the centre), and its smoothing (s). */
+  pad: { expo: [0, 0.5], lag: [0.02, 0.09] },
+  /** A thumb on the glass: the same. */
+  thumb: { expo: [0, 0.4], lag: [0.03, 0.1] },
 };
 
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */

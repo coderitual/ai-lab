@@ -68,7 +68,7 @@ export class Drivetrain {
    * @param {number} roadSpeed the car's forward speed (m/s)
    * @param {number} cornering lateral acceleration in g (the box does not shift up in the middle of a bend)
    * @param {boolean} reverse reverse is selected
-   * @param {boolean} [hold] the car is sliding: the box holds its gear (a slide is driven on the engine)
+   * @param {boolean} [hold] the car is sliding: the box does not change up (a slide is driven on the engine)
    */
   update(dt, throttle, keep, brake, wheelOmega, roadSpeed, cornering, reverse, hold = false) {
     const e = this.engine;
@@ -99,13 +99,14 @@ export class Drivetrain {
         this._timer -= dt;
         if (this._timer <= this._time * 0.5) this._forward = this._next;
         if (this._timer <= 0) this._sinceShift = 0;
-      } else if (!hold) {
-        const perRatio = (Math.max(roadSpeed, 0) / this.radius) * b.final * RPM; // engine rpm per unit of gear ratio
+      } else {
+        // engine rpm per unit of gear ratio, by the road or by the driven wheels if they are spinning faster than it
+        const perRatio = Math.max(roadSpeed / this.radius, wheelOmega, 0) * b.final * RPM;
         let target = this._forward;
         while (target > 1 && perRatio * b.ratios[target - 2] < b.downFraction * up) target--;
         if (target < this._forward) {
           if (this._sinceShift > b.minInterval * 0.5) this._begin(target, b.kickdownTime);
-        } else if (this._forward < b.ratios.length && this._sinceShift > b.minInterval) {
+        } else if (!hold && this._forward < b.ratios.length && this._sinceShift > b.minInterval) {
           const now = perRatio * b.ratios[this._forward - 1];
           const next = perRatio * b.ratios[this._forward];
           // on a wide throttle, also as soon as the next gear would make more power than this one does

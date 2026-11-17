@@ -99,6 +99,11 @@ export const CAR = {
   steering: {
     lock: 0.58, // rad at the road wheels, either way
     rate: 2.4, // rad/s the rack can move the road wheels
+    /**
+     * Rear-axle steering: at speed the rear wheels turn with the fronts by `share` of the angle that would hold the
+     * body in line with its path (Vehicle.rearShare), never more than `most` rad.
+     */
+    rear: { share: 0.85, most: 0.06 },
   },
 
   tyre: {
@@ -188,6 +193,9 @@ export const CAR = {
     viscous: 28, // N·m per rad/s
     preload: 50, // N·m
     bias: 0.22, // fraction of the axle torque added to the limit
+    /** In a slide it closes up (an active differential): this much more locking torque (N·m) and this many times more viscous. */
+    slideLock: 2500,
+    slideViscous: 8,
   },
 
   brakes: {
@@ -228,19 +236,63 @@ export const CAR = {
   },
 
   /**
-   * The slide help (used by the assist levels that ask for it: ASSISTS in game/config.js). In body-slip angles (rad)
-   * and yaw accelerations (rad/s² per rad, per rad/s). While the car is sideways (from `from`, fully at `full`) the
-   * slide it is asked for is maxSlip (or the level's) times base + throttle·t + steer·(steering into the bend); the
-   * body is turned towards it at `hold` per rad of difference and `damp` per rad/s of growth; beyond the level's angle
-   * `catch` and `catchDamp` take over. Never more than `most`.
+   * The slide help (for the assist levels that ask for it: ASSISTS in game/config.js; Vehicle.js says how it works).
+   * Angles are of the rear axle's travel against the body (rad); yaw accelerations in rad/s² per rad and per rad/s.
    */
-  drift: { minSpeed: 6, from: 0.06, full: 0.12, maxSlip: 0.6, base: 0.15, throttle: 0.75, steer: 0.4, hold: 6, damp: 3, catch: 25, catchDamp: 8, most: 6,
-    /** A lift (throttle dropped by liftGain⁻¹, remembered liftMemory s) or the brake above rotateG of cornering, above rotateFrom m/s: rad/s² of rotation. */
-    liftGain: 3, liftMemory: 0.5, rotate: 3, rotateG: 0.55, rotateFrom: 12,
-    /** s for which a slide that swings through straight is closed instead of helped, and how hard (per rad/s, at most). */
-    snapMemory: 1.2, snapDamp: 12, snapMost: 14,
+  drift: {
+    minSpeed: 6, // m/s below which there is no help at all
+    /** A slide begins where the rear tyres' grip peaks (about 6°) and is fully one a few degrees on. */
+    from: 0.105,
+    full: 0.19,
+    /** The front tyres' own peak (rad): the steering into the bend that counts as all of it; and how much of it says the slide is wanted. */
+    frontSlip: 0.15,
+    intoFull: 0.2,
+    /** s for "the driver is steering into the bend" to come and to go: a slide is wanted that long after the steering is let go. */
+    stayRise: 0.1,
+    stayFall: 0.5,
+    /** The body is turned towards the angle asked for at `hold` per rad; a slide may grow at `damp` and come back at `dampClose` per rad/s. */
+    hold: 7,
+    damp: 3.5,
+    dampClose: 11,
+    /** The most the hand turns the car: letting the tail out, bringing it back, and catching it (rad/s²). */
+    most: 5,
+    mostClose: 9,
+    catchMost: 16,
+    /** Beyond the level's angle plus `margin`: per rad and per rad/s. At walking pace the limit opens by up to `slowSlip` (below `slowSpeed` m/s). */
+    margin: 0.07,
+    catch: 30,
+    catchDamp: 9,
+    slowSpeed: 20,
+    slowSlip: 1.6,
+    /** s for which the hand stays with a car that has stopped sliding, and how hard it damps a swing the other way. */
+    snapMemory: 1.2,
+    snapDamp: 14,
+    /**
+     * Asking for a slide: a lift (the throttle dropped by 1 / liftGain against its mean over liftMemory s) or the
+     * brake (beyond kickBrake, for its first dabTime s) while cornering beyond kickG (fully kickSpan above) with
+     * the steering hard over: the front wheels turned beyond kickInto of the slip their grip peaks at (fully
+     * kickIntoSpan beyond), which is more than a tidy line ever asks for; or the handbrake. The kick fades over
+     * kickTime s.
+     */
+    liftGain: 3,
+    liftMemory: 0.5,
+    kickBrake: 0.15,
+    dabTime: 0.6,
+    kickG: 0.5,
+    kickSpan: 0.3,
+    kickInto: 0.7,
+    kickIntoSpan: 0.25,
+    kickTime: 0.8,
     /** m/s above which a level's slide angle narrows in proportion to the speed. */
-    slipSpeed: 35 },
+    slipSpeed: 35,
+    /** The most wheelspin (slip ratio) the traction control adds in a slide, however far sideways. */
+    spinMost: 1.2,
+    /** The slide's score: from this angle (degrees) and speed (m/s); beyond scoreSpin degrees it is a spin; it counts once the car has not slid for scoreEnd s. */
+    scoreFrom: 10,
+    scoreSpeed: 11,
+    scoreSpin: 100,
+    scoreEnd: 0.6,
+  },
 
   edges: {
     /** Per EDGE kind in game/track.js (rail, rock, wall, parapet, trees): bounce and sliding friction. */
