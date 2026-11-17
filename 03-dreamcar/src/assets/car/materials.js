@@ -673,9 +673,10 @@ export function createGlassMaterial(shared, caps, channel) {
   }
   else if (vCarPos.z > -0.4) { transmit = 0.72; frit = 0.0; }
   else { transmit = 0.15; frit = 0.0; }`
-      : `transmit = vCarPos.z > 0.0 ? 0.94 : 0.78; frit = 0.0;
-  // the tail lamp's lens is smoked red: it has a colour of its own and holds back some of what is behind it
-  glassTint = vCarPos.z > 0.0 ? vec3(0.01) : vec3(0.07, 0.002, 0.004);`
+      : `transmit = vCarPos.z > 0.0 ? 0.94 : 0.74; frit = 0.0;
+  // the tail lamp's lens is clear red (the daylight photographs: a bright cherry red unlit, not smoked): it has a
+  // colour of its own and holds back some of what is behind it
+  glassTint = vCarPos.z > 0.0 ? vec3(0.01) : vec3(0.32, 0.006, 0.009);`
   }
   float band = frit > 0.0 ? 1.0 - carCover(d + frit) : 0.0;
   glassAlpha = mix(1.0 - transmit, 1.0, band);
@@ -842,36 +843,37 @@ void carLampPart() {
   else if (f == ${F.screen}) { lBase = vec3(0.004); lRough = 0.06; lEmit = vec3(0.55, 0.7, 1.0) * 1.2 * carLampsC.x; }
   else if (f == ${F.brow}) {
     // a frosted bar; the white goes out on the side that indicates
-    lBase = vec3(0.6, 0.61, 0.63); lRough = 0.5;
+    lBase = vec3(0.32, 0.33, 0.34); lRough = 0.5;
     lEmit = mix(vec3(1.0, 0.97, 0.93) * 3.5 * carLampsA.x, amber * 8.0, indicator);
   } else if (f == ${F.projector}) {
     // a dome of dark glass with the reflector's ring glinting through it; lit, it glows from the middle
     float r = 1.0 - vLampUv.y;
-    lBase = mix(vec3(0.012), vec3(0.22), 1.0 - smoothstep(0.03, 0.09, abs(r - 0.62)));
+    lBase = mix(vec3(0.012), vec3(0.12), 1.0 - smoothstep(0.03, 0.09, abs(r - 0.62)));
     lRough = 0.035;
     lEmit = white * beam * (0.5 * (1.0 - 0.8 * r * r) + 0.06);
   } else if (f == ${F.matrix}) {
     float dots = step(0.55, fract(vLampUv.x * 10.0)) * step(0.5, fract(vLampUv.y * 6.0));
-    lBase = vec3(0.015 + 0.25 * dots); lMetal = 0.6; lRough = 0.1;
+    lBase = vec3(0.012 + 0.12 * dots); lMetal = 0.6; lRough = 0.1;
     lEmit = white * (carLampsA.z + 0.15 * carLampsA.y) * (0.8 + 4.0 * dots);
   } else if (f == ${F.blade}) {
-    lBase = vec3(0.4, 0.022, 0.024); lMetal = 0.35; lRough = 0.2;
+    lBase = vec3(0.75, 0.024, 0.026); lMetal = 0.35; lRough = 0.2;
     lEmit = red * (0.4 * carLampsA.w + 1.0 * carLampsB.x);
   } else if (f == ${F.guide} || f == ${F.guideOuter}) {
-    lBase = vec3(0.27, 0.02, 0.025); lRough = 0.45;
+    lBase = vec3(0.42, 0.018, 0.022); lRough = 0.45;
     lEmit = red * (9.0 * carLampsB.x + 0.12 * carLampsA.w);
     if (f == ${F.guideOuter}) lEmit = mix(lEmit, amber * 34.0, indicator);
   } else if (f == ${F.reverse}) {
     lBase = vec3(0.5); lMetal = 0.7; lRough = 0.15; lEmit = vec3(1.0, 0.98, 0.95) * 14.0 * carLampsB.y;
   } else if (f == ${F.tailHousing}) {
-    // dark red chrome in fine horizontal steps
-    lBase = vec3(0.13, 0.008, 0.01) * (0.65 + 0.35 * step(0.5, fract(vCarPos.y / 0.006)));
+    // red chrome in fine horizontal steps: behind the clear red lens it is what makes the lamp read bright red by day
+    lBase = vec3(0.78, 0.02, 0.024) * (0.65 + 0.35 * step(0.5, fract(vCarPos.y / 0.006)));
     lMetal = 0.85; lRough = 0.28;
     lEmit = red * (0.05 * carLampsA.w + 0.3 * carLampsB.x);
   } else if (f == ${F.headHousing}) {
     lBase = vec3(0.012); lRough = 0.12; lEmit = white * beam * 0.006;
   } else if (f == ${F.bezel}) {
-    lBase = vec3(0.7); lMetal = 1.0; lRough = 0.22;
+    // dark satin: unlit, the daylight photographs show the lamp's inside nearly black behind the clear cover
+    lBase = vec3(0.24); lMetal = 1.0; lRough = 0.3;
   } else if (f == ${F.accent}) {
     lBase = vec3(0.01, 0.04, 0.22); lRough = 0.2; lEmit = vec3(0.05, 0.2, 1.0) * 0.35 * carLampsA.x;
   }

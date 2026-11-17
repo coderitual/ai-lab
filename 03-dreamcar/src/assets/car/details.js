@@ -102,8 +102,10 @@ function mirror(gloss, matte, glass, segments) {
   const housing = new THREE.SphereGeometry(1, segments, Math.round(segments * 0.66));
   const P = housing.attributes.position;
   const N = housing.attributes.normal;
-  const c = V(0.923, 1.043, 0.405);
-  const half = V(0.093, 0.0675, 0.055);
+  // the daylight photographs (front, and the two from ahead and to the right) show a taller, deeper shell than
+  // the sheet's 0.135 x 0.11: 0.16 high and 0.13 deep; its width stays the published one (2.033 over the mirrors)
+  const c = V(0.923, 1.05, 0.41);
+  const half = V(0.093, 0.08, 0.065);
   const e = 0.45; // squareness: below 1 squares the sphere off
   for (let i = 0; i < P.count; i++) {
     let x = P.getX(i);
@@ -122,7 +124,7 @@ function mirror(gloss, matte, glass, segments) {
   N.needsUpdate = true;
   gloss.add(housing, new THREE.Matrix4());
   // the glass, a millimetre behind the housing's flat back
-  const pane = new THREE.ShapeGeometry(new THREE.Shape(roundRect(0.085, 0.0525, 0.02, 32)));
+  const pane = new THREE.ShapeGeometry(new THREE.Shape(roundRect(0.085, 0.064, 0.022, 32)));
   glass.add(pane, new THREE.Matrix4().makeRotationY(Math.PI).setPosition(c.x, c.y, c.z - half.z * 0.85 - 0.001));
   // the arm: a tapered block from the shoulder to the housing's lower inner part
   const from = V(0.835, 0.968, 0.56);

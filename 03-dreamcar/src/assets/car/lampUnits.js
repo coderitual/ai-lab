@@ -13,7 +13,7 @@
 // so they follow the lens at a set depth whatever the mesh's fineness.
 
 import * as THREE from 'three';
-import { HEAD_LENS, TAIL_LENS } from './features.js';
+import { HEAD_LENS, TAIL_LENS, TAIL_UPPER } from './features.js';
 import { LAMP_FN } from './materials.js';
 import { Tris, V, bar, frame, ring, roundRect } from './parts.js';
 
@@ -113,9 +113,16 @@ function headLamp(t, cast) {
   t.add(new THREE.BoxGeometry(0.022, 0.009, 0.006), at(0.782, 0.676, 1.77, 0.03), FN.accent);
 }
 
-/** The tail lamp's edges from behind (x -> y): the upper nearly straight, the lower one diagonal to its lowest point. */
-const tailUp = (x) => 0.866 + 0.044 * Math.min(1, Math.max(0, (x - 0.37) / 0.39));
-const tailLow = (x) => (x < 0.66 ? 0.852 - (0.1 * (x - 0.37)) / 0.29 : 0.752 + (0.126 * (x - 0.66)) / 0.182);
+/** Linear interpolation through [x, y] points with x rising, held flat beyond the ends. */
+const through = (pts) => (x) => {
+  if (x <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) return pts[i - 1][1] + ((pts[i][1] - pts[i - 1][1]) * (x - pts[i - 1][0])) / (pts[i][0] - pts[i - 1][0]);
+  return pts[pts.length - 1][1];
+};
+/** The tail lamp's edges from behind (x -> y), from the lens's own outline: the upper edge, and the lower one with the outer end. */
+const tailUp = through(TAIL_LENS.slice(0, TAIL_UPPER).map(([x, y]) => [x, y]));
+const tailLow = through(TAIL_LENS.slice(TAIL_UPPER).map(([x, y]) => [x, y]).reverse());
+const TAIL_INNER = TAIL_LENS[0][0];
 
 /**
  * The tail lamp (6.2), left side: a dark red mirror of a housing, a trough from the lens's two edges in to its
@@ -124,8 +131,8 @@ const tailLow = (x) => (x < 0.66 ? 0.852 - (0.1 * (x - 0.37)) / 0.29 : 0.752 + (
  */
 function tailLamp(t, cast) {
   const FN = LAMP_FN;
-  const xs = TAIL_LENS.slice(0, 11).map((p) => p[0]);
-  const zs = TAIL_LENS.slice(0, 11).map((p) => p[2]);
+  const xs = TAIL_LENS.slice(0, TAIL_UPPER).map((p) => p[0]);
+  const zs = TAIL_LENS.slice(0, TAIL_UPPER).map((p) => p[2]);
   const zOf = (x) => {
     let i = 0;
     while (i < xs.length - 2 && xs[i + 1] < x) i++;
@@ -142,7 +149,7 @@ function tailLamp(t, cast) {
   const steps = 24;
   let prev = null;
   for (let i = 0; i <= steps; i++) {
-    const x = 0.362 + ((0.846 - 0.362) * i) / steps;
+    const x = TAIL_INNER + 0.01 + ((0.842 - TAIL_INNER - 0.01) * i) / steps;
     const [up, low] = [tailUp(x), tailLow(x)];
     const now = { top: at(x, up + 0.008, 0.003).point, mid: at(x, (up + low) / 2, 0.027), bottom: at(x, low - 0.008, 0.003).point };
     if (prev) {
@@ -155,7 +162,7 @@ function tailLamp(t, cast) {
   const guideSteps = 30;
   prev = null;
   for (let i = 0; i <= guideSteps; i++) {
-    const x = 0.39 + ((0.826 - 0.39) * i) / guideSteps;
+    const x = TAIL_INNER + 0.025 + ((0.826 - TAIL_INNER - 0.025) * i) / guideSteps;
     const [up, low] = [tailUp(x), tailLow(x)];
     const outer = THREE.MathUtils.smoothstep(x, 0.54, 0.6);
     const c = THREE.MathUtils.lerp(up - 0.034, 0.5 * (up + low), outer);

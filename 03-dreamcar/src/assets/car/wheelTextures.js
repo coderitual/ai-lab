@@ -227,7 +227,7 @@ export const TYRE_MARK = {
 };
 
 /**
- * The tyre's size as raised characters ("225/45 R18": a fact about the tyre, not a name), drawn with the plate's
+ * The tyre's size as raised characters ("225/40 R19": a fact about the tyre, not a name), drawn with the plate's
  * own stroke glyphs. Red and green hold the slope of the raised characters (0.5 = flat), alpha where they stand.
  * @param {string} text
  * @returns {THREE.DataTexture | null} null where there is no canvas (Node)
@@ -292,13 +292,13 @@ export function createTyreMarkTexture(text) {
  * picks one with paletteU().
  */
 export const FINISH = {
-  machined: { color: [0.8, 0.8, 0.8], roughness: 0.22, metalness: 1 },
+  machined: { color: [0.66, 0.66, 0.67], roughness: 0.24, metalness: 1 },
   black: { color: [0.012, 0.012, 0.013], roughness: 0.16, metalness: 0.3 },
   chrome: { color: [0.83, 0.84, 0.86], roughness: 0.1, metalness: 1 },
   capRing: { color: [0.62, 0.63, 0.64], roughness: 0.34, metalness: 1 },
   bolt: { color: [0.02, 0.02, 0.021], roughness: 0.38, metalness: 0.8 },
   valve: { color: [0.022, 0.022, 0.022], roughness: 0.7, metalness: 0 },
-  disc: { color: [0.2, 0.197, 0.193], roughness: 0.45, metalness: 1 },
+  disc: { color: [0.13, 0.128, 0.125], roughness: 0.5, metalness: 1 },
   discWorn: { color: [0.13, 0.127, 0.123], roughness: 0.56, metalness: 1 },
   discEdge: { color: [0.11, 0.1, 0.095], roughness: 0.72, metalness: 0.8 },
   hat: { color: [0.05, 0.05, 0.052], roughness: 0.6, metalness: 0.5 },
