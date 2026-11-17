@@ -145,7 +145,21 @@ const SUN = towards(-120, 30);
  */
 const MOON = towards(330, 50);
 
-/** @type {{ day: TimeOfDay, night: TimeOfDay }} */
+/**
+ * (look lane, dusk) Where the sun went down: bearing 100 (along the lake, a little out over it), 5 degrees under
+ * the horizon. The rose band lies (headings from the Track, scratchpad head.mjs):
+ *   lakeside straight   ahead, 10 degrees left of the road, down the lake over the water (the C-match view)
+ *   sweeper, esses      ahead-left to left (35..105 degrees off the road) as the road turns up into the wood
+ *   tunnel, viaduct     left and behind (95..130)
+ *   hairpins            behind-left on the legs that climb away from the lake, ahead-right (50) on the others
+ *   summit              right, then behind-right
+ *   descent             behind and to the right (75..160): the descent looks into the slate side of the sky
+ *   hook, chute         right, then ahead again as the chute meets the shore
+ */
+const DUSK_BEARING = 100;
+const DUSK_SUN = towards(DUSK_BEARING, -5);
+
+/** @type {{ day: TimeOfDay, dusk: TimeOfDay, night: TimeOfDay }} */
 export const TIMES = {
   // A clear afternoon late in the year: the sun 24 degrees up, warm, well to one side; long shadows; haze in the
   // valleys; a few clouds that catch the light.
@@ -183,6 +197,47 @@ export const TIMES = {
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
+  },
+
+  // (look lane, dusk stage) THE VELVET HOUR: the half hour after sunset, after rain (reference C). The sun is 5
+  // degrees under the horizon at the far end of the lake, so the rose band stands ahead of the start straight,
+  // down the water. Nothing lights directly: the sky's gradient, through the environment map and the fill, is the
+  // light, and a weak high key from the bright side of the sky lets the car and what stands sit on a soft shadow.
+  // The lamps, windows and both towns are on; the road is wetter than at night, with more water standing.
+  dusk: {
+    name: 'dusk',
+    // `dir` is where the sun went (the band, the haze's warm side); `light` is what the directional light does
+    sun: { dir: DUSK_SUN, color: [0.8, 0.8, 1.0], intensity: 0, light: { dir: towards(DUSK_BEARING + 30, 62), intensity: 0.05 } },
+    sky: {
+      // slate blue-violet overhead, mauve lower down
+      zenith: [0.0135, 0.0155, 0.032],
+      horizon: [0.04, 0.033, 0.047],
+      falloff: 0.22,
+      phase: 0.15,
+      // a broad warm lobe over where the sun went
+      glow: { color: [1.0, 0.56, 0.42], wide: [0.03, 0.55], tight: [0.02, 0.86] },
+      disc: { size: 0.4, radiance: 0, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
+      // the dusty rose band low on the horizon (sky.js): radiance at the horizon under the sun, height (unit y)
+      band: { color: [0.05, 0.026, 0.026], height: 0.09 },
+      ground: [0.005, 0.0047, 0.0062],
+      stars: 6e-7,
+      milkyWay: 0,
+      airglow: [0, 0, 0],
+      // a few thin clouds: their undersides lit rose by the set sun, their tops grey
+      clouds: { cover: 0.16, wisps: 0.55, lit: 0, light: [0.075, 0.036, 0.034], silver: 0.8, shade: [0.017, 0.017, 0.024], drift: [0.0011, 0.0004] },
+    },
+    env: { intensity: 1 },
+    ambient: { sky: [0.8, 0.78, 1.0], ground: [0.55, 0.47, 0.5], intensity: 0.012 },
+    // a soft violet-grey haze, rose towards the band
+    fog: { color: [0.034, 0.029, 0.04], sun: [0.03, 0.014, 0.01], sunLobe: 3, density: 0.00055, heightFalloff: 0.011 },
+    // 2.7 stops above day
+    exposure: 7.2,
+    tunnelExposure: 8,
+    // restrained: a photograph of a wet evening (reference C point 6)
+    look: { contrast: 1.0, saturation: 0.95, tint: [1.0, 0.975, 1.035], lift: [0.0004, 0.0003, 0.0007], vignette: 0.2, chroma: 0.0008, grain: 0.8, bloom: 0.06, ghosts: 0 },
+    lamps: { street: 1, tunnel: 1, windows: 1 },
+    wetness: 0.75,
+    carLights: 'low',
   },
 
   // A clear night under a three-quarter moon. The moon draws the ridges, the edges of the road and the car's

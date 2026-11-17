@@ -166,7 +166,8 @@ void main() {
     points,
     stats: { studs: kind.length },
     setTime(time) {
-      uniforms.uGlow.value = time.name === 'night' ? GLOW : 0;
+      // (look lane, dusk) they glow whenever the street lamps are on: at dusk's lower exposure they read faintly
+      uniforms.uGlow.value = time.lamps.street > 0 ? GLOW : 0;
     },
     /** @param {THREE.PerspectiveCamera} camera @param {number} viewHeight device pixels */
     prepareView(camera, viewHeight) {

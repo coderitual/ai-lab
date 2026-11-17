@@ -139,9 +139,11 @@ export function createSun({ renderer, tier, shadows }) {
     objects: [light, light.target, fill],
 
     setTime(time, sky, ground) {
-      dir.fromArray(time.sun.dir).normalize();
+      // (look lane, dusk) a sun under the horizon lights nothing directly: `light` is then the soft key the
+      // directional light stands for (high, from the bright side of the sky), its shadow grounding what stands
+      dir.fromArray(time.sun.light?.dir ?? time.sun.dir).normalize();
       light.color.setRGB(...time.sun.color);
-      light.intensity = time.sun.intensity;
+      light.intensity = time.sun.light?.intensity ?? time.sun.intensity;
       fillSky.setRGB(...sky);
       fillGround.setRGB(...ground);
       fill.color.copy(fillSky);

@@ -127,6 +127,7 @@ uniform vec3 uDiscLight;    // where the disc is lit from, in its own frame (z t
 uniform float uDiscOn;
 uniform vec3 uCloudLit;     // a cloud face square to the light
 uniform vec3 uCloudShade;
+uniform vec4 uBand;         // (look lane, dusk) the twilight band: radiance (rgb) at the horizon under the set sun, height (a)
 varying vec3 vDir;
 
 vec3 clearSky(vec3 d, float mu) {
@@ -137,6 +138,15 @@ vec3 clearSky(vec3 d, float mu) {
   col *= 1.0 + uAir.y * (0.75 * (1.0 + mu * mu) - 1.0);
   col += uAirglow * low * low;
   col += uGlowColor * (uGlow.x * lobe(mu, uGlow.y) + uGlow.z * lobe(mu, uGlow.w));
+  // (look lane, dusk) after sunset: a broad rose band low all round the horizon, strongest under the set sun and
+  // still a third as strong opposite it (the belt the earth's shadow rises under), fading through mauve upwards
+  if (uBand.a > 0.0) {
+    vec2 level = normalize(d.xz + 1.0e-5);
+    vec2 sunFlat = normalize(uSunDir.xz + 1.0e-5);
+    float side = 0.5 + 0.5 * dot(level, sunFlat);
+    float h = max(d.y, 0.0);
+    col += uBand.rgb * exp(-h / (uBand.a * (0.8 + 0.6 * side))) * (0.33 + 0.67 * side * side);
+  }
   return col;
 }
 
@@ -356,6 +366,7 @@ export function createSky({ tier, rng, atmosphere }) {
     uDiscLight: { value: new THREE.Vector3(0, 0, 1) },
     uCloudLit: { value: new THREE.Vector3() },
     uCloudShade: { value: new THREE.Vector3() },
+    uBand: { value: new THREE.Vector4() },
   };
   const domeMaterial = (discOn) =>
     new THREE.ShaderMaterial({
@@ -424,6 +435,10 @@ export function createSky({ tier, rng, atmosphere }) {
       u.uMilky.value.w = sky.milkyWay;
       u.uDiscColor.value.fromArray(sun.color);
       u.uCloudLit.value.fromArray(sun.color).multiplyScalar(sun.intensity * sky.clouds.lit);
+      // (look lane, dusk) a sun under the horizon lights the clouds' undersides with its own colour, not its light
+      if (sky.clouds.light) u.uCloudLit.value.fromArray(sky.clouds.light);
+      if (sky.band) u.uBand.value.set(...sky.band.color, sky.band.height);
+      else u.uBand.value.set(0, 0, 0, 0);
       u.uCloudShade.value.fromArray(sky.clouds.shade);
 
       // The disc's own frame on the sky: x level, y up it. Its light comes from the viewer's side turned by the

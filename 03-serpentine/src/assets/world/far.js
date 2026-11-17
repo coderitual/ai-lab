@@ -502,7 +502,7 @@ void main() {
       const e = time.sun.intensity * Math.max(0.1, time.sun.dir[1]) + Math.PI * (0.7 * time.sky.zenith[1] + 0.3 * time.sky.horizon[1]) * 1.2;
       const s = (0.8 * e) / Math.PI;
       shared.uMistColor.value.set(s * (0.75 + 0.25 * time.sun.color[0]), s * (0.8 + 0.2 * time.sun.color[1]), s * (0.85 + 0.15 * time.sun.color[2]));
-      shared.uMistOpacity.value = night ? 0.15 : 0.65;
+      shared.uMistOpacity.value = night ? 0.15 : time.name === 'dusk' ? 0.45 : 0.65;
       const lamps = time.lamps.windows;
       lightPoints.material.uniforms.uRadiance.value = 0.6 * lamps;
       lightPoints.visible = lamps > 0;

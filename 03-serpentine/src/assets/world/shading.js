@@ -17,9 +17,13 @@ import * as THREE from 'three';
 /** Shared by every baked material: which of the two baked channels is the light now showing (day, night). */
 export const BAKE_UNIFORMS = { uBakeSel: { value: new THREE.Vector2(1, 0) } };
 
-/** @param {'day'|'night'} name */
+/**
+ * (look lane) Dusk has no sun to march towards: its key light is high and soft, so the ridges shade none of it
+ * (both weights 0: bakedSun() is 1) and only the sky's share, z, darkens the hollows.
+ * @param {'day'|'dusk'|'night'} name
+ */
 export function selectBake(name) {
-  BAKE_UNIFORMS.uBakeSel.value.set(name === 'night' ? 0 : 1, name === 'night' ? 1 : 0);
+  BAKE_UNIFORMS.uBakeSel.value.set(name === 'day' ? 1 : 0, name === 'night' ? 1 : 0);
 }
 
 /**
@@ -58,7 +62,7 @@ export function withBake(material) {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        '#include <common>\nvarying vec3 vBake;\nuniform vec2 uBakeSel;\nfloat bakedSun() { return dot( vBake.xy, uBakeSel ); }',
+        '#include <common>\nvarying vec3 vBake;\nuniform vec2 uBakeSel;\nfloat bakedSun() { return dot( vBake.xy, uBakeSel ) + 1.0 - uBakeSel.x - uBakeSel.y; }',
       )
       .replace('#include <lights_fragment_begin>', LIGHT_LOOP)
       .replace(
