@@ -103,6 +103,8 @@
  * @property {import('../../engine/FramePipeline.js').Look} look the grade of the finished picture
  *
  * @property {{ street: number, tunnel: number, windows: number }} lamps how far each kind of lamp is turned up, 0..1
+ * @property {number} wetness 0..1 how wet the road is (world.wetness defaults to it; ?wet= overrides): the night
+ *   is the night after rain, the road a dark mirror with puddles in the wheel tracks and low spots
  * @property {'drl'|'low'} carLights what a car's automatic lamps do under the open sky (in the tunnel: always low)
  */
 
@@ -172,6 +174,7 @@ export const TIMES = {
     tunnelExposure: 5.6,
     look: { contrast: 1.08, saturation: 1.06, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.22, chroma: 0.0012, grain: 0.6, bloom: 0.1, ghosts: 0.03 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
+    wetness: 0,
     carLights: 'drl',
   },
 
@@ -202,8 +205,10 @@ export const TIMES = {
     exposure: 32,
     // the lit tunnel is two stops brighter than the moonlit road outside
     tunnelExposure: 8,
-    look: { contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], lift: [0.0006, 0.0009, 0.0018], vignette: 0.32, chroma: 0.0012, grain: 1.2, bloom: 0.15, ghosts: 0.03 },
+    look: { contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], lift: [0.0006, 0.0009, 0.0018], vignette: 0.32, chroma: 0.0012, grain: 1.2, bloom: 0.15, ghosts: 0 },
     lamps: { street: 1, tunnel: 1, windows: 1 },
+    // the night after rain (look reference B): wet asphalt, water standing in the ruts
+    wetness: 0.65,
     carLights: 'low',
   },
 };

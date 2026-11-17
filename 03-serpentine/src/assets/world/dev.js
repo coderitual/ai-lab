@@ -67,7 +67,7 @@ export function roadCamera(track, view, camera, aspect) {
     camera.far = 2400;
   } else {
     const s = view.s - view.back;
-    placeOnRoad(track, s, view.lat, camera);
+    placeOnRoad(track, s, view.clat ?? view.lat, camera);
     track.frameAt(s, frame);
     camera.position.addScaledVector(frame.up, view.h);
     // heading from the road's direction on the map, pitch from the horizontal

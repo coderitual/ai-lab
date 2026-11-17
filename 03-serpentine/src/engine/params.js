@@ -70,7 +70,7 @@ const ORTHO_VIEWS = ['side', 'front', 'rear', 'top'];
  * @property {string|null} plate
  * @property {string|null} plate2
  * @property {string|null} paint
- * @property {number} wet
+ * @property {number|null} wet
  * @property {boolean} mute
  * @property {string|null} debug
  * @property {boolean} ldr
@@ -133,7 +133,8 @@ export function parseParams(search = typeof location !== 'undefined' ? location.
     plate: plate('plate'),
     plate2: plate('plate2'),
     paint: word('paint'),
-    wet: Math.min(1, Math.max(0, num('wet') ?? 0)),
+    // null when not given: the time of day's own wetness (lighting.js) applies
+    wet: num('wet') == null ? null : Math.min(1, Math.max(0, num('wet'))),
     mute: q.has('mute'),
     debug: word('debug'),
     ldr: q.has('ldr'),
