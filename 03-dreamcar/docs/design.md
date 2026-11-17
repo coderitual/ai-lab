@@ -348,37 +348,45 @@ about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
 
 ## The forest (trees lane, rework 2026-11)
 
-Early autumn: most broadleaves green, maples (and some limes and birches)
-turned in groups, most of them round the start; larch green-gold; spruce and
-fir dark. Built in `src/assets/world/`:
+Early autumn: most broadleaves green, maples turned, birches yellowing, larch
+green-gold, spruce and fir dark. Built in `src/assets/world/`:
 
 - `treeSpecies.js` seven species (spruce, fir, larch, birch, maple, lime,
-  hazel for the undergrowth) and nine grown individuals; per species a
-  `green` tint, `autumn` tints and how readily it `turns`.
-- `forestTextures.js` the foliage atlas (broadleaf tiles painted nearly grey,
-  the tint colours them) and the bark, with coverage-preserving mip levels.
+  hazel for the undergrowth), nine grown individuals; per species a `green`
+  tint, `autumn` tints and how readily it `turns`. The maple's autumn tints
+  and the broadleaf greens were set by measuring frames D4 and D3 (hue and
+  lightness of crown pixels) under our golden hour and day light.
+- `forestTextures.js` one atlas of 12 tiles: needles, leaf clusters, leaf
+  masses of many small leaves (for the reduced trees' big cards), fallen
+  leaves and grass-and-moss patches (the floor); broadleaf tiles painted
+  nearly grey; coverage-preserving mip levels.
 - `treeGeometry.js` grows each individual into a full and a reduced mesh;
-  broadleaf crowns are leaf masses clumped round the last limbs, normals out
-  of the crown, occlusion dark inside and below.
-- `treeMaterial.js` the standard material plus light through the leaves (sun
-  behind, sky behind and above), light and shade carrying the crown's colour
-  (`crownTone`), wind, coverage. No hashed or dithered transparency at any
-  tier: alpha to coverage where the scene target is multisampled, a plain cut
-  on low.
-- `impostors.js` bakes, at start-up, 8 level and 8 raised pictures of each
-  individual (colour; normal in the tree's frame and the crown's light).
-- `forest.js` plants and draws. Where trees stand is asked of `woodAt(track,
-  noise, s, side)` (the Track's own `woodAt` when it has one, else the sides
-  whose edge kind is TREES), from 2 m behind the barrier; `turnedAt` is how
-  much of the wood has turned; `createWorld({ keepOut })` keeps places free.
-  Levels per tier (m): full to 0 / 34 / 50, reduced to 60 / 95 / 130,
-  impostors to 650 / 900 / 1200 (low / medium / high), cross-faded by
-  coverage over 8 m on medium and high. Shadows (medium, high): impostor
-  cards on a layer only the sun's shadow camera sees, turned to the light.
-  The mirror and the probe see reduced trees and impostors only.
+  crowns are leaf masses clumped round the last limbs, each clump a small
+  dome lit on top and darker below.
+- `treeMaterial.js` light through the leaves, `crownTone` (rust or blue-green
+  in the shade, gold or yellow-green in the light), wind, coverage. No hashed
+  or dithered transparency at any tier.
+- `impostors.js` pictures of each individual baked at start-up from the full
+  trees (every tier): 8 level and 8 raised views (8 on low), cells
+  160 / 160 / 192 px (low / medium / high), sampled with a mip bias of -0.6.
+- `forest.js` plants and draws. Where trees stand: `woodAt(track, noise, s,
+  side)` (the Track's `woodAt`); `turnedAt` (turned from the pit lane to
+  about 220 m past the line, green by the first bend; the ledge's first bend
+  kept green); on the straight a deep wall of tall turned maples (a fir or
+  two among them) wherever the Track says the side is wooded and turned;
+  none on the lake side but two tall dark conifers behind the first board
+  (frame D1); trees in D3's bend grown taller; where `woodAt` is null the
+  mass of the forest keeps 30 m away (140 m at the ledge, the valley view);
+  `createWorld({ keepOut })` keeps the pits and town free. Levels per tier
+  (m): full to 0 / 34 / 50, reduced to 60 / 95 / 130, impostors to 650 / 900
+  / 1200. The floor: a grass patch under every tree of the road's rows and a
+  patch of fallen leaves under every turned one (2 triangles each, to 70 /
+  110 / 150 m). Shadows (medium, high): impostor cards on a layer only the
+  sun's shadow camera sees.
 
-Measured (software WebGL, chase view in the green wood at s 667, 1280x720):
-forest draw calls / triangles low 10 / 61 k, medium 19 / 294 k, high
-20 / 540 k (plus one shadow call of 2 triangles per caster); start-up
-(plant, textures, grow, bake, meshes) about 0.53 s low, 1.16 s medium,
-1.27 s high. Not measured on a real phone or a real GPU.
+Measured on software WebGL (chase view, 1280x720, one page at a time,
+earlier head): forest draw calls / triangles low 11 / 66 k, medium 21 / 256 k.
+High was not measured again after the last changes. Start-up of the forest
+on this machine has grown to several seconds (planting about 1.3-1.5 s,
+painting the atlas 0.7-2 s): over the 1.5 s budget, to be cut. Not measured
+on a real phone or a real GPU.
