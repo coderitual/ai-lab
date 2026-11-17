@@ -27,6 +27,12 @@ export function selectBake(name) {
 }
 
 /**
+ * (road and environment lane) How wet the world is, 0..1 (lighting.js `wetness`, ?wet=): one uniform object shared
+ * by every material that rain changes (the asphalt, the paving, the verge, the rock). The road sets it.
+ */
+export const WET_UNIFORMS = { uWet: { value: 0 } };
+
+/**
  * Adds an edit to a material's shader, after whatever edits it already has, and gives it a cache key of its own.
  * @template {THREE.Material} T
  * @param {T} material @param {string} key
