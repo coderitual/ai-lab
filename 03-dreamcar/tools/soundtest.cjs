@@ -2,6 +2,8 @@
 //
 //   node tools/soundtest.cjs http://localhost:5190/ [outDir]
 //
+// Without a URL it takes $DEV_URL, or http://localhost:5190/ (vite.config.js's dev port: npm run dev).
+//
 // The dev server's sound bench (sound.html) renders scenarios on an OfflineAudioContext with the game's own audio
 // code (engine/Audio.js, game/Sound.js); this script hands it scenarios, takes the samples back and measures
 // them: which partials are there and how strong, levels, sides, tails, jumps. Each claim the sound makes about
@@ -20,7 +22,7 @@ const fs = require('fs');
 const lab = require('./soundlab.cjs');
 
 const { dB } = lab;
-const arg = process.argv[2] || 'http://localhost:5190/';
+const arg = process.argv[2] || process.env.DEV_URL || 'http://localhost:5190/';
 const url = arg.endsWith('.html') ? arg : arg.replace(/\/?$/, '/') + 'sound.html';
 const outDir = process.argv[3] || '';
 if (outDir) fs.mkdirSync(outDir, { recursive: true });
