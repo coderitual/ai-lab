@@ -250,7 +250,7 @@ unit per view:
   gear, the ABS / TC / ESC lamps;
 - bottom left: a small map (can be hidden);
 - just above the speed, only while the car slides 12° or more: the slide's angle and its running score (`vehicle.slide`; `Hud.setDrift`), fading out a second after the slide ends; the best slide of the run is on the results;
-- touch screens: DRIFT (and GAS with the throttle on manual) under the right thumb; the speed steps 116 px left of them;
+- touch screens: DRIFT (and GAS with the throttle on manual) under the right thumb; the speed steps 116 px left of them (a side-by-side half: above DRIFT; an upright view: bottom left, the map above it; a view lower than 330 px, a stacked half on a phone: DRIFT stands beside GAS at the bottom, 160 px from the right, and the speed 206 px left);
 - touch screens: four small buttons together (camera, high beam, put back,
   pause);
 - the best-laps board on the title, the pause sheet and the results only.
