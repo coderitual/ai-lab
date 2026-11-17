@@ -139,11 +139,11 @@ export function towards(bearing, elevation) {
 const SUN = towards(116, 20);
 
 /**
- * (sky lane) The moon: low, ahead and to the right of the start straight, over the massif, so that the massif stands
+ * (sky lane) The moon: low, ahead and a little left of the start straight, beside the massif, so that the massif stands
  * as a silhouette with moonlit edges, the moon itself rides in the chase view down the straight, and the car is
  * rim-lit from ahead (its lamps and the street lamps light what faces the camera).
  */
-const MOON = towards(68, 22);
+const MOON = towards(98, 17);
 
 /**
  * (sky lane) GOLDEN HOUR (references D4 and D2): the sun 3.5 degrees up at bearing 215, out over the lake and behind
@@ -168,7 +168,7 @@ export const TIMES = {
       phase: 0.4,
       // (look lane: the aureole, `tight`, was 7: now a white-hot halo about four times the disc's radius, which is
       // what the bloom and the glare of the frame spread over the top of the picture)
-      glow: { color: [1.0, 0.9, 0.74], wide: [0.3, 0.8], tight: [60, 0.985] },
+      glow: { color: [1.0, 0.9, 0.74], wide: [0.3, 0.8], tight: [40, 0.988] },
       disc: { size: 0.4, radiance: 3000, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
       // grass, rock and forest of albedo 0.11 under the 3.1 the sun and sky lay on them
       ground: [0.105, 0.112, 0.09],
@@ -188,7 +188,7 @@ export const TIMES = {
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.07, ghosts: 0.0003, glare: 0.04 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.18, saturation: 1.22, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',

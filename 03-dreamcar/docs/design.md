@@ -172,8 +172,8 @@ a few seconds it is offered).
   right of the straight, back-lit, blue-grey in its own shade. Exposure for
   sunlit asphalt, closing by about 2.5 stops inside the tunnel and recovering
   over a second on the way out.
-- **Night:** a three-quarter moon low ahead and to the right of the start
-  straight (22° up, over the massif, which stands as a silhouette with
+- **Night:** a three-quarter moon low ahead and a little left of the start
+  straight (17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
   65 m with a sharp cut-off rising to the right, high beam about 150 m; LED
   daytime running lamps always on; tail lamps red with a hot core; brake lamps
