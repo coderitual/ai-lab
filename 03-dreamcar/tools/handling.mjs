@@ -85,22 +85,38 @@ row('tyres start to squeal at', squeal.map((q) => `${f(q.onset * 100, 0)} % of t
 
 section('Hands and drifting (tools/unit/drift.mjs)');
 {
-  for (const kind of ['keys', 'thumb', 'pad']) {
-    const r = [80, 160, 250].map((k) => D.response(kind, k));
-    row(`steering response, ${kind}`, r.map((x, i) => `${[80, 160, 250][i]}: ${f(x.rise, 2)} s (+${f(x.overshoot, 0)} %)`).join(', '), 'time to 90 % of the yaw');
+  const DEVICES = ['keys', 'thumb', 'pad'];
+  data.response = {};
+  for (const kind of DEVICES) {
+    const r = [80, 160, 250].map((k) => D.response(kind, k, kind === 'keys' ? 1 : 0.5));
+    data.response[kind] = r;
+    row(`steering response, ${kind}${kind === 'keys' ? ' (held)' : ' (half over)'}`, r.map((x, i) => `${[80, 160, 250][i]}: ${f(x.rise, 2)} s +${f(x.overshoot, 0)} % (g ${f(x.riseG, 2)} s)`).join(', '), 'time to 90 % of the yaw, overshoot [0.15-0.3 s]');
   }
+  const probe = M.makeCar();
+  row('rear-wheel steering', [100, 160, 250].map((k) => `${f(probe.rearShare(k / 3.6) * 100, 0)} % at ${k}`).join(', ') + ' km/h', 'of the fronts\' angle, the same way');
   const L = ASSISTS.levels;
   data.drift = {};
   for (const name of Object.keys(L)) {
     const level = L[name];
-    const lift = D.inBend(140, 150, (c) => { c.throttle = 0; }, { level });
-    const dab = D.inBend(140, 150, (c, t) => { c.throttle = 0; c.brake = t < 0.4 ? 0.6 : 0; }, { level });
-    const hb = [90, 140].map((k) => D.handbrakePull(k, 0.4, { level }));
-    const held = ['keys', 'thumb', 'pad'].map((device) => D.driftHold(name === 'road' ? 12 : 25, { level, device, start: 'power', kmh: 60 }));
-    data.drift[name] = { lift: lift.mostSlip, dab: dab.mostSlip, hb: hb.map((x) => x.mostSlip), held: held.map((x) => x.best) };
-    row(`[${L[name].name}] lift / brake dab at turn-in, 150 m at 140`, `${f(Math.abs(lift.mostSlip))}° / ${f(Math.abs(dab.mostSlip))}°`);
-    row(`[${L[name].name}] handbrake 0.4 s at 90 / 140 km/h`, hb.map((x) => `${f(Math.abs(x.mostSlip))}°${x.spun ? ' spun' : ''}`).join(' / '));
-    row(`[${L[name].name}] power slide held at ${name === 'road' ? 12 : 25}°`, held.map((x, i) => `${['keys', 'thumb', 'pad'][i]} ${f(x.best)} s${x.spun ? ' spun' : ''}`).join(', '));
+    const out = (data.drift[name] = {});
+    const tag = `[${level.name}]`;
+    // a slide asked for four ways at the carousel's speed, held 4 s with the steering into the bend, then let go
+    const starts = ['handbrake', 'brake', 'lift', 'power'].map((start) => D.holdSlide('keys', level, { start }));
+    out.starts = starts.map((r) => ({ onset: r.onset, mean: r.mean, spun: r.spun }));
+    row(`${tag} slide asked for by handbrake / brake / lift / power, 90 km/h`, starts.map((r) => (r.spun ? 'spins' : Number.isNaN(r.onset) ? 'none' : `${f(r.mean, 0)}° after ${f(r.onset, 1)} s`)).join(' / '), 'keys; held 4 s');
+    if (level.hold) {
+      const held = DEVICES.map((device) => D.holdSlide(device, level, {}));
+      out.held = held.map((r) => ({ mean: r.mean, kmhIn: r.kmhIn, kmhOut: r.kmhOut, close: r.close, snap: r.snap }));
+      row(`${tag} held on the throttle (handbrake in)`, held.map((r, i) => `${DEVICES[i]} ${f(r.mean, 0)}° (${f(r.least, 0)}-${f(r.most, 0)}), ${f(r.kmhIn, 0)} to ${f(r.kmhOut, 0)} km/h`).join('; '));
+      row(`${tag} let go: straight in / swing the other way`, held.map((r, i) => `${DEVICES[i]} ${f(r.close, 2)} s / ${f(r.snap)}°`).join('; '), '[no snap]');
+      const tapped = D.holdSlide('keys', level, { duty: 0.5 });
+      row(`${tag} key tapped half the time`, `${f(tapped.mean, 0)}°, ${f(tapped.kmhIn, 0)} to ${f(tapped.kmhOut, 0)} km/h, ${f(tapped.g, 2)} g`);
+      const fast = [[185, 220], [210, 300]].map(([kmh, radius]) => D.holdSlide('keys', level, { start: 'brake', kmh, radius }));
+      row(`${tag} at the shore bend's and the long right's speeds (brake in)`, fast.map((r, i) => `${[185, 210][i]} km/h: ${f(r.mean, 0)}°, to ${f(r.kmhOut, 0)} km/h`).join('; '));
+    }
+    const hb = [[90, 0.5], [150, 0.5], [150, 1.5]].map(([k, pull]) => D.handbrakePull(k, pull, { level }));
+    out.handbrake = hb.map((x) => ({ most: x.mostSlip, spun: x.spun }));
+    row(`${tag} handbrake 0.5 s at 90 / 0.5 s at 150 / 1.5 s at 150 km/h, then half throttle`, hb.map((x) => `${f(Math.abs(x.mostSlip), 0)}°${x.spun ? ' spun' : ''}`).join(' / '));
   }
 }
 
@@ -112,7 +128,7 @@ row('damping ratio front / rear', `${f(front.dampingRatio, 2)} / ${f(rear.dampin
 
 section('Keys (PlayerDriver, digital)');
 const k80 = (data.keyResponse80 = M.keyResponse(80));
-row('key held at 80 km/h', `90 % of the yaw rate in ${f(k80.rise, 2)} s, under 10 % ${f(k80.release, 2)} s after release`, '[0.30-0.45 s; under 0.35 s]');
+row('key held at 80 km/h', `90 % of the yaw rate in ${f(k80.rise, 2)} s, under 10 % ${f(k80.release, 2)} s after release`, '[0.15-0.25 s; under 0.35 s]');
 row('  where it settles', `${f(k80.steadyG, 2)} g at ${f(k80.steer, 1)}° of steering, yaw overshoot ${f(k80.overshoot, 0)} %`);
 const held = (data.keyHeld = [110, 140, 200].map((kmh) => ({ kmh, ...M.keyResponse(kmh) })));
 row('key held through a long bend', held.map((h) => `${h.kmh} km/h: ${f(h.steadyG, 2)} g, swings ${f(h.swing, 2)} g`).join('; '), '[steady]');
@@ -149,10 +165,22 @@ if (!process.argv.includes('--no-laps')) {
     const r = M.laps(track, kind, { pace, count: 2 });
     return { kind, pace, ...r };
   };
-  const lapRows = (data.laps = [lap('auto', 1), lap('auto', 0.9), lap('auto', 0.7), lap('thumb', 1), lap('pad', 1), lap('keys', 1), lap('hamfist', 1), lap('human-thumb', 1), lap('human-pad', 1)]);
+  const lapRows = (data.laps = [lap('auto', 1), lap('auto', 0.9), lap('auto', 0.7), lap('thumb', 1), lap('pad', 1), lap('keys', 1), lap('hamfist', 1)]);
   for (const l of lapRows) {
-    const who = { auto: 'autopilot', thumb: 'thumb (full throttle unless braking)', pad: 'pad (analog steering and pedals)', keys: 'keys', hamfist: 'ham-fisted keys (flat out, full keys, slow hands)', 'human-thumb': 'a person\'s thumb (0.15 s, 15 cm/s, shake)', 'human-pad': 'a person on a pad (the same limits)' }[l.kind];
-    row(`${who}, pace ${l.pace}`, `${f(l.best, 1)} s, ${l.impacts} impacts, body ${l.off > 0 ? `${f(l.off, 2)} m onto the kerb` : `${f(-l.off, 2)} m inside the pavement`} at worst, slip ${f(l.slip, 1)}° at most, stability control ${f(l.escPerLap, 1)} s a lap`);
+    const who = { auto: 'autopilot', thumb: 'thumb, ideal hands (full throttle unless braking)', pad: 'pad, ideal hands', keys: 'keys, ideal hands', hamfist: 'ham-fisted keys (flat out, full keys, slow hands)' }[l.kind];
+    row(`${who}, pace ${l.pace}`, `${f(l.best, 1)} s, ${l.impacts} impacts, body ${l.off > 0 ? `${f(l.off, 2)} m beyond the pavement` : `${f(-l.off, 2)} m inside the pavement`} at worst, slip ${f(l.slip, 1)}° at most, stability control ${f(l.escPerLap, 1)} s a lap`);
+  }
+  section('People on the real road (a person\'s lag, speed and shake on each device; flying laps, s)');
+  data.people = {};
+  for (const name of ['full', 'sport']) {
+    const level = ASSISTS.levels[name];
+    for (const device of ['keys', 'thumb', 'pad']) {
+      const tidy = D.driftLaps(track, device, [], { level });
+      const slid = D.driftLaps(track, device, [{ id: 'carousel', start: 'handbrake', lead: 0 }], { level });
+      const z = slid.zones.carousel;
+      data.people[`${name}-${device}`] = { tidy: tidy.time, tidyImpacts: tidy.impacts, slid: slid.time, slidImpacts: slid.impacts, zone: z };
+      row(`[${level.name}] ${device}`, `tidy ${f(tidy.time, 1)} s (${tidy.impacts} touches); carousel sideways ${f(slid.time, 1)} s (${slid.impacts} touches): ${f(z.most, 0)}° at most, ${f(z.sideways, 1)} s beyond 12°, slowest ${f(z.slowest, 0)} km/h`);
+    }
   }
 }
 
