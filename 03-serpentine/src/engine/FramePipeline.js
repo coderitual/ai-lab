@@ -57,6 +57,10 @@ import { GLSL_PROBE, installLdrEncoding } from './glsl.js';
  * @property {number} ghosts lens ghosts: the share of the brightest light in the view (the sun) that each of the
  *   ghosts on the line from it through the middle of the view carries (0: none; a few thousandths; not drawn on the
  *   low tier)
+ * @property {{ dir: number[], light: number, reach?: number, sky?: number }} [flare] (look lane) a light that flares
+ *   even from just outside the frame (the sun): its world direction, its light as the flare source would measure it
+ *   in the frame, over how many view heights outside the frame it fades out, and how bright (scene units) the sky
+ *   at the frame's edge nearest it must be for it to count as not hidden
  * @property {number} [glare] the veil the brightest light lays over the view round itself, as the glass of a real lens
  *   scatters it (0: none; 0.1..0.3 for a sun in the picture; not drawn on the low tier)
  */
@@ -294,6 +298,11 @@ const FLARE_FRAGMENT = /* glsl */ `
 uniform sampler2D uTex;
 uniform ivec2 uSize;     // the view's texels in that level
 uniform float uFloor;    // scene units below which nothing counts
+// LOOK LANE (day stage): where the light named by look.flare stands on the view (it may lie outside it), its
+// light as it would be measured in the frame, how much of it the lens still takes from outside the frame, and
+// the sky's brightness (scene units) that says it is not behind something
+uniform vec4 uSun;       // uv (x, y), light, 0..1 fade for lying outside the frame
+uniform float uSunSky;
 void main() {
   vec3 sum = vec3(0.0);
   for (int j = 0; j < 64; j++) {
@@ -305,6 +314,14 @@ void main() {
     }
   }
   float n = float(uSize.x * uSize.y);
+  // a light just outside the frame still flares, if the edge of the view nearest it shows open, bright sky
+  if (sum.x <= 0.0 && uSun.z > 0.0 && uSun.w > 0.0) {
+    ivec2 at = clamp(ivec2(clamp(uSun.xy, 0.0, 1.0) * vec2(uSize)), ivec2(0), uSize - 1);
+    float sky = luma(fromTarget(texelFetch(uTex, at, 0)).rgb);
+    float seen = smoothstep(0.5, 1.0, sky / uSunSky);
+    outColor = toTarget(vec4(uSun.xy, uSun.z * uSun.w * seen, 1.0));
+    return;
+  }
   outColor = toTarget(vec4(sum.y / max(sum.x, 1.0e-6), sum.z / max(sum.x, 1.0e-6), sum.x / n, 1.0));
 }
 `;
@@ -394,8 +411,8 @@ vec3 ghosts(vec2 uv) {
   if (e <= 0.0) return vec3(0.0);
   vec2 f = src.xy;
   vec3 sum = ghostShape(uv, f, -0.30, 0.095, 0.0) * vec3(0.55, 0.5, 1.0)
-    + ghostShape(uv, f, -0.44, 0.026, 1.0) * vec3(1.0, 0.55, 0.6) * 0.7
-    + ghostShape(uv, f, -0.50, 0.012, 0.0) * vec3(1.0, 0.45, 0.4) * 0.35
+    + ghostShape(uv, f, -0.44, 0.026, 1.0) * vec3(0.7, 0.55, 1.0) * 0.7
+    + ghostShape(uv, f, -0.50, 0.012, 0.0) * vec3(0.75, 0.5, 1.0) * 0.35
     + ghostShape(uv, f, -0.64, 0.062, 1.0) * vec3(0.6, 0.55, 1.0)
     + ghostShape(uv, f, -0.84, 0.075, 1.0) * vec3(0.5, 0.5, 1.0)
     + ghostShape(uv, f, -1.02, 0.060, 1.0) * vec3(0.6, 0.5, 1.0)
@@ -702,7 +719,13 @@ export class FramePipeline {
     if (this.lens) {
       this._flareTarget = keep(createTarget(caps));
       resizeTarget(this._flareTarget, 1, 1);
-      this._flare = pass(FLARE_FRAGMENT, { uTex: { value: null }, uSize: { value: new THREE.Vector2() }, uFloor: { value: 30 } });
+      this._flare = pass(FLARE_FRAGMENT, {
+        uTex: { value: null },
+        uSize: { value: new THREE.Vector2() },
+        uFloor: { value: 30 },
+        uSun: { value: new THREE.Vector4() },
+        uSunSky: { value: 1 },
+      });
     }
     this._enlarge = pass(UP_FRAGMENT, {
       uSmall: { value: null },
@@ -1036,6 +1059,22 @@ export class FramePipeline {
       fu.uTex.value = this._down[level].texture;
       fu.uSize.value.set(Math.min(64, this._levels[level].w), Math.min(64, this._levels[level].h));
       fu.uFloor.value = 30 / Math.max(view.exposure, 1e-6);
+      fu.uSun.value.set(0, 0, 0, 0);
+      const fl = look.flare;
+      if (fl && fl.dir) {
+        // where the light stands on the view, from a point far along its direction (behind the lens: nothing)
+        _flareP.fromArray(fl.dir).normalize().transformDirection(camera.matrixWorldInverse);
+        if (_flareP.z < -0.05) {
+          _flareP.applyMatrix4(camera.projectionMatrix);
+          const ux = 0.5 + 0.5 * _flareP.x;
+          const uy = 0.5 + 0.5 * _flareP.y;
+          // how far outside the frame, in heights of the view: the flare fades out over `fl.reach` of them
+          const out = Math.max(0, -ux, ux - 1) * (w / h) + Math.max(0, -uy, uy - 1);
+          const fade = 1 - Math.min(1, out / (fl.reach || 0.2));
+          fu.uSun.value.set(ux, uy, fl.light || 0, fade * fade);
+          fu.uSunSky.value = fl.sky || 1;
+        }
+      }
       this._flare.render(renderer, this._flareTarget, FLARE_RECT);
       this._passes++;
       u.uGhostTex.value = this._flareTarget.texture;
@@ -1100,6 +1139,7 @@ export class FramePipeline {
 
 const ONES = [1, 1, 1];
 const FLARE_RECT = { x: 0, y: 0, w: 1, h: 1 };
+const _flareP = new THREE.Vector3();
 const ZEROS = [0, 0, 0];
 const RECT = {
   x: 0,

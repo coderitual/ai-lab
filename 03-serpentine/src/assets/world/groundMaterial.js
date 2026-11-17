@@ -152,9 +152,12 @@ vec4 gDet = groundSample( uDetail, vGroundPos, gN, ${DETAIL_SCALE.toFixed(2)} );
 vec4 gDet2 = groundSample( uDetail, vec3( vGroundPos.z * 0.8 + vGroundPos.x * 0.6, vGroundPos.y, vGroundPos.x * 0.8 - vGroundPos.z * 0.6 ), gN, ${(DETAIL_SCALE * 0.37).toFixed(2)} );
 gDet = mix( vec4( 0.5 ), 0.6 * gDet + 0.4 * gDet2, gFade ) + ( 0.6 * gDet + 0.4 * gDet2 - 0.5 ) * ( 1.0 - gFade ) * 0.35;
 
+// (look lane, day) a middle scale (about 90 m) between the large field and the detail: outcrops on moderate
+// slopes, scree fans and sun-bleached straw among the grass, so the open slopes are not one smooth tone
+vec4 gMid = texture2D( uLarge, vGroundPos.xz / 93.0 + vec2( 0.37, 0.61 ) );
 float gSlope = 1.0 - gN.y;
-float gRock = smoothstep( 0.2, 0.34, gSlope + ( gLarge.b - 0.5 ) * 0.22 );
-float gScree = vMask.y * ( 1.0 - gRock );
+float gRock = smoothstep( 0.2, 0.34, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
+float gScree = max( vMask.y, smoothstep( 0.6, 0.74, gMid.a ) * smoothstep( 0.07, 0.18, gSlope ) * 0.85 ) * ( 1.0 - gRock );
 float gForest = vMask.x * ( 1.0 - gRock );
 float gSnow = smoothstep( 290.0, 350.0, vGroundPos.y + 70.0 * ( gLarge.a - 0.5 ) ) * ( 1.0 - smoothstep( 0.45, 0.7, gSlope ) );
 
@@ -163,6 +166,8 @@ vec3 gLush = vec3( 0.036, 0.062, 0.02 );
 vec3 gDry = vec3( 0.075, 0.078, 0.036 );
 vec3 gGrass = mix( gLush, gDry, smoothstep( 0.45, 0.85, gLarge.r + vGroundPos.y * 0.001 ) );
 gGrass *= 0.78 + 0.44 * gDet.r;
+gGrass = mix( gGrass, vec3( 0.12, 0.1, 0.055 ) * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.55, 0.8, gMid.b ) * 0.75 );
+gGrass *= 0.72 + 0.56 * gMid.r;
 // forest floor near, the canopy's colour far away
 vec3 gFloor = vec3( 0.04, 0.034, 0.024 ) * ( 0.7 + 0.6 * gDet.a );
 vec3 gCanopy = vec3( 0.022, 0.036, 0.02 ) * ( 0.8 + 0.4 * gLarge.b );

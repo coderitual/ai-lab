@@ -121,23 +121,22 @@ export function towards(bearing, elevation) {
 
 /**
  * Where the sun stands, chosen on the track map (look lane, day stage; was bearing 150, 24 degrees up, which left
- * the descent and the hook in the mountain's shade and never put the sun in the picture). Bearing of travel in
- * brackets; "lit" from a march of the land between each point of the road and the sun (scratchpad sunsurvey):
- *   lakeside straight (90)   behind and to the right, over the meadow: the straight is in full sun, the gantry
- *                            and the lamp posts throw their shadows forwards across the lanes
- *   sweeper (70..35)         the wooded slope above it shades it: the lap's one long stretch of shade
- *   esses (55..-18)          in and out of the trees' shadows; the bends at 600..660 m point at the sun
- *   tunnel exit, viaduct, ramp (-18..-28)   INTO THE SUN for 350 m at the lap's top speed: the sun sits in the
- *                            upper middle of the far chase view, the deck and the road ahead glare
- *   hairpins                 the legs driven at -28 (1700..1800 m) look into it again, uphill and slow; the
- *                            others have it behind
- *   summit, descent, hook    behind the car: the road and the valley in full sun, the rock faces above it in
- *                            their own shade
- * 77 % of the open road is in direct sun. The height is a compromise: the far chase camera sees up to about 27
- * degrees above level on the climbs (56 degree lens, looking a little down), so a sun higher than about 25 never
- * appears in it.
+ * most of the lap in the mountain's and the forest's shade: the lap read as dusk). Surveyed with the land AND the
+ * forest in the way (scratchpad lookday/sun2.mjs: a march from each point of the road towards the sun, shaded by
+ * the ground or by trees about 22 m tall within 120 m): 73 % of the open road is in direct sun (it was 54 %).
+ *   lakeside straight, start  in full sun from behind and to the left, over the lake
+ *   sweeper, esses            the spruces lay their shadows across the road, bend after bend (555..765 m)
+ *   viaduct                   in the ridge's shadow at its start
+ *   hairpins                  in and out of the wood's shadow
+ *   descent                   INTO THE SUN on its two long straights (2060..2345 m and 2685..2935 m) at 110 to
+ *                             150 km/h: the road ahead glares, the sun stands just over the top of the far chase
+ *                             view and flares (look.flare), dropping into it where the road levels out
+ * The height is a compromise: the far chase camera sees up to about 26 degrees above level, so a sun higher than
+ * that is never in its frame; the 35..45 degrees that would light the whole lap would never flare at all. At 30
+ * the disc stands just over the frame on the descent and the lens still takes its glare (FramePipeline's flare
+ * source follows a light up to a quarter of the view's height outside the frame).
  */
-const SUN = towards(-30, 24);
+const SUN = towards(-120, 30);
 
 /**
  * The moon: opposite the sun on the map and high. On the straight it is behind and to the right, over the wood,
@@ -179,7 +178,8 @@ export const TIMES = {
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
-    look: { contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.12, ghosts: 0.011, glare: 0.2 },
+    // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
+    look: { flare: { dir: SUN, light: 0.3, reach: 0.6, sky: 0.3 }, contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.12, ghosts: 0.011, glare: 0.2 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
@@ -189,28 +189,30 @@ export const TIMES = {
   // outline; everything else is lamps.
   night: {
     name: 'night',
-    sun: { dir: MOON, color: [0.6, 0.75, 1.0], intensity: 0.036 },
+    sun: { dir: MOON, color: [0.6, 0.75, 1.0], intensity: 0.08 },
     sky: {
-      zenith: [0.00022, 0.00042, 0.0011],
-      horizon: [0.0008, 0.0013, 0.0026],
+      zenith: [0.00045, 0.00085, 0.0021],
+      horizon: [0.0016, 0.0025, 0.0046],
       falloff: 0.12,
       phase: 0.25,
       glow: { color: [0.62, 0.77, 1.0], wide: [0.002, 0.7], tight: [0.012, 0.95] },
       disc: { size: 0.9, radiance: 0.055, limb: 0.1, phase: 0.75, tilt: -25, seas: 0.5 },
-      ground: [0.0003, 0.0004, 0.00065],
+      ground: [0.0007, 0.0009, 0.0014],
       stars: 1.5e-6,
       milkyWay: 0.0005,
       airglow: [0.0003, 0.00055, 0.0004],
-      clouds: { cover: 0.44, wisps: 0.6, lit: 0.2, silver: 2.2, shade: [0.00016, 0.00024, 0.0005], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.44, wisps: 0.6, lit: 0.2, silver: 2.2, shade: [0.0004, 0.00055, 0.001], drift: [0.0011, 0.0004] },
     },
     env: { intensity: 1 },
     // the night sky lays only about a tenth of the moon's light on the ground; this keeps the moon's shadows
     // from being holes
-    ambient: { sky: [0.45, 0.6, 1.0], ground: [0.3, 0.36, 0.5], intensity: 0.003 },
+    ambient: { sky: [0.45, 0.6, 1.0], ground: [0.3, 0.36, 0.5], intensity: 0.009 },
     // (look lane: the haze halved, the far ranges were pale grey behind black hills; reference B's are near black)
-    fog: { color: [0.0005, 0.00072, 0.0013], sun: [0.0004, 0.0005, 0.0008], sunLobe: 4, density: 0.00042, heightFalloff: 0.011 },
+    fog: { color: [0.0008, 0.0011, 0.0019], sun: [0.0004, 0.0005, 0.0008], sunLobe: 4, density: 0.00042, heightFalloff: 0.011 },
     // four stops above day (look lane: was five; at 32 the moonlit land read as dusk and everything that faces a head
     // lamp within 30 m burnt to white; reference B is darker, its lights brighter against it)
+    // (look lane, day stage: the lead found night far darker than reference B, where nothing is black but the far
+    // hills: the moon x2.2, the sky x2 and the fill x3 instead of more exposure, so the lamps do not burn)
     exposure: 18,
     // the lit tunnel is two stops brighter than the moonlit road outside
     tunnelExposure: 8,

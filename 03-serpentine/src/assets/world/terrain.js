@@ -161,7 +161,10 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     const floor = 3 + 20 * noise.fbm(x / 420, z / 420, 3) + 30 * smoothstep(1.2, 3, e) * noise.fbm(x / 300 + 7, z / 300, 3);
     const bottom = lakeLevel - 10 * smoothstep(0.95, 0.35, e);
     const r = Math.hypot(x - mid.x, (z - mid.z) * 0.9);
-    const ring = smoothstep(750, 1900, r) * (220 + 380 * noise.ridged(x / 1100 + 3, z / 1100, 5));
+    // (look lane, day: lower than it was (220 + 380) and broken by a ridged field at a third of the scale, so the
+    // far land reads as spurs and gullies, not smooth mounds, and the jagged ranges of far.js show over it)
+    const rise = smoothstep(750, 1900, r);
+    const ring = rise * (170 + 300 * noise.ridged(x / 1100 + 3, z / 1100, 5) + 150 * (noise.ridged(x / 380 + 11, z / 380 - 4, 4) - 0.4));
     return floor + (bottom - floor) * inLake + ring * (1 - inLake);
   }
   /** Small hills and gullies on top of the land's shape, zero on average. */

@@ -485,6 +485,9 @@ if ( uMirrorOn > 0.5 && vRoadEye > 0.5 ) {
     mCol += texture2D( uMirrorTex, muv + mStep * vec2( 0.0, 0.65 ) ).rgb * 0.09;
     mCol += texture2D( uMirrorTex, muv + mStep * vec2( 0.3, 0.85 ) ).rgb * 0.07;
     mCol += texture2D( uMirrorTex, muv + mStep * vec2( -0.3, 1.0 ) ).rgb * 0.06;
+    // (look lane, day stage) the brightest things (the car's own tail lamps a metre away) are held to a few times
+    // white in the film of water: the lead found their red pool behind the car far too strong and wide
+    mCol *= 0.04 / ( 0.04 + max( mCol.r, max( mCol.g, mCol.b ) ) );
     // nothing from beyond the picture's edge
     vec2 mIn = smoothstep( vec2( 0.0 ), vec2( 0.03 ), muv ) * smoothstep( vec2( 0.0 ), vec2( 0.03 ), 1.0 - muv );
     mWet *= mIn.x * mIn.y;
