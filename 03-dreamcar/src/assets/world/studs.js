@@ -2,6 +2,10 @@
 // hairpins, the hook and the tunnel, so that at night the road's shape is
 // drawn in points of light round the next corner (look reference B).
 //
+// (env lane, the circuit) A circuit has no studs: its markings are the edge
+// lines, the start line and the grid (rework R0). CIRCUIT below places none;
+// the code stays for a public road.
+//
 //  - Where: on the centre line and both edge lines wherever the road bends
 //    (one every 6 to 12 m, the tighter the closer) and all through the tunnel;
 //    on the straights only the centre line, every 24 m.
@@ -25,6 +29,8 @@ import { RETRO_GLSL, RETRO_UNIFORMS } from './retro.js';
 const TIGHT = 6;
 const GENTLE = 12;
 const STRAIGHT = 24;
+/** A circuit: no studs at all. */
+const CIRCUIT = true;
 /** Curvature (1/m) under which the road counts as straight, and at which the spacing is tightest. */
 const BENT = 1 / 600;
 const TIGHTEST = 1 / 40;
@@ -77,7 +83,7 @@ export function createStuds({ track, caps }) {
   };
   let s = 3;
   let sinceCentre = STRAIGHT;
-  while (s < track.length - 3) {
+  while (!CIRCUIT && s < track.length - 3) {
     const k = bendAt(s);
     const bent = k > BENT || inTunnel(s);
     const t = Math.min(1, Math.max(0, (k - BENT) / (TIGHTEST - BENT)));
@@ -158,6 +164,7 @@ void main() {
   });
   material.name = 'road-studs';
   const points = new THREE.Points(geometry, material);
+  points.visible = pos.length > 0;
   points.name = 'road-studs';
   points.matrixAutoUpdate = false;
   points.renderOrder = 12;

@@ -1,5 +1,5 @@
-// Guard rails: wherever the Track's solid edge is a RAIL, a galvanised W-beam
-// on posts, its face standing exactly at the edge distance (that is where the
+// Guard rails: wherever the Track's solid edge is a RAIL, a circuit's steel
+// barrier: two galvanised W-beams stacked on posts, its face standing exactly at the edge distance (that is where the
 // physics stops a car), with a reflector every few posts.
 //
 // The beam is one profile swept along each run, closer in bends than on the
@@ -27,15 +27,47 @@ const BEAM = [
   [0, 0.71],
   [0.03, 0.745],
   [0.075, 0.76],
+  // the second beam, stacked on the first (a circuit's barrier stands about 1.1 m)
+  [0.075, 0.78],
+  [0.03, 0.795],
+  [0, 0.83],
+  [0, 0.87],
+  [0.03, 0.905],
+  [0.055, 0.94],
+  [0.03, 0.975],
+  [0, 1.01],
+  [0, 1.05],
+  [0.03, 1.085],
+  [0.075, 1.1],
 ];
+/** The low tier's beam: each wave by its crests and troughs only. */
+const BEAM_LOW = [
+  [0.075, 0.44],
+  [0, 0.51],
+  [0.055, 0.6],
+  [0, 0.69],
+  [0.075, 0.76],
+  [0.075, 0.78],
+  [0, 0.85],
+  [0.055, 0.94],
+  [0, 1.03],
+  [0.075, 1.1],
+];
+/** Metres between the beam's cross-sections on a straight and in a bend, by tier. */
+const SECTION = { low: [8, 3], medium: [4, 2], high: [4, 2] };
 /** Posts: spacing (m) by tier, and where they stand behind the beam. */
 const POST_SPACING = { low: 4, medium: 2, high: 2 };
 const POST_OUT = 0.16;
 /** A reflector on every this many posts. */
-const REFLECTOR_EVERY = 6;
+const REFLECTOR_EVERY = 1e9; // (a circuit's barrier carries none)
 /** The terminals: metres over which a free end goes down into the ground, and how far it turns away. */
 const RAMP = 7;
 const FLARE = 0.5;
+/** Where trackside panels stand behind the barrier, its top beam is the only one (their bottom edge clears it). */
+const SINGLE_TOP = 0.76;
+/** Where a tyre wall stands at the edge (1.2 m deep), the barrier stands this far behind the edge, eased in over RAMP_TYRE m. */
+const TYRE_BEHIND = 1.35;
+const RAMP_TYRE = 4;
 
 /**
  * @param {object} options
@@ -61,6 +93,17 @@ export function createRails({ track, tier, atmosphere }) {
   const n = track.count;
   let metres = 0;
 
+  /** 0..1: how much of a range list stands at s on one side, eased over `ease` metres at its ends. */
+  const coverOf = (ranges, s, side, ease) => {
+    let v = 0;
+    for (const r of ranges ?? []) {
+      if (r.side !== side) continue;
+      const len = track.wrap(r.s1 - r.s0);
+      const d = track.wrap(s - r.s0);
+      if (d <= len + ease) v = Math.max(v, Math.min(1, Math.min(d + ease, len + ease - d) / ease));
+    }
+    return Math.max(0, Math.min(1, v));
+  };
   for (const side of [1, -1]) {
     const kinds = side > 0 ? track.kindL : track.kindR;
     for (const run of runsOf(track, (i) => kinds[i] === EDGE.RAIL)) {
@@ -83,14 +126,15 @@ export function createRails({ track, tier, atmosphere }) {
         const edge = track.edgeAt(s, side);
         track.pointAt(s, side * edge, base);
         const t = into * into;
-        const o = out + FLARE * t;
+        const o = out + FLARE * t + TYRE_BEHIND * coverOf(track.tyreWalls, s, side, RAMP_TYRE);
         return [base.x + frame.flat.x * side * o, base.y + up - 0.78 * t, base.z + frame.flat.z * side * o];
       };
 
       // the beam: closer sections where the road bends hard
       const rows = [];
       const sections = [];
-      along(track, s0, s1, (s) => (Math.abs(track.frameAt(s, frame).curvature) > 1 / 120 ? 2 : 4), (s) => sections.push(s), { ends: true });
+      const [far, near] = SECTION[tier] ?? SECTION.medium;
+      along(track, s0, s1, (s) => (Math.abs(track.frameAt(s, frame).curvature) > 1 / 120 ? near : far), (s) => sections.push(s), { ends: true });
       if (sections.length < 2) continue;
       let previous = s0;
       for (const sw of sections) {
@@ -98,7 +142,9 @@ export function createRails({ track, tier, atmosphere }) {
         while (s < previous - track.length / 2) s += track.length; // unwrapped, for the terminals and the texture
         previous = s;
         const into = terminal(s);
-        rows.push(BEAM.map(([out, up]) => [...place(s, out, up, into), s, up]));
+        // under trackside panels only the lower beam: the upper one folds down onto it (same vertices, no area)
+        const single = coverOf(track.boards, s, side, 2) > 0.5;
+        rows.push((tier === 'low' ? BEAM_LOW : BEAM).map(([out, up]) => (single && up > SINGLE_TOP ? [...place(s, 0.075, SINGLE_TOP, into), s, SINGLE_TOP] : [...place(s, out, up, into), s, up])));
       }
       beams.push(stripGeometry(rows));
 
@@ -116,7 +162,9 @@ export function createRails({ track, tier, atmosphere }) {
           if (into > 0.6) return;
           const [x, y, z] = place(su, POST_OUT, 0, into);
           levelFrame(track, su, frame);
-          posts.push(upright(new THREE.Vector3(x, y - 0.45, z), frame.yaw));
+          // a post under a single beam is cut down to it
+          const single = coverOf(track.boards, su, side, 2) > 0.5;
+          posts.push(upright(new THREE.Vector3(x, y - 0.45, z), frame.yaw, 1, single ? 0.78 : 1, 1));
           if (k % REFLECTOR_EVERY === 3 && into === 0) {
             const [rx, ry, rz] = place(su, 0.04, 0.8, 0);
             reflectors.push(upright(new THREE.Vector3(rx, ry, rz), frame.yaw));
@@ -138,9 +186,10 @@ export function createRails({ track, tier, atmosphere }) {
   group.add(beam);
 
   // a C-section post, a spacer block in front of it at the beam's height
-  const postGeometry = mergeGeometries([
-    new THREE.BoxGeometry(0.11, 1.2, 0.06).translate(0, 0.6, 0),
-    new THREE.BoxGeometry(0.1, 0.32, 0.1).translate(0, 1.05, 0),
+  const postGeometry = tier === 'low' ? new THREE.BoxGeometry(0.11, 1.55, 0.14).translate(0, 0.775, 0.03) : mergeGeometries([
+    new THREE.BoxGeometry(0.11, 1.55, 0.06).translate(0, 0.775, 0),
+    new THREE.BoxGeometry(0.1, 0.3, 0.1).translate(0, 1.05, 0),
+    new THREE.BoxGeometry(0.1, 0.3, 0.1).translate(0, 1.39, 0),
   ]);
   group.add(row(postGeometry, postSteel, posts, { name: 'rail-posts' }));
 
@@ -157,7 +206,10 @@ export function createRails({ track, tier, atmosphere }) {
   };
 }
 
-/** Galvanised steel: dull bands where the splices overlap every 4 m, and a little grime towards the bottom. */
+/**
+ * Galvanised steel: dull bands where the splices overlap every 4 m, a row of bolt heads on each post and on each
+ * splice (they read at speed as a rhythm), streaks of road dirt thrown up on the lower beam, grime at the bottom.
+ */
 function railSteel(material) {
   return extend(material, 'rail-steel', (shader) => {
     shader.vertexShader = shader.vertexShader
@@ -170,12 +222,22 @@ function railSteel(material) {
         `#include <color_fragment>
 {
   float splice = smoothstep(0.2, 0.14, abs(fract(vRail.x / 4.0 + 0.5) - 0.5) * 4.0);
+  float aaX = fwidth(vRail.x) + 1.0e-3;
+  // bolt heads on the beams' flat middles: over each post (every 2 m), and a group at each splice
+  float boltRow = smoothstep(0.03, 0.012, min(abs(vRail.y - 0.51), abs(vRail.y - 0.85)));
+  float atPost = 1.0 - smoothstep(0.03 - aaX, 0.03 + aaX, abs(fract(vRail.x / 2.0 + 0.5) - 0.5) * 2.0);
+  float atSplice = 1.0 - smoothstep(0.06 - aaX, 0.06 + aaX, abs(abs(fract(vRail.x / 4.0 + 0.5) - 0.5) * 4.0 - 0.12));
+  float bolt = boltRow * max(atPost, atSplice) * (1.0 - smoothstep(0.05, 0.2, aaX));
+  // dirt sprayed up from the road on the lower beam, in streaks along it
+  float spray = smoothstep(0.75, 0.45, vRail.y) * (0.55 + 0.45 * sin(vRail.x * 0.9 + 2.0 * sin(vRail.x * 0.23)));
   diffuseColor.rgb *= mix(1.0, 0.78, splice) * mix(0.82, 1.0, smoothstep(0.44, 0.7, vRail.y));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.29, 0.25), 0.35 * spray);
+  diffuseColor.rgb *= 1.0 - 0.6 * bolt;
 }`,
       )
       .replace(
         '#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\nroughnessFactor = mix( roughnessFactor, 0.6, smoothstep( 0.6, 0.44, vRail.y ) );',
+        '#include <roughnessmap_fragment>\nroughnessFactor = mix( roughnessFactor, 0.62, smoothstep( 0.7, 0.44, vRail.y ) );',
       );
   });
 }

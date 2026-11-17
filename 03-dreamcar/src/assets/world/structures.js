@@ -11,8 +11,8 @@ import * as THREE from 'three';
 import { disposeGroup } from './furniture.js';
 import { createDressing } from './dressing.js';
 import { createLamps } from './lamps.js';
-import { createPosts } from './posts.js';
 import { createRails } from './rails.js';
+import { createWalls } from './walls.js';
 import { setRetroBeams } from './retro.js';
 import { createTunnels } from './tunnel.js';
 import { createViaducts } from './viaduct.js';
@@ -43,13 +43,15 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng }
   lap('tunnel');
   const rails = createRails({ track, tier, atmosphere });
   lap('rails');
-  const posts = createPosts({ track, atmosphere });
-  lap('posts');
-  const viaducts = createViaducts({ track, terrain, atmosphere });
+  const walls = createWalls({ track, atmosphere });
+  lap('walls');
+  // (a circuit has no guide posts, chevrons or warning signs: posts.js is kept for a public road)
+  const posts = { group: new THREE.Group(), stats: { posts: 0 } };
+  const viaducts = createViaducts({ track, terrain, atmosphere, tier });
   lap('viaduct');
   const dressing = createDressing({ track, terrain, caps, tier, atmosphere, rng: rng.fork('dressing') });
   lap('dressing');
-  const parts = [lamps, tunnels, rails, posts, viaducts, dressing];
+  const parts = [lamps, tunnels, rails, walls, posts, viaducts, dressing];
   for (const part of parts) group.add(part.group);
 
   return {
@@ -58,7 +60,7 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng }
     probeHidden: dressing.probeHidden,
     /** What the wet road's mirror leaves out. */
     mirrorHidden: dressing.mirrorHidden,
-    stats: { ms, lamps: lamps.stats, rails: rails.stats, posts: posts.stats, viaducts: viaducts.stats, dressing: dressing.stats },
+    stats: { ms, lamps: lamps.stats, rails: rails.stats, walls: walls.stats, posts: posts.stats, viaducts: viaducts.stats, dressing: dressing.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {
       for (const part of parts) part.setTime?.(time);

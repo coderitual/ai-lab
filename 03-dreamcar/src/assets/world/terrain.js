@@ -36,13 +36,13 @@ import { planeNoise, smoothstep, withBake } from './shading.js';
 const EDGE_ROCK = 1;
 const EDGE_TREES = 4;
 const SURFACE_GRAVEL = 3;
-/** The tunnel's ceiling above the road (TUNNEL.height in game/trackLayout.js): the ground stays above it. */
-const BORE_HEIGHT = 5.6;
+/** The tunnel's crown above the road (TUNNEL.height in game/trackLayout.js) and its lining: the ground stays above it. */
+const BORE_HEIGHT = 7.2;
 
 /** Grid cell (m) per tier. */
-const CELL = { low: 8, medium: 6, high: 5 };
+const CELL = { low: 14, medium: 6, high: 5 };
 /** Band rows: one every this many Track samples, per tier. */
-export const ROW_STEP = { low: 2, medium: 1, high: 1 };
+export const ROW_STEP = { low: 3, medium: 1, high: 1 };
 /** The land-shape field's cell (m). */
 const MACRO = 16;
 /** How far the grid reaches beyond the course's bounds (m). */
@@ -54,6 +54,8 @@ const BAND_OUT = [2, 5, 9, 14, 20, 27];
 /** The far land: its cell and how far it reaches from the middle of the course (m). */
 const FAR_CELL = 100;
 const FAR_REACH = 4800;
+/** Where the start straight is seen from (x from, x to along z = 0) and the slope (tan 6 deg) the hills keep under. */
+const STRAIGHT_VIEW = { x0: -450, x1: 250, slope: 0.1 };
 
 /**
  * @typedef {object} Terrain
@@ -63,6 +65,8 @@ const FAR_REACH = 4800;
  * @property {(x: number, z: number) => number} forestAt 0..1 where the forest stands (the forest stage plants it)
  * @property {(x: number, z: number, out: number[], offset: number) => void} bakeAt the baked light at a point
  *   (aBake: sun by day, moon by night, sky), for anything that stands on the ground and wants to match it
+ * @property {(x: number, z: number, out: number[], offset: number) => void} bake4At the same with the golden hour's
+ *   sun as a fourth number (for an aBake of size 4; a size-3 aBake reads 1 there: lit)
  * @property {(s: number, side: number) => { top: number, height: number, rock: number }} cliffAt the cliff behind a
  *   rock edge: how far beyond the solid edge its top is (m), how high it rises, and how much of a rock edge it is
  * @property {(s: number, lat: number) => number} heightOnTrack the same height at track coordinates
@@ -121,7 +125,9 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   const cliffL = cliffOf(rockL, track.farSlopeL);
   const cliffR = cliffOf(rockR, track.farSlopeR);
   /** The cliff's foot starts this far beyond the edge, and climbs this far out per metre up. */
-  const FOOT = 0.8;
+  /** Bridges shorter than this (m) span a gully across them rather than a valley along them. */
+const GULLY_LENGTH = 450;
+const FOOT = 0.8;
   const LEAN = 0.3;
 
   // tunnels and bridges, per sample: how much ground stands over the bore, how deep the ravine is
@@ -135,9 +141,14 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   }
   for (const b of track.bridges) {
     const drop = b.drop ?? 30;
+    // (env lane) a short deck spans a gully that runs ACROSS it: a V along the road, deepest in the middle, with a
+    // stream's notch at the bottom; a long one a broad valley
+    const gully = b.s1 - b.s0 < GULLY_LENGTH;
     for (let i = Math.ceil(b.s0 / ds); i <= Math.floor(b.s1 / ds); i++) {
       const u = (i * ds - b.s0) / (b.s1 - b.s0);
-      ravine[i % n] = Math.max(1.5, drop * Math.pow(Math.max(0, Math.sin(Math.PI * u)), 0.6));
+      const v = Math.max(0, Math.sin(Math.PI * u));
+      const notch = gully ? 2.5 * Math.exp(-Math.pow(((u - 0.5) * (b.s1 - b.s0)) / 5, 2)) : 0;
+      ravine[i % n] = Math.max(1.5, drop * Math.pow(v, gully ? 1.4 : 0.6) + notch);
     }
   }
   const zoneOf = (s) => {
@@ -165,10 +176,25 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     // far land reads as spurs and gullies, not smooth mounds, and the jagged ranges of far.js show over it)
     const rise = smoothstep(750, 1900, r);
     const ring = rise * (170 + 300 * noise.ridged(x / 1100 + 3, z / 1100, 5) + 150 * (noise.ridged(x / 380 + 11, z / 380 - 4, 4) - 0.4));
-    return floor + (bottom - floor) * inLake + ring * (1 - inLake);
+    const h = floor + (bottom - floor) * inLake + ring * (1 - inLake);
+    // (env lane, for the SKY lane's massif) seen from the start straight the hills keep under about six degrees, so
+    // the massif's foot shows over them: a soft cap that grows with the distance from the straight
+    const sx = Math.min(STRAIGHT_VIEW.x1, Math.max(STRAIGHT_VIEW.x0, x));
+    const cap = 25 + STRAIGHT_VIEW.slope * Math.hypot(x - sx, z);
+    return h > cap - 30 ? cap - 30 * Math.exp(-(h - (cap - 30)) / 30) : h;
   }
   /** Small hills and gullies on top of the land's shape, zero on average. */
-  const detail = (x, z) => 18 * (noise.ridged(x / 280, z / 280, 4) - 0.35) + 5 * (noise.fbm(x / 70, z / 70, 3) - 0.5);
+  // (env lane) land, not domes: ridged spurs at two scales, and drainage lines cut down the slopes between them
+  // (the creases of a noise field: where it crosses its middle, a gully)
+  const detail = (x, z) => {
+    const gully = Math.pow(1 - Math.abs(2 * noise.fbm(x / 190 + 5, z / 190 - 3, 4) - 1), 5);
+    return (
+      22 * (noise.ridged(x / 260, z / 260, 4) - 0.35) +
+      8 * (noise.ridged(x / 85 + 2, z / 85, 3) - 0.4) +
+      4 * (noise.fbm(x / 35, z / 35, 2) - 0.5) -
+      12 * gully
+    );
+  };
 
   // ---- layer 2: the shape of the land, on a coarse grid
   const minX = track.bounds.minX - MARGIN;
@@ -300,7 +326,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     // which are cut open)
     const zone = zoneOf(s);
     if (zone === 1) y = Math.max(y, read(track.py, s) + BORE_HEIGHT + read(cover, s) - 0.35 * Math.max(0, d - 4));
-    else if (zone === 2) y = Math.min(y, read(track.py, s) - read(ravine, s) - 0.1 * Math.abs(lat));
+    else if (zone === 2) y = Math.min(y, read(track.py, s) - read(ravine, s) - 0.02 * Math.abs(lat));
     return y;
   }
   // Where another stretch of road lies beside this one (the hairpins' legs), the ground between them is shared:
@@ -411,8 +437,8 @@ export function createTerrain({ track, tier, rng, material, lights }) {
       if (kinds[Math.round(wrap(s) / ds) % n] === EDGE_TREES) f = smoothstep(0.5, 3, d) * (1 - smoothstep(90, 150, d));
     }
     // (the forest stage: more of the valley sides wooded, so no slope reads as a bare dune)
-    const patch = smoothstep(0.35, 0.52, noise.fbm(x / 230 + 11, z / 230, 4));
-    f = Math.max(f, patch * (1 - smoothstep(170, 230, y)) * (s === null || d > 12 ? 1 : 0));
+    const patch = smoothstep(0.3, 0.45, noise.fbm(x / 230 + 11, z / 230, 4));
+    f = Math.max(f, patch * (1 - smoothstep(330, 420, y)) * (s === null || d > 12 ? 1 : 0));
     return f * (1 - smoothstep(0.55, 0.8, slope));
   }
 
@@ -463,12 +489,17 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   function buildBand(rowList) {
     const count = rowList.length * 2 * cols;
     const pos = new Float32Array(count * 3);
-    const bake = new Float32Array(count * 3);
+    const bake = new Float32Array(count * 4);
     const mask = new Float32Array(count * 2);
+    // the verge in track terms for the ground material: metres beyond the margin, s (continuous through the
+    // line), metres beyond the solid edge, and 0 (vertices without it read the default 1: not a verge)
+    const verge = new Float32Array(count * 4);
     const offs = new Float32Array(cols);
+    let lapOffset = 0;
     for (let r = 0; r < rowList.length; r++) {
       const i = rowList[r];
       const s = i * ds;
+      if (r > 0 && i < rowList[r - 1]) lapOffset += track.length;
       for (let half = 0; half < 2; half++) {
         const side = half === 0 ? 1 : -1;
         const edge = side > 0 ? track.edgeL[i] : track.edgeR[i];
@@ -500,9 +531,13 @@ export function createTerrain({ track, tier, rng, material, lights }) {
           pos[v * 3] = pt.x;
           pos[v * 3 + 1] = y;
           pos[v * 3 + 2] = pt.z;
-          bakeAt(pt.x, pt.z, bake, v * 3);
+          bake4At(pt.x, pt.z, bake, v * 4);
           const slope = k >= 2 && k <= 6 && c.height > 0.01 ? 0.9 : 0;
           mask[v * 2] = k <= 1 ? 0 : forestOf(pt.x, pt.z, y, slope, s, lat, d);
+          verge[v * 4] = Math.abs(lat) - pave;
+          verge[v * 4 + 1] = s + lapOffset;
+          verge[v * 4 + 2] = Math.abs(lat) - edge;
+          verge[v * 4 + 3] = 0;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
         }
@@ -523,8 +558,9 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+    geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 4));
     geometry.setAttribute('aMask', new THREE.BufferAttribute(mask, 2));
+    geometry.setAttribute('aVerge', new THREE.BufferAttribute(verge, 4));
     geometry.setIndex(index);
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
@@ -574,7 +610,9 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   const bh = Math.ceil(gh / 2);
   const bcell = cell * 2;
   const bakeGrid = new Float32Array(bw * bh * 3);
-  const dirs = [lights.day, lights.night].map((d) => {
+  const duskGrid = new Float32Array(bw * bh);
+  // (env lane) the golden hour's sun as well: at a few degrees up the ridges' shadows matter most
+  const dirs = [lights.day, lights.night, lights.dusk ?? lights.day].map((d) => {
     const h = Math.hypot(d[0], d[2]);
     return { x: d[0] / h, z: d[2] / h, elevation: Math.atan2(d[1], h) };
   });
@@ -608,6 +646,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
       bakeGrid[k] = marchSun(x, z, h0, dirs[0], 2600);
       bakeGrid[k + 1] = marchSun(x, z, h0, dirs[1], 2600);
       bakeGrid[k + 2] = marchSky(x, z, h0);
+      duskGrid[j * bw + i] = marchSun(x, z, h0, dirs[2], 2600);
     }
   }
   // blurred once, so the edge of a valley's shadow is soft rather than stepped by the triangles that carry it
@@ -622,6 +661,31 @@ export function createTerrain({ track, tier, rng, material, lights }) {
         }
       }
     }
+    const tmpD = new Float32Array(duskGrid);
+    for (let j = 1; j < bh - 1; j++) {
+      for (let i = 1; i < bw - 1; i++) {
+        let sum = 0;
+        for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) sum += tmpD[(j + b) * bw + i + a] * (a || b ? 1 : 2);
+        duskGrid[j * bw + i] = sum / 10;
+      }
+    }
+  }
+  /** The golden hour's sun share at a point (1 off the grid). */
+  function duskAt(x, z) {
+    if (!(x >= minX && z >= minZ && x <= minX + (bw - 1) * bcell && z <= minZ + (bh - 1) * bcell)) return 1;
+    const fx = Math.min(bw - 1.001, (x - minX) / bcell);
+    const fz = Math.min(bh - 1.001, (z - minZ) / bcell);
+    const i = Math.floor(fx);
+    const j = Math.floor(fz);
+    const u = fx - i;
+    const v = fz - j;
+    const k = j * bw + i;
+    return (duskGrid[k] * (1 - u) + duskGrid[k + 1] * u) * (1 - v) + (duskGrid[k + bw] * (1 - u) + duskGrid[k + bw + 1] * u) * v;
+  }
+  /** bakeAt with the golden hour's share as a fourth number (aBake as a vec4: see shading.js). */
+  function bake4At(x, z, out, o) {
+    bakeAt(x, z, out, o);
+    out[o + 3] = duskAt(x, z);
   }
   function bakeAt(x, z, out, o) {
     if (!(x >= minX && z >= minZ && x <= minX + (bw - 1) * bcell && z <= minZ + (bh - 1) * bcell)) {
@@ -674,7 +738,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
       const h = Math.min(CH, gh - 1 - cj) + 1;
       const pos = new Float32Array(w * h * 3);
       const nor = new Float32Array(w * h * 3);
-      const bake = new Float32Array(w * h * 3);
+      const bake = new Float32Array(w * h * 4);
       const mask = new Float32Array(w * h * 2);
       for (let b = 0; b < h; b++) {
         for (let a = 0; a < w; a++) {
@@ -695,7 +759,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
           nor[v * 3] = -hx * inv;
           nor[v * 3 + 1] = inv;
           nor[v * 3 + 2] = -hz * inv;
-          bakeAt(x, z, bake, v * 3);
+          bake4At(x, z, bake, v * 4);
           const s = gS[k] >= 0 ? gS[k] : null;
           const d = s === null ? 1e9 : Math.max(0, Math.abs(gLat[k]) - track.edgeAt(s, gLat[k] >= 0 ? 1 : -1));
           mask[v * 2] = forestOf(x, z, y, 1 - inv, s, gLat[k], d);
@@ -721,7 +785,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       geometry.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-      geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+      geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 4));
       geometry.setAttribute('aMask', new THREE.BufferAttribute(mask, 2));
       geometry.setIndex(index);
       geometry.computeBoundingSphere();
@@ -738,7 +802,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     const z0 = farZ0;
     const heights = farHeight;
     const pos = new Float32Array(m * m * 3);
-    const bake = new Float32Array(m * m * 3);
+    const bake = new Float32Array(m * m * 4);
     const mask = new Float32Array(m * m * 2);
     for (let j = 0; j < m; j++) {
       for (let i = 0; i < m; i++) {
@@ -755,9 +819,10 @@ export function createTerrain({ track, tier, rng, material, lights }) {
         pos[v * 3 + 1] = under ? heights[v] - 150 : overlap ? heights[v] - 1.5 : heights[v];
         pos[v * 3 + 2] = z;
         const h0 = heights[v] + 2;
-        bake[v * 3] = marchSun(x, z, h0, dirs[0], 4000);
-        bake[v * 3 + 1] = marchSun(x, z, h0, dirs[1], 4000);
-        bake[v * 3 + 2] = marchSky(x, z, h0);
+        bake[v * 4] = marchSun(x, z, h0, dirs[0], 4000);
+        bake[v * 4 + 1] = marchSun(x, z, h0, dirs[1], 4000);
+        bake[v * 4 + 2] = marchSky(x, z, h0);
+        bake[v * 4 + 3] = marchSun(x, z, h0, dirs[2], 4000);
         const hx = (heights[j * m + Math.min(m - 1, i + 1)] - heights[j * m + Math.max(0, i - 1)]) / (2 * FAR_CELL);
         const hz = (heights[Math.min(m - 1, j + 1) * m + i] - heights[Math.max(0, j - 1) * m + i]) / (2 * FAR_CELL);
         mask[v * 2] = forestOf(x, z, heights[v], 1 - 1 / Math.hypot(hx, 1, hz), null, 0, 0);
@@ -772,7 +837,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     }
     farGeometry = new THREE.BufferGeometry();
     farGeometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    farGeometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+    farGeometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 4));
     farGeometry.setAttribute('aMask', new THREE.BufferAttribute(mask, 2));
     farGeometry.setIndex(index);
     farGeometry.computeVertexNormals();
@@ -824,6 +889,7 @@ export function createTerrain({ track, tier, rng, material, lights }) {
       return forestOf(x, z, heightOf(x, z, spot.s, spot.lat), 0, spot.s, spot.lat, d);
     },
     bakeAt,
+    bake4At,
     cliffAt: (s, side) => ({ ...cliffAt(s, side) }),
     stats: { vertices, triangles, gridTriangles, ms: Math.round(performance.now() - started), phases },
     dispose() {
