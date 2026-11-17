@@ -158,7 +158,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   };
   let startLights = 0;
   /** What the wet road's mirror leaves out: the road itself and what lies under or far beyond it. */
-  const mirrorHidden = [road.group, terrain.group, rock.group, lake.mesh, cover.group, far.group];
+  const mirrorHidden = [road.group, terrain.group, rock.group, lake.mesh, cover.group, far.group, ...structures.mirrorHidden];
   const mirrorPoint = new THREE.Vector3();
   const mirrorFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
   const drawing = new THREE.Vector2();

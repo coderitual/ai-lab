@@ -56,6 +56,8 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng }
     group,
     /** What the cars' reflection probes leave out. */
     probeHidden: dressing.probeHidden,
+    /** What the wet road's mirror leaves out. */
+    mirrorHidden: dressing.mirrorHidden,
     stats: { ms, lamps: lamps.stats, rails: rails.stats, posts: posts.stats, viaducts: viaducts.stats, dressing: dressing.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {

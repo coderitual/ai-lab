@@ -20,7 +20,7 @@ import { drawGlyph } from '../car/plate.js';
 
 /** The atlas at full size (px); the low tier draws it at half. */
 const W = 2048;
-const H = 1024;
+const H = 1536;
 
 /** The circuit's own name, on the gantry and on the pit building. */
 export const CIRCUIT_NAME = 'CALVENNA';
@@ -44,8 +44,24 @@ const BOARDS = [
 /** Board designs available (cells), and how many there are. */
 export const BOARD_COUNT = BOARDS.length;
 
+/**
+ * The tall hoardings of the lake side of the straight (2 : 1, about 7.6 by 3.8 m): [layout, field, ink, words,
+ * accent]. Bold blocks of flat colour with one or two big words, so that at speed each streaks as one colour.
+ */
+const TALL = [
+  ['bar', '#14234a', '#f2f2ee', ['VARNO'], '#d23a2c'],
+  ['two', '#c4261f', '#f6f3ec', ['TORVEL', 'SPORT'], '#f6f3ec'],
+  ['oval', '#f1f1ec', '#1f7a4c', ['OSKALI'], '#1f7a4c'],
+  ['grid', '#1d5fb8', '#f6f6f2', ['MI', 'RA'], '#f6f6f2'],
+  ['mark', '#f2f1ec', '#c0261f', ['PELLORA'], '#c0261f'],
+  ['bar', '#1b1c20', '#f0c020', ['BRENNIK'], '#f0c020'],
+  ['two', '#0f6b46', '#f3f3ee', ['LUNDAR', 'ACQUA'], '#f3f3ee'],
+  ['mark', '#e8742a', '#17181b', ['SOLMERE'], '#17181b'],
+];
+export const TALL_COUNT = TALL.length;
+
 /** The distance boards' labels, in their cells' order. */
-const DISTANCES = ['300', '200', '100'];
+const DISTANCES = ['300', '200', '100', '150'];
 
 /** Plain colours (sRGB hex), each a swatch of the atlas: faces that are only a colour point at one. */
 export const SWATCH = {
@@ -71,8 +87,9 @@ export const SWATCH = {
 
 // ---- the layout (in units of the full-size atlas)
 const GANTRY_CELL = [0, 0, 2048, 256];
-const DIST_CELL = (k) => [k * 256, 256, 256, 256];
+const DIST_CELL = (k) => (k < 3 ? [k * 256, 256, 256, 256] : [1024 + (k - 3) * 128, 896, 128, 128]);
 const BOARD_CELL = (k) => [(k % 4) * 512, 512 + Math.floor(k / 4) * 128, 512, 128];
+const TALL_CELL = (k) => [(k % 4) * 512, 1024 + Math.floor(k / 4) * 256, 512, 256];
 /** Special cells: tyres (plain, white band, red band), garage door, glazing, light panel, warning stripes. */
 const SPECIAL = {
   tyres: [768, 256, 128, 128],
@@ -115,6 +132,7 @@ export function createSigns({ tier, anisotropy = 1 }) {
   drawGantryGlow(e, GANTRY_CELL);
   DISTANCES.forEach((label, k) => drawDistance(g, DIST_CELL(k), label));
   BOARDS.forEach((b, k) => drawBoard(g, BOARD_CELL(k), b));
+  TALL.forEach((b, k) => drawTall(g, TALL_CELL(k), b));
   drawTyres(g, SPECIAL.tyres, null);
   drawTyres(g, SPECIAL.tyresWhite, '#e8e8e2');
   drawTyres(g, SPECIAL.tyresRed, '#b3241d');
@@ -152,6 +170,7 @@ export function createSigns({ tier, anisotropy = 1 }) {
     gantry: uvOf(GANTRY_CELL, 2),
     distance: Object.fromEntries(DISTANCES.map((label, k) => [label, uvOf(DIST_CELL(k))])),
     boards: BOARDS.map((_, k) => uvOf(BOARD_CELL(k))),
+    tall: TALL.map((_, k) => uvOf(TALL_CELL(k))),
     special: Object.fromEntries(Object.entries(SPECIAL).map(([key, cell]) => [key, uvOf(cell, 2)])),
     swatch: swatches,
     dispose() {
@@ -303,6 +322,9 @@ function drawMark(g, kind, x, y, s, color, field) {
 // ---------------------------------------------------------------------------------------------------------------
 // The cells
 
+/** The circuit's name: heavy, wide letters that fill the board. */
+const NAME_LETTERS = { pen: 0.33, wide: 1.55, slant: 0.1, gap: 0.16 };
+
 function drawGantryBoard(g, [x, y, w, h]) {
   g.fillStyle = '#163a4c';
   g.fillRect(x, y, w, h);
@@ -314,13 +336,13 @@ function drawGantryBoard(g, [x, y, w, h]) {
   g.fillRect(x + 40, y + h - 34, w - 80, 8);
   drawMark(g, 'lake', x + 150, y + h * 0.46, 170, '#e59a2c', '#163a4c');
   g.strokeStyle = '#efe6cf';
-  writeFit(g, CIRCUIT_NAME, x + 1060, y + h * 0.45, 1560, 160, { pen: 0.25, wide: 1.3, slant: 0.14, gap: 0.24 });
+  writeFit(g, CIRCUIT_NAME, x + 1070, y + h * 0.47, 1640, 185, NAME_LETTERS);
 }
 
 function drawGantryGlow(e, [x, y, w, h]) {
   e.strokeStyle = '#6b604c';
   e.lineWidth = 1;
-  writeFit(e, CIRCUIT_NAME, x + 1060, y + h * 0.45, 1560, 160, { pen: 0.25, wide: 1.3, slant: 0.14, gap: 0.24 });
+  writeFit(e, CIRCUIT_NAME, x + 1070, y + h * 0.47, 1640, 185, NAME_LETTERS);
   drawMark(e, 'lake', x + 150, y + h * 0.46, 170, '#5a3c14', '#000000');
 }
 
@@ -328,10 +350,41 @@ function drawDistance(g, [x, y, w, h], label) {
   g.fillStyle = '#f2f2ee';
   g.fillRect(x, y, w, h);
   g.strokeStyle = '#141414';
-  g.lineWidth = 14;
-  g.strokeRect(x + 10, y + 10, w - 20, h - 20);
-  g.strokeStyle = '#141414';
-  writeFit(g, label, x + w / 2, y + h / 2, w - 70, 120, { pen: 0.2, wide: 1.0, gap: 0.22 });
+  g.lineWidth = w * 0.055;
+  g.strokeRect(x + w * 0.04, y + h * 0.04, w * 0.92, h * 0.92);
+  writeFit(g, label, x + w / 2, y + h / 2, w * 0.73, h * 0.47, { pen: 0.2, wide: 1.0, gap: 0.22 });
+}
+
+function drawTall(g, [x, y, w, h], [layout, field, ink, words, accent]) {
+  g.fillStyle = field;
+  g.fillRect(x, y, w, h);
+  g.strokeStyle = ink;
+  const bold = { pen: 0.24, wide: 1.2, slant: 0.08, gap: 0.22 };
+  if (layout === 'bar') {
+    writeFit(g, words[0], x + w / 2, y + h * 0.44, w - 60, 110, bold);
+    g.fillStyle = accent;
+    g.fillRect(x + 50, y + h * 0.72, w - 100, 16);
+  } else if (layout === 'two') {
+    writeFit(g, words[0], x + w / 2, y + h * 0.36, w - 60, 100, bold);
+    writeFit(g, words[1], x + w / 2, y + h * 0.72, w * 0.5, 46, { ...bold, pen: 0.2 });
+  } else if (layout === 'oval') {
+    g.save();
+    g.strokeStyle = accent;
+    g.lineWidth = 16;
+    g.beginPath();
+    g.ellipse(x + w / 2, y + h / 2, w * 0.42, h * 0.36, 0, 0, Math.PI * 2);
+    g.stroke();
+    g.restore();
+    writeFit(g, words[0], x + w / 2, y + h / 2, w * 0.66, 84, bold);
+  } else if (layout === 'grid') {
+    writeFit(g, words[0], x + w / 2, y + h * 0.3, w * 0.5, 96, { ...bold, gap: 0.6 });
+    writeFit(g, words[1], x + w / 2, y + h * 0.72, w * 0.5, 96, { ...bold, gap: 0.6 });
+  } else {
+    drawMark(g, 'dot', x + 70, y + h / 2, 90, accent, field);
+    writeFit(g, words[0], x + w / 2 + 40, y + h / 2, w - 170, 96, bold);
+  }
+  g.fillStyle = 'rgba(0,0,0,0.2)';
+  g.fillRect(x, y + h - 10, w, 10);
 }
 
 function drawBoard(g, [x, y, w, h], [name, field, ink, mark, markColor]) {

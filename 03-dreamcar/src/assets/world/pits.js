@@ -22,6 +22,9 @@ const FLOORS = { garage: 4.4, slab: 0.45, glazed: 3.3, canopy: 2.8 };
 /** A garage bay's width and its door. */
 const BAY = { w: 5.2, door: 4.2, doorH: 3.5 };
 /** The stand: s of its ends from the line (the gantry), metres beyond the lake-side edge, rows, row depth and rise. */
+/** Far down the straight: the footbridge and the marshal's tower (m before its end), the small stand (m after). */
+const FAR = { bridge: 70, tower: 12, stand: [45, 85] };
+
 export const STAND = { s0: -66, s1: -6, beyond: 3.2, rows: 9, depth: 0.85, rise: 0.48 };
 
 /**
@@ -29,10 +32,11 @@ export const STAND = { s0: -66, s1: -6, beyond: 3.2, rows: 9, depth: 0.85, rise:
  * @param {object} options.track
  * @param {object} options.terrain
  * @param {string} options.tier
- * @param {ReturnType<import('./builder.js').createBuilder>} options.b
+ * @param {ReturnType<import('./builder.js').createBuilder>} options.b what casts shadows
+ * @param {ReturnType<import('./builder.js').createBuilder>} options.nb what does not
  * @param {ReturnType<import('./signs.js').createSigns>} options.signs
  */
-export function buildPits({ track, terrain, tier, b, signs }) {
+export function buildPits({ track, terrain, tier, b, nb, signs }) {
   const sw = signs.swatch;
   const sp = signs.special;
   const M = new THREE.Matrix4();
@@ -127,11 +131,11 @@ export function buildPits({ track, terrain, tier, b, signs }) {
     const x1 = ((k + 1) * lane.len) / steps;
     const pts = [at(lane, x0, 0, 0), at(lane, x1, 0, 0), at(lane, x1, 0, -across), at(lane, x0, 0, -across)];
     for (const p of pts) p.y = Math.max(terrain.heightAt(p.x, p.z), floor - 0.6) + 0.04;
-    b.quad([pts[0], pts[3], pts[2], pts[1]], sw.asphalt);
+    nb.quad([pts[0], pts[3], pts[2], pts[1]], sw.asphalt);
     // the pit lane's white line, a hand's width off the wall
     const l = [at(lane, x0, 0, -1.2), at(lane, x1, 0, -1.2), at(lane, x1, 0, -1.4), at(lane, x0, 0, -1.4)];
     for (const p of l) p.y = Math.max(terrain.heightAt(p.x, p.z), floor - 0.6) + 0.06;
-    b.quad([l[0], l[3], l[2], l[1]], sw.white);
+    nb.quad([l[0], l[3], l[2], l[1]], sw.white);
   }
 
   // ---- the catch fence on the pit wall: posts, a top that leans over the road, cables
@@ -145,16 +149,16 @@ export function buildPits({ track, terrain, tier, b, signs }) {
   for (let k = 0; k <= posts; k++) {
     const x = (k * fence.len) / posts;
     const g = fy(x);
-    b.box(beam(at(fence, x, g, 0), at(fence, x, g + 3.0, 0), 0.09, 0.09, M), sw.fence);
-    b.box(beam(at(fence, x, g + 3.0, 0), at(fence, x, g + 3.7, 0.45), 0.08, 0.08, M), sw.fence);
+    nb.box(beam(at(fence, x, g, 0), at(fence, x, g + 3.0, 0), 0.09, 0.09, M), sw.fence);
+    nb.box(beam(at(fence, x, g + 3.0, 0), at(fence, x, g + 3.7, 0.45), 0.08, 0.08, M), sw.fence);
   }
   const f0 = fy(0);
   const cables = tier === 'low' ? [1.2, 2.2, 3.0] : [0.9, 1.5, 2.1, 2.6, 3.0, 3.35];
   for (const h of cables) {
     const z = h > 3.0 ? ((h - 3.0) / 0.7) * 0.45 : 0;
-    b.box(beam(at(fence, 0, f0 + h, z), at(fence, fence.len, f0 + h, z), 0.025, 0.025, M), sw.fence);
+    nb.box(beam(at(fence, 0, f0 + h, z), at(fence, fence.len, f0 + h, z), 0.025, 0.025, M), sw.fence);
   }
-  b.box(beam(at(fence, 0, f0 + 3.7, 0.45), at(fence, fence.len, f0 + 3.7, 0.45), 0.06, 0.06, M), sw.fence);
+  nb.box(beam(at(fence, 0, f0 + 3.7, 0.45), at(fence, fence.len, f0 + 3.7, 0.45), 0.06, 0.06, M), sw.fence);
 
   // ---- the stand on the lake side
   const sf = lineFrame(STAND.s0, STAND.s1, 1, track.edgeAt(track.wrap(g0 + (STAND.s0 + STAND.s1) / 2), 1) + STAND.beyond);
@@ -181,6 +185,77 @@ export function buildPits({ track, terrain, tier, b, signs }) {
   for (let k = 0; k < 3; k++) {
     const x = sf.len * (0.2 + k * 0.3);
     face(sf, x - 2.4, x + 2.4, roofH - 0.55, roofH + 0.05, 0.61, signs.boards[(k * 4 + 1) % signs.boards.length]);
+  }
+
+  // ---- far down the straight (what D1 shows in the distance): a footbridge with boards across the road, a
+  // marshal's tower at the end of the straight and a small stand on the outside of the first bend
+  const straightAt = track.sections.findIndex((sec) => sec.id === 'straight');
+  const end = track.sections[straightAt].s1;
+  const ends = track.delta(g0, end);
+  {
+    // the footbridge: a stair tower beyond each wall, a deck with boards on both faces, a rail
+    const sB = ends - FAR.bridge;
+    const eL = track.edgeAt(track.wrap(g0 + sB), 1) + 1.6;
+    const eR = track.edgeAt(track.wrap(g0 + sB), -1) + 1.6;
+    const fb = lineFrame(sB - 1.2, sB + 1.2, 1, eL);
+    // its own frame across the road: t from the left tower to the right one, n towards the cars that come
+    const A = track.pointAt(track.wrap(g0 + sB), eL, new THREE.Vector3());
+    const B = track.pointAt(track.wrap(g0 + sB), -eR, new THREE.Vector3());
+    const t = new THREE.Vector3(B.x - A.x, 0, B.z - A.z);
+    const len = t.length();
+    t.divideScalar(len);
+    const bf = { a: A, t, n: new THREE.Vector3(t.z, 0, -t.x).negate(), len, hand: 1 };
+    // n = the way the cars come from (against the road's direction): t is to the right, so -ahead = (t.z, -t.x) * -1
+    if (bf.n.x * (fb.t.x) + bf.n.z * fb.t.z > 0) bf.n.negate();
+    const yR = track.pointAt(track.wrap(g0 + sB), 0).y;
+    const deck = yR + 5.8;
+    for (const x of [0, len]) {
+      const foot = at(bf, x, 0, 0);
+      const g = Math.min(terrain.heightAt(foot.x, foot.z), yR);
+      box(bf, x, (g - 0.5 + deck + 1.4) / 2, 0, 2.2, deck + 1.9 - g, 2.2, { rest: sw.pitWall });
+    }
+    box(bf, len / 2, deck - 0.6, 0, len, 1.2, 2.0, { rest: sw.frame });
+    const panels = Math.max(1, Math.round((len - 2.2) / 6.4));
+    const pw = (len - 2.2) / panels;
+    for (const side of [1, -1]) {
+      for (let k = 0; k < panels; k++) {
+        const x0 = 1.1 + k * pw;
+        const uv = signs.boards[(k * 3 + (side > 0 ? 0 : 5)) % signs.boards.length];
+        if (side > 0) face(bf, x0, x0 + pw, deck - 1.2, deck + 0.4, 1.05, uv);
+        else face({ ...bf, n: bf.n.clone().negate(), hand: -1 }, x0, x0 + pw, deck - 1.2, deck + 0.4, 1.05, uv);
+      }
+    }
+    box(bf, len / 2, deck + 1.05, -0.95, len, 0.06, 0.06, sw.steel);
+  }
+  {
+    // the marshal's tower on the lake side at the end of the straight: a shaft, a glazed cabin, a flat roof
+    const sT = ends - FAR.tower;
+    const tf = lineFrame(sT - 2, sT + 2, 1, track.edgeAt(track.wrap(g0 + sT), 1) + 3.5);
+    tf.hand = 1;
+    const foot = at(tf, 2, 0, -1.5);
+    const g = terrain.heightAt(foot.x, foot.z);
+    box(tf, 2, g + 3.5, -1.5, 2.2, 7, 2.2, { rest: sw.pitWall });
+    box(tf, 2, g + 7 + 0.15, -1.5, 3.6, 0.3, 3.6, { rest: sw.pitWall });
+    face(tf, 0.4, 3.6, g + 7.3, g + 9.0, 0.01, sp.glazing);
+    box(tf, 2, g + 8.15, -1.6, 3.2, 1.7, 3.2, { pz: sw.glassDark, rest: sw.glassDark });
+    box(tf, 2, g + 9.15, -1.5, 4.0, 0.3, 4.0, { rest: sw.red });
+  }
+  {
+    // the small stand on the outside of the first bend, facing it
+    const sf2 = lineFrame(ends + FAR.stand[0], ends + FAR.stand[1], 1, track.edgeAt(track.wrap(end + FAR.stand[0]), 1) + 6);
+    sf2.hand = 1;
+    const m2 = at(sf2, sf2.len / 2, 0, 0);
+    const y2 = terrain.heightAt(m2.x, m2.z);
+    for (let r = 0; r < 6; r++) {
+      const z = -r * 0.85 - 0.42;
+      const h = 0.5 + r * 0.45;
+      box(sf2, sf2.len / 2, y2 + h / 2 - 0.5, z, sf2.len, h + 1, 0.85, { rest: sw.stand });
+      box(sf2, sf2.len / 2, y2 + h + 0.2, z - 0.2, sf2.len - 0.4, 0.4, 0.28, { rest: r % 3 === 2 ? sw.white : sw.red });
+    }
+    const top = y2 + 0.5 + 6 * 0.45 + 2.8;
+    for (let k = 0; k <= 4; k++) box(sf2, (k * sf2.len) / 4, (y2 + top) / 2, -5.1, 0.25, top - y2, 0.25, sw.steel);
+    box(sf2, sf2.len / 2, top, -2.6, sf2.len + 1, 0.22, 6.2, { rest: sw.roof });
+    face(sf2, sf2.len / 2 - 4, sf2.len / 2 + 4, top - 0.9, top + 0.11, 0.5, signs.gantry);
   }
   return {};
 }

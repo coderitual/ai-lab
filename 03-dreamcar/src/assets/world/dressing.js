@@ -45,23 +45,32 @@ export function createDressing({ track, terrain, caps, tier, atmosphere, rng }) 
     }),
   );
   material.name = 'dressing';
+  // two sets of patches: what casts shadows (boards, buildings, the gantry), and what is low, small or stands
+  // under something else (tyre walls, posts, huts, fences, the pit lane) and casts none
   const b = createBuilder();
+  const nb = createBuilder();
   const start = createStart({ track, terrain, b, signs, atmosphere });
-  const trackside = buildTrackside({ track, terrain, tier, b, signs });
-  buildPits({ track, terrain, tier, b, signs });
+  const trackside = buildTrackside({ track, terrain, tier, b, nb, signs });
+  buildPits({ track, terrain, tier, b, nb, signs });
   // the patches in a group of their own: the cars' reflection probes leave them out (six faces of boards and
   // buildings on a blurred paint reflection cost more than they show); the start lamps stay in
   const merged = new THREE.Group();
   merged.name = 'dressing-patches';
-  const patches = b.build(material, merged);
+  const low = new THREE.Group();
+  low.name = 'dressing-low';
+  const patches = b.build(material, merged) + nb.build(material, low, { shadow: false, name: 'dressing-low' });
+  group.add(low);
   group.add(merged, start.group);
   const town = createTown({ track, terrain, tier, atmosphere, rng: rng.fork('town') });
   if (town) group.add(town.group);
 
   return {
     group,
-    probeHidden: town ? [merged, town.group] : [merged],
-    stats: { patches, triangles: b.triangles, boards: trackside.boards, town: town?.stats },
+    probeHidden: town ? [merged, low, town.group] : [merged, low],
+    /** What the wet road's mirror leaves out: the low and small things and the far town (the gantry, its lamps,
+     * the boards and the lit pit building stay: they are what the wet asphalt mirrors at night). */
+    mirrorHidden: town ? [low, town.group] : [low],
+    stats: { patches, triangles: b.triangles + nb.triangles, casting: b.triangles, boards: trackside.boards, town: town?.stats },
     setStartLights: (n) => start.setStartLights(n),
     update(dt) {
       start.update(dt);
