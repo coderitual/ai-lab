@@ -48,6 +48,8 @@ function parseArgs(argv) {
     hasTouch: !!a.mobile,
   });
   const page = await context.newPage();
+  // software WebGL: a full frame of the world can take a minute to draw and to read back
+  page.setDefaultTimeout(600000);
   const problems = [];
   page.on('console', (m) => {
     if (m.type() !== 'error' && m.type() !== 'warning') return;
@@ -59,9 +61,11 @@ function parseArgs(argv) {
   });
   page.on('pageerror', (e) => problems.push(`[pageerror] ${e.message}`));
   page.on('requestfailed', (r) => problems.push(`[requestfailed] ${r.url()}`));
-  await page.goto(a.url, { waitUntil: 'load' });
+  // the page builds its whole world before 'load' fires, and software WebGL can take minutes over that:
+  // do not wait for 'load', wait for the page to say it has drawn
+  await page.goto(a.url, { waitUntil: 'commit', timeout: 120000 });
   // software rendering is slow: a first frame with ?t= can take a while
-  await page.waitForFunction('window.__ready === true', null, { timeout: 180000 }).catch(() => problems.push('timeout waiting for __ready'));
+  await page.waitForFunction('window.__ready === true', null, { timeout: 900000 }).catch(() => problems.push('timeout waiting for __ready'));
   if (a.resize) {
     const [w, h] = String(a.resize).split('x').map((v) => parseInt(v, 10));
     await page.setViewportSize({ width: w, height: h });
