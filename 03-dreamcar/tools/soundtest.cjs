@@ -818,14 +818,14 @@ function report(label, d) {
       an.getFloatTimeDomainData(w);
       let peak = 0;
       for (const v of w) peak = Math.max(peak, Math.abs(v));
-      return { muted: audio.muted, stored: localStorage.getItem('serpentine.muted'), state: audio.ctx.state, peak };
+      return { muted: audio.muted, stored: localStorage.getItem('dreamcar.muted'), state: audio.ctx.state, peak };
     });
     await live.keyboard.press('a'); // any other gesture must not wake a muted context
     await live.waitForTimeout(200);
     const stillAsleep = await live.evaluate(() => window.__sound.audio.ctx.state);
     await live.click('#bench div:last-child button:last-child');
     await live.waitForTimeout(500);
-    const unmuted = await live.evaluate(() => ({ muted: window.__sound.audio.muted, stored: localStorage.getItem('serpentine.muted'), state: window.__sound.audio.ctx.state }));
+    const unmuted = await live.evaluate(() => ({ muted: window.__sound.audio.muted, stored: localStorage.getItem('dreamcar.muted'), state: window.__sound.audio.ctx.state }));
     check('the sound button: silent and asleep when off (and remembered), awake when on again',
       muted.muted && muted.stored === '1' && muted.peak === 0 && muted.state === 'suspended' && stillAsleep === 'suspended' && !unmuted.muted && unmuted.stored === '0' && unmuted.state === 'running',
       `off: stored '${muted.stored}', loudest sample ${muted.peak}, context ${muted.state} (after another key press: ${stillAsleep}); on: stored '${unmuted.stored}', context ${unmuted.state}`);
@@ -845,12 +845,12 @@ function report(label, d) {
     await live.click('#bench button');
     await live.waitForTimeout(300);
     const reloaded = await live.evaluate(() => ({ muted: window.__sound.audio.muted, ctx: !!window.__sound.audio.ctx }));
-    await live.evaluate(() => localStorage.removeItem('serpentine.muted'));
+    await live.evaluate(() => localStorage.removeItem('dreamcar.muted'));
     await live.context().close();
     const viaQuery = await open('query', { query: '?mute' });
     await viaQuery.click('#bench button');
     await viaQuery.waitForTimeout(300);
-    const q = await viaQuery.evaluate(() => ({ muted: window.__sound.audio.muted, ctx: !!window.__sound.audio.ctx, stored: localStorage.getItem('serpentine.muted') }));
+    const q = await viaQuery.evaluate(() => ({ muted: window.__sound.audio.muted, ctx: !!window.__sound.audio.ctx, stored: localStorage.getItem('dreamcar.muted') }));
     await viaQuery.context().close();
     check('a muted page makes no audio context at all: after a reload, and with ?mute (which is not remembered)', reloaded.muted && !reloaded.ctx && q.muted && !q.ctx && q.stored === null,
       `reloaded: muted ${reloaded.muted}, context ${reloaded.ctx}; ?mute: muted ${q.muted}, context ${q.ctx}, stored ${q.stored}`);

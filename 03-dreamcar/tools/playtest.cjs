@@ -4,7 +4,7 @@
 //   node tools/playtest.cjs http://localhost:5194/ split touch  only the sections whose names are given
 //
 // It drives the game through its real input paths (key events, pointer events, a stand-in for the gamepad
-// API, clicks on the HUD's buttons) and asks the page how the run went through window.__serp (state(),
+// API, clicks on the HUD's buttons) and asks the page how the run went through window.__dreamcar (state(),
 // stats()). Every claim is one named check, PASS or FAIL; any console error, page error or WebGL warning on a
 // page is a failure of that page. It ends with a count and exits non-zero if anything failed.
 //
@@ -61,33 +61,33 @@ async function open(query, { w = 320, h = 180, mobile = false, storage = true, i
   const started = Date.now();
   await page.goto(BASE + query, { waitUntil: 'load', timeout: 300000 });
   await page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
-  const ok = await page.evaluate('!!window.__serp');
+  const ok = await page.evaluate('!!window.__dreamcar');
   // no picture needed: the frame still runs (input, cameras, HUD), only the GPU's work is left out
-  if (ok && !gpu) await page.evaluate('window.__serp.game.draw = () => {}');
+  if (ok && !gpu) await page.evaluate('window.__dreamcar.game.draw = () => {}');
   const p = {
     page,
     context,
     problems,
     loadMs: Date.now() - started,
     ok,
-    state: () => page.evaluate('window.__serp.state()'),
-    d0: async () => (await page.evaluate('window.__serp.state()')).drivers[0],
-    skip: (s) => page.evaluate(`window.__serp.skip(${s})`),
-    advance: (s, fps = 30) => page.evaluate(`window.__serp.advance(${s}, ${fps})`),
+    state: () => page.evaluate('window.__dreamcar.state()'),
+    d0: async () => (await page.evaluate('window.__dreamcar.state()')).drivers[0],
+    skip: (s) => page.evaluate(`window.__dreamcar.skip(${s})`),
+    advance: (s, fps = 30) => page.evaluate(`window.__dreamcar.advance(${s}, ${fps})`),
     /** Step without drawing at `fps` frames a second (the fixed step does not care how often it is asked). */
     steps: (s, fps) => page.evaluate(([s, fps]) => {
-      const e = window.__serp.engine;
+      const e = window.__dreamcar.engine;
       const n = Math.round(s * fps);
       for (let i = 0; i < n; i++) e.advance(e.paused ? 0 : 1 / fps, 1 / fps, false);
     }, [s, fps]),
     /** Skip in chunks until the condition (evaluated on state()) holds, or `max` s have gone by. */
     until: async (cond, max = 600, chunk = 5) => {
       for (let t = 0; t < max; t += chunk) {
-        const s = await page.evaluate('window.__serp.state()');
+        const s = await page.evaluate('window.__dreamcar.state()');
         if (cond(s)) return s;
-        await page.evaluate(`window.__serp.skip(${chunk})`);
+        await page.evaluate(`window.__dreamcar.skip(${chunk})`);
       }
-      return page.evaluate('window.__serp.state()');
+      return page.evaluate('window.__dreamcar.state()');
     },
     async close(label = 'this page') {
       check(`${label}: no console errors, page errors or WebGL warnings`, problems.length === 0,
@@ -121,7 +121,7 @@ const SECTIONS = {
   /** The title: its choices, the time of day buttons, the attract lap after idling, then into a run. */
   async title() {
     const p = await open('?manual&q=low', { w: 480, h: 270, gpu: false });
-    const times = await p.page.evaluate('Object.keys(window.__serp.times)');
+    const times = await p.page.evaluate('Object.keys(window.__dreamcar.times)');
     let s = await p.state();
     check('opens on the title', s.phase === 'title', s.phase);
     check('the title panel is shown', await visible(p, '.hud .title'));
@@ -202,7 +202,7 @@ const SECTIONS = {
     await p.skip(3);
     await down(p, 'Space');
     await p.skip(0.3);
-    const hand = await p.page.evaluate('window.__serp.game.racers[0].controls.handbrake');
+    const hand = await p.page.evaluate('window.__dreamcar.game.racers[0].controls.handbrake');
     check('Space pulls the handbrake', hand > 0.5, `handbrake ${hand}`);
     await up(p, 'Space');
     await up(p, 'KeyW');
@@ -266,9 +266,9 @@ const SECTIONS = {
     const text = await p.page.evaluate(`document.querySelector('.hud .results').innerText`);
     check('the results show the lap time', text.includes(fmt(d.laps[0].ms)), fmt(d.laps[0].ms));
     check('the board shows the medal rows', /gold/i.test(text) && /silver/i.test(text) && /bronze/i.test(text));
-    const stored = await p.page.evaluate(`JSON.parse(localStorage.getItem('serpentine.best.v1'))`);
-    check('the lap is kept under serpentine.best.v1 for day', stored && stored.day && stored.day.laps.length === 1);
-    check('the ghost of the lap is kept', await p.page.evaluate(`!!localStorage.getItem('serpentine.ghost.v1')`));
+    const stored = await p.page.evaluate(`JSON.parse(localStorage.getItem('dreamcar.best.v1'))`);
+    check('the lap is kept under dreamcar.best.v1 for day', stored && stored.day && stored.day.laps.length === 1);
+    check('the ghost of the lap is kept', await p.page.evaluate(`!!localStorage.getItem('dreamcar.ghost.v1')`));
     await p.advance(0.2);
     await clickText(p, 'Again', '.results');
     await p.skip(0.2);
@@ -292,8 +292,8 @@ const SECTIONS = {
     // a reload: the board and the ghost are still there
     await p.page.reload();
     await p.page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
-    await p.page.evaluate('window.__serp.skip(0.1)');
-    const kept = await p.page.evaluate(`window.__serp.game._board ? window.__serp.game._board.board : JSON.parse(localStorage.getItem('serpentine.best.v1'))`);
+    await p.page.evaluate('window.__dreamcar.skip(0.1)');
+    const kept = await p.page.evaluate(`window.__dreamcar.game._board ? window.__dreamcar.game._board.board : JSON.parse(localStorage.getItem('dreamcar.best.v1'))`);
     check('best laps kept across a reload (two laps for day)', kept && kept.day && kept.day.laps.length === 2,
       kept && kept.day ? kept.day.laps.map((l) => l.ms).join(', ') : 'none');
     check('nothing for the other times of day', Object.keys(kept).filter((k) => k !== 'length' && k !== 'day' && kept[k].laps.length).length === 0);
@@ -311,7 +311,7 @@ const SECTIONS = {
     check('the total is the sum of the laps', d.total === d.laps.reduce((a, l) => a + l.ms, 0), `${d.total}`);
     check('lap one standing, the others flying', d.laps[0].standing && !d.laps[1].standing && !d.laps[2].standing);
     check('flying laps faster than the standing lap', d.laps[1].ms < d.laps[0].ms, d.laps.map((l) => l.ms).join(', '));
-    const board = await p.page.evaluate(`JSON.parse(localStorage.getItem('serpentine.best.v1'))`);
+    const board = await p.page.evaluate(`JSON.parse(localStorage.getItem('dreamcar.best.v1'))`);
     const t = s.time;
     check('a three-lap total on the board', board && board[t] && board[t].best3 === d.total, `${board && board[t] && board[t].best3}`);
     await p.close('three laps');
@@ -351,7 +351,7 @@ const SECTIONS = {
     check('. changes car two\'s camera only', s.drivers[1].camera !== cams[1] && s.drivers[0].camera === cams[0]);
     await up(p, 'KeyW');
     await up(p, 'ArrowUp');
-    await p.page.evaluate(`(() => { for (const r of window.__serp.game.racers) r.driver = r.auto; })()`);
+    await p.page.evaluate(`(() => { for (const r of window.__dreamcar.game.racers) r.driver = r.auto; })()`);
     s = await p.until((x) => x.phase === 'results', 400, 10);
     check('both cars finish; the race ends', s.phase === 'results' && s.drivers.every((x) => x.finished && x.laps.length === 1));
     check('positions one and two', s.drivers.map((x) => x.position).sort().join() === '1,2');
@@ -478,14 +478,14 @@ const SECTIONS = {
     for (const [w, h] of [[270, 480], [640, 360], [360, 200]]) {
       await p.page.setViewportSize({ width: w, height: h });
       await p.advance(0.2);
-      const size = await p.page.evaluate('[window.__serp.engine.width, window.__serp.engine.height]');
+      const size = await p.page.evaluate('[window.__dreamcar.engine.width, window.__dreamcar.engine.height]');
       check(`resized to ${w}x${h}: the engine follows`, size[0] === w && size[1] === h, size.join('x'));
     }
     const s0 = await p.d0();
     // only the context loss's own messages are expected here
     const n = p.problems.length;
     await p.page.evaluate(() => {
-      window.__lose = window.__serp.engine.renderer.getContext().getExtension('WEBGL_lose_context');
+      window.__lose = window.__dreamcar.engine.renderer.getContext().getExtension('WEBGL_lose_context');
       window.__lose.loseContext();
     });
     await p.skip(1);
@@ -498,7 +498,7 @@ const SECTIONS = {
     const fresh = p.problems.splice(n).filter((m) => !/CONTEXT_LOST|context lost|loseContext/i.test(m));
     p.problems.push(...fresh);
     const px = await p.page.evaluate(() => {
-      const gl = window.__serp.engine.renderer.getContext();
+      const gl = window.__dreamcar.engine.renderer.getContext();
       return !gl.isContextLost();
     });
     check('the context is back', px);
@@ -512,16 +512,16 @@ const SECTIONS = {
       const hits = [];
       for (const target of [150, 1150]) {
         await p.page.evaluate(async (target) => {
-          const g = window.__serp.game;
+          const g = window.__dreamcar.game;
           for (let k = 0; k < 400; k++) {
             const d = (((target - g.racers[0].vehicle.s) % g.track.length) + g.track.length) % g.track.length;
             if (d < 3 || d > g.track.length - 60) break;
-            window.__serp.skip(d > 200 ? 2 : d > 40 ? 0.5 : 0.05);
+            window.__dreamcar.skip(d > 200 ? 2 : d > 40 ? 0.5 : 0.05);
           }
-          window.__serp.advance(2 / 30, 30);
+          window.__dreamcar.advance(2 / 30, 30);
         }, target);
         const r = await p.page.evaluate(() => {
-          const g = window.__serp.game;
+          const g = window.__dreamcar.game;
           const out = [];
           const views = document.querySelectorAll('.hud .view');
           g.views.forEach((v, vi) => {
@@ -603,7 +603,7 @@ const SECTIONS = {
       if (q === 'mute') {
         await press(p, 'KeyW');
         await p.advance(0.2);
-        const audio = await p.page.evaluate(`(() => { const a = window.__serp.game.audio; return a ? { muted: a.muted, state: a.ctx ? a.ctx.state : 'none' } : null; })()`);
+        const audio = await p.page.evaluate(`(() => { const a = window.__dreamcar.game.audio; return a ? { muted: a.muted, state: a.ctx ? a.ctx.state : 'none' } : null; })()`);
         check('?mute: the sound is muted', audio && audio.muted !== false, JSON.stringify(audio));
       }
       await p.close(`?${q}`);
@@ -614,16 +614,16 @@ const SECTIONS = {
   async tiers() {
     for (const tier of ['low', 'medium', 'high']) {
       const p = await open(`?manual&q=${tier}&auto&ap&dpr=1&t=9`, { w: 240, h: 135 });
-      const times = await p.page.evaluate('Object.keys(window.__serp.times)');
+      const times = await p.page.evaluate('Object.keys(window.__dreamcar.times)');
       for (const time of times) {
         await p.page.evaluate((t) => {
-          const g = window.__serp.game;
+          const g = window.__dreamcar.game;
           g.setTime ? g.setTime(t) : g._onAction(`time:${t}`, -1);
         }, time);
         await p.advance(2, 15);
         const s = await p.state();
         const n = p.problems.length;
-        check(`${tier} tier, ${time}: a frame drawn`, s.time === time && (await p.page.evaluate('window.__serp.stats().drawCalls')) > 0, `${s.time}, ${n} problems so far`);
+        check(`${tier} tier, ${time}: a frame drawn`, s.time === time && (await p.page.evaluate('window.__dreamcar.stats().drawCalls')) > 0, `${s.time}, ${n} problems so far`);
       }
       await p.close(`${tier} tier`);
     }
