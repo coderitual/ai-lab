@@ -12,7 +12,8 @@
 //   road.js         the pavement and its asphalt
 //   rock.js         the cut rock faces at the rock edges
 //   lake.js         the water beside the straight
-//   placeholderGround.js   cones, posts and poles until the forest and the roadside exist
+//   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
+//   forest.js       the trees (treeGeometry.js, forestTextures.js), planted from the Track and the ground
 //   structures.js  what people built: lamps, tunnel, viaduct, rails, posts and chevrons, the start
 //
 // Three rules the parts keep between them:
@@ -31,10 +32,11 @@ import { createEnvironment } from './environment.js';
 import { TIMES } from './lighting.js';
 import { createGroundMaterial } from './groundMaterial.js';
 import { createLake } from './lake.js';
-import { createPlaceholderGround } from './placeholderGround.js';
+import { createFar } from './far.js';
+import { createForest } from './forest.js';
 import { selectBake } from './shading.js';
 import { createSky } from './sky.js';
-import { createSun } from './sun.js';
+import { SHADOW, createSun } from './sun.js';
 import { createRoad } from './road.js';
 import { createRockFaces } from './rock.js';
 import { createStructures } from './structures.js';
@@ -105,12 +107,16 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock') });
   lap('rock');
   const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
-  const ground = createPlaceholderGround({ caps, tier, track, rng: rng.fork('ground'), atmosphere, heightAt: terrain.heightAt });
-  lap('placeholders');
+  lap('lake');
+  const forest = createForest({ track, terrain, tier, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high });
+  lap('forest');
+  const far = createFar({ track, terrain, caps, tier, rng: rng.fork('far'), atmosphere });
+  far.setPixelRatio(renderer.getPixelRatio());
+  lap('far');
   const structures = createStructures({ track, terrain, caps, tier, atmosphere });
   lap('structures');
 
-  scene.add(terrain.group, road.group, rock.group, structures.group, lake.mesh, ground.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(terrain.group, road.group, rock.group, structures.group, lake.mesh, forest.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -137,7 +143,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     atmosphere,
     terrain,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, terrain: terrain.stats, structures: structures.stats },
+    stats: { ms, terrain: terrain.stats, structures: structures.stats, forest: forest.stats, far: far.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -160,7 +166,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       sun.setTime(time, above, below);
       scene.environment = environment.get(name);
       scene.environmentIntensity = time.env.intensity;
-      ground.setLamps(time.lamps.street);
+      forest.setTime(time);
+      far.setTime(time);
       structures.setTime(time);
       return time;
     },
@@ -168,10 +175,13 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     update(dt, simTime) {
       sky.update(dt, simTime);
       lake.update(simTime);
+      forest.update(dt, simTime);
+      far.update(dt, simTime);
     },
 
     prepareView(camera, focus, beams) {
       sun.prepareView(camera, focus);
+      forest.prepareView(camera, focus);
       road.setBeams(beams);
       structures.prepareView(camera, focus, beams);
       atmosphere.prepareView(camera);
@@ -215,7 +225,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       environment.dispose();
       sun.dispose();
       sky.dispose();
-      ground.dispose();
+      forest.dispose();
+      far.dispose();
       terrain.dispose();
       road.dispose();
       lake.dispose();
