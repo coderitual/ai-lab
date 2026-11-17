@@ -1,8 +1,8 @@
 {
-  "name": "serpentine",
+  "name": "dreamcar",
   "private": true,
   "version": "0.1.0",
-  "displayName": "Serpentine",
+  "displayName": "Dreamcar",
   "description": "A time trial over a mountain pass in a silver saloon, by day, at dusk after rain and at night, built with three.js. Solo or two-player split screen; keyboard, gamepad or touch.",
   "type": "module",
   "scripts": {

@@ -29,7 +29,7 @@ try {
   for (const [name, table] of Object.entries(config)) roots[name.toLowerCase()] = table;
 
   // A handle for automated checks and for the console.
-  window.__serp = {
+  window.__dreamcar = {
     game,
     engine,
     /** lighting.js's times of day (a test can add one at run time: the game takes whatever is there). */

@@ -20,7 +20,7 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
   For 02: `playtest` against `npm run preview`; see
   `02-backlit-swan/docs/tools.md`. For 03: `node tools/unit.mjs`, then
   `playtest` and `soundtest` against `npm run preview`; see
-  `03-serpentine/docs/tools.md`). Do not rebuild `dist/` while a test is
+  `03-dreamcar/docs/tools.md`). Do not rebuild `dist/` while a test is
   running against the preview.
 - **Say what was not verified.** These demos are developed in headless
   Chromium on software WebGL. Real phones, Safari, device frame rates and real
@@ -88,7 +88,7 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
 - Dev scripts in `tools/` need Playwright available to Node (not a project
   dependency).
 
-## 03-serpentine
+## 03-dreamcar
 
 - Everything is generated in code: no model, texture, font or audio files,
   and nothing fetched at run time. Keep it that way.
