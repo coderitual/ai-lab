@@ -144,10 +144,13 @@ export class Vehicle {
     this._escPause = 0; // s the stability control stays out of the way after the handbrake
     this._beta = 0; // body slip angle at the last step
     this._betaRate = 0;
+    this._wantedYaw = 0; // the yaw rate the stability control takes the steering to be asking for (rad/s)
     this._restTime = 0;
     this._asleep = false;
     this._grip = 1; // mean grip of the surfaces under the wheels
     this._touching = false;
+    this._edgePeak = 0; // the hardest knock against an edge in this meeting with it (m/s)
+    this._edgeQuiet = 1; // s since the body last touched an edge
     this._asking = false; // a pedal is asking the car to move
 
     this.reset({ x: 0, y: 0, z: 0, yaw: 0 });
@@ -187,6 +190,7 @@ export class Vehicle {
     this._escPause = 0;
     this._beta = 0;
     this._betaRate = 0;
+    this._wantedYaw = 0;
     this.steerAngle = 0;
     for (const w of this.wheels) {
       w.spin = 0;
@@ -204,6 +208,8 @@ export class Vehicle {
     this._locate(0);
     this.impacts.length = 0;
     this.scrape = 0;
+    this._edgePeak = 0;
+    this._edgeQuiet = 1;
     this.stuckTime = 0;
     this.wrongWayTime = 0;
     this._restTime = 0;
@@ -291,7 +297,7 @@ export class Vehicle {
 
     // ---- the assists (they read what the last step left) -----------------------------------------------------
     const a = p.assists;
-    if (handbrake > 0.1) this._escPause = 0.7;
+    if (handbrake > 0.1) this._escPause = a.esc.handbrakePause;
     else this._escPause = Math.max(0, this._escPause - dt);
 
     // stability control: the yaw moment (about +Y) that would put the car back where the steering points it
@@ -300,13 +306,20 @@ export class Vehicle {
     const beta = Math.abs(vLong) > 2 ? Math.atan2(vLat, Math.abs(vLong)) : 0;
     this._betaRate += ((beta - this._beta) / dt - this._betaRate) * Math.min(1, dt * 30);
     this._beta = beta;
-    if (this.assistsOn.esc && vLong > a.esc.minSpeed && this._escPause === 0) {
+    if (!(this.assistsOn.esc && vLong > a.esc.minSpeed && this._escPause === 0)) this._wantedYaw = yawRate;
+    else {
       const e = a.esc;
       const ratio = vLong / e.characteristicSpeed;
       const holds = (0.95 * p.gravity * this._grip) / vLong; // no more yaw than the road can hold
-      const wantedYaw = clamp((vLong * steer) / (p.wheelbase * (1 + ratio * ratio)), -holds, holds);
+      // what the steering asks for, as the car would answer it: through the car's own understeer and with the lag
+      // its yaw takes to build (a reference without the lag reads every quick release of a key as oversteer)
+      const asked = clamp((vLong * steer) / (p.wheelbase * (1 + ratio * ratio)), -holds, holds);
+      this._wantedYaw += (asked - this._wantedYaw) * (1 - Math.exp(-dt / e.lag));
+      const wantedYaw = this._wantedYaw;
       const error = yawRate - wantedYaw;
-      const beyond = Math.abs(error) - e.deadband - 0.12 * Math.abs(wantedYaw);
+      // the error let pass is a lateral acceleration (about 0.1 g) rather than a yaw rate, so that at speed, where a
+      // yaw rate is a lot of sideways g and the yaw is least damped, the brakes steady the car sooner
+      const beyond = Math.abs(error) - Math.min(e.deadband, e.deadbandG / vLong) - 0.12 * Math.abs(wantedYaw);
       if (beyond > 0) moment -= Math.sign(error) * e.yawGain * beyond;
       const slip = beta - clamp(beta, -e.slipAllowed, e.slipAllowed);
       if (slip !== 0) {
@@ -319,14 +332,17 @@ export class Vehicle {
       if (moment * yawRate < 0) trim = Math.max(trim, clamp01(Math.abs(moment) / 5000));
     }
 
-    // traction control: trim the engine while a driven wheel spins faster than the road
-    const tcOn = this.assistsOn.tc && this._escPause === 0;
+    // traction control: trim the engine while a driven wheel spins faster than the road (not while the handbrake is
+    // pulled; straight after it, it is what lets the rear tyres grip again and the slide be caught)
+    const tcOn = this.assistsOn.tc && handbrake <= 0.1;
     let spin = 0;
     for (let i = 2; i < 4; i++) {
       const w = wheels[i];
       if (!w.grounded) continue;
       const ref = Math.max(Math.abs(w._vlong), 3);
-      spin = Math.max(spin, (reverse ? -w._slip : w._slip) / ref);
+      // on a loose surface the tyre's peak comes later (tyre.js), and so does what the control aims for
+      const loose = 1 + p.tyre.looseSlip * Math.max(0, 1 - w._sample.grip);
+      spin = Math.max(spin, (reverse ? -w._slip : w._slip) / (ref * loose));
     }
     let cut = 0;
     if (tcOn && throttle > 0.02) {
@@ -374,7 +390,8 @@ export class Vehicle {
       const speed = Math.abs(w._vlong);
       let release = 0;
       if (this.assistsOn.abs && torque > 0 && speed > a.abs.minSpeed && w.grounded) {
-        const slip = (w._vlong > 0 ? -w._slip : w._slip) / Math.max(speed, 2.5); // + = the wheel is turning slower than the road
+        const loose = 1 + p.tyre.looseSlip * Math.max(0, 1 - w._sample.grip);
+        const slip = (w._vlong > 0 ? -w._slip : w._slip) / (Math.max(speed, 2.5) * loose); // + = the wheel is turning slower than the road
         const over = slip / a.abs.slip - 1;
         // as the traction control: what it has learnt this wheel's road will take, plus an answer to this instant
         w._cut = clamp(w._cut + dt * (over > 0 ? a.abs.learn * Math.min(over, 3) : a.abs.forget * Math.max(over, -1)), 0, 0.95);
@@ -578,7 +595,10 @@ export class Vehicle {
       w.slipRatio = slip / ref;
       w.slipAngle = Math.atan2(-vside, ref);
       const sliding = Math.sqrt(slip * slip + vside * vside);
-      w.skid = clamp01((contact.rho - 0.75) / 1.25) * clamp01((sliding - 0.5) / 2.5);
+      // the squeal, the marks and the smoke: from a little before the limit (about 85 % of the grip), about a
+      // quarter at it, growing past it; quiet when the patch hardly moves over the road however hard it works
+      const q = p.tyre.squeal;
+      w.skid = clamp01((contact.rho - q.from) / q.span) * clamp01((sliding - q.slide) / q.slideSpan);
 
       const gx = hx * force + sx * side;
       const gy = hy * force + sy * side;
@@ -684,6 +704,8 @@ export class Vehicle {
     this._centreHint = centre.index;
     if (centre.edgeL - centre.lat > this._reach && centre.edgeR + centre.lat > this._reach) {
       this._touching = false;
+      this._edgeQuiet += dt;
+      if (this._edgeQuiet > p.edges.apart) this._edgePeak = 0;
       this.scrape -= this.scrape * Math.min(1, dt * 18);
       return;
     }
@@ -744,8 +766,15 @@ export class Vehicle {
       const jv = clamp(-rising / this._mobility(rx, 0, rz, ux, uy, uz), -material.friction * jn, material.friction * jn);
       this._push(rx, 0, rz, ux * jv, uy * jv, uz * jv);
       rub = Math.max(rub, Math.abs(along));
-      if (-closing > p.edges.impactSpeed) this._impact(-closing, wx, com.y, wz, nx, 0, nz, 'edge', kind);
+      // One knock per meeting with the edge: the corner that arrives first is reported, and what follows while the
+      // car is still against it (the tail swinging in, the bounces of a scrape) only if it is clearly harder.
+      if (-closing > p.edges.impactSpeed && -closing > this._edgePeak * p.edges.again) {
+        this._impact(-closing, wx, com.y, wz, nx, 0, nz, 'edge', kind);
+        this._edgePeak = -closing;
+      }
     }
+    this._edgeQuiet = touching ? 0 : this._edgeQuiet + dt;
+    if (this._edgeQuiet > p.edges.apart) this._edgePeak = 0;
     com.x += deepLx * deepL + deepRx * deepR;
     com.z += deepLz * deepL + deepRz * deepR;
     this._touching = touching;

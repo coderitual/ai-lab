@@ -5,9 +5,10 @@
 // with the game's fixed step and driven through Vehicle.step's public controls; the only liberties taken are giving
 // the body a velocity to start a manoeuvre at speed or to kick the springs.
 
+import { AutoDriver, PlayerDriver } from '../../src/game/drivers.js';
 import { Vehicle } from '../../src/game/vehicle/Vehicle.js';
 import { CAR } from '../../src/game/vehicle/params.js';
-import { createPlane } from './flatTrack.mjs';
+import { EDGE, createPlane } from './flatTrack.mjs';
 
 export const DT = 1 / 120;
 export const G = 9.81;
@@ -383,4 +384,331 @@ export function reversing() {
   while (car.speed < 0 && t < 10) { car.step(DT, c); t += DT; rolledBack = z0 - car.position.z; }
   for (let i = 0; i < 120; i++) car.step(DT, c);
   return { back, stopTime: t, stopDistance: rolledBack, gearAfter: car.gear, kmhAfter: car.speed * KMH };
+}
+
+// ---- the car in a person's hands: PlayerDriver fed with keys, a stick or a thumb, exactly as the game feeds it -----
+
+/** A stand-in for engine/Input.js: whatever `state` holds is what the driver reads. */
+export function fakeInput() {
+  const state = { steer: 0, throttle: 0, brake: 0, handbrake: 0, analog: false };
+  return { state, read: (out) => Object.assign(out, state) };
+}
+
+/** The speed held by a part throttle chosen by hand (not a key): what isolates the steering in a measurement. */
+const holdThrottle = (car, speed) => Math.max(0, Math.min(1, (speed - car.speed) * 0.6 + 0.012 * speed));
+
+/**
+ * A steering key held down at a steady speed (km/h) for `seconds` and let go: how quickly the yaw rate arrives (to
+ * 90 % of its steady value) and goes (to under 10 %), the steady lateral g, the steering it settles at, the
+ * overshoot of the yaw rate and its swing once it should have settled (peak to peak in g, from 2 s on).
+ */
+export function keyResponse(kmh, params, seconds = 4) {
+  const input = fakeInput();
+  const driver = new PlayerDriver(input);
+  const car = makeCar(params);
+  const speed = kmh / KMH;
+  const c = cruise(car, speed);
+  const n1 = seconds * 120, n2 = n1 + 240;
+  const trace = [];
+  for (let i = 0; i < n2; i++) {
+    input.state.steer = i < n1 ? -1 : 0; // left
+    driver.drive(car, DT, c);
+    c.throttle = holdThrottle(car, speed);
+    car.step(DT, c);
+    trace.push({ r: yawRate(car), steer: car.steerAngle });
+  }
+  const steady = mean(trace.slice(n1 - 60, n1).map((x) => x.r));
+  const swing = trace.slice(240, n1).map((x) => (x.r * speed) / G);
+  return {
+    rise: (trace.findIndex((x) => x.r >= 0.9 * steady) + 1) * DT,
+    release: (trace.findIndex((x, i) => i >= n1 && Math.abs(x.r) < 0.1 * Math.abs(steady)) - n1 + 1) * DT,
+    steadyG: (steady * speed) / G,
+    steer: trace[n1 - 1].steer * DEG,
+    overshoot: (Math.max(...trace.slice(0, n1).map((x) => x.r)) / steady - 1) * 100,
+    swing: Math.max(...swing) - Math.min(...swing),
+  };
+}
+
+/** The steering (degrees at the road wheels) a key held down, or a stick held over, settles at at a speed (km/h). */
+export function lockAt(kmh, analog = false, params) {
+  const input = fakeInput();
+  const driver = new PlayerDriver(input);
+  const car = makeCar(params);
+  car.velocity.set(0, 0, kmh / KMH);
+  car._sync();
+  const c = controls();
+  Object.assign(input.state, { steer: 1, analog });
+  for (let i = 0; i < 240; i++) driver.drive(car, DT, c);
+  return c.steer * car.params.steering.lock * DEG;
+}
+
+/** A tap of a steering key (ms) at a speed (km/h), throttle key held: how far it turns the car and whether it saws. */
+export function keyTap(kmh, ms, params) {
+  const input = fakeInput();
+  const driver = new PlayerDriver(input);
+  const car = makeCar(params);
+  const c = cruise(car, kmh / KMH);
+  const yaw0 = car.yaw, x0 = car.position.x;
+  let reversals = 0, sign = 0, late = 0;
+  for (let i = 0; i < 360; i++) {
+    input.state.steer = i < (ms / 1000) * 120 ? 1 : 0;
+    input.state.throttle = 1;
+    driver.drive(car, DT, c);
+    car.step(DT, c);
+    const r = yawRate(car);
+    const s = Math.abs(r) > 0.003 ? Math.sign(r) : sign;
+    if (sign && s !== sign) reversals++;
+    sign = s;
+    if (i >= 120) late = Math.max(late, Math.abs(r));
+  }
+  return { heading: (car.yaw - yaw0) * DEG, lateral: car.position.x - x0, reversals, late };
+}
+
+/** The brake key from a speed (km/h) to a stop, with a steering key held from 0.5 s on (-1 left, 0, 1 right). */
+export function brakeKey(kmh, steer = 0, params) {
+  const input = fakeInput();
+  const driver = new PlayerDriver(input);
+  const car = makeCar(params);
+  const c = cruise(car, kmh / KMH + 0.5);
+  while (car.speed > kmh / KMH) { driver.drive(car, DT, c); car.step(DT, c); }
+  const x0 = car.position.x, z0 = car.position.z, yaw0 = car.yaw;
+  let t = 0;
+  input.state.brake = 1;
+  while (car.speed > 0.3 && t < 10) {
+    input.state.steer = t > 0.5 ? steer : 0;
+    driver.drive(car, DT, c);
+    car.step(DT, c);
+    t += DT;
+  }
+  return { distance: Math.hypot(car.position.x - x0, car.position.z - z0), time: t, heading: (car.yaw - yaw0) * DEG, lateral: car.position.x - x0 };
+}
+
+/** The throttle key from rest for a few seconds, with a steering key held (or not). */
+export function launchKey(steer = 0, params, seconds = 4) {
+  const input = fakeInput();
+  const driver = new PlayerDriver(input);
+  const car = makeCar(params);
+  const c = controls();
+  let mostSlip = 0, tc = 0;
+  for (let i = 0; i < seconds * 120; i++) {
+    Object.assign(input.state, { throttle: 1, steer });
+    driver.drive(car, DT, c);
+    car.step(DT, c);
+    // a car turning tight at low speed points well inside its path anyway (b/R): only slip beyond that is a slide
+    const kinematic = Math.abs(car.speed) > 1 ? Math.atan((car.params.wheelbase / 2 - car.params.com.z) * Math.abs(yawRate(car)) / Math.abs(car.speed)) * DEG : 0;
+    mostSlip = Math.max(mostSlip, Math.abs(bodySlip(car)) - kinematic);
+    tc = Math.max(tc, car.assists.tc);
+  }
+  return { kmh: car.speed * KMH, mostSlip, tc, turned: Math.abs(car.yaw) * DEG };
+}
+
+/** Steering key and handbrake together for `pull` seconds at a speed (km/h), then the throttle key. */
+export function handbrakeKeys(kmh, pull, params) {
+  const input = fakeInput();
+  const driver = new PlayerDriver(input);
+  const car = makeCar(params);
+  const c = cruise(car, kmh / KMH);
+  let turned = 0, last = car.yaw, least = Infinity, mostSlip = 0;
+  for (let i = 0; i < 120 * 4; i++) {
+    const t = i * DT;
+    input.state.steer = t < pull + 0.3 ? -1 : 0;
+    input.state.handbrake = t > 0.15 && t < pull + 0.15 ? 1 : 0;
+    input.state.throttle = t > pull + 0.15 ? 1 : 0;
+    driver.drive(car, DT, c);
+    car.step(DT, c);
+    let d = car.yaw - last;
+    if (d > Math.PI) d -= 2 * Math.PI;
+    if (d < -Math.PI) d += 2 * Math.PI;
+    turned += d;
+    last = car.yaw;
+    least = Math.min(least, car.speed);
+    mostSlip = Math.max(mostSlip, Math.abs(bodySlip(car)));
+  }
+  return { turned: turned * DEG, slowest: least * KMH, endKmh: car.speed * KMH, mostSlip };
+}
+
+/**
+ * Does the gearbox hunt? A throttle key worked on and off (0.4 s each way) at 60 km/h, and a car let run down an 8 %
+ * hill held near 70 km/h by dabs of the brake: shifts in 15 s.
+ */
+export function gearHunt(params) {
+  const input = fakeInput();
+  const driver = new PlayerDriver(input);
+  const car = makeCar(params);
+  const c = cruise(car, 60 / KMH);
+  let keyShifts = 0, gear = car.gear;
+  for (let i = 0; i < 120 * 15; i++) {
+    input.state.throttle = car.speed < 60 / KMH && Math.floor((i * DT) / 0.4) % 2 === 0 ? 1 : 0;
+    driver.drive(car, DT, c);
+    car.step(DT, c);
+    if (car.gear !== gear) keyShifts++;
+    gear = car.gear;
+  }
+  const hill = new Vehicle(createPlane({ grade: -0.08 }), params);
+  hill.reset({ x: 0, z: 0, yaw: 0 });
+  const h = controls();
+  while (hill.speed < 70 / KMH) { h.throttle = 1; hill.step(DT, h); }
+  let hillShifts = 0;
+  gear = hill.gear;
+  for (let i = 0; i < 120 * 20; i++) {
+    h.throttle = 0;
+    h.brake = hill.speed > 72 / KMH ? 0.25 : 0;
+    hill.step(DT, h);
+    if (i > 120 * 5 && hill.gear !== gear) hillShifts++;
+    gear = hill.gear;
+  }
+  return { keyShifts, hillShifts };
+}
+
+/** A slow wind of the steering at a steady speed: at what fraction of the most lateral g the tyres start to squeal. */
+export function squealOnset(kmh, params) {
+  const car = makeCar(params);
+  const speed = kmh / KMH;
+  const c = cruise(car, speed);
+  const rate = 0.013 * (60 / Math.max(kmh, 30)) ** 1.3; // rad/s at the road wheels
+  const trace = [];
+  for (let i = 0; i < 120 * 14; i++) {
+    c.steer = -Math.min(1, (i * DT * rate) / car.params.steering.lock);
+    c.throttle = holdThrottle(car, speed);
+    car.step(DT, c);
+    trace.push({ g: (car.speed * yawRate(car)) / G, skid: Math.max(...car.wheels.map((w) => w.skid)) });
+  }
+  const most = Math.max(...trace.map((x) => x.g));
+  const first = trace.find((x) => x.skid > 0.02);
+  return { onset: first ? first.g / most : NaN, atLimit: trace.find((x) => x.g === most).skid, most };
+}
+
+/** The steering gain of the car in the linear range: its characteristic speed (m/s; infinite would be neutral). */
+export function characteristicSpeed(params, speed = 30) {
+  const car = makeCar(params);
+  car.assistsOn.esc = false;
+  const c = cruise(car, speed);
+  const angle = 0.3 / speed;
+  c.steer = -angle / car.params.steering.lock;
+  hold(car, speed, 4, c);
+  const gain = yawRate(car) / angle;
+  return speed / Math.sqrt(speed / (car.params.wheelbase * gain) - 1);
+}
+
+/**
+ * A touch on a rail: the car arrives at `angle` degrees to it at a speed (km/h), throttle held as it was, and from
+ * 0.4 s to 0.7 s after the touch a key steers it away. What it keeps, how soon it lies along the rail, what was
+ * reported, and whether it drives on.
+ */
+export function railTouch(kmh, angle, params, kind = EDGE.RAIL) {
+  const plane = createPlane({ edge: 8, kind });
+  const car = makeCar(params, plane);
+  const speed = kmh / KMH;
+  const c = cruise(car, speed);
+  // turn the settled car (and its motion) towards the left rail, and put it a little way off
+  const a = angle / DEG;
+  const q = car.quaternion.clone().set(0, Math.sin(a / 2), 0, Math.cos(a / 2));
+  car.quaternion.premultiply(q);
+  car.velocity.applyQuaternion(q);
+  car._axes();
+  car._com.x = 8 - 1.2 - 2.3 * Math.sin(a) - Math.max(0.3, speed * Math.sin(a) * 0.25);
+  car._sync();
+  const input = fakeInput();
+  const driver = new PlayerDriver(input);
+  let hit = -1, before = 0, least = Infinity, parallel = NaN, impacts = 0, strength = 0, scraped = 0, kept = NaN;
+  for (let i = 0; i < 120 * 3; i++) {
+    const t = i * DT;
+    input.state.steer = hit >= 0 && t - hit > 0.4 && t - hit < 0.7 ? 1 : 0;
+    driver.drive(car, DT, c);
+    c.throttle = holdThrottle(car, speed);
+    const v = car.velocity.length();
+    car.step(DT, c);
+    if (car.impacts.length && hit < 0) {
+      hit = t;
+      before = v;
+      strength = car.impacts[0].strength;
+    }
+    if (hit >= 0 && t - hit < 1.2) impacts += car.impacts.length;
+    car.impacts.length = 0;
+    if (hit >= 0) {
+      if (t - hit < 0.6) least = Math.min(least, car.velocity.length());
+      if (Number.isNaN(parallel) && Math.abs(Math.atan2(car._fx, car._fz)) < 3 / DEG) parallel = t - hit;
+      if (Number.isNaN(kept) && t - hit >= 0.6) kept = car.velocity.length() / before;
+      if (car.scrape > 0.05) scraped += DT;
+    }
+  }
+  return { kept, least: least / before, parallel, impacts, strength, scraped, endKmh: car.speed * KMH, away: 8 - car.position.x };
+}
+
+// ---- laps of a road ---------------------------------------------------------------------------------------------
+
+/**
+ * Who drives a lap: 'auto' (the autopilot), or a person through PlayerDriver with the autopilot's wishes as their
+ * intent: 'pad' (its steering and pedals through the analog path), 'thumb' (its steering through the analog path,
+ * the throttle full unless it brakes, as on a phone) or 'keys' (keys pressed and let go to follow its steering, the
+ * throttle and brake keys when it asks for more than a little of either).
+ */
+export function lapDriver(track, kind, pace = 0.9, bias = 0, params = CAR) {
+  const auto = new AutoDriver(track, { pace, bias, params });
+  if (kind === 'auto') return auto;
+  const input = fakeInput();
+  const player = new PlayerDriver(input);
+  const probe = new PlayerDriver(fakeInput());
+  const scratch = controls();
+  const wish = controls();
+  let key = 0;
+  /** The angle (rad, + = left) a full analog input gives at this speed that way. */
+  const room = (car, left) => {
+    Object.assign(probe.input.state, { analog: true, steer: left ? -1 : 1 });
+    probe.drive(car, 0, scratch);
+    return Math.max(0.01, Math.abs(scratch.steer) * car.params.steering.lock);
+  };
+  return {
+    drive(car, dt, out) {
+      auto.drive(car, dt, wish);
+      const lock = car.params.steering.lock;
+      const angle = -wish.steer * lock;
+      const s = input.state;
+      if (kind === 'keys') {
+        const now = -(out.steer || 0) * lock;
+        const band = 0.004 + 0.1 * Math.abs(angle);
+        if (angle - now > band) key = -1;
+        else if (angle - now < -band) key = 1;
+        else if (Math.abs(angle) < 0.01 || Math.sign(-key) !== Math.sign(angle)) key = 0;
+        Object.assign(s, { analog: false, steer: key, throttle: wish.throttle > 0.35 ? 1 : 0, brake: wish.brake > 0.15 ? 1 : 0, handbrake: 0 });
+      } else {
+        s.analog = true;
+        s.steer = Math.max(-1, Math.min(1, -angle / room(car, angle > 0)));
+        s.brake = wish.brake;
+        s.throttle = kind === 'thumb' ? (wish.brake < 0.12 ? 1 : 0) : wish.throttle;
+        s.handbrake = 0;
+      }
+      return player.drive(car, dt, out);
+    },
+  };
+}
+
+/** Laps from the grid: the flying lap times (the run to the line and the first lap from rest are left out) and what happened. */
+export function laps(track, kind, { pace = 0.9, count = 2, bias = 0, slot = 0, params = CAR } = {}) {
+  const driver = lapDriver(track, kind, pace, bias, params);
+  const car = new Vehicle(track, params);
+  car.reset(track.grid(slot, {}));
+  const c = controls();
+  const times = [];
+  let t = 0, started = 0, last = car.s, impacts = 0, off = -Infinity, slip = 0, escTime = 0, finite = true;
+  while (times.length < count + 2 && t < 400 * (count + 2)) {
+    driver.drive(car, DT, c);
+    car.step(DT, c);
+    t += DT;
+    if (!Number.isFinite(car.position.x + car.velocity.x)) { finite = false; break; }
+    impacts += car.impacts.length;
+    car.impacts.length = 0;
+    if (times.length >= 1) {
+      off = Math.max(off, Math.abs(car.lat) + car.params.box.halfWidth - track.halfWidth);
+      if (car.speed > 8) slip = Math.max(slip, Math.abs(bodySlip(car)));
+      if (car.assists.esc > 0.1) escTime += DT;
+    }
+    if (car.s < last - track.length / 2) {
+      times.push(t - started);
+      started = t;
+    }
+    last = car.s;
+  }
+  const flying = times.slice(2);
+  return { times: flying, best: Math.min(...flying), impacts, off, slip, escPerLap: escTime / Math.max(1, times.length - 1), finite };
 }
