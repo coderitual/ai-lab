@@ -631,7 +631,7 @@ export class Hud {
     const title = s.phase === 'title';
     this.title.show(title);
     this.pause.show(s.paused && !title);
-    this.results.show(s.phase === 'results' && !s.paused);
+    this.results.show(s.phase === 'results' && !s.paused).flag('split', s.mode === 'split');
     this.root.classList.toggle('attract', s.attract);
     this.splitButton.text(s.mode === 'split' ? TEXT.onePlayer : TEXT.twoPlayers);
     const other = s.time === 'day' ? TEXT.night : TEXT.day;
@@ -643,6 +643,7 @@ export class Hud {
     for (const v of this.views) {
       v.setVisible(!title);
       v.setMode(s.mode === 'split', touch);
+      v.cell.flag('done', s.phase === 'results');
       if (title || (s.phase === 'countdown' && wasPhase !== 'countdown')) v.clearMoments();
     }
     this._legend(s.mode === 'split' && !touch ? 'split' : s.device);
@@ -694,8 +695,8 @@ export class Hud {
           ? `<div class="who${d.position === 1 && d.finished ? ' win' : ''}">${TEXT.driver(i)} · ${d.finished ? TEXT.place(d.position) : TEXT.dnf}</div>`
           : '';
         const medal = d.medal
-          ? `<span class="medal ${d.medal}"><i></i>${TEXT.medalWon(TEXT.medal[d.medal])}</span>`
-          : `<span class="medal none">${TEXT.noMedal}</span>`;
+          ? `<span class="award ${d.medal}"><i></i>${TEXT.medalWon(TEXT.medal[d.medal])}</span>`
+          : `<span class="award none">${TEXT.noMedal}</span>`;
         return (
           `<div class="col">${head}<table>${laps}<tr class="total"><td>${TEXT.total}</td>` +
           `<td class="t">${d.finished ? formatMs(d.total) : '—'}</td><td></td></tr></table><div class="medalline">${medal}</div></div>`

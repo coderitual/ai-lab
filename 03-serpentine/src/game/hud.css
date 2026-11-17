@@ -139,7 +139,7 @@
   color: var(--dim);
 }
 .hud .lapword {
-  font-size: calc(var(--u) * 1.25);
+  font-size: max(9px, calc(var(--u) * 1.25));
   font-weight: 600;
   letter-spacing: 0.24em;
   text-transform: uppercase;
@@ -182,14 +182,14 @@
   margin-top: calc(var(--u) * 0.6);
 }
 .hud .label {
-  font-size: calc(var(--u) * 1.15);
+  font-size: max(9px, calc(var(--u) * 1.15));
   font-weight: 600;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--dim);
 }
 .hud .besttime {
-  font-size: calc(var(--u) * 1.9);
+  font-size: max(11px, calc(var(--u) * 1.9));
   font-weight: 400;
   color: var(--dim);
 }
@@ -206,7 +206,7 @@
   border-top: max(1px, calc(var(--u) * 0.12)) solid var(--ice);
 }
 .hud .board .head {
-  font-size: calc(var(--u) * 1.1);
+  font-size: max(9px, calc(var(--u) * 1.1));
   font-weight: 600;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -228,7 +228,7 @@
   color: var(--dim);
 }
 .hud .row .tag {
-  font-size: calc(var(--u) * 1.05);
+  font-size: max(9px, calc(var(--u) * 1.05));
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -248,17 +248,17 @@
 }
 .hud .row.gold .rank,
 .hud .row.gold .tag,
-.hud .medal.gold {
+.hud .award.gold {
   color: #f0cf72;
 }
 .hud .row.silver .rank,
 .hud .row.silver .tag,
-.hud .medal.silver {
+.hud .award.silver {
   color: #cfd8e0;
 }
 .hud .row.bronze .rank,
 .hud .row.bronze .tag,
-.hud .medal.bronze {
+.hud .award.bronze {
   color: #d99868;
 }
 .hud .row.own .time,
@@ -298,7 +298,7 @@
   font-weight: 400;
 }
 .hud .next .tag {
-  font-size: calc(var(--u) * 1.15);
+  font-size: max(9px, calc(var(--u) * 1.15));
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -343,6 +343,11 @@
   position: absolute;
   left: 50%;
   top: calc(var(--pad) + var(--st) + var(--u) * 0.6);
+}
+.hud .view.narrow .lamps {
+  top: calc(var(--pad) + var(--st) + var(--u) * 11);
+}
+.hud .lamps {
   transform: translateX(-50%);
   display: flex;
   gap: calc(var(--u) * 1.1);
@@ -414,7 +419,7 @@
   display: inline-block;
   margin-top: calc(var(--u) * 0.4);
   padding: calc(var(--u) * 0.3) calc(var(--u) * 0.8);
-  font-size: calc(var(--u) * 1.2);
+  font-size: max(9px, calc(var(--u) * 1.2));
   font-weight: 600;
   letter-spacing: 0.24em;
   text-transform: uppercase;
@@ -476,9 +481,9 @@
 .hud .hint {
   position: absolute;
   left: 50%;
-  top: calc(var(--pad) + var(--st) + var(--u) * 7.5);
+  top: 28%;
   transform: translateX(-50%);
-  max-width: 80%;
+  max-width: 68%;
   padding: calc(var(--u) * 0.8) calc(var(--u) * 1.6);
   font-size: max(13px, calc(var(--u) * 1.6));
   text-align: center;
@@ -556,7 +561,7 @@
 }
 .hud .kmh {
   margin-top: calc(var(--u) * 0.7);
-  font-size: calc(var(--u) * 1.2);
+  font-size: max(9px, calc(var(--u) * 1.2));
   font-weight: 600;
   letter-spacing: 0.24em;
   text-transform: uppercase;
@@ -928,7 +933,8 @@
   font-weight: 300;
 }
 .hud .results td {
-  padding: 5px 0;
+  padding: 5px 10px 5px 0;
+  white-space: nowrap;
   border-bottom: 1px solid var(--hair);
 }
 .hud .results td.t {
@@ -972,7 +978,7 @@
 .hud .medalline {
   margin-top: 10px;
 }
-.hud .medal {
+.hud .award {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -981,13 +987,13 @@
   letter-spacing: 0.2em;
   text-transform: uppercase;
 }
-.hud .medal i {
+.hud .award i {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: 2px solid currentColor;
 }
-.hud .medal.none {
+.hud .award.none {
   color: var(--dim);
 }
 .hud .boardlist {
@@ -1004,6 +1010,22 @@
 .hud .boardlist .row {
   --u: 9px;
   font-size: 17px;
+}
+.hud .results.split table {
+  font-size: 16px;
+}
+.hud .results.split .cols {
+  gap: 16px;
+}
+.hud .results.split .boardlist {
+  display: none;
+}
+/* while the results show, the instruments step back */
+.hud .view.done .cluster,
+.hud .view.done .map,
+.hud .view.done .touchcol,
+.hud .view.done .scrim.br {
+  display: none;
 }
 .hud .results .buttons {
   margin-top: 20px;
