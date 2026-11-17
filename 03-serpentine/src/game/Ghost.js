@@ -26,28 +26,35 @@ const qb = new THREE.Quaternion();
 const round = (v, k) => Math.round(v * k) / k;
 
 function load(length) {
-  const kept = { length: Math.round(length), day: { standing: null, flying: null }, night: { standing: null, flying: null } };
+  // per time of day (whichever lighting.js has), made when first asked for
+  const kept = { length: Math.round(length) };
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (!raw || raw.length !== kept.length) return kept;
-    for (const [time, kind] of [['day', 'standing'], ['day', 'flying'], ['night', 'standing'], ['night', 'flying']]) {
-      const g = raw[time] && raw[time][kind];
-      const ok =
-        g &&
-        Number.isInteger(g.ms) &&
-        g.ms > 0 &&
-        Array.isArray(g.frames) &&
-        g.frames.length >= 2 * STRIDE &&
-        g.frames.length % STRIDE === 0 &&
-        g.frames.length <= MAX_SECONDS * GHOST_RATE * STRIDE &&
-        g.frames.every(Number.isFinite);
-      if (ok) kept[time][kind] = { ms: g.ms, frames: g.frames };
+    for (const time of Object.keys(raw)) {
+      if (time === 'length' || !/^[a-z]{1,16}$/.test(time) || !raw[time] || typeof raw[time] !== 'object') continue;
+      for (const kind of ['standing', 'flying']) {
+        const g = raw[time][kind];
+        const ok =
+          g &&
+          Number.isInteger(g.ms) &&
+          g.ms > 0 &&
+          Array.isArray(g.frames) &&
+          g.frames.length >= 2 * STRIDE &&
+          g.frames.length % STRIDE === 0 &&
+          g.frames.length <= MAX_SECONDS * GHOST_RATE * STRIDE &&
+          g.frames.every(Number.isFinite);
+        if (ok) slot(kept, time)[kind] = { ms: g.ms, frames: g.frames };
+      }
     }
   } catch {
     // no storage, or something else's data under our key
   }
   return kept;
 }
+
+/** The recordings of `time`, made empty when there are none yet. */
+const slot = (kept, time) => (kept[time] ||= { standing: null, flying: null });
 
 export class Ghost {
   /** @param {number} trackLength the road the recordings belong to */
@@ -74,14 +81,22 @@ export class Ghost {
     while (this._next * (1000 / GHOST_RATE) <= lapMs && this.recording.length < MAX_SECONDS * GHOST_RATE * STRIDE) {
       const p = vehicle.position;
       const q = vehicle.quaternion;
-      this.recording.push(round(p.x, 100), round(p.y, 100), round(p.z, 100), round(q.x, 1e4), round(q.y, 1e4), round(q.z, 1e4), round(q.w, 1e4));
+      this.recording.push(
+        round(p.x, 100),
+        round(p.y, 100),
+        round(p.z, 100),
+        round(q.x, 1e4),
+        round(q.y, 1e4),
+        round(q.z, 1e4),
+        round(q.w, 1e4),
+      );
       this._next++;
     }
   }
 
   /** The lap just recorded is the best of its kind ('standing' | 'flying') on this device for `time`: keep it. */
   keep(time, kind, ms) {
-    this.kept[time][kind] = { ms, frames: this.recording.slice() };
+    slot(this.kept, time)[kind] = { ms, frames: this.recording.slice() };
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(this.kept));
     } catch {
@@ -91,7 +106,7 @@ export class Ghost {
 
   /** Whether there is a ghost to race for `time` (and `kind`, if given). */
   has(time, kind) {
-    const t = this.kept[time];
+    const t = slot(this.kept, time);
     return kind ? !!t[kind] : !!(t.standing || t.flying);
   }
 
@@ -100,7 +115,7 @@ export class Ghost {
    * is over (or there is none).
    */
   pose(time, kind, seconds, object) {
-    const g = this.kept[time][kind];
+    const g = slot(this.kept, time)[kind];
     if (!g || seconds < 0) return false;
     const f = g.frames;
     const n = f.length / STRIDE;
@@ -110,7 +125,11 @@ export class Ghost {
     const t = u - i;
     const a = i * STRIDE;
     const b = a + STRIDE;
-    object.position.set(f[a] + (f[b] - f[a]) * t, f[a + 1] + (f[b + 1] - f[a + 1]) * t, f[a + 2] + (f[b + 2] - f[a + 2]) * t);
+    object.position.set(
+      f[a] + (f[b] - f[a]) * t,
+      f[a + 1] + (f[b + 1] - f[a + 1]) * t,
+      f[a + 2] + (f[b + 2] - f[a + 2]) * t,
+    );
     qa.set(f[a + 3], f[a + 4], f[a + 5], f[a + 6]).normalize();
     qb.set(f[b + 3], f[b + 4], f[b + 5], f[b + 6]).normalize();
     object.quaternion.slerpQuaternions(qa, qb, t);

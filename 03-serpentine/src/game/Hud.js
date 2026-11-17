@@ -293,9 +293,11 @@ export class ViewHud {
     s.width = `${zone.width * 100}%`;
     s.height = `${zone.height * 100}%`;
     const tall = h > w * 1.2;
-    // a hundredth of a 16:9 picture's width; an upright picture is read from further away and gets more
-    const u = tall ? w / 72 : Math.min(w, (h * 16) / 9) / 100;
-    s.setProperty('--u', `${Math.max(3.4, Math.min(u, 20)).toFixed(2)}px`);
+    // 0.6 of a hundredth of a 16:9 picture's width (the instruments are a corner of the picture, not its
+    // subject: the cluster stays inside a fifth of the width and clear of the car); an upright picture is read
+    // from further away and gets a little more
+    const u = tall ? w / 66 : (Math.min(w, (h * 16) / 9) / 100) * 0.6;
+    s.setProperty('--u', `${Math.max(3.4, Math.min(u, 12)).toFixed(2)}px`);
     this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460);
     this.wide = w >= 700;
   }
@@ -576,8 +578,13 @@ export class Hud {
     const choose = make('div', 'buttons', t);
     button(choose, TEXT.drive, () => this.act('start'), 'primary');
     this.splitButton = new Cell(button(choose, TEXT.twoPlayers, () => this.act(this._mode === 'split' ? 'solo' : 'split'), 'toggle'));
-    this.timeButton = new Cell(button(choose, TEXT.night, () => this.act('time'), 'toggle'));
     this.soundButton = new Cell(button(choose, TEXT.soundOn, () => this.act('mute'), 'toggle'));
+    // the time of day: one button per time lighting.js has, the one showing pressed (made in setState)
+    this.timeChoice = make('div', 'timechoice', t);
+    this.timeChoice.setAttribute('role', 'group');
+    this.timeChoice.setAttribute('aria-label', TEXT.timeOfDay);
+    /** @type {Map<string, Cell>} */
+    this.timeButtons = new Map();
     this.titleBest = cell('div', 'titlebest', t);
     this.legend = cell('dl', 'legend', t);
     this._legendKey = '';
@@ -621,10 +628,11 @@ export class Hud {
 
   /**
    * Which panels show, and the words on their toggles.
-   * @param {{ phase: string, paused: boolean, mode: string, time: string, muted: boolean, device: string, attract: boolean }} s
+   * @param {{ phase: string, paused: boolean, mode: string, time: string, times: string[], muted: boolean, device: string, attract: boolean }} s
    */
   setState(s) {
-    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}`;
+    const times = s.times || [s.time];
+    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}`;
     if (key === this._state) return;
     const [wasPhase, wasPaused] = this._state.split('|');
     this._state = key;
@@ -636,9 +644,17 @@ export class Hud {
     this.results.show(s.phase === 'results' && !s.paused).flag('split', s.mode === 'split');
     this.root.classList.toggle('attract', s.attract);
     this.splitButton.text(s.mode === 'split' ? TEXT.onePlayer : TEXT.twoPlayers);
-    const other = s.time === 'day' ? TEXT.night : TEXT.day;
-    this.timeButton.text(other);
-    this.pauseTime.text(other);
+    for (const name of times) {
+      if (this.timeButtons.has(name)) continue;
+      const b = button(this.timeChoice, TEXT.timeName(name), () => this.act(`time:${name}`), 'toggle');
+      this.timeButtons.set(name, new Cell(b));
+    }
+    // in lighting.js's order, only the times it has now
+    for (const name of times) this.timeChoice.appendChild(this.timeButtons.get(name).el);
+    for (const [name, b] of this.timeButtons) b.show(times.includes(name)).flag('on', name === s.time).attr('aria-pressed', name === s.time);
+    // the pause panel's button names the time it goes to next
+    const next = times[(times.indexOf(s.time) + 1) % times.length];
+    this.pauseTime.text(TEXT.timeName(next));
     this.soundButton.text(s.muted ? TEXT.soundOff : TEXT.soundOn).flag('off', s.muted);
     this.pauseSound.text(s.muted ? TEXT.soundOff : TEXT.soundOn).flag('off', s.muted);
     const touch = s.device === 'touch';
