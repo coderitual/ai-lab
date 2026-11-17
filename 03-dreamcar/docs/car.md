@@ -40,7 +40,7 @@ between the axles; +Z forward, +Y up, +X the car's left. Metres.
 | `lampUnits.js` | the head and tail lamp units behind their lenses, as geometry |
 | `plate.js` | the Polish number plate's picture, and the stroke characters it (and the tyres' marking) are written with |
 | `lamps.js` | the lights the lamps cast: two head-lamp spots with beam pictures, one red spot behind |
-| `wheel.js`, `wheelTextures.js` | a corner: tyre, five-twin-spoke 18-inch wheel, brake; the blur shells for a turning wheel |
+| `wheel.js`, `wheelTextures.js` | a corner: tyre, five-twin-spoke 19-inch wheel, brake; the blur shells for a turning wheel |
 | `shadow.js` | the contact shadow, laid on the road by the game |
 | `studio.js` | dev only: the studio and the light tunnel of the viewer |
 | `index.js` | `createCar()`: assembles it all and returns the handle (`CarModel`, see the build contract) |
@@ -175,7 +175,8 @@ has its black band under the edge (25 mm on the windscreen, 28 on the rear
 screen); the rear screen carries its fourteen heating lines. Behind it are
 the cabin (`details.js`: seats with head restraints and bolsters, the rear
 bench, dash and cowl, console, door cards, steering wheel, interior mirror,
-parcel shelf, all black and lit by what sun comes through), the two displays
+parcel shelf, all black and lit by what sun comes through; under the roof
+they see only 0.3 of the sky, or the seats shine grey through the side glass), the two displays
 and the third brake light, 14 mm inside the rear screen below its band.
 
 ### The lamps and their light
@@ -188,12 +189,19 @@ metalness and roughness unlit and what it emits when `setLights` switches
 its function on. The paint discards under the lenses; the lens is the glass
 material over the same skin.
 
-- **Head lamp**: a gloss black housing let in behind the lens's outline; the
+- **Head lamp**: a gloss black housing let in behind the lens's outline (unlit,
+  the daylight photographs show the inside nearly black: the bezels are a dark
+  satin, the unlit brow a grey frosted bar); the
   eyebrow light guide with its hook just under the lens (daytime running
   light, position light, amber when indicating); the projection module (a
   glass dome in a satin bezel: dipped beam), the matrix module (main beam),
   a small auxiliary reflector and the small blue accent, in a row 45 mm in.
-- **Tail lamp**: a dark red mirror of a housing as a trough from the lens's
+- **Tail lamp**: its outline was redrawn from the daylight photograph straight
+  on the tail: a long wedge from an inner tip 0.325 off the centre line, its
+  upper edge rising to a rounded outer end 0.2 high that wraps round the
+  corner, the lower edge nearly level (`TAIL_LENS`; the unit's edges are read
+  from the same outline). Unlit it is a clear cherry red, not smoked: a clear
+  red lens over a red mirror of a housing, as a trough from the lens's
   edges; two rows of slanted blades (tail light), the smooth band between
   them (brake light; the outer piece's band is also the indicator), the
   reversing window by the inner tip.
@@ -215,10 +223,16 @@ material over the same skin.
 
 ### The wheels and their blur
 
-`wheel.js`: the tyre (225/45 R18 front, 245/40 R18 rear) with a tread and
+`wheel.js`: the tyre (225/40 R19 front, 255/35 R19 rear) with a tread and
 sidewall height field (shoulder blocks, raised rings, panels of hatching, the
 rim protector), the five-twin-spoke wheel from a plan measured on a rectified
-photograph (black with machined faces), and the brake (plain disc with the
+photograph (black with machined faces), and the brake. The plan was measured
+as an 18-inch wheel; the daylight photographs show the rim's edge at 0.78 of the
+tyre's diameter, which only a 19-inch wheel gives, so the face, barrel and
+brake are built from the plan and grown in the wheel's plane by `RIM_SCALE`
+(19/18), the tyre's bead following. The same photographs show the bright bars
+nearly twice as wide as first measured, and the pocket between them narrower
+(`edgeHalf`, `slotHalf`) (plain disc with the
 pads' marks, silver-grey floating caliper, dust shield). On the medium and
 high tiers the outer sidewall carries the tyre's size twice round as raised
 characters, drawn with the plate's stroke pen into a small map of its own
@@ -285,6 +299,38 @@ in the viewer.
 | the wheel's design, tyre, blur speeds | `WHEEL`, `DETAIL`, `FADE` in `wheel.js`; textures, finishes and the size marking in `wheelTextures.js` |
 | the contact shadow | `shadow.js` |
 | what the ghost shows | the ghost branch in `index.js` |
+
+## Checked against the daylight photographs
+
+Four photographs of the car in flat overcast light: straight on the tail
+(from above eye height), straight on the nose, and two from ahead and to the
+right (the side with the fuel flap), from above. Each was staged in the viewer
+(`viewer.html?asset=car&q=low&carq=medium&sun=0&lights=off&pin=...`: the day
+sky with the sun switched off and two stops more exposure; `carq` builds the
+car at its own tier in a quick world) through a pinhole camera fitted by least
+squares to points of known place on the car (the plate, the star, the screens'
+corners, the trims, the wheels' rims, the door handles; the phone's wide lens,
+f = 1933 px on 2576 x 1932), 5 to 11 px of residual, and laid beside it at
+1600 px. What they changed:
+
+| what | before | after (from which photograph) |
+| --- | --- | --- |
+| wheels | 18-inch, 225/45 and 245/40, narrow bright bars | 19-inch, 225/40 and 255/35, bars nearly twice as wide (both from ahead and to the side) |
+| tail lamp, unlit | dark smoked maroon | clear cherry red (tail) |
+| tail lamp's outline | a leaf, deepest mid-way, pointed outer end, inner tip 0.37 | tallest at a rounded outer end, level lower edge, inner tip 0.325 (tail) |
+| boot lid's lower cut | a shallow smile | steeper sides, x 0.50 at y 0.67 (tail) |
+| head lamps, unlit | bright chrome bezels and a white brow | dark inside (nose) |
+| door mirrors | 0.135 high, 0.11 deep | 0.16 high, 0.13 deep (nose, and from the side) |
+| cabin through the glass | light grey seats | dark (from the side) |
+
+What agreed and was left alone: the silhouette and the glasshouse, the rear
+screen (its lower edge only seemed higher: the glass mirrors the sky there),
+the grille and its star, the bonnet's badge ahead of its shut line, the plate
+recess, the reflectors, the trims and the black valance, the window surrounds
+(gloss black) and the mirror caps (gloss black), the ride height and the gap
+over the tyres. Smaller than what the method can show at that size, or left:
+the brake discs are drilled on the car (plain here), the calipers larger;
+the side intake's inner detail; the shape of the mirror's foot.
 
 ## What each tier costs
 
