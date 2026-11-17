@@ -107,10 +107,21 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
   // runs: the Track's, and on bends whose inside is a wall too, the same stretch on the inside
   const runs = [];
   for (const run of track.boards) {
-    runs.push(run);
+    runs.push({ ...run });
     const len = track.wrap(run.s1 - run.s0);
     const mid = run.s0 + len / 2;
     if (track.sectionAt(mid).id !== 'straight' && kindAt(mid, -run.side) === EDGE_WALL) runs.push({ ...run, side: -run.side, inside: true });
+  }
+  // the ledge's runs are carried on to the end of its first bend wherever the wall goes on (the frame's run is
+  // continuous round the whole bend)
+  if (d3) {
+    const end = track.wrap(d3.s0 + D3_REACH);
+    for (const run of runs) {
+      if (inD3(run) && track.wrap(end - run.s1) < 100) {
+        run.s1 = end;
+        run.extended = true;
+      }
+    }
   }
   let boards = 0;
   let order = 0;
@@ -129,6 +140,8 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
       const s = track.wrap(run.s0 + (k + 0.5) * pitch);
       if (nearGantry(s, T.w / 2 + 2.5)) continue;
       if (big && (inStand(s) || byDistanceBoard(s, run.side))) continue;
+      // an extended run only where the wall is (the bend's own pieces)
+      if (run.extended && kindAt(s, run.side) !== EDGE_WALL) continue;
       levelFrame(track, s, frame);
       // on a wall the board stands on its top, just behind its face; elsewhere on legs behind the barrier
       const onWall = !big && kindAt(s, run.side) === EDGE_WALL;

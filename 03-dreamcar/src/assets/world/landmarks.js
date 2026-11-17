@@ -5,11 +5,11 @@
 //
 // The pale hall on a hilltop of frame D3: from the ledge's first bend (the
 // first piece of the section `ledge`), on the left of the way the road runs
-// there, 700 to 1300 m off, 25 to 60 degrees left, the most prominent open ground that is clear of every
+// there, 600 to 1100 m off, 14 to 48 degrees left (28 preferred), the most prominent open ground that is clear of every
 // stretch of road; it faces the bend.
 
 /** Where to look from, and how: degrees left of the road's heading, metres off. */
-const HALL = { along: 70, angles: [25, 60], range: [700, 1300], clear: 70 };
+const HALL = { along: 105, angles: [14, 48], prefer: 28, range: [600, 1100], clear: 70 };
 
 const cache = new WeakMap();
 
@@ -44,7 +44,7 @@ export function hallSite(track, heightAt) {
         // high ground standing over its surroundings (a hilltop, not a slope), seen above the road, nearer better
         let around = 0;
         for (const [dx, dz] of [[150, 0], [-150, 0], [0, 150], [0, -150]]) around += heightAt(x + dx, z + dz) / 4;
-        const score = y - P.y + 2 * (y - around) - 0.02 * r;
+        const score = y - P.y + 2 * (y - around) - 0.02 * r - 0.6 * Math.abs(a - HALL.prefer);
         if (!best || score > best.score) best = { x, z, y, score };
       }
     }

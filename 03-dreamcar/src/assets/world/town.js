@@ -24,7 +24,7 @@ const CLEAR = 35;
 /** Steepest ground a house is put on (rise per metre across its plot). */
 const STEEP = 0.75;
 /** The pale hall of frame D3: length and depth (m). */
-const HALL_SIZE = { w: 58, d: 16 };
+const HALL_SIZE = { w: 100, d: 20 };
 
 /** A slender cone of `sides` triangles (a cypress) standing on a short trunk, written as plain surfaces. */
 function cone(w, x, y, z, r, h, rec, trunkRec, sides = 6) {
@@ -205,7 +205,7 @@ export function createTown({ track, terrain, tier, atmosphere, rng }) {
     const ax = hall.x - t[0] * half + f[0] * HALL_SIZE.d / 2;
     const az = hall.z - t[1] * half + f[1] * HALL_SIZE.d / 2;
     const L = lot(ax, az, ax + t[0] * HALL_SIZE.w, az + t[1] * HALL_SIZE.w, f, HALL_SIZE.d, style(r, k++, {
-      kind: 'grand', floors: 3, groundH: 4.4, floorH: 3.6, attic: 0.7, roof: 'hip', ground: 'plain', mat: 0, age: 0.3,
+      kind: 'grand', floors: 3, groundH: 5.2, floorH: 4.2, attic: 0.9, roof: 'hip', ground: 'plain', mat: 0, age: 0.3,
       wall: [0.8, 0.76, 0.66], trim: [0.66, 0.63, 0.57], roofColor: ROOFS[0],
       win: { w: 1.25, h: 2.1, sill: 0.8, arch: 0, shutters: 1, surround: 1, rail: 0 }, bay: 3.1, margin: 1.2, pitch: 0.45,
     }));
@@ -217,14 +217,14 @@ export function createTown({ track, terrain, tier, atmosphere, rng }) {
     // cypresses: dark narrow cones, in loose groups round the hall
     const green = surface({ kind: KIND.SOLID, color: [0.035, 0.05, 0.03], seed: 9 });
     const trunk = surface({ kind: KIND.SOLID, color: [0.05, 0.04, 0.03], seed: 9 });
-    const n = tier === 'low' ? 14 : 26;
+    const n = tier === "low" ? 24 : 44;
     for (let i = 0; i < n; i++) {
       const a = r.range(0, Math.PI * 2);
-      const d = r.range(HALL_SIZE.w * 0.55, HALL_SIZE.w * 1.1);
+      const d = r.range(HALL_SIZE.w * 0.45, HALL_SIZE.w * 0.9);
       const x = hall.x + Math.sin(a) * d;
       const z = hall.z + Math.cos(a) * d;
       const y = terrain.heightAt(x, z) - 0.3;
-      const h = r.range(9, 17);
+      const h = r.range(15, 28);
       cone(w, x, y, z, h * 0.09, h, green, trunk);
     }
   }

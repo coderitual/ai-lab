@@ -23,6 +23,16 @@ const MARGIN = 4;
  */
 export function keepOut(track, heightAt) {
   const hall = heightAt ? hallSite(track, heightAt) : null;
+  // viewpoints along the ledge's first piece, each with its unit direction to the hall
+  const view = [];
+  const ledge = track.sections.find((sec) => sec.id === 'ledge');
+  if (hall && ledge) {
+    for (let d = 30; d <= 270; d += 60) {
+      const p = track.pointAt(track.wrap(ledge.s0 + d), 0);
+      const l = Math.hypot(hall.x - p.x, hall.z - p.z);
+      view.push({ x: p.x, z: p.z, dx: (hall.x - p.x) / l, dz: (hall.z - p.z) / l });
+    }
+  }
   const g0 = track.gantry.s;
   const spot = {};
   const line = track.pointAt(g0, 0);
@@ -38,7 +48,14 @@ export function keepOut(track, heightAt) {
   });
   return (x, z) => {
     // the hall itself (its cypresses are its own, round it)
-    if (hall && (x - hall.x) ** 2 + (z - hall.z) ** 2 < 36 ** 2) return true;
+    if (hall && (x - hall.x) ** 2 + (z - hall.z) ** 2 < 70 ** 2) return true;
+    // the view of it from the ledge's first bend: no tree stands on the line from the road to the hall
+    for (const v of view) {
+      const dx = x - v.x;
+      const dz = z - v.z;
+      const along = dx * v.dx + dz * v.dz;
+      if (along > 3 && along < 450 && Math.abs(dx * v.dz - dz * v.dx) < 12 + 0.08 * along) return true;
+    }
     for (const s of sites) {
       const dx = x - s.x;
       const dz = z - s.z;
