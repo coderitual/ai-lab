@@ -66,7 +66,9 @@ import { WET_UNIFORMS, extend, withBake } from './shading.js';
 /** The edge line: its width (m), its outer edge on the pavement's edge. */
 const EDGE_LINE = 0.15;
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
-const INNER = [4, 2, 0, -2, -4];
+const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
+/** The glare lobe (ASPHALT_SHEEN): its GGX alpha along the line of sight and across it, and its weight. */
+const SHEEN = { along: 0.5, across: 0.28, gain: 0.55 };
 /** Head lamp brightness (THROW in assets/car/index.js: candela-like units at the beam's peak, per lamp). */
 const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;
@@ -96,7 +98,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
   const history = roadHistory({ track, rng: rng.fork('history'), tier });
 
   // ---- the mesh, in chunks of about 150 m
-  const ACROSS = [1, pave, half, ...INNER, -half, -pave, -1]; // ±1: the outer columns, filled below
+  const ACROSS = [1, pave, half, ...(INNER[tier] ?? INNER.medium), -half, -pave, -1]; // ±1: the outer columns, filled below
   const cols = ACROSS.length;
   const geometries = [];
   const pt = new THREE.Vector3();
@@ -113,7 +115,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     const nor = new Float32Array(count * 3);
     const road = new Float32Array(count * 4);
     const along = new Float32Array(count * 4);
-    const bake = new Float32Array(count * 3);
+    const bake = new Float32Array(count * 4);
     const codeB = new Uint8Array(count * 4);
     for (let r = 0; r < list.length; r++) {
       const i = list[r] % n;
@@ -144,7 +146,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
         road[v * 4 + 3] = track.sky ? track.sky[i] : 1;
         frame.tan.toArray(along, v * 4);
         along[v * 4 + 3] = co.pond[i];
-        terrain.bakeAt(pt.x, pt.z, bake, v * 3);
+        (terrain.bake4At ?? terrain.bakeAt)(pt.x, pt.z, bake, v * 4);
         codeB[v * 4] = byte(0.5 + co.line[i] / 8);
         codeB[v * 4 + 1] = byte(co.rubber[i]);
         codeB[v * 4 + 2] = byte(co.tongue[i]);
@@ -164,7 +166,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     geometry.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     geometry.setAttribute('aRoad', new THREE.BufferAttribute(road, 4));
     geometry.setAttribute('aAlong', new THREE.BufferAttribute(along, 4));
-    geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+    geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 4));
     geometry.setAttribute('aCodeB', new THREE.BufferAttribute(codeB, 4, true));
     geometry.setIndex(index);
     geometry.computeBoundingSphere();
@@ -240,6 +242,15 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${WET_MIRROR}`);
   });
   withBake(material);
+  // the low sun's glare: a second, anisotropic lobe on every direct light, after the bake has unrolled the loop
+  extend(material, 'asphalt-sheen', (shader) => {
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <lights_pars_begin>', `#include <lights_pars_begin>\n${ASPHALT_SHEEN}`)
+      .replaceAll(
+        'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
+        'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );\nreflectedLight.directSpecular += roadSheen( directLight, geometryNormal, geometryViewDir );',
+      );
+  });
   atmosphere.patch(material);
 
   const group = new THREE.Group();
@@ -370,6 +381,36 @@ if ( vRoadWorld.w > 0.5 && roadWater > 0.003 ) {
 #endif
 `;
 
+/**
+ * GLSL (fragment, after lights_pars_begin): the asphalt's glare. A low sun on dry asphalt lays a long, wide streak
+ * on the road towards it (frames D1 and A): the stones' tops are tilted every way, so seen at a grazing angle the
+ * highlight spreads far along the line of sight and less across it. One anisotropic GGX lobe whose long axis is the
+ * view's direction laid on the road, added to the isotropic one MeshStandardMaterial already has.
+ */
+const ASPHALT_SHEEN = /* glsl */ `
+vec3 roadSheen( IncidentLight L, vec3 N, vec3 V ) {
+  float NoL = dot( N, L.direction );
+  if ( NoL <= 0.0 || roadSheenGain <= 0.0 ) return vec3( 0.0 );
+  float NoV = max( dot( N, V ), 1.0e-3 );
+  vec3 H = normalize( L.direction + V );
+  vec3 T = V - N * dot( V, N );
+  float tl = length( T );
+  T = tl > 1.0e-4 ? T / tl : normalize( cross( N, vec3( 1.0, 0.0, 0.0 ) ) );
+  vec3 B = cross( N, T );
+  float ax = ${SHEEN.along.toFixed(2)};
+  float ay = ${SHEEN.across.toFixed(2)};
+  float th = dot( H, T ) / ax;
+  float bh = dot( H, B ) / ay;
+  float nh = dot( H, N );
+  float d = th * th + bh * bh + nh * nh;
+  float D = 1.0 / ( PI * ax * ay * d * d );
+  float a2 = ax * ay;
+  float Vis = 0.5 / ( NoL * sqrt( NoV * NoV * ( 1.0 - a2 ) + a2 ) + NoV * sqrt( NoL * NoL * ( 1.0 - a2 ) + a2 ) );
+  float F = 0.04 + 0.96 * pow( 1.0 - clamp( dot( L.direction, H ), 0.0, 1.0 ), 5.0 );
+  return L.color * ( NoL * D * Vis * F * roadSheenGain );
+}
+`;
+
 const ASPHALT_PARS = /* glsl */ `
 uniform sampler2D uAgg;
 uniform sampler2D uAggN;
@@ -388,6 +429,7 @@ varying vec4 vRoadWorld;  // world position; w: 0 in a reflection probe's cube f
 varying vec4 vRoadAlong;  // the road's direction; w: how readily water stands here
 varying vec4 vCodeB;      // the racing line, rubber on it, water carried in, banking
 float roadRoughness;
+float roadSheenGain;     // how much of the stretched glare lobe this pixel shows
 float roadMetal;
 float roadPaint;
 float roadFade;
@@ -679,6 +721,10 @@ roadWaterRough = mix( 0.42, 0.05, smoothstep( 0.35, 1.05, rFill ) );
 roadTiltGain *= 1.0 - roadWater;
 
 diffuseColor.rgb *= rCol;
+// the glare lobe: on the stones' polished tops close by (the grain breaks it up), a steady sheen further off; the
+// rubbered line is glossier, water has its own mirror, paint and dust are matt
+roadSheenGain = ${SHEEN.gain.toFixed(2)} * ( 1.0 - roadWater ) * ( 1.0 - 0.6 * roadPaint ) * ( 1.0 - 0.7 * roadGravel ) * ( 1.0 + 0.5 * rRubber );
+roadSheenGain *= mix( 1.0, 0.25 + 1.5 * smoothstep( 0.35, 0.75, rAgg.g ), rNear );
 // the stones' tilts that a pixel averages away come back as roughness (see roadTextures.js)
 float rRoughDry = pow( clamp( rAlpha2 + rVariance * roadTiltGain * roadTiltGain, 0.0004, 1.0 ), 0.25 );
 roadRoughness = mix( rRoughDry, roadWaterRough, roadWater );

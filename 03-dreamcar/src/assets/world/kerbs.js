@@ -52,7 +52,7 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
   const kerb = [];
   const bake = [];
   const index = [];
-  const tmp = [0, 0, 0];
+  const tmp = [0, 0, 0, 1];
   let vertices = 0;
   for (const k of track.kerbs ?? []) {
     const len = track.wrap(k.s1 - k.s0);
@@ -77,8 +77,8 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
         along.push(frame.tan.x, frame.tan.y, frame.tan.z, k.side);
         // s as laid (it may run past the line: never jumps inside a triangle), across 0..1, how much kerb, width
         kerb.push(sRaw, t, amount, k.width);
-        terrain.bakeAt(pt.x, pt.z, tmp, 0);
-        bake.push(tmp[0], tmp[1], tmp[2]);
+        (terrain.bake4At ?? terrain.bakeAt)(pt.x, pt.z, tmp, 0);
+        bake.push(tmp[0], tmp[1], tmp[2], tmp[3]);
         vertices++;
       }
     }
@@ -97,7 +97,7 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   geometry.setAttribute('aAlong', new THREE.Float32BufferAttribute(along, 4));
   geometry.setAttribute('aKerb', new THREE.Float32BufferAttribute(kerb, 4));
-  geometry.setAttribute('aBake', new THREE.Float32BufferAttribute(bake, 3));
+  geometry.setAttribute('aBake', new THREE.Float32BufferAttribute(bake, 4));
   geometry.setIndex(index);
   geometry.computeBoundingSphere();
 

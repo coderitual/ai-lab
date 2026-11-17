@@ -40,6 +40,21 @@ const BEAM = [
   [0.03, 1.085],
   [0.075, 1.1],
 ];
+/** The low tier's beam: each wave by its crests and troughs only. */
+const BEAM_LOW = [
+  [0.075, 0.44],
+  [0, 0.51],
+  [0.055, 0.6],
+  [0, 0.69],
+  [0.075, 0.76],
+  [0.075, 0.78],
+  [0, 0.85],
+  [0.055, 0.94],
+  [0, 1.03],
+  [0.075, 1.1],
+];
+/** Metres between the beam's cross-sections on a straight and in a bend, by tier. */
+const SECTION = { low: [8, 3], medium: [4, 2], high: [4, 2] };
 /** Posts: spacing (m) by tier, and where they stand behind the beam. */
 const POST_SPACING = { low: 4, medium: 2, high: 2 };
 const POST_OUT = 0.16;
@@ -102,7 +117,8 @@ export function createRails({ track, tier, atmosphere }) {
       // the beam: closer sections where the road bends hard
       const rows = [];
       const sections = [];
-      along(track, s0, s1, (s) => (Math.abs(track.frameAt(s, frame).curvature) > 1 / 120 ? 2 : 4), (s) => sections.push(s), { ends: true });
+      const [far, near] = SECTION[tier] ?? SECTION.medium;
+      along(track, s0, s1, (s) => (Math.abs(track.frameAt(s, frame).curvature) > 1 / 120 ? near : far), (s) => sections.push(s), { ends: true });
       if (sections.length < 2) continue;
       let previous = s0;
       for (const sw of sections) {
@@ -110,7 +126,7 @@ export function createRails({ track, tier, atmosphere }) {
         while (s < previous - track.length / 2) s += track.length; // unwrapped, for the terminals and the texture
         previous = s;
         const into = terminal(s);
-        rows.push(BEAM.map(([out, up]) => [...place(s, out, up, into), s, up]));
+        rows.push((tier === 'low' ? BEAM_LOW : BEAM).map(([out, up]) => [...place(s, out, up, into), s, up]));
       }
       beams.push(stripGeometry(rows));
 
@@ -150,7 +166,7 @@ export function createRails({ track, tier, atmosphere }) {
   group.add(beam);
 
   // a C-section post, a spacer block in front of it at the beam's height
-  const postGeometry = mergeGeometries([
+  const postGeometry = tier === 'low' ? new THREE.BoxGeometry(0.11, 1.55, 0.14).translate(0, 0.775, 0.03) : mergeGeometries([
     new THREE.BoxGeometry(0.11, 1.55, 0.06).translate(0, 0.775, 0),
     new THREE.BoxGeometry(0.1, 0.3, 0.1).translate(0, 1.05, 0),
     new THREE.BoxGeometry(0.1, 0.3, 0.1).translate(0, 1.39, 0),

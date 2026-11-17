@@ -15,15 +15,15 @@
 import * as THREE from 'three';
 
 /** Shared by every baked material: which of the two baked channels is the light now showing (day, night). */
-export const BAKE_UNIFORMS = { uBakeSel: { value: new THREE.Vector2(1, 0) } };
+export const BAKE_UNIFORMS = { uBakeSel: { value: new THREE.Vector3(1, 0, 0) } };
 
 /**
- * (look lane) Dusk has no sun to march towards: its key light is high and soft, so the ridges shade none of it
- * (both weights 0: bakedSun() is 1) and only the sky's share, z, darkens the hollows.
+ * Which baked channel the directional light reads: the day's sun (x), the night's moon (y) or the golden hour's sun
+ * (aBake.w; env lane). Geometry whose aBake has only three numbers reads w = 1 (lit) at dusk.
  * @param {'day'|'dusk'|'night'} name
  */
 export function selectBake(name) {
-  BAKE_UNIFORMS.uBakeSel.value.set(name === 'day' ? 1 : 0, name === 'night' ? 1 : 0);
+  BAKE_UNIFORMS.uBakeSel.value.set(name === 'day' ? 1 : 0, name === 'night' ? 1 : 0, name === 'dusk' ? 1 : 0);
 }
 
 /**
@@ -56,19 +56,20 @@ const LIGHT_LOOP = THREE.ShaderChunk.lights_fragment_begin.replace(
 );
 
 /**
- * Makes a material read `aBake` (see above). Geometry drawn with it must carry that attribute (vec3).
+ * Makes a material read `aBake` (see above). Geometry drawn with it must carry that attribute: three numbers (x, y, z)
+ * or four (w: the golden hour's sun; terrain.bake4At).
  * @template {THREE.Material} T @param {T} material @returns {T}
  */
 export function withBake(material) {
   return extend(material, 'bake', (shader) => {
     Object.assign(shader.uniforms, BAKE_UNIFORMS);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec3 aBake;\nvarying vec3 vBake;')
+      .replace('#include <common>', '#include <common>\nattribute vec4 aBake;\nvarying vec4 vBake;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBake = aBake;');
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        '#include <common>\nvarying vec3 vBake;\nuniform vec2 uBakeSel;\nfloat bakedSun() { return dot( vBake.xy, uBakeSel ) + 1.0 - uBakeSel.x - uBakeSel.y; }',
+        '#include <common>\nvarying vec4 vBake;\nuniform vec3 uBakeSel;\nfloat bakedSun() { return dot( vBake.xyw, uBakeSel ) + 1.0 - uBakeSel.x - uBakeSel.y - uBakeSel.z; }',
       )
       .replace('#include <lights_fragment_begin>', LIGHT_LOOP)
       .replace(

@@ -157,25 +157,38 @@ gDet = mix( vec4( 0.5 ), 0.6 * gDet + 0.4 * gDet2, gFade ) + ( 0.6 * gDet + 0.4 
 // slopes, scree fans and sun-bleached straw among the grass, so the open slopes are not one smooth tone
 vec4 gMid = texture2D( uLarge, vGroundPos.xz / 93.0 + vec2( 0.37, 0.61 ) );
 float gSlope = 1.0 - gN.y;
-float gRock = smoothstep( 0.2, 0.34, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
-float gScree = max( vMask.y, smoothstep( 0.6, 0.74, gMid.a ) * smoothstep( 0.07, 0.18, gSlope ) * 0.85 ) * ( 1.0 - gRock );
-float gForest = vMask.x * ( 1.0 - gRock );
-float gSnow = smoothstep( 290.0, 350.0, vGroundPos.y + 70.0 * ( gLarge.a - 0.5 ) ) * ( 1.0 - smoothstep( 0.45, 0.7, gSlope ) );
+// (env lane) aMask.y = 2 marks a cut rock face (rock.js): rock whatever its facets' slopes
+float gCut = step( 1.5, vMask.y );
+float gRock = gCut + ( 1.0 - gCut ) * smoothstep( 0.2, 0.34, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
+float gScree = max( min( vMask.y, 1.0 ), smoothstep( 0.68, 0.8, gMid.a ) * smoothstep( 0.12, 0.25, gSlope ) * 0.7 ) * ( 1.0 - gRock );
+// (env lane) scrub: dark clumps of box and juniper on the moderate slopes, between meadow and rock
+float gScrub = smoothstep( 0.06, 0.16, gSlope + ( gMid.b - 0.5 ) * 0.12 ) * smoothstep( 0.35, 0.6, gDet.r * 0.5 + gMid.g * 0.7 ) * ( 1.0 - gRock );
+// (env lane) the wood's edge broken by clumps of crowns, not a soft blend
+float gForest = smoothstep( 0.3, 0.6, vMask.x + ( gMid.b - 0.5 ) * 0.5 + ( gLarge.b - 0.5 ) * 0.3 ) * step( 0.02, vMask.x ) * ( 1.0 - gRock );
+// (env lane: no snow on the hills round the circuit; the far massif is the SKY lane's)
+float gSnow = 0.0 * smoothstep( 290.0, 350.0, vGroundPos.y + 70.0 * ( gLarge.a - 0.5 ) ) * ( 1.0 - smoothstep( 0.45, 0.7, gSlope ) );
 
 // meadow: lush where gLarge.r is low, dry and paler where it is high, higher up a little browner
 vec3 gLush = vec3( 0.036, 0.062, 0.02 );
-vec3 gDry = vec3( 0.075, 0.078, 0.036 );
+vec3 gDry = vec3( 0.058, 0.074, 0.03 );
 vec3 gGrass = mix( gLush, gDry, smoothstep( 0.45, 0.85, gLarge.r + vGroundPos.y * 0.001 ) );
 gGrass *= 0.78 + 0.44 * gDet.r;
-gGrass = mix( gGrass, vec3( 0.12, 0.1, 0.055 ) * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.55, 0.8, gMid.b ) * 0.75 );
+gGrass = mix( gGrass, vec3( 0.075, 0.08, 0.04 ) * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.6, 0.85, gMid.b ) * 0.5 );
 gGrass *= 0.72 + 0.56 * gMid.r;
 // forest floor near, the canopy's colour far away
 vec3 gFloor = vec3( 0.04, 0.034, 0.024 ) * ( 0.7 + 0.6 * gDet.a );
-vec3 gCanopy = vec3( 0.022, 0.036, 0.02 ) * ( 0.8 + 0.4 * gLarge.b );
+vec3 gCanopy = vec3( 0.02, 0.034, 0.017 ) * ( 0.7 + 0.5 * gLarge.b ) * ( 0.75 + 0.5 * gMid.r );
 vec3 gForestCol = mix( gFloor, gCanopy, smoothstep( 120.0, 400.0, gDist ) );
 vec3 gScreeCol = vec3( 0.17, 0.162, 0.145 ) * ( 0.6 + 0.8 * gDet.b );
 vec4 gDetRock = mix( vec4( 0.5 ), groundSample( uDetail, vGroundPos, gN, ${(DETAIL_SCALE * 2.7).toFixed(2)} ), 0.4 + 0.6 * gFade );
-vec3 gRockCol = mix( vec3( 0.15, 0.14, 0.125 ), vec3( 0.12, 0.118, 0.112 ), gLarge.g ) * ( 0.62 + 0.45 * gDetRock.g + 0.2 * gDet.g );
+vec3 gRockCol = mix( vec3( 0.13, 0.13, 0.125 ), vec3( 0.1, 0.104, 0.108 ), gLarge.g ) * ( 0.62 + 0.45 * gDetRock.g + 0.2 * gDet.g );
+// a cut face: limestone in beds, pale and grey by turns, streaked dark where water runs down it
+float gBed = vGroundPos.y / 0.85 + 0.6 * gDet.g;
+float gBedTone = fract( sin( floor( gBed ) * 12.9898 ) * 43758.5453 );
+vec3 gLime = mix( vec3( 0.27, 0.265, 0.25 ), vec3( 0.42, 0.41, 0.385 ), 0.35 + 0.65 * gBedTone ) * ( 0.8 + 0.3 * gDetRock.g );
+float gStreak = smoothstep( 0.55, 0.8, texture2D( uLarge, vec2( ( vGroundPos.x + vGroundPos.z ) / 23.0, vGroundPos.y / 400.0 ) ).b );
+gLime *= 1.0 - 0.45 * gStreak;
+gRockCol = mix( gRockCol, gLime, gCut );
 vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 
 // (env lane) the verge: mown grass in stripes along the road, a strip of worn earth and loose stones along the
@@ -203,7 +216,23 @@ if ( gVerge > 0.0 ) {
   gScree *= 1.0 - gVerge;
   gForest *= 1.0 - gVerge;
 }
+// (env lane) fields on the valley floor: a patchwork of meadows and crops between hedges, far from the road
+{
+  float fieldZone = ( 1.0 - smoothstep( 0.05, 0.12, gSlope ) ) * ( 1.0 - smoothstep( 40.0, 90.0, vGroundPos.y ) ) * step( 0.5, vVerge.w ) * smoothstep( 60.0, 140.0, gDist );
+  if ( fieldZone > 0.0 ) {
+    vec2 fp = mat2( 0.92, 0.39, -0.39, 0.92 ) * vGroundPos.xz / vec2( 130.0, 75.0 );
+    vec2 fc = floor( fp );
+    float fh = fract( sin( dot( fc, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+    vec3 crop = fh < 0.35 ? vec3( 0.05, 0.085, 0.025 ) : fh < 0.6 ? vec3( 0.075, 0.09, 0.03 ) : fh < 0.85 ? vec3( 0.04, 0.065, 0.02 ) : vec3( 0.085, 0.08, 0.045 );
+    vec2 fe = min( fract( fp ), 1.0 - fract( fp ) ) * vec2( 130.0, 75.0 );
+    float fAa = fwidth( vGroundPos.x ) + fwidth( vGroundPos.z ) + 0.5;
+    float hedge = 1.0 - smoothstep( 2.0, 2.0 + fAa, min( fe.x, fe.y ) );
+    vec3 fieldCol = mix( crop * ( 0.85 + 0.3 * gMid.r ), vec3( 0.02, 0.035, 0.016 ), hedge * 0.8 );
+    gGrass = mix( gGrass, fieldCol, fieldZone );
+  }
+}
 vec3 gAlbedo = gGrass;
+gAlbedo = mix( gAlbedo, vec3( 0.03, 0.045, 0.02 ) * ( 0.7 + 0.6 * gDet.r ), gScrub * 0.85 );
 gAlbedo = mix( gAlbedo, gForestCol, gForest );
 gAlbedo = mix( gAlbedo, gScreeCol, gScree );
 gAlbedo = mix( gAlbedo, gRockCol, gRock );

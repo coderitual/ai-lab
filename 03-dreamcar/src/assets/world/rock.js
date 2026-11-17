@@ -122,12 +122,15 @@ export function createRockFaces({ track, terrain, tier, rng }) {
       }
     }
     const count = tris * 3;
-    const bake = new Float32Array(count * 3);
-    for (let v = 0; v < count; v++) terrain.bakeAt(pos[v * 3], pos[v * 3 + 2], bake, v * 3);
+    const bake = new Float32Array(count * 4);
+    for (let v = 0; v < count; v++) (terrain.bake4At ?? terrain.bakeAt)(pos[v * 3], pos[v * 3 + 2], bake, v * 4);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
-    geometry.setAttribute('aMask', new THREE.BufferAttribute(new Float32Array(count * 2), 2));
+    geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 4));
+    // aMask.y = 2: a cut face (groundMaterial.js draws it as bedded limestone whatever the facets' slopes)
+    const mask = new Float32Array(count * 2);
+    for (let v = 0; v < count; v++) mask[v * 2 + 1] = 2;
+    geometry.setAttribute('aMask', new THREE.BufferAttribute(mask, 2));
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
     return geometry;

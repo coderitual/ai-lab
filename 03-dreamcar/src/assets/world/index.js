@@ -114,7 +114,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     tier,
     rng: rng.fork('terrain'),
     material: groundMaterial.material,
-    lights: { day: TIMES.day.sun.dir, night: TIMES.night.sun.dir },
+    lights: { day: TIMES.day.sun.dir, night: TIMES.night.sun.dir, dusk: TIMES.dusk?.sun.dir },
   });
   lap('terrain');
   const mirror = MIRROR[tier] && caps.hdr ? new PlanarMirror(renderer, caps, MIRROR[tier]) : null;
