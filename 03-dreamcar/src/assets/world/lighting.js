@@ -136,7 +136,7 @@ export function towards(bearing, elevation) {
  * the disc stands just over the frame on the descent and the lens still takes its glare (FramePipeline's flare
  * source follows a light up to a quarter of the view's height outside the frame).
  */
-const SUN = towards(-120, 30);
+const SUN = towards(116, 20);
 
 /**
  * The moon: opposite the sun on the map and high. On the straight it is behind and to the right, over the wood,
@@ -167,8 +167,8 @@ export const TIMES = {
     name: 'day',
     sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 6.2 },
     sky: {
-      zenith: [0.04, 0.15, 0.5],
-      horizon: [0.23, 0.37, 0.62],
+      zenith: [0.03, 0.12, 0.46],
+      horizon: [0.2, 0.36, 0.68],
       falloff: 0.15,
       phase: 0.4,
       // (look lane: the aureole, `tight`, was 7: now a white-hot halo about four times the disc's radius, which is
@@ -180,20 +180,20 @@ export const TIMES = {
       stars: 0,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      clouds: { cover: 0.44, wisps: 0.6, lit: 0.2, silver: 1.6, shade: [0.27, 0.31, 0.39], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.3, wisps: 0.35, lit: 0.22, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
     },
     // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
     env: { intensity: 0.72 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
     ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.06 },
-    fog: { color: [0.36, 0.46, 0.62], sun: [0.6, 0.42, 0.24], sunLobe: 8, density: 0.0003, heightFalloff: 0.011 },
+    fog: { color: [0.3, 0.44, 0.7], sun: [0.25, 0.16, 0.08], sunLobe: 16, density: 0.0002, heightFalloff: 0.011 },
     exposure: 1.1,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.12, ghosts: 0.008, glare: 0.3 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.16, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0, 0, 0], vignette: 0.3, chroma: 0.0012, grain: 0.6, bloom: 0.07, ghosts: 0.0015, glare: 0.04 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',

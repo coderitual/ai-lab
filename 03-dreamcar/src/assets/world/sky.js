@@ -186,13 +186,23 @@ void main() {
   cloudSlope = vec4(dFdx(p), dFdy(p));
   vec2 cover = cloudCover(d);
   if (cover.x + cover.y > 0.0) {
-    // a cloud is bright where little cloud stands between it and the light, and brightest with the light behind it
-    vec3 lit = uCloudLit * (1.0 + uCloud.z * lobe(mu, 0.6));
+    // (sky lane) A cumulus is lit from above and from the sun's side and shaded underneath. On the dome "up the
+    // cloud" is towards the zenith, which on the cloud sheet is towards p = 0: a point whose neighbour towards the
+    // zenith is still cloud is in the body or the base; one whose neighbour is clear sky is a lit top. The same
+    // test towards the sun gives the sunlit flank, and the thin rim with the sun behind it shines silver.
     vec2 toLight = normalize(uSunDir.xz + 1.0e-5);
-    float behind = 0.6 * cumulus(p + toLight * 0.35) + 0.4 * cumulus(p + toLight * 0.9);
+    vec2 toTop = -normalize(p + 1.0e-5) * (0.6 + 0.25 * length(p));
+    float behind = 0.6 * cumulus(p + toLight * 0.45) + 0.4 * cumulus(p + toLight * 1.1);
+    float over = 0.65 * cumulus(p + toTop * 0.5) + 0.35 * cumulus(p + toTop * 1.3);
     float thick = cover.y / 0.94;
-    col = mix(col, uCloudShade + lit * 0.55, cover.x);
-    col = mix(col, uCloudShade * (1.0 - 0.35 * thick) + lit * exp(-2.6 * behind) * (1.0 - 0.5 * thick), cover.y);
+    float sunlit = exp(-2.2 * behind) * 0.55 + exp(-2.6 * over) * 0.45;
+    // the silver lining: forward scattering through the thin edge, strongest round the sun
+    float rim = uCloud.z * lobe(mu, 0.75) * (1.0 - thick) * 2.0;
+    vec3 lit = uCloudLit * (sunlit * (1.0 + 0.6 * uCloud.z * lobe(mu, 0.6)) + rim);
+    // the base: the sky's blue from below and around, darker the more cloud stands over it
+    vec3 base = uCloudShade * (1.0 - 0.45 * over * thick);
+    col = mix(col, uCloudShade + uCloudLit * (0.55 + rim), cover.x);
+    col = mix(col, base + lit, cover.y);
   }
 
   // the haze, taken to the end of the air; under the horizon, far land seen through it
