@@ -55,9 +55,9 @@ export const CASTER_LAYER = 3;
  * foliage tile and bark tile (texels), impostor picture (texels), whether trees cast shadow.
  */
 const TIER = {
-  low: { full: 0, reduced: 60, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: false },
-  medium: { full: 34, reduced: 95, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
-  high: { full: 50, reduced: 130, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
+  low: { full: 0, reduced: 55, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: true },
+  medium: { full: 58, reduced: 80, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
+  high: { full: 80, reduced: 110, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
 };
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
 const BLEND = 8;
@@ -75,15 +75,17 @@ const CAST_REACH = 160;
  * @param {object} track @param {ReturnType<typeof planeNoise>} noise @param {number} s
  */
 export function turnedAt(track, noise, s) {
-  // the start: from the pit lane to some 220 m past the line the wood has turned (D4's wall); by the first bend it is
-  // green again, the sunlit, back-lit wood of D1's middle distance
+  // the start: from the line to some 230 m past it the wood has turned (D4's wall of maples beyond the pit exit).
+  // Before the line, behind the pits, it is green, and green again by the first bend: the sunlit wood of D1.
   const d = track.delta(0, s);
-  const start = d < 0 ? 1 - smoothstep(150, 400, -d) : 1 - smoothstep(220, 330, d);
-  // groups here and there along the lap, but none in the ledge's first bend (D3's wood is green)
+  const start = smoothstep(-20, 10, d) * (1 - smoothstep(205, 255, d));
+  // green, too, for a good way either side of the start, and in the ledge's first bend (D3's wood)
   const ledge = track.sections?.find((x) => x.id === 'ledge');
-  const green = ledge ? smoothstep(-40, 0, track.delta(ledge.s0, s)) * (1 - smoothstep(280, 340, track.delta(ledge.s0, s))) : 0;
+  const near = 1 - smoothstep(520, 700, Math.abs(d));
+  const green = Math.max(near, ledge ? smoothstep(-40, 0, track.delta(ledge.s0, s)) * (1 - smoothstep(280, 340, track.delta(ledge.s0, s))) : 0);
+  // elsewhere, groups here and there along the lap
   const groups = smoothstep(0.55, 0.72, noise.fbm(s / 140, 7.1, 2)) * (1 - green);
-  return Math.min(1, 0.85 * start + 0.6 * groups + 0.06 * (1 - green));
+  return Math.min(1, start + 0.6 * groups + 0.05 * (1 - green));
 }
 
 /**
@@ -283,7 +285,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const ledge = track.sections?.find((x) => x.id === 'ledge');
   /** In the ledge's first bend (D3's place). */
   const ledgeAt = (s) => !!ledge && track.delta(ledge.s0, s) > -30 && track.delta(ledge.s0, s) < 320;
-  const BROAD = [SPECIES.indexOf('maple'), SPECIES.indexOf('lime'), SPECIES.indexOf('birch')];
+  const BROAD = [SPECIES.indexOf('maple'), SPECIES.indexOf('lime'), SPECIES.indexOf('hornbeam'), SPECIES.indexOf('birch')];
   const NEEDLE = [SPECIES.indexOf('spruce'), SPECIES.indexOf('fir'), SPECIES.indexOf('larch')];
   /** A species for a tree of this mix at this height (the road's edge has more birch). */
   function pickSpecies(mix, y, edge, turned = 0) {
@@ -294,39 +296,58 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     }
     // where the wood has turned, it is mostly maples that turned it
     const r = plantRng.next();
-    const maple = 0.38 + 0.45 * turned * turned;
-    return BROAD[r < maple ? 0 : r < maple + (1 - maple) * (edge ? 0.5 : 0.65) ? 1 : 2];
+    const maple = 0.3 + 0.5 * turned * turned;
+    const rest = (r - maple) / (1 - maple);
+    return BROAD[r < maple ? 0 : rest < 0.4 ? 1 : rest < (edge ? 0.7 : 0.8) ? 2 : 3];
   }
-  function addTree(x, y, z, species, { road, turned, inside, young = 1 }) {
+  /**
+   * @param {object} o road: one of the road's own trees; turned: how much of the wood has turned there; inside: how far
+   *   inside the wood it stands (0..1: the lower part of a tree inside is in the others' shade); young: its species'
+   *   heights times this, or height: [lo, hi] its own range (m); detail: how far out it keeps its finer levels of
+   *   detail (1: the tier's distances; trees behind others need less); lean: [x, z, rad] leaning that way by so much
+   */
+  function addTree(x, y, z, species, { road, turned, inside, young = 1, height = null, detail = 1, lean = null, slim = 1 }) {
     const data = SPECIES_DATA[SPECIES[species]];
     const variants = VARIANTS_OF[species];
     const variant = variants[plantRng.int(variants.length)];
-    const lo = data.height[0] * young;
-    const hi = data.height[1] * young;
+    const lo = height ? height[0] : data.height[0] * young;
+    const hi = height ? height[1] : data.height[1] * young;
     const u = plantRng.next();
-    const h = road ? lo + (hi - lo) * (0.3 + 0.7 * u) : lo + (hi - lo) * Math.sqrt(u);
+    const h = height ? lo + (hi - lo) * u : road ? lo + (hi - lo) * (0.3 + 0.7 * u) : lo + (hi - lo) * Math.sqrt(u);
     // does this one turn, and how far along is it
     const ready = turned * data.turns;
     const roll = plantRng.next();
-    const turn = data.autumn.length ? (roll < ready ? 0.7 + 0.3 * plantRng.next() : ready * 0.35 * plantRng.next()) : 0;
-    trees.push({ x, y, z, variant, h, rank: plantRng.next(), road, turned: turn, inside });
+    const turn = data.autumn.length ? (roll < ready ? 0.75 + 0.25 * plantRng.next() : ready * 0.35 * plantRng.next()) : 0;
+    trees.push({ x, y, z, variant, h, rank: plantRng.next(), road, turned: turn, inside, detail, lean, slim });
     occupy(x, z);
   }
   const point = new THREE.Vector3();
 
-  // the rows along the road where it is wooded
+  // the rows along the road where it is wooded (not on the stretches that are planted by hand below)
   const ROWS = [
-    { off: [0.3, 1.8], step: [3.2, 4.6], gap: 1.2, inside: 0.15 },
-    { off: [3.4, 5.8], step: [3.4, 5.0], gap: 0.66, inside: 0.4 },
-    { off: [6.8, 10.5], step: [3.6, 5.4], gap: 0.6, inside: 0.6 },
+    { off: [0.3, 1.8], step: [3.2, 4.6], gap: 1.2, inside: 0.15, detail: 1 },
+    { off: [3.4, 5.8], step: [3.4, 5.0], gap: 0.66, inside: 0.4, detail: 0.8 },
+    { off: [6.8, 10.5], step: [3.6, 5.4], gap: 0.6, inside: 0.6, detail: 0.6 },
   ];
   const glimpse = (s, side) => noise.fbm(s / 55 + side * 13.7, 3.3, 2);
+  const MAPLE = SPECIES.indexOf('maple');
+  const LIME = SPECIES.indexOf('lime');
+  const BIRCH = SPECIES.indexOf('birch');
+  const FIR = SPECIES.indexOf('fir');
+  const HORNBEAM = SPECIES.indexOf('hornbeam');
+  const HAZEL = SPECIES.indexOf('hazel');
+  /** The wall of maples (D4): the land side of the straight where the wood has turned. */
+  const wallAt = (s, side) => side < 0 && turnedAt(track, noise, s) > 0.5 && !!woodAt(track, noise, s, side);
+  /** The bank of D3: the wooded side (the right) of the ledge's first bend. */
+  const bankAt = (s, side) => side < 0 && ledgeAt(s) && !!woodAt(track, noise, s, side);
+  /** Beyond that bend, on the valley's side, the wood stays low: the view over the valley from the bend stays open. */
+  const lowAt = (s, side) => side > 0 && !!ledge && track.delta(ledge.s0, s) > 200 && track.delta(ledge.s0, s) < 460;
   for (const side of [1, -1]) {
     ROWS.forEach((row, r) => {
       let hint = -1;
       for (let s = plantRng.range(0, 2); s < track.length; s += plantRng.range(row.step[0], row.step[1])) {
         const wood = woodAt(track, noise, s, side);
-        if (!wood) continue;
+        if (!wood || wallAt(s, side) || bankAt(s, side)) continue;
         if (glimpse(s, side) > row.gap) continue;
         track.pointAt(s, side * (wood.from + plantRng.range(row.off[0], row.off[1])), point);
         if (blocked(point.x, point.z, 0, hint)) continue;
@@ -334,50 +355,99 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         if (!free(point.x, point.z, r === 0 ? 2.6 : 3.0)) continue;
         const y = terrain.heightAt(point.x, point.z);
         if (y < lakeLevel + 0.5) continue;
-        // (in D3's bend the trees over the road are big ones)
-        addTree(point.x, y - 0.15, point.z, pickSpecies(wood.mix, y, r === 0, wood.turned), { road: true, turned: wood.turned, inside: row.inside, young: ledgeAt(s) ? 1.45 : 1 });
+        const low = lowAt(s, side);
+        addTree(point.x, y - 0.15, point.z, pickSpecies(low ? 'broadleaf' : wood.mix, y, r === 0, wood.turned), { road: true, turned: wood.turned, inside: row.inside, detail: row.detail, young: low ? 0.5 : 1 });
       }
     });
   }
-  // THE START: where the Track says the straight's side is wooded and the wood has turned (behind the pits and past
-  // the pit exit), a wall of turned crowns, tall and close, rows deep, rising behind whatever stands at the road.
-  // Nowhere else on the straight: the lake side and the paddock before the pits stay open, so that the massif shows.
-  // (The straight is the Track's section `straight`.)
+
+  /**
+   * Rows planted by hand along a stretch: `rows` of { off: [lo, hi] metres behind where trees may begin, step: [lo,
+   * hi] metres between trunks, r: the room a trunk needs, height: [lo, hi], detail, inside, lean: [lo, hi] rad
+   * towards the road }; `species(row)` picks each tree's.
+   */
+  function plantRows(s0, span, side, rows, here, species, turnedOf) {
+    rows.forEach((row, r) => {
+      let hint = -1;
+      for (let d = plantRng.range(0, row.step[0]); d < span; d += plantRng.range(row.step[0], row.step[1])) {
+        const s = (s0 + d + track.length) % track.length;
+        if (!here(s, side)) continue;
+        const lat = side * (track.edgeAt(s, side) + BARRIER_CLEAR + plantRng.range(row.off[0], row.off[1]));
+        track.pointAt(s, lat, point);
+        if (blocked(point.x, point.z, row.clear ?? 0, hint)) continue;
+        hint = spot.index;
+        if (!free(point.x, point.z, row.r)) continue;
+        const y = terrain.heightAt(point.x, point.z);
+        if (y < lakeLevel + 0.4) continue;
+        const x = point.x;
+        const z = point.z;
+        let lean = null;
+        if (row.lean) {
+          // towards the road: from where it stands to the centre line abeam
+          track.pointAt(s, 0, point);
+          const l = Math.hypot(point.x - x, point.z - z) || 1;
+          lean = [(point.x - x) / l, (point.z - z) / l, plantRng.range(row.lean[0], row.lean[1])];
+        }
+        const kind = species(r);
+        addTree(x, y - 0.15, z, kind, { road: true, turned: turnedOf(s), inside: row.inside, height: kind === FIR && row.fir ? row.fir : row.height, detail: row.detail, lean, slim: kind === FIR ? 1 : (row.slim ?? 1) });
+      }
+    });
+  }
+
+  // THE START (D4): beyond the pit exit, where the Track says the land side is wooded and the wood has turned, a wall
+  // of turned maples: 14 to 20 m tall close behind the barrier, crowns touching, and each row behind taller than the
+  // one before it, so that from the grid the wall closes the picture and no sky stands over it; a small dark fir or
+  // two in its front. Nowhere else on the straight: the lake side and the paddock before the line stay open, so that
+  // the massif shows (D1). (The straight is the Track's section `straight`.)
   const straight = track.sections?.find((x) => x.id === 'straight');
   if (straight) {
-    const MAPLE = SPECIES.indexOf('maple');
-    const LIME = SPECIES.indexOf('lime');
-    const BIRCH = SPECIES.indexOf('birch');
     const span = (track.delta(straight.s0, straight.s1) + track.length) % track.length;
-    const FIR = SPECIES.indexOf('fir');
-    // most of it maples; a lime or a birch here and there; a dark fir or two among them
-    const startWood = (r) => (r < 0.88 ? MAPLE : r < 0.92 ? LIME : r < 0.94 ? BIRCH : FIR);
+    const WALL = [
+      { off: [0.2, 1.6], step: [5.6, 7.4], r: 4.0, height: [14, 19], fir: [8, 11], detail: 1, inside: 0.05, slim: 0.74 },
+      { off: [5.8, 8.2], step: [5.6, 7.6], r: 4.2, height: [16, 21], fir: [10, 13], detail: 0.85, inside: 0.3, slim: 0.74 },
+      { off: [12, 15.5], step: [6, 8], r: 4.4, height: [18, 23], detail: 0.7, inside: 0.45, slim: 0.74 },
+      { off: [19, 23.5], step: [6, 8.5], r: 4.4, height: [20, 25], detail: 0.55, inside: 0.55, slim: 0.7 },
+      { off: [27, 33], step: [6.5, 9], r: 4.4, height: [22, 27], detail: 0.45, inside: 0.6, slim: 0.7 },
+    ];
+    // nearly all maples; a lime here and there; a dark fir or two in the first rows
+    plantRows(straight.s0, span, -1, WALL, wallAt, (r) => {
+      const roll = plantRng.next();
+      return r < 2 && roll < 0.07 ? FIR : roll > 0.95 ? LIME : MAPLE;
+    }, (s) => turnedAt(track, noise, s));
+  }
+
+  // THE LEDGE'S FIRST BEND (D3): big green broadleaves close behind the wall and up the bank, the first of them
+  // leaning out over the road, tall, with long pale limbs showing under open crowns
+  if (ledge) {
+    // (not a closed wood: a row at the wall, a thinner one behind it and single trees up the sunlit bank, so that the
+    // sun, which stands behind them by day, comes through between the crowns and lies in patches on the road)
+    const BANK = [
+      { off: [-0.9, 0.4], step: [7.5, 11], r: 4.5, height: [16, 21], detail: 1, inside: 0, lean: [0.14, 0.27] },
+      { off: [5.5, 9], step: [11, 17], r: 5, height: [17, 22], detail: 0.9, inside: 0.1, lean: [0.03, 0.12] },
+      { off: [14, 22], step: [16, 26], r: 6, height: [16, 23], detail: 0.7, inside: 0.1 },
+      { off: [28, 44], step: [18, 30], r: 6, height: [16, 24], detail: 0.6, inside: 0.1 },
+    ];
+    plantRows(ledge.s0 - 30, 350, -1, BANK, bankAt, (r) => {
+      const roll = plantRng.next();
+      return roll < (r === 0 ? 0.8 : 0.55) ? HORNBEAM : roll < 0.9 ? LIME : MAPLE;
+    }, () => 0);
+  }
+
+  // THE FIRST BEND AFTER THE STRAIGHT (D1's middle distance): behind the road's own rows, more of the green wood,
+  // low and round, so that from the run-up the far end of the straight is closed by sunlit crowns right across
+  const sweep = track.sections?.find((x) => x.id === 'sweep');
+  if (sweep) {
+    const BACK = [
+      { off: [12, 17], step: [4.5, 7], r: 3.4, height: [7, 13], detail: 0.5, inside: 0.5 },
+      { off: [19, 26], step: [5, 8], r: 3.4, height: [8, 15], detail: 0.4, inside: 0.6 },
+      { off: [28, 38], step: [5, 8], r: 3.6, height: [9, 16], detail: 0.4, inside: 0.6 },
+    ];
+    const green = (s, side) => !!woodAt(track, noise, s, side) && !wallAt(s, side);
     for (const side of [1, -1]) {
-      const rows = [
-            { off: [0.2, 1.4], step: [2.6, 3.4], r: 2.2 },
-            { off: [3.6, 5.6], step: [2.8, 3.8], r: 2.4 },
-            { off: [7.5, 10.5], step: [3.0, 4.2], r: 2.6 },
-            // and deeper, so that behind whatever stands at the road (the pits, the stand) the crowns rise as a wall
-            { off: [12, 16], step: [3.0, 4.2], r: 2.8 },
-            { off: [18, 24], step: [3.2, 4.6], r: 3.0 },
-            { off: [26, 34], step: [3.4, 4.8], r: 3.0 },
-          ];
-      for (const row of rows) {
-        let hint = -1;
-        for (let d = plantRng.range(0, 2); d < span; d += plantRng.range(row.step[0], row.step[1])) {
-          const s = (straight.s0 + d) % track.length;
-          // (only where the wood has turned: the far end of the straight is the ordinary wood)
-          const turned = turnedAt(track, noise, s);
-          if (turned < 0.5 || !woodAt(track, noise, s, side)) continue;
-          track.pointAt(s, side * (track.edgeAt(s, side) + BARRIER_CLEAR + plantRng.range(row.off[0], row.off[1])), point);
-          if (blocked(point.x, point.z, 0, hint)) continue;
-          hint = spot.index;
-          if (!free(point.x, point.z, row.r)) continue;
-          const y = terrain.heightAt(point.x, point.z);
-          if (y < lakeLevel + 0.4) continue;
-          addTree(point.x, y - 0.15, point.z, startWood(plantRng.next()), { road: true, turned, inside: 0.3, young: 1.25 + 0.012 * Math.min(30, row.off[0]) });
-        }
-      }
+      plantRows(sweep.s0 - 20, 300, side, BACK, green, () => {
+        const roll = plantRng.next();
+        return roll < 0.45 ? LIME : roll < 0.75 ? HORNBEAM : roll < 0.9 ? MAPLE : roll < 0.95 ? BIRCH : FIR;
+      }, () => 0.05);
     }
   }
 
@@ -397,13 +467,14 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   }
 
   // the undergrowth at the wood's edge, in front of and between the first trunks: hazel shrubs and young trees
-  const HAZEL = SPECIES.indexOf('hazel');
   for (const side of [1, -1]) {
     let hint = -1;
     for (let s = plantRng.range(0, 2); s < track.length; s += plantRng.range(1.6, 3.2)) {
       const wood = woodAt(track, noise, s, side);
       if (!wood) continue;
       if (glimpse(s, side) > 1.0) continue;
+      // (trunks and limbs show under the wall's and the bank's crowns: only a shrub here and there before them)
+      if ((wallAt(s, side) || bankAt(s, side)) && plantRng.next() < 0.75) continue;
       track.pointAt(s, side * (wood.from + plantRng.range(0, 3.5)), point);
       if (blocked(point.x, point.z, 0, hint)) continue;
       hint = spot.index;
@@ -412,10 +483,35 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       if (y < lakeLevel + 0.5) continue;
       const sapling = plantRng.next() < 0.22;
       const species = sapling ? pickSpecies(wood.mix, y, true) : HAZEL;
-      addTree(point.x, y - 0.1, point.z, species, { road: true, turned: wood.turned, inside: 0, young: sapling ? 0.3 : 1 });
+      addTree(point.x, y - 0.1, point.z, species, { road: true, turned: wood.turned, inside: 0, young: sapling ? 0.3 : 1, detail: 0.6 });
     }
   }
   const roadTrees = trees.length;
+
+  // THE VALLEY BELOW THE LEDGE'S FIRST BEND (D3's left): nothing but low growth on the slopes the bend looks out
+  // over, as far as the wooded ridge beyond. Kept as the bend's centre line where its inside is open, with the
+  // direction to that side.
+  const valley = [];
+  if (ledge) {
+    const frame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
+    for (let d = -30; d <= 300; d += 10) {
+      const s = (ledge.s0 + d + track.length) % track.length;
+      if (woodAt(track, noise, s, 1)) continue;
+      track.frameAt(s, frame);
+      valley.push([frame.pos.x, frame.pos.z, frame.left.x, frame.left.z]);
+    }
+  }
+  const VALLEY_REACH = 260;
+  const inValley = (x, z) => {
+    for (const v of valley) {
+      const dx = x - v[0];
+      const dz = z - v[1];
+      const across = dx * v[2] + dz * v[3];
+      if (across > 0 && across < VALLEY_REACH && Math.abs(dx * v[3] - dz * v[2]) < 24) return true;
+    }
+    return false;
+  };
+  const valleyBox = valley.reduce((box, v) => [Math.min(box[0], v[0]), Math.min(box[1], v[1]), Math.max(box[2], v[0]), Math.max(box[3], v[1])], [1e9, 1e9, -1e9, -1e9]);
 
   // the mass of the forest
   const b = track.bounds;
@@ -429,8 +525,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       const pz = z + plantRng.range(-0.45, 0.45) * LATTICE;
       const roll = plantRng.next();
       const rank = plantRng.next();
-      // (the cheap test first: start-up time)
+      // (the cheap tests first: start-up time)
       if (rank > T.keep) continue;
+      if (px > valleyBox[0] - VALLEY_REACH && px < valleyBox[2] + VALLEY_REACH && pz > valleyBox[1] - VALLEY_REACH && pz < valleyBox[3] + VALLEY_REACH && inValley(px, pz)) continue;
       const f = terrain.forestAt(px, pz);
       // dense where the forest is, a few strays at its edges and on the meadows
       if (roll > Math.min(0.92, f * 1.15) && roll > 0.015) continue;
@@ -442,6 +539,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         const beyond = Math.abs(spot.lat) - track.edgeAt(spot.s, side);
         const wood = woodAt(track, noise, spot.s, side);
         if (!wood && beyond < (ledgeAt(spot.s) ? 140 : 30)) continue;
+        // (D3's bank is planted by hand, openly: the mass of the forest begins behind it)
+        if (bankAt(spot.s, side) && beyond < 62) continue;
         // near the road the mass of the forest is of the road's own kind of wood
         nearMix = wood && beyond < 90 ? wood.mix : 'mixed';
       }
@@ -455,7 +554,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       // the turned share of the road's nearest point, fading with the distance from it
       const away = Math.max(0, Math.abs(spot.lat) - track.edgeAt(spot.s, spot.lat >= 0 ? 1 : -1));
       const turned = turnedAt(track, noise, spot.s) * Math.exp(-away / 140) + 0.05;
-      addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies(nearMix, y, false, turned), { road: false, turned, inside: 0.75 });
+      addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies(nearMix, y, false, turned), { road: false, turned, inside: 0.75, detail: 0.5 });
     }
   }
   lap('plant');
@@ -477,6 +576,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const e = new THREE.Euler();
+    const tip = new THREE.Quaternion();
+    const axis = new THREE.Vector3();
     const sc = new THREE.Vector3();
     const p = new THREE.Vector3();
     const bake = [0, 0, 0];
@@ -485,11 +586,13 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       const variant = VARIANTS[t.variant];
       const data = SPECIES_DATA[variant.species];
       const s = t.h / variant.P.H;
-      const wide = tintRng.range(0.88, 1.12);
+      const wide = tintRng.range(0.88, 1.12) * t.slim;
       const lean = tintRng.range(0, data.lean);
       const dir = tintRng.range(0, Math.PI * 2);
       e.set(Math.cos(dir) * lean, tintRng.range(0, Math.PI * 2), Math.sin(dir) * lean, 'YXZ');
       q.setFromEuler(e);
+      // (one that was planted leaning: tipped that way in the world, whichever way it is turned)
+      if (t.lean) q.premultiply(tip.setFromAxisAngle(axis.set(t.lean[1], 0, -t.lean[0]), t.lean[2]));
       m.compose(p.set(t.x, t.y, t.z), q, sc.set(s * wide, s, s * wide));
       m.toArray(matrices, i * 16);
       // its own green (a little towards yellow or blue, lighter or darker), mixed towards its own autumn colour
@@ -509,7 +612,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       spheres[i * 4] = t.x;
       spheres[i * 4 + 1] = t.y + model.top * s * 0.5;
       spheres[i * 4 + 2] = t.z;
-      spheres[i * 4 + 3] = Math.max(model.top * 0.5, model.radius) * s * 1.1;
+      spheres[i * 4 + 3] = Math.max(model.top * 0.5, model.radius) * s * 1.1 + (t.lean ? t.h * t.lean[2] : 0);
     });
   }
   // THE WOOD'S FLOOR: under each tree of the road's rows (and each shrub) a patch of grass and low growth, and under a
@@ -732,9 +835,10 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
           const reachF = FLOOR_REACH[tier] ?? FLOOR_REACH.high;
           if (df < reachF) for (let j = patchStart[i]; j < patchStart[i + 1]; j++) writePatch(j, i, coverage ? Math.min(1, (reachF - df) / 15) : 1);
         }
-        const small = trees[i].h < 6;
-        const fD = small ? fullD * 0.55 : fullD;
-        const rD = small ? redD * 0.6 : redD;
+        // (trees behind others, the undergrowth and the mass of the forest go to the simpler levels sooner)
+        const detail = trees[i].detail;
+        const fD = fullD * detail;
+        const rD = redD * (0.4 + 0.6 * detail);
         const d = flat ? rD - blend - 1 : sphere.center.distanceTo(eye);
         if (d < fD) {
           const a = blend ? Math.min(1, (fD - d) / blend) : 1;

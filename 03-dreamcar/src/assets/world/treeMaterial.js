@@ -128,7 +128,7 @@ const TREE_LIGHT = /* glsl */ `
 // How much of a light from L reaches this leaf through its crown: all of it from inside the cone of open sky round
 // the bent normal (wide for a leaf on the outside, a chink for one inside), fading over soft outside it.
 float crownLets( vec3 L, float soft ) {
-  float edge = mix( 0.92, - 0.4, treeOpen );
+  float edge = mix( 0.92, - 0.25, treeOpen );
   return smoothstep( edge - soft, edge + soft, dot( treeBent, L ) ) * ( 0.12 + 0.88 * treeOpen );
 }
 // The share of leaves that show the eye their far face, seen from V and lit (or open) from L.
@@ -142,7 +142,7 @@ void RE_Direct_Tree( const in IncidentLight directLight, const in vec3 geometryP
   }
   vec3 L = directLight.direction;
   IncidentLight lit = directLight;
-  lit.color *= crownLets( L, 0.45 );
+  lit.color *= crownLets( L, 0.35 );
   float own = dot( treeCard, L );
   float far = farFace( geometryViewDir, L, own );
   // (leaves stand every way: half of the light falls on them on average; a card's own facing counts for a part)
@@ -168,7 +168,7 @@ if ( treeThrough >= 0.0 ) {
   #endif
   // the sky's light comes in along the bent normal; a leaf seen from its far face shows the sky through it
   float skyFar = farFace( geometryViewDir, treeBent, dot( treeCard, treeBent ) );
-  material.diffuseContribution = mix( material.diffuseContribution, treeBack * treeThrough, skyFar ) * ( 0.15 + 0.85 * treeOpen );
+  material.diffuseContribution = mix( material.diffuseContribution, treeBack * treeThrough, skyFar ) * ( 0.08 + 0.92 * treeOpen * treeOpen );
 }
 reflectedLight.directSpecular *= treeGloss;
 `;
@@ -316,7 +316,7 @@ export function treeMaterial({ foliage, bark, barkNormal, atmosphere, uniforms, 
     tex.rgb *= mix( tint, vec3( 0.55 ), step( 0.25, vShade.y ) );
     treeThrough = vShade.w;
     treeOpen = vShade.x;
-    treeGloss = vShade.x * ( 0.45 + 0.55 * uWet );
+    treeGloss = vShade.x * ( 0.25 + 0.75 * uWet );
     // the card's own facing; seen edge-on it goes
     treeCard = normalize( cross( dFdx( vViewPosition ), dFdy( vViewPosition ) ) );
     float towards = dot( treeCard, normalize( vViewPosition ) );
@@ -327,7 +327,7 @@ export function treeMaterial({ foliage, bark, barkNormal, atmosphere, uniforms, 
 }
 ${TREE_BACK}`,
       )
-      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = treeBark > 0.5 ? mix( 0.92, 0.55, uWet ) : mix( 0.52, 0.36, uWet );')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = treeBark > 0.5 ? mix( 0.92, 0.55, uWet ) : mix( 0.6, 0.38, uWet );')
       .replace(
         '#include <normal_fragment_begin>',
         /* glsl */ `float faceDirection = gl_FrontFacing ? 1.0 : - 1.0;
@@ -443,10 +443,10 @@ ${IMP_READ}
   // between two pictures a silhouette is half there: that becomes half coverage, or a cut where there is none
   float cover = colour.a;
   #ifdef ALPHA_TO_COVERAGE
-    diffuseColor.a = clamp( ( cover - 0.15 ) / 0.45, 0.0, 1.0 );
+    diffuseColor.a = clamp( ( cover - 0.25 ) / 0.4, 0.0, 1.0 );
     if ( diffuseColor.a <= 0.0 ) discard;
   #else
-    if ( cover < 0.4 ) discard;
+    if ( cover < 0.42 ) discard;
   #endif
   colour.rgb /= cover;
   // the shape atlas's alpha: 0.04 to 0.24 bark, 0.3 to 1 a leaf, by the light that gets there
@@ -456,13 +456,13 @@ ${IMP_READ}
   treeThrough = leaf > 0.5 ? vImpCell.w : - 1.0;
   treeOpen = clamp( ( shape.a - 0.3 ) / 0.7, 0.0, 1.0 );
   treeCards = 0.0;
-  treeGloss = leaf * treeOpen * 0.6 * ( 0.45 + 0.55 * uWet ) + ( 1.0 - leaf ) * 0.7;
+  treeGloss = leaf * treeOpen * 0.6 * ( 0.25 + 0.75 * uWet ) + ( 1.0 - leaf ) * 0.7;
   diffuseColor.rgb *= colour.rgb * mix( vec3( 1.0 ), vTint.rgb, leaf );
 }
 ${TREE_BACK}`,
       )
       .replace('#include <alphatest_fragment>', FADE)
-      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix( mix( 0.52, 0.36, uWet ), mix( 0.92, 0.55, uWet ), treeBark );')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix( mix( 0.6, 0.38, uWet ), mix( 0.92, 0.55, uWet ), treeBark );')
       .replace(
         '#include <normal_fragment_begin>',
         /* glsl */ `float faceDirection = 1.0;
@@ -479,7 +479,7 @@ vec3 nonPerturbedNormal = normal;`,
 }
 
 /** The impostor shaders' constants for an atlas. */
-const impostorDefines = (atlas) => ({ IMP_VARIANTS: atlas.variants, IMP_ROWS: atlas.rows, IMP_VIEWS: atlas.views.toFixed(1), IMP_ELEV: atlas.elevation.toFixed(4), IMP_BIAS: '-0.5' });
+const impostorDefines = (atlas) => ({ IMP_VARIANTS: atlas.variants, IMP_ROWS: atlas.rows, IMP_VIEWS: atlas.views.toFixed(1), IMP_ELEV: atlas.elevation.toFixed(4), IMP_BIAS: '-0.75' });
 const impostorUniforms = (atlas) => ({
   uImpColor: { value: atlas.color },
   uImpShape: { value: atlas.shape },
