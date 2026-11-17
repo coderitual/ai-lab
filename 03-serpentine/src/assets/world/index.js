@@ -13,6 +13,7 @@
 //   rock.js         the cut rock faces at the rock edges
 //   lake.js         the water beside the straight
 //   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
+//   groundCover.js  grass, bushes and rocks along the verges and under the trees
 //   forest.js       the trees (treeGeometry.js, forestTextures.js), planted from the Track and the ground
 //   structures.js  what people built: lamps, tunnel, viaduct, rails, posts and chevrons, the start
 //
@@ -34,6 +35,7 @@ import { createGroundMaterial } from './groundMaterial.js';
 import { createLake } from './lake.js';
 import { createFar } from './far.js';
 import { createForest } from './forest.js';
+import { createGroundCover } from './groundCover.js';
 import { selectBake } from './shading.js';
 import { createSky } from './sky.js';
 import { SHADOW, createSun } from './sun.js';
@@ -110,13 +112,15 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
   lap('lake');
   const forest = createForest({ track, terrain, tier, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high });
   lap('forest');
+  const cover = createGroundCover({ track, terrain, tier, rng: rng.fork('cover'), atmosphere, uniforms: forest.uniforms });
+  lap('cover');
   const far = createFar({ track, terrain, caps, tier, rng: rng.fork('far'), atmosphere });
   far.setPixelRatio(renderer.getPixelRatio());
   lap('far');
   const structures = createStructures({ track, terrain, caps, tier, atmosphere });
   lap('structures');
 
-  scene.add(terrain.group, road.group, rock.group, structures.group, lake.mesh, forest.group, far.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(terrain.group, road.group, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -143,7 +147,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     atmosphere,
     terrain,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, terrain: terrain.stats, structures: structures.stats, forest: forest.stats, far: far.stats },
+    stats: { ms, terrain: terrain.stats, structures: structures.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -182,6 +186,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
     prepareView(camera, focus, beams) {
       sun.prepareView(camera, focus);
       forest.prepareView(camera, focus);
+      cover.prepareView(camera);
       road.setBeams(beams);
       structures.prepareView(camera, focus, beams);
       atmosphere.prepareView(camera);
@@ -227,6 +232,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params }) {
       sky.dispose();
       forest.dispose();
       far.dispose();
+      cover.dispose();
       terrain.dispose();
       road.dispose();
       lake.dispose();

@@ -29,8 +29,8 @@ export const SPECIES = ['spruce', 'fir', 'birch', 'larch'];
 const SHAPES = {
   // crownBase: share of H below the lowest live branches; R: the widest branch (m); whorls; per: branches per whorl;
   // rise and droop: how a branch climbs at first and then hangs (per metre of its length)
-  spruce: { H: 20, trunk: 0.3, crownBase: 0.08, R: 3.0, whorls: 17, per: 6, rise: 0.25, droop: 0.6, power: 0.95, core: 0.28 },
-  fir: { H: 18, trunk: 0.27, crownBase: 0.1, R: 2.5, whorls: 16, per: 6, rise: 0.12, droop: 0.25, power: 0.7, core: 0.3 },
+  spruce: { H: 20, trunk: 0.3, crownBase: 0.08, R: 3.0, whorls: 17, per: 6, rise: 0.25, droop: 0.6, power: 0.95, core: 0.22 },
+  fir: { H: 18, trunk: 0.27, crownBase: 0.1, R: 2.5, whorls: 16, per: 6, rise: 0.12, droop: 0.25, power: 0.7, core: 0.24 },
   larch: { H: 18, trunk: 0.26, crownBase: 0.2, R: 2.6, whorls: 13, per: 5, rise: 0.4, droop: 0.8, power: 0.9, core: 0.15 },
   birch: { H: 15, trunk: 0.16 },
 };

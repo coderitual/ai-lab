@@ -4,7 +4,7 @@
 // Foliage is drawn pale (the tree's colour is its instance tint times this):
 //   FROND    a spruce twig seen from above: a stem, side shoots, needles; alpha
 //   LEAVES   a spray of small leaves (birch); alpha
-//   MASS     needles packed solid, for the core of a crown; opaque
+//   MASS     needles packed nearly solid, for the core of a crown; alpha
 //   SIL      a whole tree's silhouette per species, for the far level of detail; alpha
 // Bark is drawn in its own colour (not tinted):
 //   BARK     grey-brown, flaking in plates (spruce, fir, larch)
@@ -165,10 +165,9 @@ export function createForestAtlas(size, rng) {
   // ---- packed needles, opaque and darker (the inside of a crown)
   {
     const [u0, v0, u1, v1] = ATLAS.MASS;
-    ctx.fillStyle = grey(0.32);
-    ctx.fillRect(u0, v0, u1 - u0, v1 - v0);
-    ctx.lineWidth = 2 * px;
-    for (let k = 0; k < 2600; k++) {
+    // not quite solid: the alpha test leaves small holes, so the core never shows as a slab
+    ctx.lineWidth = 2.4 * px;
+    for (let k = 0; k < 3400; k++) {
       const x = u0 + rng.next() * (u1 - u0);
       const y = v0 + rng.next() * (v1 - v0);
       const a = rng.range(0, Math.PI * 2);
