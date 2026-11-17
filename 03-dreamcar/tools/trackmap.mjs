@@ -226,7 +226,7 @@ const HEIGHT = stripsY0 + strips.reduce((sum, st) => sum + st.h + 62, 0) + 20;
 
 out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${f1(WIDTH)}" height="${f1(HEIGHT)}" viewBox="0 0 ${f1(WIDTH)} ${f1(HEIGHT)}">`);
 out.push(`<rect width="100%" height="100%" fill="${SURFACE_BG}"/>`);
-text(PAD, 44, 'Serpentine: the course', { size: 22, fill: INK, weight: 600 });
+text(PAD, 44, 'Dreamcar: the course', { size: 22, fill: INK, weight: 600 });
 text(
   PAD,
   66,

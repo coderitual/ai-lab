@@ -2,7 +2,7 @@
 // for testing and for staging pictures.
 //
 // The game (index.html):
-//   ?manual        no animation loop: frames come only from __serp.advance() / skip()
+//   ?manual        no animation loop: frames come only from __dreamcar.advance() / skip()
 //   ?nodraw        the loop runs but nothing is drawn (fast automated checks)
 //   ?auto          skip the title and start a solo run
 //   ?ap            an autopilot drives the local cars

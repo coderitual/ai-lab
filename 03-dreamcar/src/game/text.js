@@ -3,7 +3,7 @@
 // Functions are for words that carry a number or a name.
 
 export const TEXT = {
-  name: 'Serpentine',
+  name: 'Dreamcar',
   tagline: 'A time trial over a mountain pass, three laps against the clock.',
   loading: 'Loading',
   noWebgl: 'This device could not start WebGL 2. Try a recent version of Safari or Chrome.',
