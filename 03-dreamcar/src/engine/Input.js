@@ -39,6 +39,9 @@ export const TOUCH = {
   steerShare: 0.55,
   drift: { r: 38, right: 64, bottom: 150 },
   gas: { r: 44, right: 64, bottom: 56 },
+  /** On a zone lower than `lowBelow` px (a stacked half on a phone) DRIFT stands beside GAS instead, at the bottom. */
+  lowBelow: 330,
+  driftLow: { r: 38, right: 160, bottom: 56 },
   grace: 0.4,
 };
 const PAD_DEAD = 0.12; // of the stick's travel that does nothing
@@ -220,7 +223,7 @@ export class Input {
       // a little more than the drawn circle, never less than a 64 px target
       return Math.hypot(x - cx, y - cy) <= Math.max(32, b.r + 6);
     };
-    if (hit(TOUCH.drift)) return 'drift';
+    if (hit(zr.height < TOUCH.lowBelow ? TOUCH.driftLow : TOUCH.drift)) return 'drift';
     if (this.throttle === 'manual' && hit(TOUCH.gas)) return 'gas';
     return '';
   }

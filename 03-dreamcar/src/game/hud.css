@@ -663,6 +663,40 @@
 .hud .view.touch .slide {
   right: calc(var(--pad) + var(--sr) + 116px);
 }
+/* a narrow, wide-shaped view (a side-by-side half): the speed stands above DRIFT instead */
+.hud .view.touch.narrow:not(.tall) .cluster {
+  right: calc(var(--pad) + var(--sr));
+  bottom: calc(var(--sb) + 200px);
+}
+.hud .view.touch.narrow:not(.tall) .slide {
+  right: calc(var(--pad) + var(--sr));
+  bottom: calc(var(--sb) + 200px + var(--u) * 19.5);
+}
+/* an upright view: the speed at the bottom left, the map above it, the right side free for the thumb's buttons */
+.hud .view.touch.tall .cluster,
+.hud .view.touch.tall .slide {
+  right: auto;
+  left: calc(var(--pad) + var(--sl));
+}
+.hud .view.touch.tall .map {
+  bottom: calc(var(--pad) + var(--sb) + var(--u) * 21);
+}
+.hud .view.touch.tall.small .cluster,
+.hud .view.touch.tall.small .slide {
+  left: 6px;
+  width: calc(var(--u) * 21);
+}
+/* a low view (a stacked half): DRIFT beside GAS at the bottom; the speed left of both */
+.hud .view.touch.low .cluster,
+.hud .view.touch.low .slide {
+  right: calc(var(--pad) + var(--sr) + 206px);
+}
+.hud .view.touch.low .cluster {
+  bottom: calc(var(--pad) + var(--sb));
+}
+.hud .view.touch.low .slide {
+  bottom: calc(var(--pad) + var(--sb) + var(--u) * 19.5);
+}
 /* the zones named on the first touch run, ghosted: STEER over the left part, BRAKE over the right */
 .hud .zonehint {
   position: absolute;

@@ -969,8 +969,9 @@ const SECTIONS = {
       const c = window.__dreamcar.game.views[0].camera;
       return { fov: c.fov, hud: !document.querySelector('.hud').hidden };
     });
-    check('?photo=d4: the named camera, its time of day and its moment (the countdown)', !!preset && Math.abs(named.fov - preset.fov) < 0.01 && !named.hud
-      && st.time === preset.time && st.phase === 'countdown' && st.lamps > 0, `${st.time}, ${st.phase}, ${st.lamps} lamps, fov ${named.fov}`);
+    const clock = await p3.page.evaluate('window.__dreamcar.game.race.clock + window.__dreamcar.game.race.lead');
+    check('?photo=d4: the named camera, its time of day and its moment', !!preset && Math.abs(named.fov - preset.fov) < 0.01 && !named.hud
+      && st.time === preset.time && Math.abs(clock - preset.t) < 0.05, `${st.time}, ${st.phase}, ${clock.toFixed(2)} s into the run, fov ${named.fov}`);
     await p3.close('photo d4');
   },
 

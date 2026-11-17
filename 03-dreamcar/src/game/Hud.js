@@ -312,7 +312,12 @@ export class ViewHud {
     // and stay in the corners, clear of the car in the middle; an upright picture gets a little more
     const u = tall ? w / 62 : (Math.min(w, (h * 16) / 9) / 100) * 0.72;
     s.setProperty('--u', `${Math.max(3.6, Math.min(u, 10)).toFixed(2)}px`);
-    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330);
+    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330).flag('low', h < TOUCH.lowBelow);
+    // a low view (a stacked half on a phone): DRIFT stands beside GAS at the bottom, as Input finds it
+    const b = h < TOUCH.lowBelow ? TOUCH.driftLow : TOUCH.drift;
+    const ds = this.padDrift.el.style;
+    ds.right = `calc(var(--sr) + ${b.right - b.r}px)`;
+    ds.bottom = `calc(var(--sb) + ${b.bottom - b.r}px)`;
   }
 
   setVisible(on) {
