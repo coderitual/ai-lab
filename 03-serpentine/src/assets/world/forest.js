@@ -37,7 +37,7 @@ const EDGE_TREES = 4;
 
 /** Per tier: near detail out to (m), the far cards out to (m), share of the general forest kept, atlas size. */
 const TIER = {
-  low: { near: 42, far: 480, keep: 0.45, atlas: 512, casters: 1.0 },
+  low: { near: 42, far: 480, keep: 0.45, atlas: 512, casters: 0.85 },
   medium: { near: 75, far: 800, keep: 0.8, atlas: 1024, casters: 1.15 },
   high: { near: 85, far: 1100, keep: 1, atlas: 1024, casters: 1.15 },
 };
@@ -260,7 +260,7 @@ export function createForest({ track, terrain, tier, rng, atmosphere, shadow }) 
       const y = terrain.heightAt(px, pz);
       if (y < lakeLevel + 1) continue;
       // the tree line: thinning above 75 m, a few stragglers higher up
-      if (plantRng.next() < 0.9 * smoothstep(75, 115, y)) continue;
+      if (plantRng.next() < 0.8 * smoothstep(75, 115, y)) continue;
       const slope = Math.max(Math.abs(terrain.heightAt(px + 2, pz) - y), Math.abs(terrain.heightAt(px, pz + 2) - y)) / 2;
       if (slope > 0.9) continue;
       if (!free(px, pz, 2.6)) continue;
@@ -344,7 +344,7 @@ export function createForest({ track, terrain, tier, rng, atmosphere, shadow }) 
   const farMaterial = makeMaterial(false);
   const depthMaterial = new THREE.MeshDepthMaterial({ map: atlas, alphaTest: 0.42, side: THREE.DoubleSide });
 
-  const geometries = createTreeGeometries(rng.fork('shapes'));
+  const geometries = createTreeGeometries(rng.fork('shapes'), tier === 'low');
   const group = new THREE.Group();
   group.name = 'forest';
   const perSpecies = SPECIES.map((_, k) => trees.filter((t) => t.species === k).length);
