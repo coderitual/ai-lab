@@ -31,7 +31,7 @@ import { TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
 import { createRng } from '../engine/rng.js';
 import { CameraRig } from './Cameras.js';
-import { CAMERA, DRIVERS, EXPOSURE, FX, HUD, LIGHTS, PROBE, RULES, VIEW } from './config.js';
+import { CAMERA, DEFAULT_TIME, DRIVERS, EXPOSURE, FX, HUD, LIGHTS, PROBE, RULES, SHOWCASE, VIEW } from './config.js';
 import { AutoDriver, PlayerDriver } from './drivers.js';
 import { Effects } from './effects.js';
 import { Ghost } from './Ghost.js';
@@ -108,8 +108,8 @@ export class Game {
     this.pipeline = new FramePipeline(engine.renderer, this.caps, { tier: this.tier, post: params.post });
     this.pipeline.debug = params.debug;
     this.track = createTrack();
-    // the times of day are whatever lighting.js has, in its order; the demo opens at dusk when there is one
-    params = { ...params, time: params.time && TIMES[params.time] ? params.time : TIMES.dusk ? 'dusk' : 'day' };
+    // the times of day are whatever lighting.js has, in its order; the demo opens at DEFAULT_TIME (config.js)
+    params = { ...params, time: params.time && TIMES[params.time] ? params.time : TIMES[DEFAULT_TIME] ? DEFAULT_TIME : Object.keys(TIMES)[0] };
     this.params = params;
     this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params });
     if (this.world.time.name !== params.time) this.world.setTime(params.time);
@@ -312,6 +312,8 @@ export class Game {
         zone: { left: 0, top: 0, width: 1, height: 1 },
         frame: { exposure: 1, look: world.time.look, motionBlur: VIEW.motionBlur, cut: true, sharp, probe: probe?.texture },
         exposure: this._exposureFor(racer.vehicle),
+        /** 0..1: how much of the showcase's exposure compensation is in (eased in the fixed step). */
+        showcase: this.phase === 'title' ? 1 : 0,
         /** The probe the paint reads now; `still` says which of the two it is. */
         probe,
         probes: probe ? [probe] : [],
@@ -319,7 +321,12 @@ export class Game {
       };
     });
     this.layout();
-    for (const view of this.views) view.rig.snap(view.racer.vehicle);
+    for (const view of this.views) {
+      view.rig.sun = world.time.sun?.dir;
+      view.rig.time = world.time.name;
+      view.rig.snap(view.racer.vehicle);
+      view.exposure = this._viewExposure(view);
+    }
     // nothing has moved yet: the boxes start where they are
     this.render(0, 1);
     for (const racer of this.racers) racer.sharp.prevMatrix.copy(racer.sharp.matrix);
@@ -486,7 +493,9 @@ export class Game {
     this.world.setTime(name);
     if (this.race) this.race.setTime(name);
     for (const view of this.views) {
-      view.exposure = this._exposureFor(view.racer.vehicle);
+      view.rig.sun = this.world.time.sun?.dir;
+      view.rig.time = name;
+      view.exposure = this._viewExposure(view);
       view.frame.cut = true;
     }
   }
@@ -515,7 +524,18 @@ export class Game {
     this.world.refresh();
     this.effects.refresh();
     this.layout();
-    for (const view of this.views) view.exposure = this._exposureFor(view.racer.vehicle);
+    for (const view of this.views) view.exposure = this._viewExposure(view);
+  }
+
+  /** Where a view's exposure settles: the car's light, and the showcase's compensation as far as it is in. */
+  _viewExposure(view) {
+    return this._exposureFor(view.racer.vehicle) * 2 ** (this._showcaseEv() * view.showcase);
+  }
+
+  /** The exposure compensation (stops) of the hero picture and the results at this time of day. */
+  _showcaseEv() {
+    const v = SHOWCASE[this.world.time.name];
+    return typeof v === 'number' ? v : SHOWCASE.default;
   }
 
   /** What the exposure settles at where this car is: the open sky's, the tunnel's, or between at the portals. */
@@ -618,11 +638,16 @@ export class Game {
       if (this.phase !== 'title' && racer.driver === racer.player) view.rig.lookBack = !!this.input.read(lookRead, racer.scheme, i).lookBack;
       else view.rig.lookBack = false;
       // the rig reads this step's knocks, the start sweep off the race clock, and whether its car has taken the flag
-      const sweep = race && race.clock < 0 ? clamp01((race.clock + race.lead) / RULES.sweep) : 1;
+      // the camera's dive: from the clock's start until the last start lamp lights
+      const diveEnd = race ? race.firstLamp + RULES.lampStep * (RULES.lamps - 1) : 0;
+      const sweep = race && race.clock < diveEnd ? clamp01((race.clock + race.lead) / (diveEnd + race.lead)) : 1;
       const finished = !!race && this.phase !== 'title' && race.cars[racer.index].finished;
-      view.rig.update(dt, racer.vehicle, this.track, { impacts: racer.impacts, sweep, finished });
+      view.rig.update(dt, racer.vehicle, this.track, { impacts: racer.impacts, sweep, finished, sun: time.sun?.dir, time: time.name });
+      // the title's hero picture and the results' orbit: the car exposed for, eased in and out (SHOWCASE)
+      const show = this.phase === 'title' && !this.attract ? 1 : finished ? 1 : 0;
+      view.showcase = damp(view.showcase, show, 1 / SHOWCASE.ease, dt);
       // eyes take a moment to follow the light: closing down quickly, opening up slowly (eased in stops)
-      const target = this._exposureFor(racer.vehicle);
+      const target = this._viewExposure(view);
       const tau = target < view.exposure ? EXPOSURE.close : EXPOSURE.open;
       view.exposure = Math.exp(damp(Math.log(view.exposure), Math.log(target), 1 / tau, dt));
     });
@@ -848,7 +873,8 @@ export class Game {
       const speed = Math.abs(view.racer.vehicle.speed);
       view.frame.exposure = view.exposure * fade;
       view.frame.look = time.look;
-      view.frame.motionBlur = lerp(VIEW.motionBlurSlow, VIEW.motionBlur, clamp01(speed / VIEW.blurSpeed));
+      // the shutter opens with speed; while the camera itself dives at the start it is held short
+      view.frame.motionBlur = lerp(VIEW.motionBlurSlow, VIEW.motionBlur, clamp01(speed / VIEW.blurSpeed)) * lerp(VIEW.diveShutter, 1, view.rig.settled);
       view.frame.cut = view.frame.cut || view.rig.cut;
     }
 
