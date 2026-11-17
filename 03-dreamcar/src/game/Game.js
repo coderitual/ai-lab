@@ -108,8 +108,8 @@ export class Game {
     this.pipeline = new FramePipeline(engine.renderer, this.caps, { tier: this.tier, post: params.post });
     this.pipeline.debug = params.debug;
     this.track = createTrack();
-    // the times of day are whatever lighting.js has, in its order; the demo opens at dusk when there is one
-    params = { ...params, time: params.time && TIMES[params.time] ? params.time : TIMES.dusk ? 'dusk' : 'day' };
+    // the times of day are whatever lighting.js has, in its order; the demo opens on the first of them (day)
+    params = { ...params, time: params.time && TIMES[params.time] ? params.time : Object.keys(TIMES)[0] };
     this.params = params;
     this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params });
     if (this.world.time.name !== params.time) this.world.setTime(params.time);
