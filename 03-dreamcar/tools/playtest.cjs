@@ -626,14 +626,14 @@ const SECTIONS = {
       if (k === 6) await up(p, 'Space');
       const a = await p.page.evaluate('window.__dreamcar.game.racers[0].vehicle.slide.angle');
       most = Math.max(most, a);
-      if (a >= 12) shown = shown || (await p.page.evaluate(`!!document.querySelector('.hud .view .drift.on')`));
+      if (a >= 12) shown = shown || (await p.page.evaluate(`!!document.querySelector('.hud .view .slide.on')`));
     }
     await up(p, 'KeyD');
     await up(p, 'KeyW');
     check('a handbrake turn at speed slides the car past 12 degrees', most >= 12, `${most.toFixed(1)} degrees at most`);
     check('the slide readout shows while it does', shown);
     await p.advance(2.5, 30);
-    check('and fades once the slide is over', !(await p.page.evaluate(`!!document.querySelector('.hud .view .drift.on')`)));
+    check('and fades once the slide is over', !(await p.page.evaluate(`!!document.querySelector('.hud .view .slide.on')`)));
     await p.page.reload({ waitUntil: 'load' });
     await p.page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
     check('the driving help survives a reload', (await p.page.evaluate('window.__dreamcar.game.racers[0].vehicle.level.name')) === 'Sport');

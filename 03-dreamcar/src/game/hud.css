@@ -597,7 +597,7 @@
 
 /* ---- the slide readout: small, just above the speed; it shows while the car slides and fades a second after */
 
-.hud .drift {
+.hud .slide {
   position: absolute;
   right: calc(var(--pad) + var(--sr));
   bottom: calc(var(--pad) + var(--sb) + var(--u) * 19.5);
@@ -610,16 +610,16 @@
   transition: opacity 0.6s ease-out 1s;
   pointer-events: none;
 }
-.hud .drift.on {
+.hud .slide.on {
   opacity: 1;
   transition: opacity 0.12s ease-out;
 }
-.hud .drift .angle {
+.hud .slide .angle {
   font-size: calc(var(--u) * 2.6);
   font-weight: 800;
   color: var(--amber);
 }
-.hud .drift .score {
+.hud .slide .score {
   font-size: calc(var(--u) * 2.2);
   font-weight: 800;
   padding: 0 calc(var(--u) * 0.6);
@@ -660,7 +660,7 @@
   display: none;
 }
 .hud .view.touch .cluster,
-.hud .view.touch .drift {
+.hud .view.touch .slide {
   right: calc(var(--pad) + var(--sr) + 116px);
 }
 /* the zones named on the first touch run, ghosted: STEER over the left part, BRAKE over the right */

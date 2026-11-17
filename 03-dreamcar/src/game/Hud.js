@@ -249,7 +249,7 @@ export class ViewHud {
 
     // the drift readout (designed, not yet wired: the HANDLING lane's slide angle and score feed setDrift): over
     // the road above the car, only while the car slides beyond about 15 degrees, fading out after
-    this.drift = cell('div', 'drift', el);
+    this.drift = cell('div', 'slide', el);
     this.driftAngle = cell('span', 'angle', this.drift.el, '0°');
     this.driftScore = cell('span', 'score', this.drift.el, '0');
     this._driftOn = false;
