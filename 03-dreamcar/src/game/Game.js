@@ -198,6 +198,8 @@ export class Game {
     this.ghostCar = null;
     /** Per driver: the camera mode they chose. */
     this.cameraModes = [params.camera, params.camera];
+    /** The staging camera's pose, or null (setPhoto). */
+    this.photo = null;
     /** Drivers whose car is to be put back in the next step. */
     this._resets = new Set();
     /** The day-night fade: { t, to, switched } or null. */
@@ -352,6 +354,7 @@ export class Game {
     for (const view of this.views) {
       view.rig.sun = world.time.sun?.dir;
       view.rig.time = world.time.name;
+      view.rig.photo = this.photo || null;
       view.rig.snap(view.racer.vehicle);
       view.exposure = this._viewExposure(view);
     }
@@ -423,6 +426,22 @@ export class Game {
       view.rig.lookBack = false;
       view.rig.snap(view.racer.vehicle, 0);
     });
+  }
+
+  /**
+   * The staging camera for comparison stills: every view's camera at `o` ({ back, right, up, yaw, pitch, fov }:
+   * metres behind, right of and above its car's origin in the car's level frame, degrees left of its heading and
+   * up, the lens top to bottom), the HUD hidden unless `o.hud`; null gives the views back to their rigs.
+   * @param {{ back?: number, right?: number, up?: number, yaw?: number, pitch?: number, fov?: number, hud?: boolean }|null} o
+   */
+  setPhoto(o) {
+    this.photo = o ? { ...o } : null;
+    for (const view of this.views) {
+      view.rig.photo = this.photo;
+      view.frame.cut = true;
+    }
+    if (this.params.ui) this.hud.root.hidden = !!this.photo && !this.photo.hud;
+    if (this.engine.manual && !this._rendering) this.engine.advance(0);
   }
 
   /** Back to the title: the cars parked on the grid, the camera circling. */

@@ -96,6 +96,8 @@ export class CameraRig {
     this._hint = -1;
     this._speed = 0;
     this._alpha = 1;
+    /** The staging camera's pose ({ back, right, up, yaw, pitch, fov }) or null: see _photo. */
+    this.photo = null;
     this._noise = new Float32Array(NOISE);
     for (let i = 0; i < NOISE; i++) this._noise[i] = rng.range(-1, 1);
   }
@@ -276,7 +278,9 @@ export class CameraRig {
     let shake = 0;
     let roll = 0;
 
-    if (this.mode === 'orbit') {
+    if (this.photo) {
+      fov = this._photo(camera, this.photo);
+    } else if (this.mode === 'orbit') {
       fov = this._hero(eye, target, at(ORBITY));
       this._keepClear(eye, vehicle);
       camera.position.copy(eye);
@@ -312,7 +316,7 @@ export class CameraRig {
 
     // shake: smooth noise of the rig's own clock, mostly turning, a little moving. The road's own only above
     // `fromSpeed` (rising to full at the top of the speed signal), the kerbs' and the verge's at any speed.
-    if (shake > 0) {
+    if (shake > 0 && !this.photo) {
       const t = at(TIME);
       const trauma = at(TRAUMA);
       const sh = CAMERA.shake;
@@ -328,9 +332,9 @@ export class CameraRig {
       roll += rollN;
       if (knock > 0) camera.translateY(knock * sh.impactMove * this._n(t * sh.impactHz + 200) / sh.impact);
     }
-    if (roll) camera.rotateZ(roll);
+    if (roll && !this.photo) camera.rotateZ(roll);
 
-    fov = this._fit(fov);
+    fov = this.photo ? fov : this._fit(fov);
     if (Math.abs(camera.fov - fov) > 1e-4) {
       camera.fov = fov;
       camera.updateProjectionMatrix();
@@ -387,7 +391,9 @@ export class CameraRig {
     const tanHalf = Math.tan((this._fit(fov) * Math.PI) / 360);
     const horizon = lerp(m.horizon ?? c.horizon, c.narrowHorizon, narrow);
     const carAt = lerp(m.carAt ?? c.carAt, c.narrowCarAt, narrow);
-    const pitch = Math.atan(2 * (0.5 - horizon) * tanHalf);
+    // ...but never so far down that less than `skyAbove` degrees of sky is left over the horizon (the day's sun
+    // stands down the start straight, about 16 degrees up: it must stay in the picture on every shape of screen)
+    const pitch = Math.min(Math.atan(2 * (0.5 - horizon) * tanHalf), Math.atan(tanHalf) - (c.skyAbove * Math.PI) / 180);
     const below = pitch + Math.atan(2 * (carAt - 0.5) * tanHalf);
     const reach = distance + c.middle[1];
     const lift = Math.abs(bend) * c.bendLift;
@@ -427,6 +433,30 @@ export class CameraRig {
     // the look moves from the car's middle to the chase camera's point ahead
     targetOut.lerpVectors(eye2, targetOut, smoothstep(0.45, 1, k));
     return lerp(sw.fov, fov, smoothstep(0.3, 1, k));
+  }
+
+  /**
+   * The staging camera (`__dreamcar.photo`, `?photo=`): `back`, `right` and `up` metres from the car's origin in
+   * its own level frame, turned `yaw` degrees left of its heading and `pitch` degrees up, a lens of `fov` degrees
+   * top to bottom (as given, whatever the picture's shape). Nothing but the car's pose: the same run is the
+   * same picture.
+   */
+  _photo(camera, o) {
+    const heading = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
+    const fx = Math.sin(heading);
+    const fz = Math.cos(heading);
+    // the car's right: its local -x, (-cos h, 0, sin h) in the world
+    const rx = -fz;
+    const rz = fx;
+    const back = o.back ?? 6;
+    const right = o.right ?? 0;
+    eye.set(p.x - fx * back + rx * right, p.y + (o.up ?? 1.2), p.z - fz * back + rz * right);
+    const yaw = heading + ((o.yaw ?? 0) * Math.PI) / 180;
+    const pitch = ((o.pitch ?? 0) * Math.PI) / 180;
+    target.set(eye.x + Math.sin(yaw) * Math.cos(pitch), eye.y + Math.sin(pitch), eye.z + Math.cos(yaw) * Math.cos(pitch));
+    camera.position.copy(eye);
+    camera.lookAt(target);
+    return o.fov ?? 50;
   }
 
   /** The bonnet and bumper cameras: fixed to the body, its pitch and roll followed a little softly. */

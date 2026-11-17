@@ -196,6 +196,21 @@ a few seconds it is offered).
   so at 80 km/h the roadside is nearly crisp and at 250 km/h it streaks while
   the car, held sharp by the engine, does not.
 
+## Staging stills
+
+For comparison stills (and the repository's screenshot tool) the page handle
+has a staging camera: `__dreamcar.photo({ back, right, up, yaw, pitch, fov })`
+puts every view's camera `back` m behind, `right` m right of and `up` m above
+its car's origin in the car's own level frame, turned `yaw` degrees left of
+the car's heading and `pitch` degrees up, with a lens of `fov` degrees top to
+bottom (as given, whatever the picture's shape); the HUD is hidden unless
+`hud: true` is given; `photo(null)` ends it. The same in the address:
+`?photo=back,right,up,yaw,pitch,fov` (add `,hud` to keep the HUD), so that
+`node tools/shot.cjs --url "…?manual&auto&ap&t=20&photo=4.5,2.2,0.9,22,1,46"`
+needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
+is the same picture every time. Frame D1's camera on the start straight is
+about `{ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46 }`.
+
 ## The look
 
 - Linear HDR frame, filmic tone curve, bloom from real brightness (lamps are

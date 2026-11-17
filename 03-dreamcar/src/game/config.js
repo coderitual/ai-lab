@@ -109,6 +109,8 @@ export const CAMERA = {
      */
     horizon: 0.37,
     carAt: 0.6,
+    /** At least this much sky (degrees) between the horizon and the picture's top edge, on every shape of screen. */
+    skyAbove: 22,
     middle: [0.62, -0.4],
     /** The lens, top to bottom on a 16:9 picture: `fov` at `slowSpeed` and below, `fovFast` at `fastSpeed` (m/s) and above. */
     fov: 58,

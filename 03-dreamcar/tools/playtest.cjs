@@ -829,6 +829,45 @@ const SECTIONS = {
     }
   },
 
+  /** The staging camera: ?photo= and __dreamcar.photo() put the camera where they say, hide the HUD, and give it back. */
+  async photo() {
+    const q = '?manual&q=low&auto&ap&time=day&t=20&photo=4.5,2.2,0.9,22,1,46';
+    const read = (p) => p.page.evaluate(() => {
+      const g = window.__dreamcar.game;
+      const v = g.views[0];
+      const car = v.racer.car.object;
+      const c = v.camera;
+      const h = Math.atan2(2 * (car.quaternion.w * car.quaternion.y + car.quaternion.x * car.quaternion.z), 1 - 2 * (car.quaternion.y ** 2 + car.quaternion.z ** 2));
+      const dx = c.position.x - car.position.x;
+      const dz = c.position.z - car.position.z;
+      const back = -(dx * Math.sin(h) + dz * Math.cos(h));
+      const right = -dx * Math.cos(h) + dz * Math.sin(h);
+      const d = new c.position.constructor();
+      c.getWorldDirection(d);
+      const yaw = ((Math.atan2(d.x, d.z) - h + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+      return {
+        back: +back.toFixed(3), right: +right.toFixed(3), up: +(c.position.y - car.position.y).toFixed(3), yaw: +((yaw * 180) / Math.PI).toFixed(2),
+        pitch: +((Math.asin(d.y) * 180) / Math.PI).toFixed(2), fov: +c.fov.toFixed(2), hud: !document.querySelector('.hud').hidden,
+      };
+    });
+    const p = await open(q, { w: 640, h: 360, gpu: false });
+    const a = await read(p);
+    check('?photo= puts the camera behind, right of and above the car, turned left and up, with its lens', Math.abs(a.back - 4.5) < 0.01 && Math.abs(a.right - 2.2) < 0.01
+      && Math.abs(a.up - 0.9) < 0.01 && Math.abs(a.yaw - 22) < 0.1 && Math.abs(a.pitch - 1) < 0.1 && Math.abs(a.fov - 46) < 0.01, JSON.stringify(a));
+    check('the HUD is hidden while it is on', !a.hud);
+    await p.page.evaluate('window.__dreamcar.photo(null)');
+    const b = await read(p);
+    check('photo(null) gives the camera back to the chase rig and shows the HUD', b.hud && Math.abs(b.fov - 46) > 1, JSON.stringify(b));
+    await p.page.evaluate('window.__dreamcar.photo({ back: 4.5, right: 2.2, up: 0.9, yaw: 22, pitch: 1, fov: 46, hud: true })');
+    const c = await read(p);
+    check('photo({ hud: true }) keeps the HUD', c.hud && JSON.stringify({ ...c, hud: 0 }) === JSON.stringify({ ...a, hud: 0 }));
+    await p.close('photo');
+    const p2 = await open(q, { w: 640, h: 360, gpu: false });
+    const a2 = await read(p2);
+    check('the same address gives the same camera', JSON.stringify(a2) === JSON.stringify(a), `${JSON.stringify(a2)}`);
+    await p2.close('photo again');
+  },
+
   /** The same run is the same run: twice by keys, and by the autopilot at 30, 60 and 144 frames a second. */
   async determinism() {
     const keyRun = async () => {

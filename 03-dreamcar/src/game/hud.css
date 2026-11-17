@@ -646,10 +646,19 @@
 .hud .view.tall .flash,
 .hud .view.tall .banner,
 .hud .view.tall .lamps {
-  top: 18%;
+  top: max(18%, calc(var(--pad) + var(--st) + var(--u) * 15));
 }
 .hud .view.tall.flashing .banner {
-  top: calc(18% + var(--u) * 8.5);
+  top: calc(max(18%, calc(var(--pad) + var(--st) + var(--u) * 15)) + var(--u) * 8.5);
+}
+/* a narrow upright half with thumbs: the buttons' column fills the top right, the moments come under it */
+.hud .view.tall.small.touch .flash,
+.hud .view.tall.small.touch .lamps {
+  top: 34%;
+}
+/* split screen: the line's gap says enough; the lap's banner would crowd a half */
+.hud .view.split .banner {
+  display: none;
 }
 .hud .view.tall .warn,
 .hud .view.tall .hint {
