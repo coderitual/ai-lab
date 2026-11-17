@@ -75,7 +75,10 @@ const CAST_REACH = 160;
  * @param {object} track @param {ReturnType<typeof planeNoise>} noise @param {number} s
  */
 export function turnedAt(track, noise, s) {
-  const start = 1 - smoothstep(160, 460, Math.abs(track.delta(0, s)));
+  // the start: the grid and the straight behind the line have turned; past the line it turns green again before the
+  // straight's end, so that the wood ahead of the first bend is the green of a sunlit day
+  const d = track.delta(0, s);
+  const start = d < 0 ? 1 - smoothstep(380, 560, -d) : 1 - smoothstep(50, 170, d);
   const groups = smoothstep(0.55, 0.72, noise.fbm(s / 140, 7.1, 2));
   return Math.min(1, 0.85 * start + 0.6 * groups + 0.06);
 }
@@ -250,13 +253,16 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         let hint = -1;
         for (let d = plantRng.range(0, 2); d < span; d += plantRng.range(row.step[0], row.step[1])) {
           const s = (straight.s0 + d) % track.length;
+          // (only where the wood has turned: the far end of the straight is the ordinary wood)
+          const turned = turnedAt(track, noise, s);
+          if (turned < 0.5) continue;
           track.pointAt(s, side * (track.edgeAt(s, side) + BARRIER_CLEAR + plantRng.range(row.off[0], row.off[1])), point);
           if (blocked(point.x, point.z, 0, hint)) continue;
           hint = spot.index;
           if (!free(point.x, point.z, row.r)) continue;
           const y = terrain.heightAt(point.x, point.z);
           if (y < lakeLevel + 0.4) continue;
-          addTree(point.x, y - 0.15, point.z, startWood(plantRng.next()), { road: true, turned: turnedAt(track, noise, s), inside: land ? 0.3 : 0.1, young: land ? 1.2 : 1 });
+          addTree(point.x, y - 0.15, point.z, startWood(plantRng.next()), { road: true, turned, inside: land ? 0.3 : 0.1, young: land ? 1.2 : 1 });
         }
       }
     }
