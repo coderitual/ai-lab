@@ -266,8 +266,8 @@ export const CAMERA = {
  */
 export const PHOTOS = {
   d1: { back: 6.5, right: 3.2, up: 0.9, yaw: 17, pitch: 3.5, fov: 46, t: 100, time: 'day' },
-  d3: { back: 5.5, right: -2.5, up: 1.0, yaw: -4, pitch: 4, fov: 46, t: 78.8, time: 'day' },
-  d4: { back: 5.5, right: -1.4, up: 0.5, yaw: -16, pitch: 5, fov: 40, t: 5.5, time: 'dusk' },
+  d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
+  d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
 };
 
 /**
