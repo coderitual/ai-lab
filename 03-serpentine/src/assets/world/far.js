@@ -1,5 +1,5 @@
 // What lies beyond the terrain: the mountains on the horizon, mist lying in
-// the valleys, and at night the lights of a village down by the lake.
+// the valleys, and at night the lights of a town across the lake (mirrored in it) and of a hamlet up the far slope.
 //
 // MOUNTAINS. Three rings of jagged ridges round the course, 5 to 11 km out,
 // each a strip of faces from below the far land up to a ridge line made of
@@ -259,71 +259,111 @@ void main() {
     group.add(mistMesh);
   }
 
-  // ---------------------------------------------------------------- the village
+  // ---------------------------------------------------------------- the town by the lake
+  // (look lane) A small town on the lake's far shore, climbing the lower slope behind it, and a hamlet high on the
+  // slope beyond it (seen from the hairpins, which the town is hidden from): what the descent, the summit and the hairpins look out over at night (look reference B's city, here
+  // a few hundred lamps). Its streets run along the slope (level, as streets on a hillside do) and down it to the
+  // water; a promenade of lamps lines the shore, and the lake mirrors them (the second cloud of points below).
+  // Placed where the most of those views see it (worked out against the height field when it was laid out).
   const lightRng = rng.fork('village');
   const lights = [];
-  let village = null;
-  {
-    // on the far shore: walk the lake's rim away from the course and take the first gentle, dry spot
-    const ext = terrain.lake.extent;
-    const cx = (ext.x0 + ext.x1) / 2;
-    const cz = (ext.z0 + ext.z1) / 2;
-    let best = null;
-    for (let k = 0; k < 48; k++) {
-      const a = Math.PI * (1.15 + (k / 48) * 0.7); // the half of the rim facing away from the straight
-      for (let f = 1.0; f < 1.6; f += 0.05) {
-        const x = cx + Math.cos(a) * (ext.x1 - ext.x0) * 0.5 * f;
-        const z = cz + Math.sin(a) * (ext.z1 - ext.z0) * 0.5 * f;
-        const h = terrain.heightAt(x, z);
-        if (h < terrain.lake.level + 2) continue;
-        const slope = Math.abs(terrain.heightAt(x + 20, z) - h) + Math.abs(terrain.heightAt(x, z + 20) - h);
-        track.locate(x, z, -1, spot);
-        const score = slope + Math.max(0, 600 - Math.abs(spot.lat)) * 0.1 + Math.max(0, h - 30) * 0.5;
-        if (!best || score < best.score) best = { x, z, h, score };
-        break;
-      }
-    }
-    village = best ?? { x: cx, z: ext.z0 - 150, h: 5 };
-    // a few streets from the middle, lamps along them, windows beside them
-    const streets = 5;
+  const level = terrain.lake.level;
+  const ext = terrain.lake.extent;
+  const lakeMid = { x: (ext.x0 + ext.x1) / 2, z: (ext.z0 + ext.z1) / 2, rx: (ext.x1 - ext.x0) / 2.2, rz: (ext.z1 - ext.z0) / 2.2 };
+  const TOWN = { x: -170, z: -760, rx: 520, rz: 260, top: 175 };
+  const HAMLET = { x: 200, z: -1430, rx: 150, rz: 90, top: 520 };
+  const share = tier === 'low' ? 0.45 : tier === 'medium' ? 0.75 : 1;
+  const village = { x: TOWN.x, z: TOWN.z, h: Math.max(level + 2, terrain.heightAt(TOWN.x, TOWN.z)) };
+  const SODIUM = [1, 0.5, 0.16];
+  const WARM = [1, 0.8, 0.55];
+  const COOL = [0.72, 0.84, 1.0];
+  const lampColour = () => {
+    const r = lightRng.next();
+    return r < 0.5 ? SODIUM : r < 0.8 ? WARM : COOL;
+  };
+  /** A lamp or a window at (x, z) if the ground there is dry land below the place's top; returns whether it was put. */
+  const put = (place, x, z, rise, c, i, kind) => {
+    const h = terrain.heightAt(x, z);
+    if (h < level + 0.6 || h > place.top) return false;
+    lights.push({ x, y: h + rise, z, c, i, kind });
+    return true;
+  };
+  for (const [place, density] of [[TOWN, 1], [HAMLET, 0.35]]) {
+    // streets along the slope: walk from a seed along the level (the gradient's normal), lamps every 30 m or so
+    const streets = Math.round(21 * density);
     for (let st = 0; st < streets; st++) {
-      let a = lightRng.range(0, Math.PI * 2);
-      let x = village.x + lightRng.range(-40, 40);
-      let z = village.z + lightRng.range(-40, 40);
-      const steps = lightRng.int(8) + 6;
+      let x = place.x + lightRng.range(-1, 1) * place.rx;
+      let z = place.z + lightRng.range(-1, 1) * place.rz;
+      let heading = lightRng.sign();
+      const steps = 4 + lightRng.int(9);
       for (let k = 0; k < steps; k++) {
-        a += lightRng.range(-0.35, 0.35);
-        x += Math.cos(a) * 28;
-        z += Math.sin(a) * 28;
-        const h = terrain.heightAt(x, z);
-        if (h < terrain.lake.level + 0.5) break;
-        // a street lamp: sodium or a warm LED
-        const sodium = lightRng.next() < 0.6;
-        lights.push({ x, y: h + 6, z, c: sodium ? [1, 0.55, 0.2] : [1, 0.82, 0.6], i: lightRng.range(0.8, 1.2) });
-        // a window or two beside it
-        for (let w = 0; w < 2; w++) {
-          if (lightRng.next() < 0.45) continue;
-          const side = lightRng.sign();
-          const wx = x - Math.sin(a) * side * lightRng.range(10, 18);
-          const wz = z + Math.cos(a) * side * lightRng.range(10, 18);
-          lights.push({ x: wx, y: terrain.heightAt(wx, wz) + 3, z: wz, c: [1, 0.72, 0.42], i: lightRng.range(0.25, 0.5) });
+        const e = ((x - place.x) / place.rx) ** 2 + ((z - place.z) / place.rz) ** 2;
+        if (e > 1.3) break;
+        // closer together in the middle of town
+        if (lightRng.next() < share * (1.15 - 0.6 * e)) {
+          if (put(place, x, z, 6, lampColour(), lightRng.range(0.7, 1.2), 'street')) {
+            // a window or two beside it, warm
+            for (let w = 0; w < 3; w++) {
+              if (lightRng.next() > 0.4 * share) continue;
+              put(place, x + lightRng.range(-14, 14), z + lightRng.range(-14, 14), lightRng.range(3, 9), lightRng.next() < 0.8 ? [1, 0.7, 0.42] : COOL, lightRng.range(0.2, 0.45), 'window');
+            }
+          }
         }
+        const h0 = terrain.heightAt(x, z);
+        const gx = terrain.heightAt(x + 8, z) - h0;
+        const gz = terrain.heightAt(x, z + 8) - h0;
+        const g = Math.hypot(gx, gz) || 1;
+        // along the level, with a little wander; now and then a street that climbs
+        const climb = k % 5 === 4 ? 0.8 : 0.1;
+        let dx = (-gz / g) * heading + (gx / g) * climb * lightRng.range(-1, 1);
+        let dz = (gx / g) * heading + (gz / g) * climb * lightRng.range(-1, 1);
+        const n = Math.hypot(dx, dz) || 1;
+        x += (dx / n) * lightRng.range(24, 34);
+        z += (dz / n) * lightRng.range(24, 34);
       }
-    }
-    // two lit windows far apart on the slopes (farms)
-    for (let k = 0; k < 40 && lights.length < 400; k++) {
-      const a = lightRng.range(0, Math.PI * 2);
-      const r = lightRng.range(900, 1800);
-      const x = mid.x + Math.cos(a) * r;
-      const z = mid.z + Math.sin(a) * r;
-      track.locate(x, z, -1, spot);
-      const h = terrain.heightAt(x, z);
-      if (Math.abs(spot.lat) < 300 || h < 40 || h > 250) continue;
-      lights.push({ x, y: h + 3, z, c: [1, 0.7, 0.4], i: 0.4, farm: true });
-      if (lights.filter((l) => l.farm).length >= 2) break;
     }
   }
-  const lightPoints = (() => {
+  // the promenade: lamps along the waterline in front of the town, every 25 m where there is shore
+  for (let a = -0.85; a <= 0.85; a += 0.012) {
+    // walk outwards from the lake's middle until dry land
+    const ang = -Math.PI / 2 + a * 1.4;
+    for (let f = 0.8; f < 1.5; f += 0.01) {
+      const x = lakeMid.x + Math.cos(ang) * lakeMid.rx * f;
+      const z = lakeMid.z + Math.sin(ang) * lakeMid.rz * f;
+      const h = terrain.heightAt(x, z);
+      if (h < level + 0.8) continue;
+      if (((x - TOWN.x) / (TOWN.rx * 1.25)) ** 2 + ((z - TOWN.z) / (TOWN.rz * 2)) ** 2 < 1 && lightRng.next() < 0.85 * share + 0.15) {
+        lights.push({ x, y: h + 5, z, c: lightRng.next() < 0.7 ? SODIUM : WARM, i: 1.1, kind: 'shore' });
+      }
+      break;
+    }
+  }
+  // a few brighter ones: floodlit squares, a petrol station's canopy; a church tower; a radio mast on the slope above
+  for (let k = 0; k < 8; k++) put(TOWN, TOWN.x + lightRng.range(-0.8, 0.8) * TOWN.rx, TOWN.z + lightRng.range(-0.6, 0.6) * TOWN.rz, 8, k % 3 ? WARM : COOL, lightRng.range(2.5, 4), 'bright');
+  put(TOWN, TOWN.x + 60, TOWN.z + 40, 32, [1, 0.85, 0.6], 3.5, 'church');
+  {
+    // the mast stands on the first high ground behind the town
+    let mx = TOWN.x - 120;
+    let mz = TOWN.z - TOWN.rz;
+    for (let k = 0; k < 20 && terrain.heightAt(mx, mz) < TOWN.top + 40; k++) mz -= 25;
+    lights.push({ x: mx, y: terrain.heightAt(mx, mz) + 70, z: mz, c: [1, 0.06, 0.03], i: 5, kind: 'mast' });
+    lights.push({ x: mx, y: terrain.heightAt(mx, mz) + 38, z: mz, c: [1, 0.06, 0.03], i: 3, kind: 'mast' });
+  }
+  // two lit windows far apart on the slopes (farms)
+  for (let k = 0; k < 40; k++) {
+    const a = lightRng.range(0, Math.PI * 2);
+    const r = lightRng.range(900, 1800);
+    const x = mid.x + Math.cos(a) * r;
+    const z = mid.z + Math.sin(a) * r;
+    track.locate(x, z, -1, spot);
+    const h = terrain.heightAt(x, z);
+    if (Math.abs(spot.lat) < 300 || h < 40 || h > 250) continue;
+    lights.push({ x, y: h + 3, z, c: [1, 0.7, 0.4], i: 0.4, kind: 'farm' });
+    if (lights.filter((l) => l.kind === 'farm').length >= 2) break;
+  }
+  const lakeUniform = { value: new THREE.Vector4(lakeMid.x, lakeMid.z, lakeMid.rx, lakeMid.rz) };
+  const levelUniform = { value: level };
+  const makeLights = (mirror) => {
     const n = lights.length;
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 4);
@@ -336,35 +376,63 @@ void main() {
     geometry.setAttribute('aLight', new THREE.BufferAttribute(col, 4));
     geometry.computeBoundingSphere();
     const material = new THREE.ShaderMaterial({
-      defines: targetDefines(caps),
-      uniforms: { ...hazeUniforms, ...shared, uRadiance: { value: 0 }, uPixel: { value: 1 } },
+      defines: { ...targetDefines(caps), ...(mirror ? { LAKE_MIRROR: 1 } : {}) },
+      uniforms: { ...hazeUniforms, ...shared, uRadiance: { value: 0 }, uPixel: { value: 1 }, uLake: lakeUniform, uLevel: levelUniform },
       vertexShader: /* glsl */ `
 attribute vec4 aLight;
 uniform float uTime;
 uniform float uRadiance;
 uniform float uPixel;
+uniform vec4 uLake;
+uniform float uLevel;
 varying vec3 vColor;
 ${GLSL_HASH}
 ${GLSL_NOISE}
 ${ATMOSPHERE_PARS}
 void main() {
   vec4 w = modelMatrix * vec4(position, 1.0);
+  float gain = 1.0;
+#ifdef LAKE_MIRROR
+  // The lake mirrors the lamp: its reflection lies where the line from the eye to the lamp's mirror image (as far
+  // under the water as the lamp is above it) meets the water. Drawn a hair nearer than the water on that line, so
+  // it wins against the lake and loses against the land in front. Only over the lake (its ellipse), only with the
+  // eye above the water, and dimmed: water at a glancing angle, broken by ripples.
+  vec3 m = vec3(w.x, 2.0 * uLevel - w.y, w.z);
+  float above = cameraPosition.y - uLevel;
+  float t = above / max(cameraPosition.y - m.y, 1.0e-3);
+  vec3 p = cameraPosition + (m - cameraPosition) * t * 0.995;
+  vec2 e = (p.xz - uLake.xy) / uLake.zw;
+  gain = 0.35 * step(dot(e, e), 0.92) * step(0.5, above);
+  w.xyz = p;
+#endif
   gl_Position = projectionMatrix * viewMatrix * w;
   // a lamp a kilometre or two away covers less than a pixel: its light is spread over a fixed small spot, and
   // its brightness goes with the inverse square of the distance relative to 1 km
   float d = length(w.xyz - cameraPosition);
   float shimmer = 1.0 + 0.22 * (valueNoise(vec2(uTime * 6.0, aLight.w * 97.0)) - 0.5) * smoothstep(300.0, 1500.0, d);
-  vec3 c = aLight.rgb * uRadiance * shimmer * clamp(1.0e6 / (d * d), 0.0, 25.0);
+#ifdef LAKE_MIRROR
+  shimmer = 0.6 + 0.8 * valueNoise(vec2(uTime * 1.3, aLight.w * 61.0));
+#endif
+  vec3 c = aLight.rgb * uRadiance * gain * shimmer * clamp(1.0e6 / (d * d), 0.0, 25.0);
   // through the air: dimmed by the haze between (its own glow is too faint to matter)
   vColor = c * (1.0 - hazeBetween(cameraPosition.y, w.xyz - cameraPosition));
+#ifdef LAKE_MIRROR
+  gl_PointSize = 7.0 * uPixel;
+#else
   gl_PointSize = 3.0 * uPixel;
+#endif
 }`,
       fragmentShader: /* glsl */ `
 ${GLSL_TARGET}
 varying vec3 vColor;
 void main() {
   vec2 q = gl_PointCoord * 2.0 - 1.0;
+#ifdef LAKE_MIRROR
+  // a short upright streak (point sprites are square: the streak is drawn inside one)
+  float spot = exp(-q.x * q.x * 22.0 - q.y * q.y * 1.6) * 2.3;
+#else
   float spot = exp(-dot(q, q) * 3.0);
+#endif
   gl_FragColor = toTarget(vec4(vColor * spot, 1.0));
 }`,
       transparent: true,
@@ -372,13 +440,18 @@ void main() {
       blending: THREE.AdditiveBlending,
       fog: false,
     });
-    material.name = 'far-lights';
+    material.name = mirror ? 'far-lights-lake' : 'far-lights';
     const points = new THREE.Points(geometry, material);
-    points.name = 'far-lights';
+    points.name = material.name;
     points.renderOrder = 11;
     points.matrixAutoUpdate = false;
+    if (mirror) points.frustumCulled = false;
     return points;
-  })();
+  };
+  const lightPoints = makeLights(false);
+  // the lake's reflection of them (not on the low tier)
+  const lakePoints = lowTier ? null : makeLights(true);
+  if (lakePoints) group.add(lakePoints);
   group.add(lightPoints);
 
   // the glow of the village on the air over it: a soft card that always faces the camera
@@ -406,8 +479,8 @@ void main() {
       blending: THREE.AdditiveBlending,
       fog: false,
     });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(900, 360), material);
-    mesh.position.set(village.x, village.h + 120, village.z);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1700, 460), material);
+    mesh.position.set(village.x, village.h + 140, village.z);
     mesh.updateMatrix();
     mesh.matrixAutoUpdate = false;
     mesh.frustumCulled = false;
@@ -422,20 +495,29 @@ void main() {
     stats: { mountainTriangles, sheets: sheets.length, lights: lights.length, village: { x: Math.round(village.x), z: Math.round(village.z) }, ms: Math.round(performance.now() - started) },
     setTime(time) {
       const night = time.name === 'night';
+      // (look lane) the far ranges by moonlight: snow under a three-quarter moon read as dusk at the night's exposure;
+      // reference B's far hills are near black, so they are let down to a dim silhouette
+      for (const mesh of mountains) mesh.material.color.setScalar(night ? 0.15 : 1);
       // the mist: lit from above by the sun or moon and the sky, albedo about 0.8
       const e = time.sun.intensity * Math.max(0.1, time.sun.dir[1]) + Math.PI * (0.7 * time.sky.zenith[1] + 0.3 * time.sky.horizon[1]) * 1.2;
       const s = (0.8 * e) / Math.PI;
       shared.uMistColor.value.set(s * (0.75 + 0.25 * time.sun.color[0]), s * (0.8 + 0.2 * time.sun.color[1]), s * (0.85 + 0.15 * time.sun.color[2]));
-      shared.uMistOpacity.value = night ? 0.3 : 0.65;
+      shared.uMistOpacity.value = night ? 0.15 : 0.65;
       const lamps = time.lamps.windows;
-      lightPoints.material.uniforms.uRadiance.value = 0.35 * lamps;
+      lightPoints.material.uniforms.uRadiance.value = 0.6 * lamps;
       lightPoints.visible = lamps > 0;
-      glow.material.uniforms.uGlow.value.set(0.0012, 0.0006, 0.00035).multiplyScalar(lamps);
+      if (lakePoints) {
+        lakePoints.material.uniforms.uRadiance.value = 0.6 * lamps;
+        lakePoints.visible = lamps > 0;
+      }
+      // the town's light on the haze over it: a soft warm band (reference B's is a dull red-brown)
+      glow.material.uniforms.uGlow.value.set(0.0032, 0.0019, 0.0011).multiplyScalar(lamps);
       glow.visible = lamps > 0;
     },
     /** @param {number} ratio the renderer's pixel ratio (the lights' spot is a few pixels across) */
     setPixelRatio(ratio) {
       lightPoints.material.uniforms.uPixel.value = ratio;
+      if (lakePoints) lakePoints.material.uniforms.uPixel.value = ratio;
     },
     update(dt, simTime) {
       shared.uTime.value = simTime;

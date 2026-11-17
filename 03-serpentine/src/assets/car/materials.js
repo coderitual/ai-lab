@@ -14,9 +14,11 @@
 //  - Built on THREE.MeshPhysicalMaterial (onBeforeCompile), so the world's
 //    lights, shadows, fog and environment map keep working. What is added:
 //    the clear coat and the glass mirror the car's own reflection probe
-//    (GLSL_PROBE) instead of the far environment map, and every reflection is
-//    scaled by how much sky is overhead (setReflections), so the car goes dark
-//    in a tunnel. The base layer keeps the scene's environment map.
+//    (GLSL_PROBE) instead of the far environment map; where there is no probe
+//    the environment map's reflection is scaled by how much sky is overhead
+//    (setReflections), so the car goes dark in a tunnel. With a probe the
+//    paint's metal layer mirrors the probe too (look lane: a silver car is
+//    nearly all reflection, and must be silver under the tunnel's lamps).
 
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE, GLSL_PROBE, targetDefines } from '../../engine/glsl.js';
@@ -117,8 +119,11 @@ const COAT_GAIN = 1.6;
 
 /**
  * Reflections: the car's probe in the clear coat (`coat`) and in the layer under it (`base`; for glass and plain
- * trim that is the only specular layer), all of it scaled by the sky. The probe is read at each layer's own
- * roughness, so the rough flake layer gets the surroundings blurred: the road darkens the sills, a wood one flank.
+ * trim that is the only specular layer). The probe is read at each layer's own roughness, so the rough flake layer
+ * gets the surroundings blurred: the road darkens the sills, a wood one flank.
+ * Only the far environment map is scaled by the sky overhead; the probe is the car's real surroundings and is taken
+ * as it is. With both scaled, the silver paint, whose colour is nearly all reflection, went black under the tunnel's
+ * sodium lamps and matt dark grey at night; now the lamp rows slide over it.
  */
 const REFLECTIONS = (coat, base = !coat, gain = 1) => /* glsl */ `
 #include <lights_fragment_maps>
@@ -129,10 +134,12 @@ const REFLECTIONS = (coat, base = !coat, gain = 1) => /* glsl */ `
   #ifdef USE_CLEARCOAT
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryClearcoatNormal), viewMatrix);
-    clearcoatRadiance = mix(clearcoatRadiance, probeSample(carProbe, r, material.clearcoatRoughness), carProbeOn);
+    clearcoatRadiance = mix(clearcoatRadiance * carSky, probeSample(carProbe, r, material.clearcoatRoughness), carProbeOn);
   }
+  #else
+  clearcoatRadiance *= carSky;
   #endif
-  clearcoatRadiance *= carSky * ${gain.toFixed(2)};`
+  clearcoatRadiance *= ${gain.toFixed(2)};`
       : ''
   }
   ${
@@ -140,11 +147,11 @@ const REFLECTIONS = (coat, base = !coat, gain = 1) => /* glsl */ `
       ? `
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryNormal), viewMatrix);
-    radiance = mix(radiance, probeSample(carProbe, r, material.roughness), carProbeOn);
+    radiance = mix(radiance * carSky, probeSample(carProbe, r, material.roughness), carProbeOn);
   }`
-      : ''
+      : `
+  radiance *= carSky;`
   }
-  radiance *= carSky;
 #endif
 #if defined( RE_IndirectDiffuse )
   iblIrradiance *= mix(0.3, 1.0, carSky);

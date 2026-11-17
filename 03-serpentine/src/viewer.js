@@ -180,6 +180,10 @@ const ASSETS = {
       made.car.setLights(lampPreset(given.lights));
       made.car.setReflections({ cube: null, sky: 1 });
       stand.add(made.car.object);
+      // (look lane) as in the game: its reflection probe (probe=0: none), so the paint mirrors the lamps, the town and
+      // the wet road round it
+      made.probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[tier].probeSize) : null;
+      if (made.probe) made.car.setReflections({ cube: made.probe.texture, sky: 1 });
     }
     if (query.has('card')) {
       const towardsLight = new THREE.Vector3().fromArray(time.sun.dir).transformDirection(stand.matrixWorld.clone().invert());
@@ -419,7 +423,7 @@ engine.onDraw = () => {
   }
   if (asset.probe) {
     const at = asset.car.box.center.clone().applyMatrix4(stand.matrixWorld);
-    asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...world.probeHidden], 6);
+    asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...world.probeHidden].filter(Boolean), 6);
   }
   pipeline.render(world.scene, camera, rect, frame);
 };

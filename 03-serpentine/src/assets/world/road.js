@@ -26,8 +26,16 @@
 //    that send a car's own head lamps back towards it;
 //  - roughness from the same fields (polished wheel tracks, rough patches, a
 //    glassy tar seam, coarse gravel): what the lamps' highlights streak along;
-//  - wetness (world.wetness, ?wet=): darker, smoother asphalt and, in the low
-//    spots and the ruts, puddles that are mirrors.
+//  - wetness (world.wetness, ?wet=; the night is wet by default): darker,
+//    smoother asphalt and, in the low spots and the ruts, puddles that are
+//    mirrors. With a `mirror` (engine/PlanarMirror.js, medium and high tiers)
+//    the wet surface shows the scene's real reflection: the mirror's picture
+//    looked up where this point of the road lands in it, pushed about by the
+//    aggregate's normal, smeared along the screen's vertical (a wet road
+//    stretches its reflections towards the viewer) the more the rougher the
+//    surface, and weighed by water's Fresnel. Where the road leaves the
+//    mirror's plane (over a crest, down a dip) the reflection fades out, and
+//    the environment map's reflection is what is left.
 
 import * as THREE from 'three';
 import { fieldTexture, normalTexture, valueField, worleyField } from '../../engine/noise.js';
@@ -48,8 +56,8 @@ const TUNNEL_DOUBLE = 60;
 const AGG_SCALE = 2.1;
 const BIG_SCALE = 37;
 /** Head lamp brightness (THROW in assets/car/index.js: candela-like units at the beam's peak, per lamp). */
-const LAMP_LOW = 3200;
-const LAMP_HIGH = 9000;
+const LAMP_LOW = 1600;
+const LAMP_HIGH = 4500;
 /** Up to this many cars' head lamps answered by the paint. */
 const BEAMS = 2;
 
@@ -61,8 +69,10 @@ const BEAMS = 2;
  * @param {import('./atmosphere.js').Atmosphere} options.atmosphere
  * @param {import('./terrain.js').Terrain} options.terrain for the baked light
  * @param {number} options.rowStep one row every this many samples (the terrain band's own step)
+ * @param {{ uniforms: object }|null} [options.mirror] the wet road's planar reflection (its uniforms, with
+ *   uMirrorPlane added: the plane as (normal, constant)), or null for speculars only
  */
-export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep }) {
+export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, mirror = null }) {
   const n = track.count;
   const ds = track.ds;
   const half = track.halfWidth;
@@ -85,6 +95,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep }) 
     const road = new Float32Array(count * 3);
     const along = new Float32Array(count * 3);
     const bake = new Float32Array(count * 3);
+    const open = new Float32Array(count);
     for (let r = 0; r < list.length; r++) {
       const i = list[r] % n;
       const s = list[r] * ds;
@@ -105,6 +116,8 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep }) 
         road[v * 3 + 2] = lats[k] > 0 ? (pavedL ? 1 : 0) : pavedR ? 1 : 0;
         frame.tan.toArray(along, v * 3);
         terrain.bakeAt(pt.x, pt.z, bake, v * 3);
+        // how much sky is over it: rain does not reach far into the tunnel
+        open[v] = track.sky ? track.sky[i] : 1;
       }
     }
     const index = [];
@@ -120,6 +133,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep }) 
     geometry.setAttribute('aRoad', new THREE.BufferAttribute(road, 3));
     geometry.setAttribute('aAlong', new THREE.BufferAttribute(along, 3));
     geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 3));
+    geometry.setAttribute('aOpen', new THREE.BufferAttribute(open, 1));
     geometry.setIndex(index);
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
@@ -205,27 +219,30 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep }) 
     uBeamPos: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, -1e4, 0)) },
     uBeamDir: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, 0, 1)) },
     uBeamPower: { value: new Array(BEAMS).fill(0) },
+    ...(mirror ? mirror.uniforms : {}),
   };
 
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0 });
   material.name = 'asphalt';
-  extend(material, 'asphalt', (shader) => {
+  if (mirror) material.defines = { ...material.defines, ROAD_MIRROR: 1 };
+  extend(material, mirror ? 'asphalt-mirror' : 'asphalt', (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute vec3 aRoad;\nattribute vec3 aAlong;\nvarying vec3 vRoad;\nvarying vec3 vRoadWorld;\nvarying vec3 vAlong;\nvarying vec3 vRoadNormal;',
+        '#include <common>\nattribute vec3 aRoad;\nattribute vec3 aAlong;\nattribute float aOpen;\nvarying float vOpen;\nvarying float vRoadEye;\nvarying vec3 vRoad;\nvarying vec3 vRoadWorld;\nvarying vec3 vAlong;\nvarying vec3 vRoadNormal;',
       )
       .replace(
         '#include <begin_vertex>',
-        '#include <begin_vertex>\nvRoad = aRoad;\nvAlong = aAlong;\nvRoadWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\nvRoadNormal = normalize( mat3( modelMatrix ) * objectNormal );',
+        '#include <begin_vertex>\nvOpen = aOpen;\nvRoadEye = abs( abs( projectionMatrix[ 1 ][ 1 ] ) - 1.0 ) < 1.0e-3 && abs( abs( projectionMatrix[ 0 ][ 0 ] ) - 1.0 ) < 1.0e-3 ? 0.0 : 1.0;\nvRoad = aRoad;\nvAlong = aAlong;\nvRoadWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\nvRoadNormal = normalize( mat3( modelMatrix ) * objectNormal );',
       );
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${ASPHALT_PARS}`)
       .replace('#include <map_fragment>', ASPHALT_COLOR)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = roadRoughness;')
       .replace('#include <normal_fragment_maps>', ASPHALT_NORMAL)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${ASPHALT_BEADS}`);
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${ASPHALT_BEADS}`)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${ASPHALT_MIRROR}`);
   });
   withBake(material);
   atmosphere.patch(material);
@@ -285,6 +302,16 @@ varying vec3 vRoad;
 varying vec3 vRoadWorld;
 varying vec3 vAlong;
 varying vec3 vRoadNormal;
+varying float vOpen;
+varying float vRoadEye; // 0 in a reflection probe's cube face (retro.js says why)
+float roadWet;
+#ifdef ROAD_MIRROR
+uniform sampler2D uMirrorTex;
+uniform mat4 uMirrorMatrix;
+uniform float uMirrorOn;
+uniform vec2 uMirrorTexel;
+uniform vec4 uMirrorPlane;
+#endif
 float roadRoughness;
 float roadPaint;
 float roadPuddle;
@@ -394,13 +421,19 @@ roadPaint *= smoothstep( 0.2, 0.42, rWear ) * ( 1.0 - 0.8 * rPatch );
 rCol = mix( rCol, vec3( 0.62, 0.62, 0.6 ) * ( 0.9 + 0.1 * rSpeck ), roadPaint );
 rRough = mix( rRough, 0.55, roadPaint );
 
-// ---- water: the asphalt darkens and smooths, and the low spots and ruts fill
-float rLow = rBig.a * 0.8 + 0.2 * rBig2.a + 0.22 * rTracks * rOnRoad - 0.15 * roadGravel;
-roadPuddle = smoothstep( 0.95 - 0.5 * uWet, 1.0 - 0.5 * uWet, rLow ) * step( 0.02, uWet );
-rCol *= mix( 1.0, mix( 0.5, 0.85, roadPaint ), uWet );
-rRough = mix( rRough, 0.14 + 0.3 * rRough * rRough, uWet );
-rCol = mix( rCol, rCol * 0.7, roadPuddle );
-rRough = mix( rRough, 0.025, roadPuddle );
+// ---- water (dry under the tunnel's roof, wet again towards its portals):
+roadWet = uWet * smoothstep( 0.05, 0.6, vOpen );
+// ---- water: the asphalt darkens and smooths, and water stands in the ruts and the low spots. The puddles are
+// broken: their rims follow the aggregate, so they read as patches of mirror among wet stone, not as a lake.
+float rLow = rBig.a * 0.62 + 0.18 * rBig2.a + 0.32 * rTracks * rOnRoad - 0.15 * roadGravel;
+float rRag = 0.1 * ( rAgg.g - 0.5 ) + 0.06 * ( rAgg2.r - 0.5 ) * roadFade;
+float rLevel = 0.93 - 0.42 * roadWet;
+roadPuddle = smoothstep( rLevel, rLevel + 0.025, rLow + rRag ) * step( 0.02, roadWet ) * ( 1.0 - 0.7 * roadPaint );
+rCol *= mix( 1.0, mix( 0.42, 0.8, roadPaint ), roadWet );
+// a wet film fills the texture: what was rough becomes a satin that smears reflections, the polished tracks glossy
+rRough = mix( rRough, 0.1 + 0.28 * rRough * rRough, roadWet );
+rCol = mix( rCol, rCol * 0.6, roadPuddle );
+rRough = mix( rRough, 0.03, roadPuddle );
 
 diffuseColor.rgb *= rCol;
 roadRoughness = rRough;
@@ -421,6 +454,45 @@ const ASPHALT_NORMAL = /* glsl */ `
 }
 `;
 
+const ASPHALT_MIRROR = /* glsl */ `
+#ifdef ROAD_MIRROR
+// (not in a reflection probe's faces: the mirror's picture belongs to the view's own eye)
+if ( uMirrorOn > 0.5 && vRoadEye > 0.5 ) {
+  // how much of a mirror this point is: the puddles fully, the wet film by how wet and smooth, the gravel hardly
+  float mWet = clamp( roadPuddle + roadWet * ( 1.0 - roadGravel * 0.8 ) * ( 1.15 - roadRoughness ), 0.0, 1.0 );
+  // only near the plane the mirror was drawn for
+  float mOff = abs( dot( vRoadWorld, uMirrorPlane.xyz ) + uMirrorPlane.w );
+  mWet *= 1.0 - smoothstep( 0.4, 2.5, mOff );
+  if ( mWet > 0.002 ) {
+    vec4 mc = uMirrorMatrix * vec4( vRoadWorld, 1.0 );
+    vec2 muv = mc.xy / mc.w;
+    // pushed about by the surface's own tilt (the aggregate, the ruts): reflections break up
+    muv += ( normal.xy - nonPerturbedNormal.xy ) * vec2( 0.04, 0.1 );
+    // Smeared, the rougher the more, and up the picture only: a wet road draws each light out into a streak from
+    // the point that mirrors it towards the viewer (the nearer road sees it at a glancing angle off the far side of
+    // its bumps). Sharp in a puddle; a share of the picture's height, whatever the target's size.
+    float mLen = mix( 0.003, 0.07, smoothstep( 0.03, 0.5, roadRoughness ) );
+    vec2 mStep = vec2( 0.06 * mLen * uMirrorTexel.x / uMirrorTexel.y, mLen );
+    vec3 mCol = texture2D( uMirrorTex, muv ).rgb * 0.22;
+    mCol += texture2D( uMirrorTex, muv + mStep * vec2( 1.0, 0.06 ) ).rgb * 0.17;
+    mCol += texture2D( uMirrorTex, muv + mStep * vec2( -1.0, 0.15 ) ).rgb * 0.15;
+    mCol += texture2D( uMirrorTex, muv + mStep * vec2( 0.5, 0.28 ) ).rgb * 0.13;
+    mCol += texture2D( uMirrorTex, muv + mStep * vec2( -0.5, 0.45 ) ).rgb * 0.11;
+    mCol += texture2D( uMirrorTex, muv + mStep * vec2( 0.0, 0.65 ) ).rgb * 0.09;
+    mCol += texture2D( uMirrorTex, muv + mStep * vec2( 0.3, 0.85 ) ).rgb * 0.07;
+    mCol += texture2D( uMirrorTex, muv + mStep * vec2( -0.3, 1.0 ) ).rgb * 0.06;
+    // nothing from beyond the picture's edge
+    vec2 mIn = smoothstep( vec2( 0.0 ), vec2( 0.03 ), muv ) * smoothstep( vec2( 0.0 ), vec2( 0.03 ), 1.0 - muv );
+    mWet *= mIn.x * mIn.y;
+    // water's Fresnel (n = 1.33), on the unbroken surface
+    float mCos = clamp( dot( nonPerturbedNormal, normalize( vViewPosition ) ), 0.0, 1.0 );
+    float mF = 0.02 + 0.98 * pow( 1.0 - mCos, 5.0 );
+    reflectedLight.indirectSpecular = mix( reflectedLight.indirectSpecular, mCol * mF, mWet );
+  }
+}
+#endif
+`;
+
 const ASPHALT_BEADS = /* glsl */ `
 {
   // glass beads in the paint: light from a head lamp comes back towards the lamp, so a driver sees the lines lit
@@ -436,6 +508,31 @@ const ASPHALT_BEADS = /* glsl */ `
     float a = acos( clamp( dot( l, toEye ), -1.0, 1.0 ) );
     retro += e * exp( -a * a / 0.018 );
   }
-  totalEmissiveRadiance += roadPaint * 0.45 * retro * vec3( 1.0, 0.98, 0.93 );
+  totalEmissiveRadiance += roadPaint * 0.9 * retro * vRoadEye * vec3( 1.0, 0.98, 0.93 );
+
+  // The head lamps' pool. Lit at a glancing angle, asphalt sends much of the light back the way it came (each stone
+  // shades the next; its lit faces look back at the lamp): a driver sees the road ahead brighter than its cosine
+  // says, the far end of the pool most of all. The beam's shape is the lamp's own (assets/car/lamps.js): a cut-off
+  // just under the horizontal, dimmer the steeper it points down, wide across. Water mirrors it away instead.
+  vec3 pool = vec3( 0.0 );
+  for ( int i = 0; i < ${BEAMS}; i ++ ) {
+    vec3 v = vRoadWorld - uBeamPos[ i ];
+    float d = max( length( v ), 1.0 );
+    v /= d;
+    vec3 ax = uBeamDir[ i ];
+    vec3 axUp = normalize( vec3( 0.0, 1.0, 0.0 ) - ax * ax.y );
+    vec3 axRight = cross( ax, axUp );
+    float vert = degrees( asin( clamp( dot( v, axUp ), -1.0, 1.0 ) ) );
+    float side = degrees( asin( clamp( dot( v, axRight ), -1.0, 1.0 ) ) );
+    float cutOff = -0.57 + min( 1.1, max( 0.0, side ) * 0.268 );
+    float edge = clamp( ( cutOff - vert ) / 0.3 + 0.5, 0.0, 1.0 );
+    float depth = pow( min( 1.0, 1.5 / max( 1.5, 0.3 - vert ) ), 2.6 );
+    float spread = exp( -pow( side / 17.0, 2.0 ) ) * 0.75 + exp( -pow( side / 6.0, 2.0 ) ) * 0.25;
+    float e = uBeamPower[ i ] * edge * depth * spread * step( 0.0, dot( v, ax ) ) / ( d * d );
+    vec3 l = -v;
+    float back = exp( -pow( acos( clamp( dot( l, toEye ), -1.0, 1.0 ) ), 2.0 ) / 0.09 );
+    pool += e * back;
+  }
+  totalEmissiveRadiance += vRoadEye * pool * diffuseColor.rgb * ( 0.6 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
 }
 `;

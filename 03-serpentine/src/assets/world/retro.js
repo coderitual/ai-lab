@@ -19,11 +19,11 @@ import { extend } from './shading.js';
 /** Up to this many cars' head lamps are answered. */
 export const BEAMS = 2;
 /** Head lamp output (THROW in assets/car/lamps.js: candela at the beam's brightest point, per lamp; two per car). */
-const LAMP_LOW = 3200;
-const LAMP_HIGH = 9000;
+const LAMP_LOW = 1600;
+const LAMP_HIGH = 4500;
 
 /** The beams of every car, shared by all retro-reflective materials. */
-const uniforms = {
+export const RETRO_UNIFORMS = {
   uRetroPos: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, -1e4, 0)) },
   uRetroDir: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, 0, 1)) },
   uRetroPower: { value: Array.from({ length: BEAMS }, () => new THREE.Vector2()) },
@@ -34,10 +34,10 @@ export function setRetroBeams(beams) {
   for (let i = 0; i < BEAMS; i++) {
     const b = beams?.[i];
     if (b) {
-      uniforms.uRetroPos.value[i].copy(b.pos);
-      uniforms.uRetroDir.value[i].copy(b.dir).normalize();
-      uniforms.uRetroPower.value[i].set(2 * LAMP_LOW * b.low, 2 * LAMP_HIGH * b.high);
-    } else uniforms.uRetroPower.value[i].set(0, 0);
+      RETRO_UNIFORMS.uRetroPos.value[i].copy(b.pos);
+      RETRO_UNIFORMS.uRetroDir.value[i].copy(b.dir).normalize();
+      RETRO_UNIFORMS.uRetroPower.value[i].set(2 * LAMP_LOW * b.low, 2 * LAMP_HIGH * b.high);
+    } else RETRO_UNIFORMS.uRetroPower.value[i].set(0, 0);
   }
 }
 
@@ -46,11 +46,17 @@ export function setRetroBeams(beams) {
  * colour. A low beam is dark above a cut-off just under the horizontal (kicked up on the right), keeping a few per
  * cent of glare above it; main beam is the same picture tilted up 3.5 degrees.
  */
-const RETRO_GLSL = /* glsl */ `
+export const RETRO_GLSL = /* glsl */ `
 uniform vec3 uRetroPos[${BEAMS}];
 uniform vec3 uRetroDir[${BEAMS}];
 uniform vec2 uRetroPower[${BEAMS}];
 varying vec3 vRetroWorld;
+varying float vRetroEye;
+
+// (look lane) 1 for a camera that is an eye, 0 for a reflection probe's cube face (90 degrees square, which no view
+// uses): a probe sits right at the car's lamps, so every reflector blazed into it and from there across the paint.
+// Light sent back to the lamp is seen by the driver, not mirrored by his car.
+#define RETRO_EYE_FROM_PROJECTION (abs(abs(projectionMatrix[1][1]) - 1.0) < 1.0e-3 && abs(abs(projectionMatrix[0][0]) - 1.0) < 1.0e-3 ? 0.0 : 1.0)
 
 float retroReturn(vec3 P, vec3 N) {
   vec3 toEye = normalize(cameraPosition - P);
@@ -83,7 +89,7 @@ float retroReturn(vec3 P, vec3 N) {
     float coefficient = 250.0 * exp(-(a / 0.75) * (a / 0.75)) + 40.0 * exp(-a / 2.0);
     sum += E * coefficient * (0.35 + 0.65 * facing);
   }
-  return sum;
+  return sum * vRetroEye;
 }
 `;
 
@@ -95,9 +101,9 @@ float retroReturn(vec3 P, vec3 N) {
  */
 export function retroReflective(material, gain = 1) {
   return extend(material, `retro${gain}`, (shader) => {
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, RETRO_UNIFORMS);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vRetroWorld;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRetroWorld;\nvarying float vRetroEye;')
       .replace(
         '#include <project_vertex>',
         `#include <project_vertex>
@@ -105,7 +111,8 @@ vec4 retroWorld = vec4( transformed, 1.0 );
 #ifdef USE_INSTANCING
   retroWorld = instanceMatrix * retroWorld;
 #endif
-vRetroWorld = ( modelMatrix * retroWorld ).xyz;`,
+vRetroWorld = ( modelMatrix * retroWorld ).xyz;
+vRetroEye = abs( abs( projectionMatrix[ 1 ][ 1 ] ) - 1.0 ) < 1.0e-3 && abs( abs( projectionMatrix[ 0 ][ 0 ] ) - 1.0 ) < 1.0e-3 ? 0.0 : 1.0;`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${RETRO_GLSL}`)
