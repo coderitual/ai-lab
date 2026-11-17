@@ -373,7 +373,7 @@ void carLamp(float lens, float w) {
     met = 0.85; rough = 0.3;
     float wall = smoothstep(0.0, 0.006 + 0.025 * sqrt(1.0 - cosv * cosv) / cosv, inside);
     col *= 0.25 + 0.75 * wall;
-    emit += vec3(1.0, 0.02, 0.01) * (0.35 * carLampsA.w + 1.6 * carLampsB.x) * (0.3 + 0.7 * wall);
+    emit += vec3(1.0, 0.02, 0.01) * (0.35 * carLampsA.w + 0.6 * carLampsB.x) * (0.3 + 0.7 * wall);
     // the light guide between the rows: wide in the outer piece, a slim strip through the inner one
     float x = qg.x;
     float yu = TAIL_UP(x); float yl = TAIL_LOW(x);
@@ -383,7 +383,7 @@ void carLamp(float lens, float w) {
     float guide = carInside(abs(qg.y - c) - hh) * step(0.39, x) * carInside(x - 0.825);
     col = mix(col, vec3(0.3, 0.025, 0.03), guide); met = mix(met, 0.0, guide); rough = mix(rough, 0.5, guide);
     float amber = indicator * step(0.6, x);
-    emit += guide * mix(vec3(1.0, 0.02, 0.01) * (30.0 * carLampsB.x + 0.8 * carLampsA.w), vec3(1.0, 0.4, 0.03) * 34.0, amber);
+    emit += guide * mix(vec3(1.0, 0.02, 0.01) * (20.0 * carLampsB.x + 0.8 * carLampsA.w), vec3(1.0, 0.4, 0.03) * 34.0, amber);
     // the reversing lamp's clear window
     float rev = carInside(carBox(qg.xy, vec2(0.407, 0.858), vec2(0.021, 0.008), 0.003));
     col = mix(col, vec3(0.55), rev); met = mix(met, 0.7, rev); rough = mix(rough, 0.15, rev);
