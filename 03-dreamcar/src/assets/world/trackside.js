@@ -34,7 +34,7 @@ const D3_REACH = 300;
 const D3_OUTSIDE = [0, 10, 6];
 const D3_INSIDE = [0, 6, 5, 10];
 /** The tall run is phased at this many metres before the line (frame D1's camera). */
-const D1_ANCHOR = 200;
+const D1_ANCHOR = 175;
 /** A tyre stack: radius, height (four tyres), spacing along the wall. */
 const TYRE = { r: 0.31, h: 1.0, step: 0.62 };
 /** The distance boards: size, height of the foot over the road. */
