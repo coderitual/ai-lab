@@ -70,7 +70,7 @@ function fft(re, im) {
 }
 
 /**
- * The spectrum of a stretch of a signal (Hann window, zero-padded to a power of two at least `pad` times its length).
+ * The spectrum of a stretch of a signal (Hann window, or Blackman-Harris with `bh`; zero-padded to a power of two at least `pad` times its length).
  * @returns {{ amp: Float64Array, power: Float64Array, df: number }} `amp[k]`: the amplitude a steady sine at that
  *   frequency would have; `power[k]`: mean square per bin, so that summing a band gives that band's mean square
  */

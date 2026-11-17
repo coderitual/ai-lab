@@ -6,9 +6,11 @@
 // rpm / 30 Hz) pushed through a soft saturation: one carries the first few
 // harmonics of the firing, the other the half orders that make an engine
 // growl instead of hum, and how hard they are pushed is the throttle. What
-// comes out goes through filters that do not move with the revs (a body, a
-// formant that opens under load), so the harmonics climb through them and
-// the timbre changes across the rev range as a real one does. The same wave
+// comes out goes through resonances that do not move with the revs (a
+// formant near 650 Hz that opens under load, a rasp near 1.35 kHz that only
+// a working engine at high revs drives) under a low-pass that opens with
+// rpm squared, so the harmonics climb through them, the timbre changes across
+// the rev range and brightness climbs faster than the pitch. The same wave
 // gates a band of noise (the intake), a turbocharger whistles with boost,
 // and a gear change is a cut, a thump and a glide. Tyres, wind, road and
 // contact are bands of one noise source, each with its own law.
@@ -93,7 +95,7 @@ const EDGES = [
 
 /** A sliding tyre: the squeal and a partial above it into gain 0, the rougher band into gain 1. */
 const TYRE_BANDS = [
-  { type: 'bandpass', freq: 1000, q: 16, out: 0 },
+  { type: 'bandpass', freq: 1000, q: 20, out: 0 },
   { type: 'bandpass', freq: 1350, q: 24, out: 0, level: 0.35 },
   { type: 'bandpass', freq: 700, q: 3, out: 1 },
 ];
