@@ -500,7 +500,8 @@ function paintCluster(ctx, rng, px, { colours, shape, size, leaves, wood }) {
     const y = Math.min(0.9, Math.max(0.1, y0 + (y1 - y0) * t + Math.sin(a) * stalk));
     const depth = k / leaves;
     const [h, sat, l] = autumn(colours, lean + rng.range(-0.3, 0.3) + (rng.next() < 0.12 ? rng.range(-0.5, 0.5) : 0), rng);
-    const light = l * (0.68 + 0.36 * depth);
+    // (each leaf its own light: a crown seen from a distance is a fine texture of them)
+    const light = l * (0.42 + 0.66 * depth) * rng.range(0.78, 1.18);
     leaf(ctx, x, y, a, s, hsl(h, sat, light), hsl(h - 4, sat, light * 0.72), hsl(h + 6, sat * 0.8, Math.min(92, light * 1.28)), shape, px);
   }
 }
@@ -664,8 +665,8 @@ export function createFoliageAtlas(tile, rng, anisotropy = 4) {
       }),
     [TILE.LARCH]: (r) => paintLarch(ctx, r, px),
     [TILE.BIRCH]: (r) => paintBirch(ctx, r, px),
-    [TILE.MAPLE]: (r) => paintCluster(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.115, leaves: 190, wood: 'rgb(60,44,36)' }),
-    [TILE.LIME]: (r) => paintCluster(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.085, leaves: 260, wood: 'rgb(56,46,40)' }),
+    [TILE.MAPLE]: (r) => paintCluster(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.085, leaves: 270, wood: 'rgb(60,44,36)' }),
+    [TILE.LIME]: (r) => paintCluster(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.065, leaves: 440, wood: 'rgb(56,46,40)' }),
     [TILE.TWIG]: (r) => paintTwig(ctx, r, px),
     [TILE.MAPLE_MASS]: (r) => paintMass(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.05, leaves: 1500, wood: 'rgb(60,44,36)' }),
     [TILE.LIME_MASS]: (r) => paintMass(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.042, leaves: 1900, wood: 'rgb(56,46,40)' }),
