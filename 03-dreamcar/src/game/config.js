@@ -429,13 +429,16 @@ export const FX = {
 /**
  * The car's reflection probe, per tier: the cube's edge and how it is kept up to date. At speed (`moving`) a few
  * faces are redrawn each `every`-th frame; with the car nearly still (the title's orbit, the grid: below `stillBelow`
- * m/s, back to moving above `movingAbove`) a larger cube is redrawn whole over a few frames (`stillFaces` a frame)
- * so the paint's mirror is crisp where it is looked at closely.
+ * m/s, back to moving above `movingAbove`) a larger cube is redrawn whole over a few frames (`stillFaces` each
+ * `stillEvery`-th frame) so the paint's mirror is crisp where it is looked at closely.
+ * (picture lane) A face costs about as many triangles as the view itself (it sees the whole world round the car):
+ * on medium a face every other frame at speed (the cube is new every 12 frames, 0.2 s at 60 Hz) and two every
+ * third frame standing still kept the frame near its budget (docs/spec.md, "Budgets").
  */
 export const PROBE = {
-  low: { size: 64, faces: 1, every: 2, stillSize: 128, stillFaces: 1 },
-  medium: { size: 128, faces: 1, every: 1, stillSize: 256, stillFaces: 2 },
-  high: { size: 256, faces: 2, every: 1, stillSize: 512, stillFaces: 3 },
+  low: { size: 64, faces: 1, every: 2, stillSize: 128, stillFaces: 1, stillEvery: 2 },
+  medium: { size: 128, faces: 1, every: 2, stillSize: 256, stillFaces: 2, stillEvery: 3 },
+  high: { size: 256, faces: 2, every: 1, stillSize: 512, stillFaces: 3, stillEvery: 1 },
   stillBelow: 1.5,
   movingAbove: 4,
 };

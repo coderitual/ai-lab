@@ -174,7 +174,15 @@ metallic base with flakes; what it mirrors is the car's reflection probe
 (`src/engine/ReflectionProbe.js`): a cube picture of the surroundings round
 the car, a face or two a frame at speed, a larger cube redrawn whole while the
 car is still (the title, the grid), sizes in `PROBE` per tier. The probes
-leave out what would only cost (the start's dressing, the town).
+leave out what would only cost (the start's dressing, the town; on `low`
+also the rails, the guide posts and the lamps' glow, which are less than a
+texel of its 64-texel faces). A face sees the whole world round the car and
+costs about as many triangles as the view, so on `medium` one face is
+redrawn every other frame at speed and two every third frame standing still
+(`PROBE.every`, `stillEvery`). What is big and far is drawn for the probes by
+a cheaper stand-in on `PROBE_LAYER`, a layer only the probes' cameras have:
+the massif's grid on every other column and row (a quarter of its triangles);
+the full grid sets its draw range to nothing for a probe's camera.
 
 ## The trees
 
@@ -327,6 +335,31 @@ vignette, a filmic tone curve, saturation, split toning, lift, sRGB, grain and
 dither. On low the blur is done inside the final pass and FXAA replaces the
 multisampling. Every pattern (blur jitter, AO rotation, dither) is a function
 of the pixel, grain of the run's own clock.
+
+## What each pass draws (the budget)
+
+`__dreamcar.stats()` counts the draw calls and triangles of a whole frame:
+the scene, the sun's shadow map, the car's probe faces and the wet road's
+mirror together, so each of those passes is a share of one budget (spec.md,
+"Quality tiers and budgets"). What kept those passes expensive was not the
+detail of things but three.js's culling, which tests one sphere per mesh: a
+row of posts, a rail or a strip of glow that runs round the whole lap in one
+mesh is inside every camera's frustum, so every pass drew all of it. After
+the world is built, `chunk` (`src/engine/chunks.js`) cuts every mesh under
+the structures, the kerbs and the rock whose sphere is wider than 300 m into
+pieces by a 400 m grid on the ground: children of the original that share its
+vertex buffers (plain meshes get an index of their own, instanced ones their
+cell's matrices and colours) and carry its material, shadows and layers. The
+original stays in place, taken off every layer, so lists that hide it (the
+mirror's, the probes') still work. Smaller cells cull more but cost draw
+calls, of which `low` has 150.
+
+Other passes leave out what cannot show in them: the mirror the lamps' glow
+(it lies on the road, which the mirror leaves out), the skid marks draw only
+the slots some wheel has used (none on a clean run), and the glow under the
+lamps is a coarse grid (5 columns, a row every 5 m: the light itself is
+worked out per pixel), one mesh per kind of lamp, hidden while that kind is
+off (the street lamps by day).
 
 ## Determinism
 

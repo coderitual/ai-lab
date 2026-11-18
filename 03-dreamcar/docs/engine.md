@@ -18,6 +18,7 @@ src/engine/            reusable; knows nothing about cars or roads
   FramePipeline.js     everything from the scene target to the canvas (this document)
   ReflectionProbe.js   a cube picture round one point, a face or two a frame
   PlanarMirror.js      a flat mirror in any plane (the wet road's)
+  chunks.js            cuts meshes that run the length of the scene into pieces three.js can cull (techniques.md, "the budget")
   rng.js math.js noise.js Input.js Audio.js
 tools/frametest.cjs    the tone curve's numbers; frame times and frame pairs of any page (see below)
 tools/shot.cjs         one screenshot of any URL
@@ -320,7 +321,10 @@ level from roughness: `level = log2(1.65 r² size)`, clamped. The mips are plain
 must carry `targetDefines(caps)` so the 8-bit fallback's encoding is undone.
 
 The probe redraws `faces` of its six faces per update, round and round; the
-first update after construction or `reset()` draws all six. Its cameras skip
+first update after construction or `reset()` draws all six. Its cameras see
+layer 0 and `PROBE_LAYER` (30), which no other camera has: a cheaper stand-in
+for something big lives on that layer alone, and the full thing draws nothing
+when `camera.layers.isEnabled(PROBE_LAYER)` (the massif does this). Its cameras skip
 what the caller hides (the car itself, effects) and the shadow maps are not
 drawn again for it.
 

@@ -57,9 +57,11 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng }
   return {
     group,
     /** What the cars' reflection probes leave out. */
-    probeHidden: dressing.probeHidden,
-    /** What the wet road's mirror leaves out. */
-    mirrorHidden: dressing.mirrorHidden,
+    // (picture lane) on the low tier a probe's face is 64 texels across 90 degrees: posts, rails and the glow under
+    // the lamps are less than a texel in it, and each cost a draw call
+    probeHidden: tier === 'low' ? [...dressing.probeHidden, rails.group, posts.group, ...lamps.glows] : dressing.probeHidden,
+    /** What the wet road's mirror leaves out (the lamps' glow lies on the road, which the mirror leaves out too). */
+    mirrorHidden: [...dressing.mirrorHidden, ...lamps.glows],
     stats: { ms, lamps: lamps.stats, rails: rails.stats, walls: walls.stats, posts: posts.stats, viaducts: viaducts.stats, dressing: dressing.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {

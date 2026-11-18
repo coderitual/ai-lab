@@ -41,6 +41,7 @@ import { createGroundCover } from './groundCover.js';
 import { selectBake } from './shading.js';
 import { createSky } from './sky.js';
 import { SHADOW, createSun } from './sun.js';
+import { chunk } from '../../engine/chunks.js';
 import { createRoad } from './road.js';
 import { createRockFaces } from './rock.js';
 import { keepOut as startKeepOut } from './startPlan.js';
@@ -154,6 +155,10 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   const studs = createStuds({ track, caps });
   lap('studs');
 
+  // (picture lane) whatever runs the length of the lap in one mesh (rails, posts, kerbs, the lamps' glow) is cut
+  // into 400 m pieces, so that each pass draws only the pieces it can see (engine/chunks.js). Smaller pieces cull
+  // more triangles but cost more draw calls: the low tier has 150 of those.
+  const chunked = [structures.group, kerbs.mesh, rock.group].map((root) => chunk(root, { cell: 400, minRadius: 300 }));
   scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
@@ -197,7 +202,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     /** The trees (forest.js): where they stand (woodAt, turnedAt), single trees for the viewer (specimen). */
     forest,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
+    stats: { ms, chunked, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
 
     setTime(name) {
       const time = TIMES[name];

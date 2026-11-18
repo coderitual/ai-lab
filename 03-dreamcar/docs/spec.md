@@ -26,7 +26,7 @@ cameras, the HUD's map, the sound) asks the Track.
 | height | 0 to 108.2 m above the line, top at s = 3111 m; the lake 1.8 m under the line |
 | gradient | -8.0 to +6.0 per cent |
 | tightest radius | 55 m (the carousel); 11 bends |
-| banking | by rule 9° x tanh(250 m / R), or the piece's own; at most 10° (the sky road, the first ledge bend) |
+| banking | by rule 9° x tanh(250 m / R), or the piece's own; at most 10° (the sky road) |
 | crest | vertical radius 453 m at s = 3132 m; the compression 1116 m at s = 3333 m; everywhere else at least 1207 m |
 | closest approach of two stretches | 85.6 m apart (63.2 m between barriers, 22.9 m of height): the climb and the crest beside the carousel |
 
@@ -46,7 +46,7 @@ run of `tools/handling.mjs`.
 | `carousel` | The carousel | 2582 to 2915 | 150 m climb at 6 %, then right R 55 through 190°, banked 8° | 90 to 229 |
 | `crest` | The crest | 2915 to 3115 | 200 m straight over the top | 108 to 161 |
 | `plunge` | The plunge | 3115 to 3394 | right R 400 through 40°, banked 5°, 8 % down into the compression | 161 to 215 |
-| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 10°; low walls both sides, the valley open inside, a wooded bank outside), right R 350 20° (6°, rock on the inside) | 216 to 257 |
+| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 7°; low walls both sides, the valley open inside, a wooded bank outside), right R 350 20° (6°, rock on the inside) | 216 to 257 |
 | `gully` | Gully bridge | 3778 to 4115 (337 m) | straight on piers, ground 26 m under the middle, 8 % down | 257 to 282 |
 | `sweepback` | The long right | 4115 to 4686 | 100 m straight, then right R 300 through 90°, banked 9° | 234 to 283 |
 
@@ -112,36 +112,36 @@ set (in brackets in the tool's output) are met.
 
 | | |
 | --- | --- |
-| 0 to 100 km/h | 3.89 s |
-| 0 to 200 km/h | 12.1 s |
-| standing 400 m | 11.81 s at 198 km/h |
-| up-shifts at full throttle | 53, 86, 124, 170 km/h (2nd to 5th) |
-| top speed | 283.9 km/h in 8th (limited); 324.7 km/h without the limiter |
-| 100 to 0 km/h | 27.8 m in 2.11 s (mean 1.42 g); locked, without ABS, 32.5 m |
-| 200 to 0 km/h | 105.6 m in 3.97 s |
+| 0 to 100 km/h | 3.67 s |
+| 0 to 200 km/h | 11.7 s |
+| standing 400 m | 11.62 s at 200 km/h |
+| up-shifts at full throttle | 50, 84, 122, 167 km/h (2nd to 5th) |
+| top speed | 283.9 km/h in 8th (limited); 324.8 km/h without the limiter |
+| 100 to 0 km/h | 27.7 m in 2.12 s (mean 1.42 g); locked, without ABS, 32.5 m |
+| 200 to 0 km/h | 105.6 m in 3.98 s |
 | steady cornering, 50 m circle | 1.26 g at 90 km/h; understeer 0.92° per g; roll 3.47° per g |
-| key held through a long bend | 1.26 g at 110, 1.27 g at 140, 1.31 g at 200 km/h |
-| step steer, 2° at 100 km/h | 0.67 g; yaw rate 90 % in 0.11 s, overshoot 2 % |
-| tyres squeal from | 84 % of the most grip at 60 km/h, 87 % at 110 km/h |
-| full key lock for 3 s, throttle held | 4.4° of slip at 150, 3.8° at 200, 3.0° at 250, 2.9° at 280 km/h: never spins |
+| key held through a long bend | 1.26 g at 110, 1.27 g at 140, 1.29 g at 200 km/h |
+| step steer, 2° at 100 km/h | 0.62 g; yaw rate 90 % in 0.12 s, overshoot 0 % |
+| tyres squeal from | 85 % of the most grip at 60 km/h, 89 % at 110 km/h |
+| full key lock for 3 s, throttle held | 1.3° of slip at 150, 0.9° at 200, 1.5° at 250, 1.7° at 280 km/h: never spins |
 | full throttle in 2nd at 0.65 g | assists on: 2.8° of slip; assists off: spins |
-| rail touched at 10° / 100 km/h, 5° / 200, 8° / 250 | keeps 93 %, 96 %, 92 % of the speed, along the rail in 0.02 to 0.10 s |
-| rail hit at 45°, 80 km/h | keeps 53 % |
+| rail touched at 10° / 100 km/h, 5° / 200, 8° / 250 | keeps 93 %, 96 %, 94 % of the speed, along the rail in 0.02 to 0.10 s |
+| rail hit at 45°, 80 km/h | keeps 56 % |
 | ride | 1.30 / 1.51 Hz, damping 0.47 (bump 0.35, rebound 0.58) |
-| key steering lock | 33.2° at 20, 20.4° at 40, 6.6° at 100, 4.0° at 200 km/h |
-| a key held at 80 km/h | 90 % of the yaw rate in 0.33 s, under 10 % 0.33 s after release |
+| key steering lock | 33.2° at 20, 20.4° at 40, 7.2° at 100, 6.7° at 200 km/h |
+| a key held at 80 km/h | 90 % of the yaw rate in 0.22 s, under 10 % 0.26 s after release |
 
 Laps of the real road (flying laps, Node, no drawing):
 
 | driver | lap | notes |
 | --- | --- | --- |
-| autopilot, pace 1.0 | 85.1 s (217 km/h mean) | 0 impacts, stability control 4.5 s a lap |
-| autopilot, pace 0.9 (`?ap`) | 92.9 s | 0 impacts |
-| autopilot, pace 0.7 | 117.1 s | 0 impacts |
-| one thumb (full throttle unless braking) | 84.7 s | 0 impacts |
-| pad (analog) | 85.1 s | 0 impacts |
-| keys | 85.6 s | 0 impacts, stability control 20.8 s a lap |
-| ham-fisted keys (flat out, full keys, slow hands) | 90.5 s | 0 impacts, body 0.38 m onto the kerb at worst |
+| autopilot, pace 1.0 | 85.0 s (218 km/h mean) | 0 impacts, stability control 4.3 s a lap |
+| autopilot, pace 0.9 (`?ap`) | 93.1 s | 0 impacts |
+| autopilot, pace 0.7 | 117.4 s | 0 impacts |
+| one thumb (full throttle unless braking) | 84.5 s | 0 impacts |
+| pad (analog) | 85.0 s | 0 impacts |
+| keys | 85.0 s | 0 impacts, stability control 6.8 s a lap |
+| ham-fisted keys (flat out, full keys, slow hands) | 85.4 s | 0 impacts, body 0.14 m beyond the pavement at worst |
 
 ### Assists
 
@@ -329,7 +329,7 @@ pass with their sizes. In short:
 | bloom levels | 4 | 5 | 6 |
 | lens (flare source, ghosts, glare, star) | no | yes | yes |
 | ambient occlusion | no | 8 samples, half size | 14 samples |
-| car's probe at speed / standing | 64 / 128 per face, a face every 2nd frame | 128 / 256 | 256 / 512, 2 faces a frame |
+| car's probe at speed / standing | 64 / 128 per face, a face every 2nd frame (standing too) | 128 / 256; a face every 2nd frame, standing 2 every 3rd | 256 / 512, 2 faces a frame, standing 3 |
 | wet road mirror | none | 0.35 of the view's height, to 220 m | 0.5, to 320 m |
 | forest: full / reduced / impostor trees to | 0 / 60 / 650 m | 34 / 95 / 900 m | 50 / 130 / 1200 m |
 | effects: skid quads / soft particles / sparks | 800 / 192 / 48 | 1500 / 320 / 96 | 2000 / 400 / 128 |
@@ -347,20 +347,29 @@ other desktop GPUs `high`. The choice is stored and applied by reloading.
 Budgets set by the rework for a chase frame: low 150 draw calls and 250 k
 triangles, medium 300 and 600 k, high 500 and 1.2 M.
 
-Measured (software WebGL, by the lanes, with `__dreamcar.stats()`):
+Measured (picture lane, 2026-11-18): a whole chase frame at phone shape
+(393x852 at device scale 2), autopilot run by day, the triangles of every pass
+of the frame (scene, sun's shadow map, probe faces, and by night the wet
+road's mirror) averaged over 6 frames, before and after the budget work
+(chunked rails, posts, kerbs and glow; the probe's cadence and stand-in
+massif; the glow's coarser grid; skid marks drawn only where laid):
 
-- whole frame, low, merged head of the rework: 432 k triangles, 173 draw calls
-  (ENV lane) — **over the low budget**; of it the forest 54 k, the far
-  mountains 39 k, lamps 46 k, the car 44 k, the ghost 25 k;
-- the forest, chase view in the green wood: low 10 calls / 61 k, medium
-  19 / 294 k, high 20 / 540 k (TREES lane);
-- the start's dressing (delta of hiding it, probe off): low 27 / 11 k, medium
-  25 / 40 k by dusk and 39 / 52 k by night, high 34 / 55 k and 48 / 67 k
-  (START lane);
-- the road mirror: about 48 draw calls and 9 to 13 ms of CPU (LOOK lane,
-  viewer, 960x540);
-- ambient occlusion: 36 ms on medium, 45 ms on high on software WebGL
-  (ENGINE lane).
+| place (time in the run) | low before | low after | medium before | medium after | medium, night, after |
+| --- | --- | --- | --- | --- | --- |
+| grid (t = 0, standing) | 467 k | 253 k | 2.07 M | 861 k | 1.05 M |
+| esses, before the tunnel (t = 33) | 479 k | 328 k | 1.83 M | 1.04 M | 1.31 M |
+| sky road (t = 45) | 420 k | 254 k | 1.49 M | 666 k | 838 k |
+| ledge bend (t = 79) | 480 k | 323 k | 1.73 M | 929 k | 1.17 M |
+
+Draw calls after: low 168 to 230, medium 197 to 279 (by night 265 to 375).
+**Still over budget**: low by up to 30 %, medium by up to 75 %. What is left
+on medium: the scene's own triangles, 420 to 780 k (the nearest trees at full
+detail, up to 185 k among the conifers of the esses; the terrain 60 to 130 k;
+the massif 92 k; the car 85 k with its wheels), the shadow map 140 to 190 k
+(the car 58 k, the terrain 60 k), the probe 100 to 160 k, the mirror 170 to
+245 k (the car again 85 k). How it was measured: `renderer.renderBufferDirect`
+wrapped in the page, labelled by the pass being drawn (techniques.md, "What
+each pass draws").
 
 None of these was measured on a real GPU or phone.
 

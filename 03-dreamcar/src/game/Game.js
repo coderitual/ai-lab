@@ -1166,7 +1166,7 @@ export class Game {
           view.frame.probe = view.probe.texture;
         }
       }
-      const probeEvery = view.still ? 1 : table.every;
+      const probeEvery = view.still ? (table.stillEvery ?? 1) : table.every;
       const probeFaces = view.still ? table.stillFaces : table.faces;
       if (view.probe && this.engine.frame % (probeEvery * n) === i * probeEvery) {
         probeAt.copy(car.box.center).applyMatrix4(car.object.matrixWorld);
