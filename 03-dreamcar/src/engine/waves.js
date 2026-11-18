@@ -54,6 +54,13 @@ export const WAVES = [
  * chop as patches of rough and calm water. The same factor moves the mesh, shades the normals and answers sampleWaves.
  */
 export const GROUPS = { amp: 0.65, len: 7.5, turn: 65 };
+/**
+ * (sea lane, round 2: the owner's "sea side with BIG waves") Where the swell runs big: round a place the caller
+ * names (`setBoost`: x, z, radius), the swell's waves (the first SWELLS, not the chop) are `gain` times higher at its
+ * middle, easing to their own height from `inner` of the radius out. One factor for the mesh, the normals, the foam
+ * and sampleWaves.
+ */
+export const BOOST = { gain: 1.5, inner: 0.35 };
 /** How many of WAVES are the swell (foam behind crests looks back over these). */
 export const SWELLS = 3;
 /** Rough crest-to-trough range of the open sea (m), for shading by height. */
@@ -80,6 +87,13 @@ const BUILT = WAVES.map((w, i) => {
 });
 /** A wave's group factor at (x, z) (GROUPS). */
 const groupOf = (w, x, z) => 1 + GROUPS.amp * Math.cos(w.gx * x + w.gz * z + w.gp);
+/** The swell's boost at (x, z) round `place` ({ x, z, r } or null) (BOOST). */
+export function boostAt(x, z, place) {
+  if (!place) return 1;
+  const d = Math.hypot(x - place.x, z - place.z) / place.r;
+  const t = Math.min(1, Math.max(0, (d - BOOST.inner) / (1 - BOOST.inner)));
+  return 1 + BOOST.gain * (1 - t * t * (3 - 2 * t));
+}
 
 /**
  * @typedef {object} WaveField
@@ -110,6 +124,8 @@ export function createWaveField({ count = WAVES.length, segments = 0 } = {}) {
     uWaveC: { value: new Float32Array(n).fill(1e5) },
     // the group's wave vector (x, z) and phase, and its depth (GROUPS)
     uWaveG: { value: waves.map((w) => [w.gx, w.gz, w.gp, GROUPS.amp]).flat() },
+    // where the swell runs big (x, z, radius; radius 0: nowhere) (BOOST)
+    uWaveBoost: { value: [0, 0, 0, BOOST.gain] },
     uWaveTime: { value: 0 },
   };
   const glsl = /* glsl */ `
@@ -121,10 +137,17 @@ uniform float uWaveC[WAVE_COUNT];  // how far out it draws in the normals
 uniform vec4 uWaveG[WAVE_COUNT];   // its group: wave vector (x, z), phase, depth
 uniform float uWaveTime;
 
-// how high a wave runs at p: its sets and lulls (GROUPS)
+uniform vec4 uWaveBoost;          // where the swell runs big: x, z, radius, gain (BOOST)
+
+// how high a wave runs at p: its sets and lulls (GROUPS), and the swell's boost (BOOST)
 float waveGroup( int i, vec2 p ) {
   vec4 g = uWaveG[ i ];
-  return 1.0 + g.w * cos( dot( g.xy, p ) + g.z );
+  float f = 1.0 + g.w * cos( dot( g.xy, p ) + g.z );
+  if ( i < SWELL_COUNT && uWaveBoost.z > 0.0 ) {
+    float d = length( p - uWaveBoost.xy ) / uWaveBoost.z;
+    f *= 1.0 + uWaveBoost.w * ( 1.0 - smoothstep( ${BOOST.inner.toFixed(2)}, 1.0, d ) );
+  }
+  return f;
 }
 
 // Where the undisplaced surface point p is moved to, dist metres from the eye: waves too short for the mesh there
@@ -195,6 +218,13 @@ float swellCrest( vec2 p, float ampScale, float lag, float steepen ) {
     uniforms,
     glsl,
     count: n,
+    /** Where the swell runs big ({ x, z, r }, or null: nowhere) (BOOST). */
+    setBoost(place) {
+      const b = uniforms.uWaveBoost.value;
+      b[0] = place?.x ?? 0;
+      b[1] = place?.z ?? 0;
+      b[2] = place?.r ?? 0;
+    },
     update(time, eyeHeight) {
       uniforms.uWaveTime.value = time;
       // (01's rule) a wave of length L stops showing at about sqrt(570 h L) m from an eye h m above it
@@ -212,8 +242,9 @@ float swellCrest( vec2 p, float ampScale, float lag, float steepen ) {
  * @param {number} x @param {number} z @param {number} t
  * @param {{ y: number, nx: number, ny: number, nz: number, vy: number }} out
  * @param {number} [count]
+ * @param {{ x: number, z: number, r: number } | null} [place] where the swell runs big (BOOST), as the shader's
  */
-export function sampleWaves(x, z, t, out, count = SWELLS + 4) {
+export function sampleWaves(x, z, t, out, count = SWELLS + 4, place = null) {
   const n = Math.min(count, BUILT.length);
   let px = x;
   let pz = z;
@@ -222,7 +253,7 @@ export function sampleWaves(x, z, t, out, count = SWELLS + 4) {
     let oz = 0;
     for (let i = 0; i < n; i++) {
       const w = BUILT[i];
-      const c = Math.cos(w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase) * groupOf(w, px, pz);
+      const c = Math.cos(w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase) * groupOf(w, px, pz) * (i < SWELLS ? boostAt(px, pz, place) : 1);
       ox += w.dx * w.hAmp * c;
       oz += w.dz * w.hAmp * c;
     }
@@ -237,7 +268,7 @@ export function sampleWaves(x, z, t, out, count = SWELLS + 4) {
   for (let i = 0; i < n; i++) {
     const w = BUILT[i];
     const th = w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase;
-    const g = groupOf(w, px, pz);
+    const g = groupOf(w, px, pz) * (i < SWELLS ? boostAt(px, pz, place) : 1);
     const s = Math.sin(th) * g;
     const c = Math.cos(th) * g;
     y += w.amp * s;

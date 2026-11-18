@@ -456,6 +456,16 @@ Track's point at the piece's middle, `r` to its inside) down the tongue
 between its legs, added after the two legs' grounds are blended, so both
 legs see the same hill, and only beyond the cut's top.
 
+**The low crossing and the big waves** (round 2). The causeway is the same
+cliff function with other numbers (a 2.5 m lip, a bank 0.6 down per metre),
+applied to both sides of a stretch of `back` (`seaSide`: on the inside it
+fades out beyond the lagoon's width, so the land comes back), and on the
+lagoon side the seabed stops at 9 m. The big swell is a factor on the swell's
+amplitudes only, a smoothstep bump round one place (`BOOST`, set by
+`waves.setBoost` from `terrain.sea.surf`): in the shader it multiplies the
+same `waveGroup` factor that the sets and lulls use, so the mesh, the normals,
+the Jacobian foam and `sampleWaves` all see one surface.
+
 **Per-piece road markings** (round 2, road.js `PIECE_MARKS`). A scheme per
 piece id, each scheme one channel of a per-metre RGBA texture (`uMarks`,
 sampled at s / length like the edge texture), eased over 6 m at its ends.

@@ -539,13 +539,42 @@ comes from behind the camera's left and lights the face.
   down into the sea (1.6 to 2.6 m down per metre out, rounded at its top, a
   talus at its foot 7 m under the water), so that open water lies some 40
   to 60 m beyond the solid edge and 85 to 110 m below the road. The land
-  side is cut 11 m deep (the coast's rust face), and inside the carousel the
-  spur rises as a hill up to about 22 m over the road beyond the cut, along
-  a ridge 230 m down the tongue between the climb and the crest. Nothing
-  grows tall either side of the coast road: dry olive grass and scrub.
+  side is cut 4 m deep (the coast's rust face) and rises gently beyond it
+  (at most 0.25 per metre), and the spur between the climb and the crest
+  rises as a hill up to about 22 m over the road, along a ridge from 80 to
+  230 m down the tongue from the hairpin's centre, set towards the climb.
+  It is low round the hairpin itself, on purpose: the day's sun stands on
+  that side 16 degrees up, and with an 11 m cut and the rock preset's steep
+  hillside (round 2's first tries) the whole of E1's road and apron lay in
+  its shade; now the shade covers the inside of the road at the bend's
+  exit, as the frame's does. Nothing grows tall either side of the coast
+  road: dry olive grass and scrub.
 - **The sky road over the sea** (round 2): the deck crosses an inlet; the
   ground under its middle is 96 m down (`drop`), under the water, so its
   piers stand in the sea.
+- **The low crossing and the big waves** (round 2; the owner: "after the
+  tunnel it would be nice to see some sea side with BIG waves. Maybe some
+  river that will be super nice to cross ... we will be very close to it").
+  Between the tunnel and the gully the road is 60 to 108 m up and already
+  climbs and falls at 7.5 to 8 per cent: no piece can come down to the water
+  there without breaking the course's limits (the gradient, the top on the
+  crest 100 to 130 m over the lake). The first place after the tunnel where
+  the road comes down to the sea is the long right before the straight
+  (`back`), from half way round it to near its end: 170 m with the road 2
+  to 14 m over the water. There the land either side falls away (terrain.js
+  `CAUSEWAY`): the road runs on a causeway, a lip of 2.5 m beyond each rail
+  and a rubble bank into the water, across the mouth of a lagoon on the
+  inside of the bend (120 m wide, 9 m deep at most) with the bay on the
+  outside. The rails are the open steel rails the corridor already had; the
+  course is untouched. Off the outer side the swell runs big (waves.js
+  `BOOST`): its three long waves 2.5 times their height at the middle of a
+  circle of 360 m, so that sets of rollers about 3 to 5 m from crest to
+  trough come in beside the road and bunch up into foam behind their crests;
+  the same factor moves the mesh (medium, high), shades the normals (low)
+  and answers `sampleWaves`. It stops short of the straight, whose bay
+  frames D1 and D4 look over. `?photo=waves` stands low on the causeway on
+  the bay side. Left out: spray thrown up against the bank, and breakers
+  that curl over (the waves bunch and foam; they do not break as a lip).
 - **The coast road** (`coastDown`, `coastRun`, `coastTop` in trackLayout.js:
   the climb, the carousel, the crest and the plunge): on the sea side the
   steel rail stands on white posts and nothing grows that would hide the

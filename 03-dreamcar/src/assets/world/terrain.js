@@ -95,20 +95,34 @@ const SEA = {
  * land does not slope away to a shore far off: beyond the barrier a lip of dry grass `lip` m wide (it wanders), then
  * a cliff straight down into the sea, `steep` m down per m out (it wanders), rounded at its top and with a talus at
  * its foot, `below` m under the water's level; the seabed shelves away beyond it (SEA.shelf, SEA.deep). `ease`: metres
- * over which a side becomes coast. On the land side, the cut face is `cut` m high (the coast's ochre and rust rock),
- * and inside the carousel's hairpin (`knoll.piece`, the bend frame E1 looks at) the headland rises `knoll.rise` m
- * over the road beyond the cut, along a ridge `knoll.along` m long from the bend's centre down the tongue between its
- * legs, `knoll.across` m to either side of it, moved `knoll.shift` of the way towards the hairpin's entry leg (the
- * climb): the day's sun (16 degrees up, due east) comes from that side, and a hill close to the crest would lay its
- * shadow over the whole of the bend's exit, where frame E1 has the road and the apron in the sun.
- * (round 2: the cut was 11 m; a face that high, facing west, shaded the hairpin's road from the low eastern sun)
+ * over which a side becomes coast. On the land side, the cut face is `cut` m high (the coast's ochre and rust rock)
+ * and the hillside beyond it rises at most `landFar` per metre; inside the carousel's hairpin (`knoll.piece`, the
+ * bend frame E1 looks at) the headland rises `knoll.rise` m over the road beyond the cut, along a ridge down the
+ * tongue between its legs (from nothing at the bend's centre to its full height a third of the way along, gone by
+ * `knoll.along` m), `knoll.across` m to either side of it, moved `knoll.shift` of the way towards the hairpin's entry
+ * leg (the climb). The day's sun (16 degrees up, due east) comes from that side: round 2's first tries (an 11 m cut,
+ * the rock preset's steep hillside, the hill's top by the bend) put the whole of the bend's exit in their shade,
+ * where frame E1 has the road and the apron in the sun and the shade only over the inside of the road.
  */
+/**
+ * (sea lane, round 2: the owner's "sea side with big waves ... some river that will be super nice to cross") THE LOW
+ * CROSSING. The first place after the tunnel where the road comes down to the water is the long right before the
+ * straight (`piece`, from `from` to `to` of it: the road 12 m down to 0.4 m over the line, 14 to 2 m over the
+ * water); there the land either side falls away into the sea, so the road runs on a causeway across the mouth of a
+ * lagoon: beyond each rail a lip of `lip` m, then a rubble bank `steep` m down per m out to `below` m under the water;
+ * on the inside of the bend the lagoon is `lagoon` m wide (and `floor` m deep at most) before the land comes back over
+ * 60 m, on the outside it is the bay. `surf`: where the swell runs big (waves.js BOOST), round a point `out` m to the
+ * left of the piece's centre line `at` of the way along it, `r` m across: the crossing's outer side, short of the
+ * straight (frames D1 and D4 look over the bay further east). The course is untouched (what lies inside the solid edges is the Track's).
+ */
+const CAUSEWAY = { piece: 'back', from: 0.5, to: 0.93, ease: 50, lip: 2.5, steep: 0.6, below: 5, lagoon: 120, floor: 9, surf: { at: 0.75, out: 70, r: 360 } };
 const COAST = {
   lip: [1.5, 4],
   steep: [1.6, 2.6],
   below: 7,
   ease: 30,
-  cut: 6,
+  cut: 4,
+  landFar: 0.25,
   knoll: { piece: 'carousel', rise: 22, along: 230, across: 40, shift: 0.8 },
 };
 
@@ -142,6 +156,8 @@ const COAST = {
  *   texel over a square `extent` m a side from (x0, z0), x along a row: r the water's depth (sqrt of depth / 64 m),
  *   g how far the land is from the water (0 at its edge, 1 at 500 m and more), b how far the water is from the land
  *   (0 at the shore, 1 at 160 m and more), a the sea's share (at)
+ * @property {Array<{ x: number, z: number, r: number, h: number }>} stacks the sea stacks
+ * @property {{ x: number, z: number, r: number } | null} surf where the swell runs big (off the low crossing)
  */
 
 /**
@@ -207,6 +223,32 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   };
   const coastL = coastWeight(track.coastL);
   const coastR = coastWeight(track.coastR);
+  // (sea lane, round 2) the low crossing (CAUSEWAY): both sides, per sample
+  const lowW = (() => {
+    const flags = new Uint8Array(n);
+    let s0 = 0;
+    for (const seg of track.layout?.segments ?? []) {
+      const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
+      if (seg.id === CAUSEWAY.piece) {
+        for (let d = len * CAUSEWAY.from; d <= len * CAUSEWAY.to; d += ds) flags[Math.round(wrap(s0 + d) / ds) % n] = 1;
+      }
+      s0 += len;
+    }
+    const half = Math.round(CAUSEWAY.ease / 2 / ds);
+    const out = new Float32Array(n);
+    let sum = 0;
+    for (let k = -half; k <= half; k++) sum += flags[(k + n) % n];
+    for (let i = 0; i < n; i++) {
+      out[i] = smoothstep(0, 1, sum / (2 * half + 1));
+      sum += flags[(i + half + 1) % n] - flags[(i - half + n) % n];
+    }
+    return out;
+  })();
+  /** (sea lane, round 2) 0..1 how much the ground d m beyond the solid edge of a side at s is the sea's cliff or bank. */
+  const seaSide = (s, side, d) => {
+    const lagoon = side < 0 ? 1 - smoothstep(CAUSEWAY.lagoon, CAUSEWAY.lagoon + 60, d) : 1;
+    return Math.max(read(side > 0 ? coastL : coastR, s), read(lowW, s) * lagoon);
+  };
   const cliffL = cliffOf(rockL, track.farSlopeL);
   const cliffR = cliffOf(rockR, track.farSlopeR);
   // (sea lane, round 2) the land side of the coast road is cut deeper: the rust face of frame E1
@@ -280,17 +322,23 @@ const FOOT = 0.8;
    * (sea lane, round 2) The coast road's cliff (COAST) at d m beyond the solid edge of a sea side at s, from the
    * ground at the edge (`top`): the lip, the face, the talus under the water and the seabed beyond.
    */
-  const coastCliff = (s, d, top) => {
+  const coastCliff = (s, d, top, side = 1) => {
+    const low = read(lowW, s);
     const lip = COAST.lip[0] + (COAST.lip[1] - COAST.lip[0]) * noise.fbm(s / 70 + 3.1, 8.3, 2);
     const steep = COAST.steep[0] + (COAST.steep[1] - COAST.steep[0]) * noise.fbm(s / 45 - 6.2, 2.9, 3);
-    const foot = lakeLevel - COAST.below;
+    // (the low crossing's bank, CAUSEWAY)
+    if (low > 0) return coastBank(s, d, top, lip + (CAUSEWAY.lip - lip) * low, steep + (CAUSEWAY.steep - steep) * low, COAST.below + (CAUSEWAY.below - COAST.below) * low, side < 0 ? low : 0);
+    return coastBank(s, d, top, lip, steep, COAST.below, 0);
+  };
+  const coastBank = (s, d, top, lip, steep, below, shallow) => {
+    const foot = lakeLevel - below;
     const drop = Math.max(1, top - foot);
     const run = drop / steep;
     const lipY = top - 0.06 * Math.min(d, lip);
     if (d <= lip) return lipY;
     const t = (d - lip) / run;
     if (t < 1) return lipY - (lipY - foot) * smoothstep(0, 1, t);
-    return Math.max(lakeLevel - SEA.deep, foot - SEA.shelf * (d - lip - run));
+    return Math.max(lakeLevel - SEA.deep + (SEA.deep - CAUSEWAY.floor) * shallow, foot - SEA.shelf * (d - lip - run));
   };
   /** (sea lane, round 2) The headland inside the carousel (COAST.knoll): its rise over the road at a point. */
   const knollAt = (() => {
@@ -311,8 +359,9 @@ const FOOT = 0.8;
           const v = (x - c.x) * az - (z - c.z) * ax - v0;
           const back = Math.max(0, -u);
           const off = Math.hypot(v, back);
-          // highest a little down the tongue from the bend's centre, falling away along it and to its sides
-          const crest = smoothstep(along, along * 0.25, u) * smoothstep(-across, 0, u);
+          // highest down the tongue from the bend's centre, falling away along it and to its sides; low round the
+          // hairpin itself, whose exit would otherwise lie in its shade (the day's sun is on that side, 16 degrees up)
+          const crest = smoothstep(along, along * 0.45, u) * smoothstep(0, along * 0.35, u);
           const wobble = 0.85 + 0.3 * noise.fbm(x / 40 + 2, z / 40 - 5, 3);
           return rise * crest * wobble * smoothstep(across, across * 0.15, off);
         };
@@ -416,10 +465,12 @@ const FOOT = 0.8;
           const sea = seaSector(x, z);
           if (sea > 0) v += (coastAt(x, z, base, d, zoneOf(spot.s) === 2 && longBridge(spot.s)) - v) * sea;
           if ((sea > 0.5 && d > shoreAt(x, z) + 30) || lakeE(x, z) < 0.8) seaSeed[j * mx + i] = 1;
-          const cw = read(side > 0 ? coastL : coastR, spot.s);
+        }
+        {
+          const cw = seaSide(spot.s, side, d);
           if (cw > 0 && d > 0) {
             coastCell[j * mx + i] = cw;
-            coastCellY[j * mx + i] = coastCliff(spot.s, d, base);
+            coastCellY[j * mx + i] = coastCliff(spot.s, d, base, side);
             if (cw > 0.5 && coastCellY[j * mx + i] < lakeLevel - 2) seaSeed[j * mx + i] = 1;
           }
         }
@@ -581,12 +632,15 @@ const FOOT = 0.8;
         y += c.height * smoothstep(0, 1, (d - foot) / (LEAN * c.height));
         beyond = Math.max(0, d - c.top);
       }
-      const far = read(side > 0 ? track.farSlopeL : track.farSlopeR, s);
+      let far = read(side > 0 ? track.farSlopeL : track.farSlopeR, s);
+      // (sea lane, round 2) the land side of the coast road rises gently beyond its cut (the hill is COAST.knoll's):
+      // the rock preset's steep hillside put the carousel's exit in its shade under the low eastern sun (frame E1)
+      far = Math.min(far, far + (COAST.landFar - far) * read(side > 0 ? coastR : coastL, s));
       const top = y;
       y += far * 40 * (1 - Math.exp(-beyond / 40));
       // (sea lane, round 2) the sea side of the coast road: a lip, then the cliff into the sea
-      const sea = read(side > 0 ? coastL : coastR, s);
-      if (sea > 0) y += (coastCliff(s, d, top) - y) * sea;
+      const sea = seaSide(s, side, d);
+      if (sea > 0) y += (coastCliff(s, d, top, side) - y) * sea;
     }
     // over a bore the ground stays above its crown, falling away to the sides; under a deck it keeps clear of it.
     // Both ease to nothing at their ends, so the ground is continuous along the road (except in the portals,
@@ -687,7 +741,7 @@ const FOOT = 0.8;
     if (d > 0 && side < 0 && zoneOf(s) !== 2) near += knollAt(x, z) * smoothstep(0, 1, (d - cliffAt(s, side).top - 1) / 10);
     // (sea lane, round 2) off the coast road's sea side the cliff and the seabed are the road's own out to the edge of
     // its reach: the land's shape and its small hills would raise shelves at the cliff's foot
-    const sea = d > 0 ? read(side > 0 ? coastL : coastR, s) : 0;
+    const sea = d > 0 ? seaSide(s, side, d) : 0;
     const w = smoothstep(10, 100, d) * reach * (1 - sea) + sea * smoothstep(NEAR_REACH - 40, NEAR_REACH, d);
     if (w <= 0) return near;
     const far = (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z) * smoothstep(15, 150, d);
@@ -710,7 +764,7 @@ const FOOT = 0.8;
   function forestOf(x, z, y, slope, s, lat, d) {
     if (y < lakeLevel + 0.6) return 0;
     // (sea lane, round 2) nothing grows tall either side of the coast road: dry grass and scrub (frame E1)
-    if (s !== null && Math.max(read(coastL, s), read(coastR, s)) > 0.02) return 0;
+    if (s !== null && Math.max(read(coastL, s), read(coastR, s), read(lowW, s)) > 0.02) return 0;
     let f = 0;
     if (s !== null) {
       const kinds = lat > 0 ? track.kindL : track.kindR;
@@ -1159,6 +1213,20 @@ const FOOT = 0.8;
     farGeometry.computeVertexNormals();
   }
 
+  // ---- (sea lane, round 2) where the swell runs big: off the low crossing's outer side, in the bay (CAUSEWAY.surf)
+  const surf = (() => {
+    let s0 = 0;
+    for (const seg of track.layout?.segments ?? []) {
+      const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
+      if (seg.id === CAUSEWAY.piece) {
+        const p = track.pointAt(s0 + len * CAUSEWAY.surf.at, CAUSEWAY.surf.out, new THREE.Vector3());
+        return { x: p.x, z: p.z, r: CAUSEWAY.surf.r };
+      }
+      s0 += len;
+    }
+    return null;
+  })();
+
   // ---- (sea lane) the sea map: what the water's shader and the ground's need to know about the coast, per texel
   // (SeaShape.map): the depth, and how far land and water are from each other (two chamfer passes over the texels)
   const seaMap = (() => {
@@ -1254,7 +1322,7 @@ const FOOT = 0.8;
     group,
     material,
     lake: { level: lakeLevel, extent: { x0: LAKE.x - LAKE.rx * 1.1, x1: LAKE.x + LAKE.rx * 1.1, z0: LAKE.z - LAKE.rz * 1.1, z1: LAKE.z + LAKE.rz * 1.1 } },
-    sea: { level: lakeLevel, at: seaAt, sector: seaSector, map: seaMap, stacks },
+    sea: { level: lakeLevel, at: seaAt, sector: seaSector, map: seaMap, stacks, surf },
     heightAt,
     heightOnTrack,
     normalAt(x, z, out = normal) {

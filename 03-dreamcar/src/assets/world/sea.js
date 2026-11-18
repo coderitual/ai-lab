@@ -168,6 +168,8 @@ export function createSea({ caps, tier, atmosphere, sea, far, glints = null }) {
   const spec = TIER[tier] ?? TIER.medium;
   const outer = far * SEA_LOOK.reach;
   const waves = createWaveField({ count: spec.waves, segments: spec.displace ? spec.segments : 0 });
+  // (round 2) the big swell off the low crossing (terrain.js CAUSEWAY.surf, waves.js BOOST)
+  waves.setBoost(sea.surf ?? null);
   // (low: a few rings only; the cells need not be square where nothing moves them)
   const geometry = radialGrid({ segments: spec.segments, inner: spec.displace ? 1.2 : outer / 3, outer });
   geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), outer);

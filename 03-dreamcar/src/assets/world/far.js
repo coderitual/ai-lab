@@ -354,7 +354,11 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         }
         // the ends of the field fade into the land, so it never ends in a wall
         const edge = smoothstep(0, 0.06, u) * smoothstep(1, 0.94, u) * smoothstep(1, 0.92, v);
-        y = -60 + (y + 60) * edge;
+        // (sea lane, round 2) where the column's bearing from the course's middle is wholly the sea's (its far end on
+        // the land side, 60 to 75 degrees off the straight: outside frame D1, which sees -13 to 63) it sinks under the
+        // horizon: from the coast road (frame E1) it stood across the open sea as a far shore
+        const sink = terrain.sea ? smoothstep(0.85, 1, terrain.sea.sector(start.pos.x + Math.cos(a) * MASSIF.crest, start.pos.z + Math.sin(a) * MASSIF.crest)) : 0;
+        y = -60 + (y + 60) * edge * (1 - sink);
         const p = at(i, j);
         pos[p * 3] = x;
         pos[p * 3 + 1] = y;
