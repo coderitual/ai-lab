@@ -78,12 +78,12 @@ try {
     },
   };
 
-  // ?photo=back,right,up,yaw,pitch,fov[,hud]: the staging camera from the first frame (see photo above)
+  // ?photo=back,right,up,yaw,pitch,fov[,roll][,hud]: the staging camera from the first frame (see photo above)
   const photo = query.get('photo');
   if (named) game.setPhoto(named);
   else if (photo) {
     const n = photo.split(',').map(parseFloat);
-    const keys = ['back', 'right', 'up', 'yaw', 'pitch', 'fov'];
+    const keys = ['back', 'right', 'up', 'yaw', 'pitch', 'fov', 'roll'];
     const o = {};
     keys.forEach((k, i) => Number.isFinite(n[i]) && (o[k] = n[i]));
     if (/,hud$/.test(photo)) o.hud = true;

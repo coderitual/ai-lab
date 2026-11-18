@@ -257,9 +257,15 @@ if ( uSeaBox.w > -1000.0 ) {
   gCoast = 1.0 - smoothstep( 160.0, 460.0, seaLandOff( gSea ) + 120.0 * ( gLarge.b - 0.5 ) );
   gWetBand = ( 1.0 - smoothstep( 0.4, 1.6 + 0.8 * gDet.g, vGroundPos.y - uSeaBox.w ) ) * smoothstep( 0.3, 0.6, gSea.a + gCoast );
 }
-vec3 gOchre = mix( vec3( 0.15, 0.092, 0.055 ), vec3( 0.25, 0.16, 0.095 ), 0.25 + 0.75 * gBedTone ) * ( 0.7 + 0.45 * gDetRock.g ) * ( 1.0 - 0.4 * gStreak );
+// (round 2, frame E1) rust and ochre earth and soft rock, its beds faint, scored by erosion gullies that run down the
+// face (dark in their shade, pale on their ribs) and darker towards its foot
+float gGullyX = texture2D( uLarge, vec2( ( vGroundPos.x - vGroundPos.z ) / 31.0, vGroundPos.y / 260.0 ) ).g;
+float gGully = smoothstep( 0.35, 0.65, gGullyX + 0.25 * ( gDetRock.g - 0.5 ) );
+vec3 gOchre = mix( vec3( 0.2, 0.105, 0.05 ), vec3( 0.3, 0.175, 0.085 ), 0.6 * gBedTone * 0.35 + 0.65 * gGully ) * ( 0.72 + 0.4 * gDetRock.g ) * ( 1.0 - 0.3 * gStreak );
 gRockCol = mix( gRockCol, mix( gOchre * ( 0.75 + 0.25 * gLarge.g ), gOchre, gCut ), gCoast );
-gScreeCol = mix( gScreeCol, vec3( 0.26, 0.175, 0.11 ) * ( 0.72 + 0.5 * gDet.b ), gCoast );
+gScreeCol = mix( gScreeCol, vec3( 0.29, 0.17, 0.095 ) * ( 0.75 + 0.45 * gDet.b ), gCoast );
+// the coast's grass is dry: olive and straw, sun-bleached (frame E1)
+gGrass = mix( gGrass, mix( vec3( 0.06, 0.062, 0.026 ), vec3( 0.105, 0.088, 0.045 ), smoothstep( 0.3, 0.75, gMid.b + 0.3 * ( gDet.r - 0.5 ) ) ) * ( 0.8 + 0.4 * gDet.r ), 0.85 * gCoast );
 vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 
 // (env lane) the verge: mown grass in stripes along the road, a strip of worn earth and loose stones along the
@@ -319,7 +325,7 @@ if ( gVerge > 0.0 ) {
   }
 }
 // (env lane) clumps of trees and hedges across open meadow beyond the verge, so no slope reads as bare
-float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) );
+float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) ) * ( 1.0 - gScree ) * ( 1.0 - gCoast );
 gForest = max( gForest, gClump );
 vec3 gAlbedo = gGrass;
 // blades let some light through, the mown verge most (bare earth none)

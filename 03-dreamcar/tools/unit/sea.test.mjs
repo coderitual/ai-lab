@@ -56,24 +56,33 @@ test('the coast presets keep the course: edge, verge slope, verge and barrier as
     const a = SIDES[name];
     const b = SIDES[old];
     expect(a.coast === true, `${name} is not a coast side`);
-    for (const key of ['kind', 'edge', 'slope', 'far', 'verge']) {
+    // (round 2, frame E1) round the carousel and over the crest the verge is the gravel apron of a run-off: the same
+    // ground, gravel's grip and sound instead of grass's
+    for (const key of ['kind', 'edge', 'slope', 'far', ...(a.verge === 'gravel' ? [] : ['verge'])]) {
       expect(JSON.stringify(a[key]) === JSON.stringify(b[key]), `${name}.${key} is ${JSON.stringify(a[key])}, ${old}'s ${JSON.stringify(b[key])}`);
     }
   }
 });
 
-test('nowhere does the water reach the course: every sample is dry out to 2 m beyond its solid edge', () => {
+test('nowhere does the water reach the course: every sample is dry out to 2 m beyond its solid edge (on a deck: the deck stands 10 m over it)', () => {
   let low = Infinity;
+  let deck = Infinity;
   const p = new Vector3();
   for (let i = 0; i < track.count; i += 2) {
     const s = i * track.ds;
+    // (round 2) the sky road's piers stand in the sea: there the deck is the course
+    if (track._onBridge(s)) {
+      deck = Math.min(deck, track.py[i] - sea.level);
+      continue;
+    }
     for (const side of [1, -1]) {
       track.pointAt(s, side * (track.edgeAt(s, side) + 2), p);
       low = Math.min(low, terrain.heightAt(p.x, p.z) - sea.level);
     }
   }
   expect(low > 0.5, `the ground 2 m beyond an edge stands only ${low.toFixed(2)} m over the water`);
-  return `${low.toFixed(1)} m over the water at the lowest`;
+  expect(deck > 10, `a deck stands only ${deck.toFixed(2)} m over the water`);
+  return `${low.toFixed(1)} m over the water at the lowest; decks ${deck.toFixed(0)} m and more`;
 });
 
 test('after the tunnel the sea is in view: open water within 250 m of the sea side of the sky road, the climb, the crest and the plunge', () => {

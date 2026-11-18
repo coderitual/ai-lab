@@ -61,6 +61,11 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
   const index = [];
   const tmp = [0, 0, 0, 1];
   let vertices = 0;
+  // (sea lane, round 2) on the coast road (either side a coast side) the kerbs are bare concrete, unpainted (frame E1)
+  const plainAt = (s) => {
+    const i = Math.round(track.wrap(s) / track.ds) % track.count;
+    return track.coastL?.[i] === 1 || track.coastR?.[i] === 1;
+  };
   for (const k of track.kerbs ?? []) {
     const len = track.wrap(k.s1 - k.s0);
     // rows on the teeth's peaks (and valleys): s a whole number of steps, offset to the peaks
@@ -81,7 +86,8 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
         track.pointAt(s, lat, pt);
         pos.push(pt.x, pt.y, pt.z);
         nor.push(frame.up.x, frame.up.y, frame.up.z);
-        along.push(frame.tan.x, frame.tan.y, frame.tan.z, k.side);
+        // (sea lane, round 2) w: the side, doubled where the kerb is plain concrete (the coast road, frame E1)
+        along.push(frame.tan.x, frame.tan.y, frame.tan.z, k.side * (plainAt(s) ? 2 : 1));
         // s as laid (it may run past the line: never jumps inside a triangle), across 0..1, how much kerb, width
         kerb.push(sRaw, t, amount, k.width);
         (terrain.bake4At ?? terrain.bakeAt)(pt.x, pt.z, tmp, 0);
@@ -186,6 +192,9 @@ vec4 kAgg = texture2D( uAgg, kUv * 0.7 );
 vec4 kBig = texture2D( uBig, vec2( kT * kW, kS ) / 9.0 );
 vec4 kBig2 = texture2D( uBig, vec2( kS * 0.11, kT * kW * 0.6 ) );
 vec3 kPaint = mix( vec3( 0.62, 0.61, 0.58 ), vec3( 0.42, 0.035, 0.03 ), kRed );
+// (sea lane, round 2) bare pale concrete on the coast road
+float kPlain = step( 1.5, abs( vKerbAlong.w ) );
+kPaint = mix( kPaint, vec3( 0.46, 0.45, 0.42 ), kPlain );
 // paint worn through to the concrete where it is old, most on the tops of the teeth and at the road edge
 float kWorn = smoothstep( 0.55, 0.8, kBig.b * 0.7 + kAgg.a * 0.3 + 0.25 * kTri * kBump + 0.2 * ( 1.0 - kT ) );
 vec3 kConcrete = vec3( 0.3, 0.29, 0.27 ) * ( 0.75 + 0.5 * kAgg.r );
@@ -204,7 +213,7 @@ kerbRough = mix( kerbRough, 0.12 + 0.2 * kWorn, smoothstep( 0.05, 0.4, uWet ) );
 diffuseColor.rgb *= kCol;
 // (finish lane) how much of the pixel is beaded white paint, in specks (retro.js reads it as its weight); a kerb
 // stands proud of the water, so the wet road drowns only some of the beads
-float kBeads = ( 1.0 - kRed ) * ( 1.0 - 0.85 * kWorn ) * ( 1.0 - kRubber ) * ( 1.0 - 0.65 * kDirt ) * ( 1.0 - kSeam )
+float kBeads = ( 1.0 - kRed ) * ( 1.0 - kPlain ) * ( 1.0 - 0.85 * kWorn ) * ( 1.0 - kRubber ) * ( 1.0 - 0.65 * kDirt ) * ( 1.0 - kSeam )
   * ( 0.35 + 2.2 * smoothstep( 0.6, 0.92, kAgg.r ) ) * ( 1.0 - 0.3 * uWet );
 `;
 
@@ -214,7 +223,7 @@ const KERB_NORMAL = /* glsl */ `
   vec3 alongV = normalize( ( viewMatrix * vec4( vKerbAlong.xyz, 0.0 ) ).xyz );
   alongV = normalize( alongV - n0 * dot( alongV, n0 ) );
   // outwards: towards the verge (left of the road when the kerb is on the left)
-  vec3 outV = cross( n0, alongV ) * vKerbAlong.w;
+  vec3 outV = cross( n0, alongV ) * sign( vKerbAlong.w );
   normal = normalize( n0 - outV * kerbSlope.x - alongV * kerbSlope.y );
 }
 `;

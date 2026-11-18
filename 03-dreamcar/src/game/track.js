@@ -680,7 +680,9 @@ function layCircuit(track, plan) {
     if (r <= rule.outside) kerbs.push({ s0: s1 - (s1 - s0) * rule.exit, s1: s1 + easeOut, side: -inside, width: rule.width });
     if (seg.runoff) {
       const side = seg.runoff === 'L' ? 1 : -1;
-      if (r <= 450) tyres.push({ s0: s0 + (s1 - s0) * 0.35, s1: s1 + easeOut * 0.5, side });
+      // (sea lane, round 2) not on the coast road's sea side, where the run-off is gravel out to the rail (frame E1)
+      const coast = layout.sides[seg[seg.runoff]]?.coast;
+      if (r <= 450 && !coast) tyres.push({ s0: s0 + (s1 - s0) * 0.35, s1: s1 + easeOut * 0.5, side });
       boards.push({ s0: s0 + (s1 - s0) * 0.15, s1: s1 - (s1 - s0) * 0.1, side });
     }
   }

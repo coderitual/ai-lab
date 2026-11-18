@@ -78,7 +78,7 @@ const STRAIGHT_VIEW = { x0: -450, x1: 250, slope: 0.1 };
  * `map`: the sea map's texels a side and its half width (m) round the middle (see seaMap below).
  */
 const SEA = {
-  mainland: [-115, 50],
+  mainland: [-115, 24],
   soft: 14,
   shore: [55, 170],
   cliff: 1.15,
@@ -88,6 +88,25 @@ const SEA = {
   stacks: 7,
   bridgeShore: 45,
   map: { size: 512, half: 2400 },
+};
+
+/**
+ * (sea lane, round 2: frame E1) THE COAST ROAD'S CLIFF. On the sea side of the coast road (a preset's `coast`) the
+ * land does not slope away to a shore far off: beyond the barrier a lip of dry grass `lip` m wide (it wanders), then
+ * a cliff straight down into the sea, `steep` m down per m out (it wanders), rounded at its top and with a talus at
+ * its foot, `below` m under the water's level; the seabed shelves away beyond it (SEA.shelf, SEA.deep). `ease`: metres
+ * over which a side becomes coast. On the land side, the cut face is `cut` m high (the coast's ochre and rust rock),
+ * and inside the carousel's hairpin (`knoll.piece`, the bend frame E1 looks at) the headland rises `knoll.rise` m
+ * over the road beyond the cut, along a ridge `knoll.along` m long from the bend's centre down the tongue between its
+ * legs, `knoll.across` m to either side of it.
+ */
+const COAST = {
+  lip: [1.5, 4],
+  steep: [1.6, 2.6],
+  below: 7,
+  ease: 30,
+  cut: 11,
+  knoll: { piece: 'carousel', rise: 22, along: 230, across: 46 },
 };
 
 /**
@@ -170,8 +189,28 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     for (let i = 0; i < n; i++) out[i] = rock[i] * Math.min(9, Math.max(1.4, 2 + 5 * far[i]));
     return out;
   };
+  // (sea lane, round 2) per sample and side, 0..1 how much this side is the coast road's sea side (eased along the road)
+  const coastWeight = (flags) => {
+    const out = new Float32Array(n);
+    if (!flags) return out;
+    const half = Math.round(COAST.ease / 2 / ds);
+    let sum = 0;
+    for (let k = -half; k <= half; k++) sum += flags[(k + n) % n];
+    for (let i = 0; i < n; i++) {
+      out[i] = smoothstep(0, 1, sum / (2 * half + 1));
+      sum += flags[(i + half + 1) % n] - flags[(i - half + n) % n];
+    }
+    return out;
+  };
+  const coastL = coastWeight(track.coastL);
+  const coastR = coastWeight(track.coastR);
   const cliffL = cliffOf(rockL, track.farSlopeL);
   const cliffR = cliffOf(rockR, track.farSlopeR);
+  // (sea lane, round 2) the land side of the coast road is cut deeper: the rust face of frame E1
+  for (let i = 0; i < n; i++) {
+    cliffL[i] = Math.max(cliffL[i], rockL[i] * coastR[i] * COAST.cut);
+    cliffR[i] = Math.max(cliffR[i], rockR[i] * coastL[i] * COAST.cut);
+  }
   /** The cliff's foot starts this far beyond the edge, and climbs this far out per metre up. */
   /** Bridges shorter than this (m) span a gully across them rather than a valley along them. */
 const GULLY_LENGTH = 450;
@@ -234,6 +273,49 @@ const FOOT = 0.8;
     const fall = d < shore ? SEA.cliff : SEA.shelf;
     return Math.max(lakeLevel - SEA.deep, Math.min(base - 0.25 * d, lakeLevel + fall * (shore - d)));
   };
+  /**
+   * (sea lane, round 2) The coast road's cliff (COAST) at d m beyond the solid edge of a sea side at s, from the
+   * ground at the edge (`top`): the lip, the face, the talus under the water and the seabed beyond.
+   */
+  const coastCliff = (s, d, top) => {
+    const lip = COAST.lip[0] + (COAST.lip[1] - COAST.lip[0]) * noise.fbm(s / 70 + 3.1, 8.3, 2);
+    const steep = COAST.steep[0] + (COAST.steep[1] - COAST.steep[0]) * noise.fbm(s / 45 - 6.2, 2.9, 3);
+    const foot = lakeLevel - COAST.below;
+    const drop = Math.max(1, top - foot);
+    const run = drop / steep;
+    const lipY = top - 0.06 * Math.min(d, lip);
+    if (d <= lip) return lipY;
+    const t = (d - lip) / run;
+    if (t < 1) return lipY - (lipY - foot) * smoothstep(0, 1, t);
+    return Math.max(lakeLevel - SEA.deep, foot - SEA.shelf * (d - lip - run));
+  };
+  /** (sea lane, round 2) The headland inside the carousel (COAST.knoll): its rise over the road at a point. */
+  const knollAt = (() => {
+    const segs = track.layout?.segments ?? [];
+    let s0 = 0;
+    for (const seg of segs) {
+      const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
+      if (seg.id === COAST.knoll.piece && seg.r) {
+        const c = track.pointAt(s0 + len / 2, seg.r, new THREE.Vector3());
+        const apex = track.pointAt(s0 + len / 2, 0, new THREE.Vector3());
+        const ax = (c.x - apex.x) / Math.abs(seg.r);
+        const az = (c.z - apex.z) / Math.abs(seg.r);
+        const { rise, along, across } = COAST.knoll;
+        return (x, z) => {
+          const u = (x - c.x) * ax + (z - c.z) * az;
+          const v = (x - c.x) * az - (z - c.z) * ax;
+          const back = Math.max(0, -u);
+          const off = Math.hypot(v, back);
+          // highest a little down the tongue from the bend's centre, falling away along it and to its sides
+          const crest = smoothstep(along, along * 0.25, u) * smoothstep(-across, 0, u);
+          const wobble = 0.85 + 0.3 * noise.fbm(x / 40 + 2, z / 40 - 5, 3);
+          return rise * crest * wobble * smoothstep(across, across * 0.15, off);
+        };
+      }
+      s0 += len;
+    }
+    return () => 0;
+  })();
   /** The valley with the bay and the open sea far from the road. */
   const valley = (x, z) => {
     const h = valleyLand(x, z);
@@ -281,6 +363,9 @@ const FOOT = 0.8;
   const macroD = new Float32Array(mx * mz);
   /** (sea lane) 1 where a cell of the field could start the sea's flood (open water well beyond the road, or the bay). */
   const seaSeed = new Uint8Array(mx * mz);
+  /** (sea lane, round 2) per cell: how much it lies off the coast road's sea side, and the cliff's height there. */
+  const coastCell = new Float32Array(mx * mz);
+  const coastCellY = new Float32Array(mx * mz);
   const spot = { index: -1, s: 0, lat: 0 };
   // the loop as a polygon on the map, to tell inside (the massif) from outside (the valleys)
   const ring = [];
@@ -326,6 +411,12 @@ const FOOT = 0.8;
           const sea = seaSector(x, z);
           if (sea > 0) v += (coastAt(x, z, base, d, zoneOf(spot.s) === 2 && longBridge(spot.s)) - v) * sea;
           if ((sea > 0.5 && d > shoreAt(x, z) + 30) || lakeE(x, z) < 0.8) seaSeed[j * mx + i] = 1;
+          const cw = read(side > 0 ? coastL : coastR, spot.s);
+          if (cw > 0 && d > 0) {
+            coastCell[j * mx + i] = cw;
+            coastCellY[j * mx + i] = coastCliff(spot.s, d, base);
+            if (cw > 0.5 && coastCellY[j * mx + i] < lakeLevel - 2) seaSeed[j * mx + i] = 1;
+          }
         }
         macro[j * mx + i] = v;
         macroD[j * mx + i] = d;
@@ -350,6 +441,10 @@ const FOOT = 0.8;
         }
       }
       macro.set(tmp);
+    }
+    // (sea lane, round 2) off the coast road the cliff stays a cliff (after the smoothing, which would make it a slope)
+    for (let k = 0; k < macro.length; k++) {
+      if (coastCell[k] > 0) macro[k] += (Math.min(macro[k], coastCellY[k]) - macro[k]) * coastCell[k];
     }
   }
   const bilinear = (arr, w, h, x0, z0, cell, x, z) => {
@@ -482,7 +577,11 @@ const FOOT = 0.8;
         beyond = Math.max(0, d - c.top);
       }
       const far = read(side > 0 ? track.farSlopeL : track.farSlopeR, s);
+      const top = y;
       y += far * 40 * (1 - Math.exp(-beyond / 40));
+      // (sea lane, round 2) the sea side of the coast road: a lip, then the cliff into the sea
+      const sea = read(side > 0 ? coastL : coastR, s);
+      if (sea > 0) y += (coastCliff(s, d, top) - y) * sea;
     }
     // over a bore the ground stays above its crown, falling away to the sides; under a deck it keeps clear of it.
     // Both ease to nothing at their ends, so the ground is continuous along the road (except in the portals,
@@ -579,10 +678,16 @@ const FOOT = 0.8;
         reach = smoothstep(80, 200, g);
       }
     }
-    const w = smoothstep(10, 100, d) * reach;
+    // (sea lane, round 2) the headland over the carousel, beyond the cut (the same rise seen from either leg)
+    if (d > 0 && side < 0 && zoneOf(s) !== 2) near += knollAt(x, z) * smoothstep(0, 1, (d - cliffAt(s, side).top - 1) / 10);
+    // (sea lane, round 2) off the coast road's sea side the cliff and the seabed are the road's own out to the edge of
+    // its reach: the land's shape and its small hills would raise shelves at the cliff's foot
+    const sea = d > 0 ? read(side > 0 ? coastL : coastR, s) : 0;
+    const w = smoothstep(10, 100, d) * reach * (1 - sea) + sea * smoothstep(NEAR_REACH - 40, NEAR_REACH, d);
     if (w <= 0) return near;
     const far = (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z) * smoothstep(15, 150, d);
-    return keepDry(near + (far - near) * w, x, z);
+    const h = near + (far - near) * w;
+    return sea > 0.5 ? Math.max(h, stackAt(x, z)) : keepDry(h, x, z);
   }
   const near = (x, z) => (inMacro(x, z) ? bilinear(macroD, mx, mz, minX, minZ, MACRO, x, z) : 1e9) < NEAR_REACH;
   function heightAt(x, z) {
@@ -599,6 +704,8 @@ const FOOT = 0.8;
   // ---- the forest: where the Track says trees stand, and in patches on the massif and the far slopes
   function forestOf(x, z, y, slope, s, lat, d) {
     if (y < lakeLevel + 0.6) return 0;
+    // (sea lane, round 2) nothing grows tall either side of the coast road: dry grass and scrub (frame E1)
+    if (s !== null && Math.max(read(coastL, s), read(coastR, s)) > 0.02) return 0;
     let f = 0;
     if (s !== null) {
       const kinds = lat > 0 ? track.kindL : track.kindR;
@@ -717,10 +824,13 @@ const FOOT = 0.8;
           verge[v * 4 + 2] = Math.abs(lat) - edge;
           // w: 0 on a verge with no wood behind it, 0.4 under woods (leaf litter); vertices without the attribute read 1
           verge[v * 4 + 3] = woodHere ? 0.4 : 0;
+          // (sea lane, round 2) a gravel run-off is not mown grass: the ground's loose stone shows (frame E1's apron)
+          if (gravel && coast) verge[v * 4 + 3] = 0.8;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
-          // (sea lane) beyond the barrier on the sea side of the coast road, a strip of gravel (ochre on the coast)
-          if (coast && k >= 1) mask[v * 2 + 1] = Math.max(mask[v * 2 + 1], 1 - smoothstep(3, 7, d));
+          // (sea lane) beyond the barrier on the sea side of the coast road: the gravel runs out at the rail's foot and
+          // the lip is dry grass (round 2: frame E1); the cliff below it is rock by its steepness
+          if (coast && k >= 1) mask[v * 2 + 1] = gravel ? 1 - smoothstep(0.5, 2.5, d) : Math.max(mask[v * 2 + 1], 1 - smoothstep(0.3, 1.5, d));
         }
         ext[half][i] = edge + offs[lastOwn];
         if (bandStep > 1) for (let b = 1; b < bandStep && i + b < n; b++) ext[half][i + b] = ext[half][i];

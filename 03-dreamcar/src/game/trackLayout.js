@@ -88,8 +88,11 @@ export const SIDES = {
   // gravel beyond it and nothing growing that would hide the sea. The corridor is the preset's it replaces (edge,
   // slope, verge, kind, far: highDown, highRun, open), so the course and what the cars hit are exactly as they were.
   coastDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.35, verge: 'grass', wood: null, coast: true },
-  coastRun: { kind: 'rail', edge: [7, 10], slope: -0.02, far: -0.3, verge: 'grass', wood: null, coast: true },
-  coastTop: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'grass', wood: null, coast: true },
+  // (sea lane, round 2: frame E1) round the carousel and over the crest the verge is a broad apron of ochre gravel
+  // (run-off: the grip and the sound of gravel) out to the rail; beyond the rail terrain.js puts a lip of dry grass and
+  // the cliff straight down into the sea. No tyre wall on a coast side's run-off (track.js): the rail on white posts.
+  coastRun: { kind: 'rail', edge: [7, 10], slope: -0.02, far: -0.3, verge: 'gravel', wood: null, coast: true },
+  coastTop: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'gravel', wood: null, coast: true },
 };
 
 /** The named stretches, in driving order. */
@@ -150,8 +153,9 @@ const SEGMENTS = [
   { id: 'tunnel', sec: 'tunnel', r: -1000, deg: 20, ease: 60, g: 3, L: 'wallDown', R: 'wallUp', tunnel: true },
   { id: 'mouth', sec: 'tunnel', len: 177.7441, ease: 50, g: 3.5, L: 'cutting', R: 'cutting' },
 
-  // The sky road: out of the mountain onto piers, a long banked left across the valley.
-  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapet', bridge: true, drop: 42 },
+  // The sky road: out of the mountain onto piers, a long banked left across an inlet of the sea (sea lane, round 2:
+  // the ground under the middle of the deck is 96 m down, under the water: the piers stand in the sea).
+  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapet', bridge: true, drop: 96 },
 
   // The carousel: a climb along the far side, then a right round the spur, the slow corner of the lap.
   // (sea lane) the coast road: from here to the foot of the plunge the sea lies below on the left, the land cut on the right

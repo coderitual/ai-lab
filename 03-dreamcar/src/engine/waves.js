@@ -45,6 +45,13 @@ export const WAVES = [
   { dir: 62, len: 2.5, amp: 0.009, steep: 1.0 },
   { dir: -14, len: 1.7, amp: 0.006, steep: 1.0 },
 ];
+/**
+ * Wave groups (sea lane, round 2): no train of a real sea is even. Each wave's height swells and fades over a long
+ * pattern of its own, `amp` times its mean either way, `len` times its wavelength long and turned `turn` degrees off its
+ * direction (alternating sides), so that from high above the swell reads as sets and lulls, not as ruled lines, and the
+ * chop as patches of rough and calm water. The same factor moves the mesh, shades the normals and answers sampleWaves.
+ */
+export const GROUPS = { amp: 0.5, len: 7.5, turn: 65 };
 /** How many of WAVES are the swell (foam behind crests looks back over these). */
 export const SWELLS = 3;
 /** Rough crest-to-trough range of the open sea (m), for shading by height. */
@@ -52,8 +59,25 @@ export const SEA_HEIGHT = 2 * Math.sqrt(WAVES.reduce((s, w) => s + w.amp * w.amp
 
 const BUILT = WAVES.map((w, i) => {
   const k = (2 * Math.PI) / w.len;
-  return { dx: Math.cos(w.dir * DEG), dz: Math.sin(w.dir * DEG), k, omega: Math.sqrt(G * k), amp: w.amp, hAmp: w.amp * w.steep, phase: i * 1.7 + 0.4, len: w.len };
+  // the group's pattern: longer for the short waves (patches tens of metres across at least), never under 160 m
+  const gk = (2 * Math.PI) / Math.max(160, GROUPS.len * w.len * (1 + 0.37 * i));
+  const ga = (w.dir + (i % 2 ? GROUPS.turn : -GROUPS.turn) + 9 * i) * DEG;
+  return {
+    dx: Math.cos(w.dir * DEG),
+    dz: Math.sin(w.dir * DEG),
+    k,
+    omega: Math.sqrt(G * k),
+    amp: w.amp,
+    hAmp: w.amp * w.steep,
+    phase: i * 1.7 + 0.4,
+    len: w.len,
+    gx: Math.cos(ga) * gk,
+    gz: Math.sin(ga) * gk,
+    gp: i * 2.3 + 1.1,
+  };
 });
+/** A wave's group factor at (x, z) (GROUPS). */
+const groupOf = (w, x, z) => 1 + GROUPS.amp * Math.cos(w.gx * x + w.gz * z + w.gp);
 
 /**
  * @typedef {object} WaveField
@@ -82,6 +106,8 @@ export function createWaveField({ count = WAVES.length, segments = 0 } = {}) {
     uWaveB: { value: waves.map((w) => [w.amp, w.hAmp, w.phase, segments > 0 ? (w.len * segments) / 32 : 0]).flat() },
     // how far out (m) each wave still draws in the normals (update sets it from the eye's height)
     uWaveC: { value: new Float32Array(n).fill(1e5) },
+    // the group's wave vector (x, z) and phase, and its depth (GROUPS)
+    uWaveG: { value: waves.map((w) => [w.gx, w.gz, w.gp, GROUPS.amp]).flat() },
     uWaveTime: { value: 0 },
   };
   const glsl = /* glsl */ `
@@ -90,7 +116,14 @@ export function createWaveField({ count = WAVES.length, segments = 0 } = {}) {
 uniform vec4 uWaveA[WAVE_COUNT];   // direction (x, z), wavenumber, angular frequency
 uniform vec4 uWaveB[WAVE_COUNT];   // amplitude, horizontal amplitude, phase, how far out the mesh is moved by it
 uniform float uWaveC[WAVE_COUNT];  // how far out it draws in the normals
+uniform vec4 uWaveG[WAVE_COUNT];   // its group: wave vector (x, z), phase, depth
 uniform float uWaveTime;
+
+// how high a wave runs at p: its sets and lulls (GROUPS)
+float waveGroup( int i, vec2 p ) {
+  vec4 g = uWaveG[ i ];
+  return 1.0 + g.w * cos( dot( g.xy, p ) + g.z );
+}
 
 // Where the undisplaced surface point p is moved to, dist metres from the eye: waves too short for the mesh there
 // are left out.
@@ -102,6 +135,7 @@ vec3 waveDisplace( vec2 p, float ampScale, float dist ) {
     float f = 1.0 - smoothstep( B.w * 0.55, B.w, dist );
     if ( f <= 0.0 ) continue;
     float th = A.z * dot( A.xy, p ) - A.w * uWaveTime + B.z;
+    f *= waveGroup( i, p );
     d.xz += A.xy * ( B.y * cos( th ) * f );
     d.y += B.x * sin( th ) * f;
   }
@@ -121,13 +155,13 @@ void waveNormal( vec2 p, float ampScale, float dist, out vec3 n, out float jac, 
     vec4 A = uWaveA[ i ];
     vec4 B = uWaveB[ i ];
     float keep = 1.0 - smoothstep( uWaveC[ i ] * 0.5, uWaveC[ i ], dist );
-    float ka = A.z * B.x * ampScale;
+    float ka = A.z * B.x * ampScale * waveGroup( i, p );
     lost += 0.5 * ka * ka * ( 1.0 - keep * keep );
     if ( keep <= 0.0 ) continue;
     float th = A.z * dot( A.xy, p ) - A.w * uWaveTime + B.z;
     float c = cos( th );
     float s = sin( th );
-    float kh = A.z * B.y * ampScale * keep;
+    float kh = A.z * B.y * ampScale * keep * waveGroup( i, p );
     slope += A.xy * ( ka * keep * c );
     ny += kh * s;
     jxx += kh * A.x * A.x * s;
@@ -147,7 +181,7 @@ float swellCrest( vec2 p, float ampScale, float lag, float steepen ) {
     vec4 A = uWaveA[ i ];
     vec4 B = uWaveB[ i ];
     float s = sin( A.z * dot( A.xy, p ) - A.w * ( uWaveTime - lag ) + B.z );
-    float kh = A.z * B.y * ampScale * steepen;
+    float kh = A.z * B.y * ampScale * steepen * waveGroup( i, p );
     jxx += kh * A.x * A.x * s;
     jzz += kh * A.y * A.y * s;
     jxz += kh * A.x * A.y * s;
@@ -186,7 +220,7 @@ export function sampleWaves(x, z, t, out, count = SWELLS + 4) {
     let oz = 0;
     for (let i = 0; i < n; i++) {
       const w = BUILT[i];
-      const c = Math.cos(w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase);
+      const c = Math.cos(w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase) * groupOf(w, px, pz);
       ox += w.dx * w.hAmp * c;
       oz += w.dz * w.hAmp * c;
     }
@@ -201,8 +235,9 @@ export function sampleWaves(x, z, t, out, count = SWELLS + 4) {
   for (let i = 0; i < n; i++) {
     const w = BUILT[i];
     const th = w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase;
-    const s = Math.sin(th);
-    const c = Math.cos(th);
+    const g = groupOf(w, px, pz);
+    const s = Math.sin(th) * g;
+    const c = Math.cos(th) * g;
     y += w.amp * s;
     sx += w.dx * w.k * w.amp * c;
     sz += w.dz * w.k * w.amp * c;
