@@ -160,13 +160,14 @@ function measure(f, p, n) {
   // a distance in the view's plane is shorter than the same distance on a surface that leans away from it
   let d = Math.sqrt(best) / Math.max(facing, 0.3);
   if (d >= RANGE) d = Infinity; // beyond the range, only the side matters (and offsets of it stay beyond)
-  if (!f.closed) return d;
   // which side: the segment's left normal, or at a vertex the sum of the two segments' normals
+  if (bi < 0) return d;
   let nx = -f.dy[bi] / Math.sqrt(f.len2[bi]);
   let ny = f.dx[bi] / Math.sqrt(f.len2[bi]);
   let vx = f.ax[bi];
   let vy = f.ay[bi];
-  if (bt >= 1 || bt <= 0) {
+  const ends = !f.closed && ((bt >= 1 && bi === f.count - 1) || (bt <= 0 && bi === 0));
+  if ((bt >= 1 || bt <= 0) && !ends) {
     const other = bt >= 1 ? (bi + 1) % f.count : (bi - 1 + f.count) % f.count;
     const l = Math.sqrt(f.len2[other]);
     nx += -f.dy[other] / l;
@@ -177,6 +178,9 @@ function measure(f, p, n) {
     }
   }
   const left = (px - vx) * nx + (py - vy) * ny > 0;
+  // a line has no inside: its distance is signed by the side of it a point is on (the shut lines' second
+  // channel, which interpolates through zero on the line instead of dipping towards it, see CHANNELS)
+  if (!f.closed) return left ? -d : d;
   return left === f.turn > 0 ? -d : d;
 }
 

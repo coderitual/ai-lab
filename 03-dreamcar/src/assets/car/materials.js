@@ -23,7 +23,7 @@
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE, GLSL_PROBE, targetDefines } from '../../engine/glsl.js';
 import { RANGE } from './atlas.js';
-import { ARCHES, INTAKE_SIDE } from './features.js';
+import { ARCHES, INTAKE_CENTRE, INTAKE_SIDE } from './features.js';
 import { DIMS, STATIONS } from './spec.js';
 
 /** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
@@ -283,7 +283,7 @@ export function mirrorProbe(shader, uniforms, { coat = false, seen = 1 } = {}) {
 }
 
 /** The paint, and everything else opaque on the skin. */
-export function createPaintMaterial(shared, caps, paintName = 'silver', { shoulderV = 0.5, extentV = 5, pins = true } = {}) {
+export function createPaintMaterial(shared, caps, paintName = 'silver', { shoulderV = 0.5, extentV = 5, texel = 0.005, pins = true } = {}) {
   const paint = PAINTS[paintName] || PAINTS.silver;
   const material = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 1, roughness: 0.4, clearcoat: 1, clearcoatRoughness: 0.03 });
   const own = {
@@ -298,8 +298,11 @@ export function createPaintMaterial(shared, caps, paintName = 'silver', { should
 // where the shoulder's rail lies in the atlas (v), and the metres of skin the atlas spans that way
 #define SHOULDER_V ${shoulderV.toFixed(5)}
 #define EXTENT_V ${extentV.toFixed(4)}
+// the atlas's texel on the car, at its coarsest (m)
+#define ATLAS_TEXEL ${texel.toFixed(5)}
 #define GRILLE_PINS ${pins ? 1 : 0}
 ${['UI', 'LI', 'LO', 'UO'].map((name, i) => `#define INTAKE_${name} vec2(${f4(INTAKE_SIDE[i][0])}, ${f4(INTAKE_SIDE[i][1])})`).join('\n')}
+${INTAKE_CENTRE.slice(0, 4).map(([x, y], i) => `#define INTAKE_C${i} vec2(${f4(x)}, ${f4(y)})`).join('\n')}
 uniform vec3 paintColor;
 uniform float paintMetal;
 uniform float paintRough;
@@ -388,12 +391,13 @@ void carFlake(float amount) {
 vec3 carForm(vec3 p, vec3 n) {
   vec3 tilt = vec3(0.0);
   float side = sign(vCarPos.x);
-  // power domes: crests at x 0.27 at the cowl converging to 0.20 at z 1.9, 9 mm high, the outer flank sharper
-  if (n.y > 0.5 && p.z > 0.72 && p.z < 2.0) {
-    float crest = mix(0.27, 0.20, clamp((p.z - 0.8) / 1.1, 0.0, 1.0));
-    float s = p.x < crest ? 0.055 : 0.028;
+  // power domes: crests at x 0.27 at the cowl converging to 0.20 at z 1.9, 14 mm high, the outer flank sharper,
+  // running out just behind the bonnet's front edge (the press pictures show them the whole length of the bonnet)
+  if (n.y > 0.45 && p.z > 0.72 && p.z < 2.1) {
+    float crest = mix(0.27, 0.19, clamp((p.z - 0.8) / 1.2, 0.0, 1.0));
+    float s = p.x < crest ? 0.06 : 0.03;
     float t = (p.x - crest) / s;
-    float a = 0.009 * smoothstep(0.74, 0.9, p.z) * (1.0 - smoothstep(1.6, 1.95, p.z));
+    float a = 0.014 * smoothstep(0.74, 0.92, p.z) * (1.0 - smoothstep(1.8, 2.08, p.z));
     float slope = a * exp(-t * t) * (-2.0 * t / s);
     tilt.x -= side * slope;
   }
@@ -570,7 +574,7 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   // (its distance to their edges is worked out here: the atlas's is too coarse to be a relief)
   if (p.z > 1.85 && p.y < 0.47 && p.y > 0.17 && B.r > 0.0) {
     float w = min(min(carLine(p.xy, INTAKE_UI, INTAKE_LI), carLine(p.xy, INTAKE_LI, INTAKE_LO)), carLine(p.xy, INTAKE_LO, INTAKE_UO));
-    w = min(w, min(carLine(p.xy, vec2(0.26, 0.335), vec2(0.42, 0.28)), min(carLine(p.xy, vec2(0.42, 0.28), vec2(0.42, 0.245)), carLine(p.xy, vec2(0.42, 0.245), vec2(0.0, 0.245)))));
+    w = min(w, min(carLine(p.xy, INTAKE_C0, INTAKE_C1), min(carLine(p.xy, INTAKE_C1, INTAKE_C2), carLine(p.xy, INTAKE_C2, INTAKE_C3))));
     float t = clamp(w / 0.055, 0.0, 1.0);
     float hump = sin(3.14159 * t);
     // (run out smoothly towards the region's own edges: a cut-off height is a crease)
@@ -579,7 +583,9 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
     cAO *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 0.014, w));
   }
   // shut lines: a dark gap with a little shade either side; the fuel flap (right side only)
-  float shut = A.b;
+  // (the signed channel draws the line; the unsigned one, which interpolates at most about a texel too far,
+  // keeps away the zeros the signed one has where its sign flips off the lines)
+  float shut = max(abs(B.b), A.b - 0.8 * ATLAS_TEXEL);
   if (vCarPos.x < 0.0 && vCarNormal.x < -0.4) {
     float flap = carBox(vec2(-vCarPos.z, vCarPos.y), vec2(1.71, 0.875), vec2(0.145, 0.07), 0.04);
     shut = min(shut, abs(flap));

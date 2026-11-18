@@ -13,7 +13,7 @@
 //    material turns into light (materials.js, LAMP_FN).
 
 import * as THREE from 'three';
-import { GRILLE_HALF, INTAKE_SIDE } from './features.js';
+import { GRILLE_HALF, INTAKE_CENTRE, INTAKE_SIDE } from './features.js';
 import { buildLampUnits } from './lampUnits.js';
 import { LAMP_FN } from './materials.js';
 import { MIRROR, Tris, V, bar, createSkinCaster, frame, roundRect, surfaceHit } from './parts.js';
@@ -105,8 +105,9 @@ function mirror(gloss, matte, glass, segments) {
   // the daylight photographs (front, and the two from ahead and to the right) show a taller, deeper shell than
   // the sheet's 0.135 x 0.11: 0.16 high and 0.13 deep; its width stays the published one (2.033 over the mirrors)
   const c = V(0.923, 1.05, 0.41);
-  const half = V(0.093, 0.08, 0.065);
-  const e = 0.45; // squareness: below 1 squares the sphere off
+  // rounder than a box (the press pictures: a smooth rounded shell, its outer end a soft curve)
+  const half = V(0.095, 0.075, 0.065);
+  const e = 0.68; // squareness: below 1 squares the sphere off
   for (let i = 0; i < P.count; i++) {
     let x = P.getX(i);
     let y = P.getY(i);
@@ -285,10 +286,10 @@ export function buildDetails(samples, { tier, plate, skin, lay }) {
     };
     const [ui, li] = INTAKE_SIDE;
     const innerX = (y) => ui[0] + ((li[0] - ui[0]) * (ui[1] - y)) / (ui[1] - li[1]);
-    for (const y of [0.3, 0.368]) slat(y, innerX(y) - 0.015, 0.79, 0.028, left.matte);
-    slat(0.29, 0.0, 0.415, 0.022, left.matte);
+    for (const y of [0.39, 0.428]) slat(y, innerX(y) - 0.015, 0.79, 0.028, left.matte);
+    slat(0.265, 0.0, INTAKE_CENTRE[2][0] - 0.01, 0.022, left.matte);
     // the air curtain: an upright gloss black blade against the outer edge, standing clear of the slot behind it
-    const blade = [0.236, 0.3, 0.36, 0.424].map((y) => V(0.775, y, skinZ(0.775, y) - 0.012));
+    const blade = [0.316, 0.36, 0.41, 0.455].map((y) => V(0.775, y, skinZ(0.775, y) - 0.012));
     bar(left.gloss, blade, V(0.35, 0, 1).normalize(), 0.0125, 0.03, 0);
     matte.addMirrored(left.matte);
     gloss.addMirrored(left.gloss);

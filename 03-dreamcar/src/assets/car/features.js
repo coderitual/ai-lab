@@ -208,7 +208,15 @@ export const GRILLE_HALF = [[0, 0.71, 2.2675], [0.15, 0.708, 2.262], [0.3, 0.7, 
   [0.515, 0.615, 2.189], [0.535, 0.56, 2.178], [0.525, 0.515, 2.178], [0.49, 0.487, 2.186], [0.42, 0.472, 2.207],
   [0.3, 0.465, 2.226], [0.15, 0.462, 2.242], [0, 0.462, 2.247]];
 /** The side intake's opening (5.3), left, in front view [x, y]: upper inner, lower inner, lower outer, upper outer. */
-export const INTAKE_SIDE = [[0.45, 0.455], [0.52, 0.245], [0.8, 0.225], [0.8, 0.432]];
+export const INTAKE_SIDE = [[0.43, 0.455], [0.47, 0.37], [0.8, 0.305], [0.79, 0.465]];
+/**
+ * The lower intake across the apron (5.3), left half in front view [x, y], from the middle of its upper edge.
+ * Redrawn with INTAKE_SIDE from the daylight photograph straight on the nose (camera fitted, outlines projected
+ * onto the skin): the side intakes are wedges under the grille's outer corners, tallest at the bumper's corner,
+ * their lower edge rising inwards, and the painted blade between them and this black band sweeps under the plate
+ * (the first outlines had the side intakes as tall trapezoids reaching down to the lip).
+ */
+export const INTAKE_CENTRE = [[0, 0.305], [0.55, 0.305], [0.68, 0.265], [0.68, 0.225], [0, 0.225]];
 
 /** Every outline. Pure arithmetic: the dev tools run it in Node too. */
 export function buildFeatures() {
@@ -268,7 +276,7 @@ export function buildFeatures() {
   area('grille', 'grille', { n: 0.3, y: [0.4, 0.8], z: [1.95, 2.5] }, smooth(P('grille', grille), true));
   area('intakeSide', 'front', { n: 0.12, y: [0.15, 0.5], z: [1.8, 2.5] }, poly('front', face(INTAKE_SIDE), 0.03));
   area('intakeCentre', 'front', { n: 0.3, y: [0.15, 0.4], z: [1.95, 2.5] },
-    poly('front', face([[-0.26, 0.335], [-0.42, 0.28], [-0.42, 0.245], [0.42, 0.245], [0.42, 0.28], [0.26, 0.335]]), 0.015));
+    poly('front', face([...INTAKE_CENTRE.slice(1, -1).map(([x, y]) => [-x, y]).reverse(), ...INTAKE_CENTRE.slice(1, -1)]), 0.015));
 
   // ---- shut lines (2.5, 2.7, 3.4, 5.3, 6.3)
   const sideLine = { n: 0.35 };
@@ -290,6 +298,9 @@ export function buildFeatures() {
   return list;
 }
 
+/** The shut lines' features (the lines of channels 2 and 6). */
+const SHUT_LINES = ['cutFender', 'cutB', 'cutRear', 'cutBumperRear', 'doorsBottom', 'bonnet', 'bootSide', 'bootRear', 'roofSeam'];
+
 /**
  * What the shaders read: the channels of the atlas, each a signed distance (m, negative inside) made from the
  * features' own distances `d` (by name). Four to a texture, in order.
@@ -297,8 +308,17 @@ export function buildFeatures() {
 export const CHANNELS = [
   (d) => Math.min(Math.max(d.dlo, -d.bpillar, -d.divider), d.windscreen, d.rearScreen, d.roofGlass), // 0 glass
   (d) => Math.min(d.dlo - 0.02, d.slit), // 1 gloss black: the window surround and belt strip (and so the B-pillar)
-  (d) => Math.min(d.cutFender, d.cutB, d.cutRear, d.cutBumperRear, d.doorsBottom, d.bonnet, d.bootSide, d.bootRear, d.roofSeam), // 2 shut lines
+  (d) => Math.min(...SHUT_LINES.map((k) => Math.abs(d[k]))), // 2 shut lines (unsigned)
   (d) => Math.min(d.headLamp, d.tailLamp), // 3 lamp lenses
   (d) => Math.min(d.grille, d.intakeSide, d.intakeCentre), // 4 openings
   (d) => d.reflector, // 5 red reflectors
+  // 6 the shut lines again, signed by the side of the nearest line. Interpolated between texels, an unsigned
+  // distance only dips towards zero on the line, by as much as the texels happen to straddle it, and the line
+  // came out dotted at the texels' pitch; a signed one passes through zero wherever the line is. Where the sign
+  // flips away from a line (between two lines, past a line's end) the unsigned channel overrules it.
+  (d) => {
+    let best = Infinity;
+    for (const k of SHUT_LINES) if (Math.abs(d[k]) < Math.abs(best)) best = d[k];
+    return best;
+  },
 ];
