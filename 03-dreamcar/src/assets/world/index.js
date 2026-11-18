@@ -67,8 +67,15 @@ const MIRROR = { medium: { scale: 0.35, far: 220, streak: 0.3 }, high: { scale: 
  * than a pixel on a phone and lies in the haze; each piece was a draw call. The lamps' heads, cones and glow, the
  * boards and the buildings are not in the list: they read from far away.
  */
-const SMALL_REACH = { low: 350, medium: 500, high: 800 };
-const SMALL = new Set(['rail-posts', 'rail-beams', 'kerbs', 'lamp-fittings', 'viaduct-rail-posts', 'viaduct-rails']);
+const SMALL_REACH = { low: 300, medium: 500, high: 800 };
+/** Which (by name), and how many times SMALL_REACH: the barriers are long lines that read further than a post. */
+const SMALL = new Map([
+  ['rail-beams', 2],
+  ['viaduct-rails', 2],
+  ['kerbs', 1],
+  ['lamp-fittings', 1],
+  ['viaduct-joints', 1],
+]);
 
 /**
  * @typedef {object} Beam one car's head lamps, for whatever answers them (reflectors), and its tail lamps (the wet
@@ -184,7 +191,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       const lowDressing = o.isMesh && o.parent?.name === 'dressing-low';
       if (!piece && !lowDressing) return;
       const sphere = (o.isInstancedMesh ? o.boundingSphere : o.geometry.boundingSphere)?.clone();
-      if (sphere) small.push({ object: o, sphere: sphere.applyMatrix4(o.matrixWorld) });
+      if (sphere) small.push({ object: o, sphere: sphere.applyMatrix4(o.matrixWorld), reach: SMALL.get(o.parent.name) ?? 1 });
     });
   }
   const smallReach = SMALL_REACH[tier] ?? SMALL_REACH.medium;
@@ -228,6 +235,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       forest.group.traverse((o) => {
         if (/^forest-(reduced|full|floor)-/.test(o.name)) list.push(o);
       });
+      // and the small things along the road (SMALL): less than a texel of a 64-texel face
+      for (const p of small) list.push(p.object);
     }
     return list;
   }
@@ -237,7 +246,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     scene,
     time: null,
     // (finish lane) the probe's faces leave out the kerbs and the ground cover, and on the low tier (64 texels) the
-    // near trees too (the impostors stay): a face cost thirty to fifty draw calls, a sixth of the frame's budget
+    // near trees (the impostors stay) and the small things: a face cost thirty to fifty draw calls, a sixth of the
+    // frame's budget
     probeHidden: [sky.stars, ...structures.probeHidden, ...probeLeavesOut()],
     /** The wet road's planar reflection (null on the low tier): its target, camera, last cost (`ms`). */
     mirror,
@@ -289,7 +299,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
 
     prepareView(camera, focus, beams, hidden = null) {
       eye.setFromMatrixPosition(camera.matrixWorld);
-      for (const p of small) p.object.visible = p.sphere.center.distanceTo(eye) - p.sphere.radius < smallReach;
+      for (const p of small) p.object.visible = p.sphere.center.distanceTo(eye) - p.sphere.radius < smallReach * p.reach;
       sun.prepareView(camera, focus);
       forest.prepareView(camera, focus);
       cover.prepareView(camera);

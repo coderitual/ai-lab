@@ -67,7 +67,7 @@ pictures.
 | dusk | `grid-dusk`: low behind the car under the gantry while the lamps count |
 | night | `night`: the end of the first lap onto the wet, lit straight |
 | split | `split`: two players in the esses |
-| phone | `phone`: 390x844 at 2x, touch, `low`, with the touch controls |
+| phone | `phone`: 390x844 at 2x, touch, `medium` (what a recent iPhone gets), with the touch controls |
 
 When a stretch of road moves or the car changes, the distances and poses in
 the tool's `LOADS` table are what to adjust; then look at every picture.

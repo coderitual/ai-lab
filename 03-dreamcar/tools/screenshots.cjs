@@ -114,7 +114,8 @@ const LOADS = [
   {
     name: 'phone',
     size: PHONE,
-    query: 'time=day&q=low',
+    // (finish lane) the tier a recent iPhone gets (caps.js), which is what the owner plays on
+    query: 'time=day&q=medium',
     shots: [{ name: 'phone', start: true, skip: 9, hands: true, caption: 'On a phone held upright: the touch controls' }],
   },
 ];

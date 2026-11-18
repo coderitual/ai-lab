@@ -267,7 +267,9 @@ if ( gVerge > 0.0 ) {
   float narrow = 1.0 - smoothstep( 4.5, 6.0, vWidth );
   float rag = 0.55 + 0.5 * ( gDet.b - 0.5 ) + 0.6 * ( gLarge.b - 0.5 ) + 0.4 * ( gDet2.r - 0.5 );
   float earth = 1.0 - smoothstep( rag - 0.15, rag + 0.15, vd );
-  float bare = smoothstep( 0.42, 0.6, 0.55 * gDet2.r + 0.45 * gMid.a + 0.35 * ( 1.0 - smoothstep( 0.0, 2.2, vd ) ) - 0.2 * gDet.r );
+  // (finish lane) a little less bare earth than it had: without the glow of the light through the blades, a narrow
+  // verge under the woods read as all earth and leaves
+  float bare = smoothstep( 0.5, 0.68, 0.55 * gDet2.r + 0.45 * gMid.a + 0.35 * ( 1.0 - smoothstep( 0.0, 2.2, vd ) ) - 0.2 * gDet.r );
   earth = max( earth, narrow * bare );
   vec3 earthCol = mix( vec3( 0.075, 0.058, 0.04 ), vec3( 0.15, 0.125, 0.095 ), gDet.b ) * ( 0.75 + 0.4 * gDet2.g );
   // a few stones thrown out onto the grass beyond it
@@ -278,7 +280,7 @@ if ( gVerge > 0.0 ) {
   vec3 vergeCol = mix( mown, roughCol, rough );
   vergeCol = mix( vergeCol, earthCol, max( earth, stones * 0.8 ) );
   // fallen leaves drifted against the barrier's foot under woods (frame D4)
-  float leaves = gWoodBehind * smoothstep( -2.2, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
+  float leaves = gWoodBehind * smoothstep( -1.6, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
   vergeCol = mix( vergeCol, mix( vec3( 0.2, 0.075, 0.02 ), vec3( 0.09, 0.04, 0.015 ), gDet.b ), leaves );
   gGrass = mix( gGrass, vergeCol, gVerge );
   gVergeEarth = gVerge * max( earth, stones * 0.8 );

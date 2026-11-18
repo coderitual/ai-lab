@@ -383,6 +383,32 @@ lamps is a coarse grid (5 columns, a row every 5 m: the light itself is
 worked out per pixel), one mesh per kind of lamp, hidden while that kind is
 off (the street lamps by day).
 
+The finish lane's pass on draw calls (each a call in every pass that sees
+it), none of it visible at the size a player sees it:
+
+- **One mesh per material per piece.** The lamps' poles, arms and housings
+  are one baked geometry, the street lamps' and floodlights' emitters and
+  glow one mesh each (lamps.js); the rail posts are in the beams' mesh (their
+  texture coordinate v = -1 paints them as the posts' steel); the viaducts'
+  abutments are in the deck's mesh and their rail posts in the rails'; the
+  walls' runs are one mesh; the dressing's patches are 400 m squares (they
+  were 160 m), and on `low` the low dressing is in the same patches as the
+  rest. The terrain's band and the road are cut into pieces of `PIECE`
+  metres (terrain.js: 400 on low, 240 on medium, 160 on high), the grid into
+  squares of about 400 m on low and medium.
+- **A draw distance for small things** (`SMALL_REACH` in world/index.js: 300,
+  500 and 800 m by tier, twice that for the barriers' beams): a piece of
+  kerbs, lamp poles or barrier whose sphere lies wholly beyond it is not
+  drawn in any pass of that view. The lamps' heads, cones and glow, the
+  boards and the buildings are not in the list.
+- **What each pass leaves out.** The mirror: also the viaducts, the lamps'
+  cones and their heads (it has their halos). The probe: also the kerbs, the
+  ground cover and, on medium, the rails; on low the near trees (the
+  impostors stay) and the small things. The tunnels' four veils of daylight
+  are culled and not drawn while they add nothing.
+- The kerbs' beads and the rails' reflectors answer the head lamps in their
+  own shaders (retro.js), with no light and no mesh of their own.
+
 ## The lamps at night
 
 `src/assets/world/lamps.js`. 150 lamps: 23 street lamps on the straight
