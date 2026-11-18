@@ -23,7 +23,7 @@ import * as THREE from 'three';
 import { createCar } from '../assets/car/index.js';
 import { LAMPS as CAR_LAMPS } from '../assets/car/spec.js';
 import { createWorld } from '../assets/world/index.js';
-import { canopyOpen } from '../assets/world/canopy.js';
+import { CANOPY, canopyOpen } from '../assets/world/canopy.js';
 import { TIMES } from '../assets/world/lighting.js';
 import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
@@ -671,7 +671,10 @@ export class Game {
   /** What the exposure settles at where this car is: the open sky's, the tunnel's, or between at the portals. */
   _exposureFor(vehicle) {
     const time = this.world.time;
-    return lerp(time.tunnelExposure, time.exposure, vehicle.sky);
+    // under the woods the eye opens up as it does in a tunnel, only less: the shade of a forest road by day is a road
+    // one can read, not a black one (how much of the sky the woods hide: canopy.js; how far it opens: lighting.js)
+    const shade = clamp((1 - canopyOpen(this.track, vehicle.s, vehicle.lat)) / (1 - CANOPY.floor), 0, 1);
+    return lerp(time.tunnelExposure, time.exposure * 2 ** ((time.shadeEv || 0) * shade), vehicle.sky);
   }
 
   /** Put a car back on the road where it is, pointing along it, at rest; the clock keeps running. */

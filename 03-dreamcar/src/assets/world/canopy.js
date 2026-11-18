@@ -32,7 +32,7 @@ export const CANOPY = {
   /** Woods are averaged over this many metres either way along the road: a gap of a tree or two changes little. */
   reach: 15,
   /** The least share of the sky that is left. */
-  floor: 0.3,
+  floor: 0.4,
 };
 
 const tables = new WeakMap();
