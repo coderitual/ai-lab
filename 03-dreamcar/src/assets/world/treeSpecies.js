@@ -32,7 +32,7 @@ export const SPECIES_DATA = {
   hazel: { height: [1.8, 3.4], green: [0.18, 0.22, 0.05], autumn: [[0.95, 0.42, 0.07], [1.0, 0.55, 0.08]], turns: 0.35, value: [0.8, 1.1], hue: 0.35, lean: 0.12, through: 0.9 },
   hornbeam: { height: [14, 21], green: [0.2, 0.23, 0.052], autumn: [[0.95, 0.8, 0.3]], turns: 0.15, value: [0.85, 1.12], hue: 0.3, lean: 0.1, through: 1.0 },
   // (forest lane) the pines of frames e2 and e5: a long bare stem, the crown only in the top third, bluish-green
-  pine: { height: [20, 30], green: [0.4, 0.55, 0.42], autumn: [], turns: 0, value: [0.82, 1.1], hue: 0.2, lean: 0.06, through: 0.35 },
+  pine: { height: [20, 30], green: [0.48, 0.64, 0.44], autumn: [], turns: 0, value: [0.82, 1.1], hue: 0.2, lean: 0.06, through: 0.35 },
   lime: { height: [12, 21], green: [0.185, 0.23, 0.052], autumn: [[0.973, 0.819, 0.377], [0.897, 0.656, 0.294]], turns: 0.3, value: [0.85, 1.12], hue: 0.3, lean: 0.06, through: 0.95 },
 };
 

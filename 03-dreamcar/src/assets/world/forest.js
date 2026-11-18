@@ -651,9 +651,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         [FIR, -1, 0.14, [15, 21]],
       ],
       stonepine: [
-        [PINE, PINE_A, 0.42, [18, 26]],
-        [FIR, -1, 0.3, [12, 19]],
-        [SPRUCE, -1, 0.28, [14, 22]],
+        [PINE, PINE_A, 0.58, [18, 26]],
+        [FIR, -1, 0.24, [12, 19]],
+        [SPRUCE, -1, 0.18, [14, 22]],
       ],
     };
     const pick = (wood) => {
@@ -680,6 +680,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         continue;
       }
       if (t.road) continue;
+      // (e2) the wood behind the road's rows thinned, so that the low sun comes through between the crowns and lies on
+      // the road in patches; under a closed canopy 60 to 90 m deep towards the sun the road was in plain shade
+      if (wood === 'pinewood' && schemeRng.next() < 0.45) continue;
       const m = pick(wood);
       const variants = VARIANTS_OF[m[0]];
       t.variant = m[1] >= 0 ? m[1] : variants[schemeRng.int(variants.length)];
@@ -738,6 +741,32 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
             addTree(x, y - 0.15, z, m[0], { road: true, turned: 0, inside: row.inside, height: m[3], detail: row.detail, lean, rng: schemeRng, variant: m[1] });
           }
         });
+      }
+      // (e5) the wood all round, closing the picture behind the island and the outcrops: this high on the hill the mass
+      // of the forest is thin (the tree line), but the frame's bend lies in a full wood
+      if (run.wood === 'stonepine') {
+        for (const side of [1, -1]) {
+          let hint = -1;
+          for (let d = -60; d < run.s1 - run.s0 + 60; d += schemeRng.range(4.5, 7)) {
+            const s = track.wrap(run.s0 + d);
+            const sch = schemeAt(track, s);
+            if (!sch || sch.def.wood !== run.wood) continue;
+            for (let out = 14 + schemeRng.range(0, 5); out < 110; out += schemeRng.range(5, 8)) {
+              if (schemeRng.next() >= sch.w) continue;
+              const lat = side * (track.edgeAt(s, side) + out);
+              track.pointAt(s, lat, point);
+              if (blocked(point.x, point.z, 1, hint)) continue;
+              hint = spot.index;
+              // (only beside its own stretch: another stretch's corridor is somebody else's)
+              if (Math.abs(track.delta(spot.s, s)) > 60) continue;
+              if (!free(point.x, point.z, 3.4)) continue;
+              const y = terrain.heightAt(point.x, point.z);
+              if (y < lakeLevel + 0.5) continue;
+              const m = pick(run.wood);
+              addTree(point.x, y - 0.2, point.z, m[0], { road: false, turned: 0, inside: 0.6, height: m[3], detail: out < 40 ? 0.9 : 0.5, rng: schemeRng, variant: m[1] });
+            }
+          }
+        }
       }
       // (e5) the stone pine: alone on the inside of the bend near its apex, its umbrella over the grass island
       if (run.wood === 'stonepine') {

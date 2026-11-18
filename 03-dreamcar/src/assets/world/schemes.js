@@ -78,3 +78,14 @@ export function schemeAt(track, s) {
   if (k < 0 || t.w[i] <= 0) return null;
   return { name: t.names[k], def: t.defs[k], w: t.w[i], on: t.on[i] === 1 };
 }
+
+/**
+ * True where s lies on the own pieces of a scheme that draws the solid edges as low kerbstones (`curb`): there the
+ * world draws no rail, no cut face and no tyre walls, boards or marshal posts (schemeFurniture.js draws the stones).
+ * @param {object} track @param {number} s
+ */
+export function curbAt(track, s) {
+  const t = schemeTable(track);
+  const i = Math.round(track.wrap(s) / track.ds) % track.count;
+  return t.index[i] >= 0 && t.on[i] === 1 && !!t.defs[t.index[i]].curb;
+}

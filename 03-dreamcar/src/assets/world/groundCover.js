@@ -31,6 +31,27 @@ const TIER = {
 };
 
 /**
+ * (forest lane) Frame E5's boulders, in its places along the granite scheme's own pieces (the carousel), as seen from
+ * the `e5` camera: [share of the way along, 'in' (the island) or 'out', metres from the solid edge to the boulder's
+ * near side, size (m), shape, lift (m: one stacked on others)]. The near-left pair on the island by the exit, a rock
+ * in the island's middle, and the outcrop of van-sized blocks on the outside round the apex.
+ */
+const E5_ROCKS = [
+  [0.87, 'in', 0.2, 5.0, 'round', 0],
+  [0.83, 'in', 1.5, 3.6, 'round', 0],
+  [0.78, 'in', 3.5, 2.0, 'block', 0],
+  [0.55, 'in', 7, 1.8, 'round', 0],
+  [0.62, 'out', 0.6, 4.6, 'block', 0],
+  [0.66, 'out', 4, 5.8, 'block', 0.8],
+  [0.6, 'out', 6, 3.8, 'round', 3.2],
+  [0.7, 'out', 1.0, 3.4, 'block', 0],
+  [0.65, 'out', 9, 4.6, 'block', 5],
+  [0.74, 'out', 1.6, 2.4, 'round', 0],
+  [0.56, 'out', 2, 2.4, 'round', 0],
+  [0.69, 'out', 7, 4.0, 'block', 2.5],
+];
+
+/**
  * A small canvas of four tiles side by side: grass blades, a leafy bush, a fern and flowers (spikes and small heads
  * on thin stems: forest lane). Drawn pale; tinted per instance.
  */
@@ -462,16 +483,16 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       return r * 1.2 + 0.15;
     };
     const PLAN = Math.max(planOf(boulderGeo.round), planOf(boulderGeo.block));
-    const rocky = (kind, s, side, lat, size, moss) => {
+    const rocky = (kind, s, side, lat, size, moss, lift = 0) => {
       track.pointAt(s, lat, point);
       if (!ownStretch(s, point.x, point.z)) return false;
-      const y = terrain.heightOnTrack(s, lat);
+      const y = terrain.heightOnTrack(s, lat) + lift;
       const v = sr.range(0.85, 1.12);
       const sc = [size * sr.range(0.85, 1.2), size * sr.range(0.85, 1.1), size * sr.range(0.85, 1.15)];
       const tilt = sr.range(-0.12, 0.12);
       if (tier === 'low') {
         // (low: the rocks' own mesh and shape, the granite's tone)
-        rockItems.push(make(point.x, y - size * 0.25, point.z, sr.range(0, Math.PI * 2), sc, [0.34 * v, 0.33 * v, 0.31 * v], size * 1.5, tilt));
+        rockItems.push(make(point.x, y - size * 0.25, point.z, sr.range(0, Math.PI * 2), sc, [0.26 * v, 0.255 * v, 0.24 * v], size * 1.5, tilt));
       } else {
         const item = make(point.x, y - size * (kind === 'block' ? 0.2 : 0.3), point.z, sr.range(0, Math.PI * 2), sc, [v, v, v * (moss > 0.5 ? 0.97 : 1)], size * 1.5, tilt);
         boulderItems[kind].push(item);
@@ -482,6 +503,40 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       const def = run.def;
       const blend = def.blend ?? 80;
       const len = track.wrap(run.s1 - run.s0);
+      // (e5) the frame's own boulders, in its places: set by hand along the scheme's own pieces
+      if (def.boulders === 'granite') {
+        let k = 0;
+        for (let d = 0; d < len; d += 5) k += track.curvature[Math.round(track.wrap(run.s0 + d) / track.ds) % track.count];
+        const inside = k >= 0 ? 1 : -1;
+        for (const [at, where, beyond, size, kind, lift] of E5_ROCKS) {
+          const s = track.wrap(run.s0 + at * len);
+          const side = where === 'in' ? inside : -inside;
+          const lat = side * (track.edgeAt(s, side) + size * PLAN + beyond);
+          rocky(kind, s, side, lat, size, 0.3, lift);
+          if (!T.bushes) continue;
+          for (let b = 0; b < 3; b++) {
+            const ss = track.wrap(s + sr.range(-size * 1.6, size * 1.6));
+            const latB = side * (track.edgeAt(ss, side) + sr.range(0.5, size * PLAN * 2 + beyond));
+            track.pointAt(ss, latB, point);
+            if (!ownStretch(ss, point.x, point.z)) continue;
+            const h = sr.range(1.0, 2.2);
+            const v = sr.range(0.5, 0.8);
+            bushItems.push(make(point.x, terrain.heightOnTrack(ss, latB) - 0.1, point.z, sr.range(0, Math.PI), [h * 1.6, h, h * 1.6], GRASS.bush.map((c) => c * v), h));
+          }
+        }
+        // lupins at the foot of the big boulders by the kerb
+        if (T.grass > 0) {
+          for (let d = 0.72 * len; d < 0.9 * len; d += 0.3) {
+            const s = track.wrap(run.s0 + d);
+            const lat = inside * sr.range(pave + 0.4, track.edgeAt(s, inside) + 1.5);
+            track.pointAt(s, lat, point);
+            if (!ownStretch(s, point.x, point.z)) continue;
+            const g = groundAt(s, lat, inside);
+            const h = sr.range(0.4, 0.75);
+            flowerItems.push(make(point.x, g.y - 0.02, point.z, sr.range(0, Math.PI), [h * 1.3, h, h * 1.3], PURPLE.map((c) => c * sr.range(0.8, 1.15)), h));
+          }
+        }
+      }
       for (const side of [1, -1]) {
         const kinds = side > 0 ? track.kindL : track.kindR;
         // the verge: long grass, ferns, flowers

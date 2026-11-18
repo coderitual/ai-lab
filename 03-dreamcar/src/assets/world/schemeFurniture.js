@@ -137,12 +137,14 @@ export function createBendSigns({ track, terrain, material }) {
 
 /** The kerbstone: precast concrete, a little weathered; its blocks (m). */
 const CURB = { width: 0.3, block: 1, colour: [0.4, 0.39, 0.36] };
-/** The Track's edge kind ROCK (game/track.js EDGE; assets/ does not import game/). */
+/** The Track's edge kinds RAIL and ROCK (game/track.js EDGE; assets/ does not import game/). */
+const EDGE_RAIL = 0;
 const EDGE_ROCK = 1;
 
 /**
  * Low concrete kerbstones standing at the solid edge (face exactly at it, beyond the corridor) wherever a piece's
- * scheme names a `curb` height and the edge is of kind rock: one mesh for all of them.
+ * scheme names a `curb` height and the edge is a rail or rock (neither of which is drawn there: rails.js, terrain.js):
+ * one mesh for all of them. To the cars the edge is what the Track says it is.
  * @param {object} o
  * @param {object} o.track
  * @param {object} o.terrain heightOnTrack, bakeAt
@@ -168,7 +170,7 @@ export function createCurbs({ track, terrain, material }) {
       for (let d = 0; d <= len + 1e-6; d += 1) {
         const s = track.wrap(run.s0 + Math.min(d, len));
         const i = Math.round(s / track.ds) % track.count;
-        if (kinds[i] !== EDGE_ROCK) {
+        if (kinds[i] !== EDGE_ROCK && kinds[i] !== EDGE_RAIL) {
           prev = -1;
           continue;
         }

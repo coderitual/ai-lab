@@ -105,13 +105,13 @@ export const SIDES = {
  *   verge    'meadow' (long grass, ferns, yellow flowers) or 'islands' (grass islands with purple and yellow flowers)
  *   boulders 'mossy' (boulders among the trunks) or 'granite' (pale granite boulders and outcrops at the roadside)
  *   sign     a bend-warning sign this many metres before the piece, on its outside (0: none)
- *   curb     a solid edge of kind 'rock' on its pieces is drawn as a low concrete kerbstone this high (m) with the
- *            ground behind it as the hillside's, not as a cut face
+ *   curb     the solid edges on its pieces (rail or rock to the cars) are drawn as low concrete kerbstones this high
+ *            (m): no rail, no cut face or cliff, no tyre walls, boards or marshal posts there
  * The two schemes answer the owner's frames e2 (a forest road in low side sun: the rise and the first ess) and e5 (a
  * mountain bend round an island of granite boulders: the carousel), design.md "The reference frames".
  */
 export const SCHEMES = {
-  pinewood: { lines: 'double-yellow', gap: 0.16, asphalt: 0.7, cracks: 0.6, strip: 0.32, kerb: [[0.4, 0.39, 0.37], [0.52, 0.51, 0.49]], wood: 'pinewood', verge: 'meadow', boulders: 'mossy', sign: 0, blend: 90 },
+  pinewood: { lines: 'double-yellow', gap: 0.16, asphalt: 0.9, cracks: 0.6, strip: 0.32, kerb: [[0.4, 0.39, 0.37], [0.52, 0.51, 0.49]], wood: 'pinewood', verge: 'meadow', boulders: 'mossy', sign: 0, blend: 90 },
   granite: { lines: 'double-yellow', gap: 0.16, asphalt: 0.5, cracks: 0.4, strip: 0.32, kerb: [[0.02, 0.09, 0.42], [0.62, 0.61, 0.58]], wood: 'stonepine', verge: 'islands', boulders: 'granite', sign: 90, curb: 0.32, blend: 70 },
 };
 
@@ -238,12 +238,13 @@ export const LAYOUT = {
    * (night lane) The rest of the lap is lit too, more sparsely: a circuit's floodlights on tall poles at the solid
    * edge, `spacing` metres apart, everywhere outside the tunnels and the straight's own lamps (lamps keep `clear`
    * metres from a portal): on the inside of every bend tighter than `inside` metres, alternating sides elsewhere.
-   * None stand on the pieces in `skip`: the ledge's first bend is frame D3's place, which has no poles.
+   * None stand on the pieces in `skip`: the ledge's first bend is frame D3's place, the carousel frame E5's (forest
+   * lane), which have no poles.
    * (finish lane) Where the edge is a rail or the trees, a pole stands `setback` metres behind it, so that it is never
    * between the chase camera and the car, and `height` m high; one due at a rock face goes to the other side if that is
    * a rail or the trees; at a rock face, a wall or a parapet it stands at the edge.
    */
-  lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1'] },
+  lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1', 'carousel'] },
   /**
    * (tunnel lane) The tunnel's lamp rows: the light of the lines of fittings along the haunches (tunnel.js draws the
    * fittings), `drop` under the ceiling and `inset` in from the kerb's face (over the shoulder: from there the light

@@ -19,7 +19,7 @@ import { GRASS } from './groundMaterial.js';
 import { planeNoise } from './shading.js';
 
 /** Granite (linear albedo), flecks either way, lichen, the earth at its foot. */
-const GRANITE = { base: [0.34, 0.33, 0.31], fleck: 0.07, lichen: [0.4, 0.39, 0.3], foot: [0.075, 0.07, 0.062] };
+const GRANITE = { base: [0.25, 0.245, 0.23], fleck: 0.08, lichen: [0.31, 0.3, 0.24], foot: [0.075, 0.07, 0.062] };
 /** Moss: the grass's own green (groundMaterial.js GRASS), a shade deeper. */
 const MOSS = GRASS.bush.map((c) => c * 0.95);
 
