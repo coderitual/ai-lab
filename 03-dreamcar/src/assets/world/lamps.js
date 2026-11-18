@@ -24,9 +24,10 @@
 // lap has a hundred and fifty lamps, more uniforms than a phone's shader holds.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ATMOSPHERE_PARS } from './atmosphere.js';
 import { GLSL_TARGET, targetDefines } from '../../engine/glsl.js';
-import { footBox, levelFrame, row, upright } from './furniture.js';
+import { footBox, levelFrame, upright } from './furniture.js';
 import { WET_UNIFORMS } from './shading.js';
 
 /**
@@ -38,7 +39,9 @@ export const LAMP_KINDS = {
   street: { intensity: 14, range: 26, angle: 1.25, penumbra: 0.65, tilt: 0.42, head: 90, color: [1.0, 0.86, 0.7], arm: 2.4 },
   // (night lane) the floodlights round the lap: taller, a cooler white than the straight's warm lamps, so that the
   // wet road mirrors two colours of light
-  lap: { intensity: 18, range: 30, angle: 1.2, penumbra: 0.6, tilt: 0.36, head: 120, color: [0.84, 0.92, 1.0], arm: 1.8 },
+  // (finish lane) they stand back from the edge (trackLayout.js lapLamps.setback) and higher, leaning further in, so
+  // that the chase camera never has a pole between it and the car and is never close under a head
+  lap: { intensity: 18, range: 32, angle: 1.2, penumbra: 0.6, tilt: 0.44, head: 120, color: [0.84, 0.92, 1.0], arm: 2.2 },
   // (render lane) a warm white, not sodium orange: under the orange lamps the bore, the road and the car were one
   // murky brown; a little stronger, so that each lamp lays a pool on the road
   tunnel: { intensity: 34, range: 18, angle: 1.3, penumbra: 0.5, tilt: 0.6, head: 55, color: [1.0, 0.85, 0.66], arm: 0 },
@@ -54,9 +57,11 @@ const GROUND_ALBEDO = 0.09;
 /**
  * The cone of light in the damp air under a lamp on a pole: its half angle (rad), its radiance seen through its
  * middle near the head at full haze (scene units: about 1/4000 of the head's), and how it fades towards the
- * ground (a power of the distance from the head, as the light thins out over the cone's widening section).
+ * ground (a power of the distance from the head, as the light thins out over the cone's widening section). `near`:
+ * from how far (m) to how far it fades in with its distance from the eye (finish lane: a cone a dozen metres from the
+ * chase camera filled a phone's portrait frame with its light).
  */
-const CONE = { angle: 0.45, radiance: 0.018, fade: 2.0, sides: 10, near: [6, 24] };
+const CONE = { angle: 0.45, radiance: 0.018, fade: 2.0, sides: 10, near: [12, 36] };
 /**
  * What the wet road's mirror sees of a lamp's head: a soft disc of light `radius` metres across the damp air round
  * it (gaussian, `radiance` at its middle), drawn only into the mirror, where a head a few centimetres wide would
@@ -88,7 +93,7 @@ float spotIrradiance(vec3 P, vec3 N, vec3 lampPos, vec3 lampDir, float intensity
  *   prepareView with the heads of the GLINTS lit lamps nearest the eye (xyz, w the head's radiance): the wet road's
  *   stand-in for its mirror where there is none
  */
-export function createLamps({ track, caps, tier, atmosphere, glints = null }) {
+export function createLamps({ track, terrain = null, caps, tier, atmosphere, glints = null }) {
   const group = new THREE.Group();
   group.name = 'lamps';
   const frame = {};
@@ -101,10 +106,12 @@ export function createLamps({ track, caps, tier, atmosphere, glints = null }) {
     levelFrame(track, lamp.s, frame);
     const lat = lamp.lat ?? lamp.side * track.edgeAt(lamp.s, lamp.side);
     const foot = track.pointAt(lamp.s, lat, new THREE.Vector3());
-    // the head reaches in over the road on its arm
+    // the head reaches in over the road on its arm, `height` over the corridor's level where the pole stands
     const inward = frame.flat.clone().multiplyScalar(-lamp.side);
     const head = foot.clone().addScaledVector(inward, spec.arm);
     head.y = foot.y + lamp.height;
+    // (finish lane) a pole set back beyond the solid edge stands on the ground there, if that lies lower
+    if (terrain && Math.abs(lat) > track.edgeAt(lamp.s, lamp.side) + 0.05) foot.y = Math.min(foot.y, terrain.heightAt(foot.x, foot.z) - 0.1);
     const dir = new THREE.Vector3(0, -1, 0).addScaledVector(inward, Math.tan(spec.tilt)).normalize();
     return { index, kind, spec, s: lamp.s, side: lamp.side, lat, foot, head, dir, yaw: frame.yaw };
   });
@@ -127,46 +134,65 @@ export function createLamps({ track, caps, tier, atmosphere, glints = null }) {
     shares.needsUpdate = true;
   };
 
-  // ---- the heads (and the street lamps' poles)
+  // ---- the heads (and the poles of the lamps that stand on them)
+  // (finish lane) Everything of one material is one mesh: a lamp's pole, arm and housing are baked into one geometry
+  // with every other lamp's (world/index.js then cuts it into 400 m pieces), and the emitters of the street lamps
+  // and the floodlights, which switch together, are one mesh whose vertex colours carry each kind's colour and
+  // radiance. Five instanced rows per piece were five draw calls; this is two.
   const metal = atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0x585d63, roughness: 0.45, metalness: 0.7 }));
-  const emitters = {};
-  for (const kind of Object.keys(LAMP_KINDS)) {
-    emitters[kind] = atmosphere.patch(new THREE.MeshBasicMaterial({ color: 0x000000 }));
-  }
-  // the street lamps and the floodlights share the pole, the arm and the housing; each kind has its own emitter
+  /** The emitters: the poled lamps' (street and lap, vertex colours) and the tunnel's; their colour is how far they are on. */
+  const emitters = {
+    poled: atmosphere.patch(new THREE.MeshBasicMaterial({ color: 0x000000, vertexColors: true })),
+    tunnel: atmosphere.patch(new THREE.MeshBasicMaterial({ color: 0x000000 })),
+  };
+  const emitterMeshes = {};
   const street = lamps.filter((l) => l.kind === 'street' || l.kind === 'lap');
   if (street.length) {
     const pole = new THREE.CylinderGeometry(0.07, 0.11, 1, 10, 1).translate(0, 0.5, 0);
     const arm = new THREE.BoxGeometry(0.08, 0.08, 1).translate(0, 0, 0.5);
     const housing = new THREE.BoxGeometry(0.34, 0.1, 0.72);
     const emitter = new THREE.PlaneGeometry(0.28, 0.6).rotateX(Math.PI / 2);
-    const m = (l, fn) => street.map((lamp) => fn(lamp));
     const inwardYaw = (lamp) => lamp.yaw + (lamp.side > 0 ? -Math.PI / 2 : Math.PI / 2);
-    group.add(
-      row(pole, metal, m(street, (l) => upright(l.foot, l.yaw, 1, l.head.y - l.foot.y + 0.1, 1)), { name: 'lamp-poles' }),
-      row(arm, metal, m(street, (l) => upright(p.copy(l.foot).setY(l.head.y + 0.12), inwardYaw(l), 1, 1, l.spec.arm)), { name: 'lamp-arms' }),
-      row(housing, metal, m(street, (l) => upright(p.copy(l.head).setY(l.head.y + 0.05), inwardYaw(l))), { name: 'lamp-housings' }),
+    const fittings = baked(
+      street.flatMap((l) => [
+        [pole, upright(l.foot, l.yaw, 1, l.head.y - l.foot.y + 0.1, 1)],
+        [arm, upright(p.copy(l.foot).setY(l.head.y + 0.12), inwardYaw(l), 1, 1, l.spec.arm)],
+        [housing, upright(p.copy(l.head).setY(l.head.y + 0.05), inwardYaw(l))],
+      ]),
     );
-    for (const kind of ['street', 'lap']) {
-      const these = street.filter((l) => l.kind === kind);
-      if (these.length) group.add(row(emitter, emitters[kind], m(these, (l) => upright(p.copy(l.head).setY(l.head.y - 0.005), inwardYaw(l))), { shadow: false, name: `lamp-emitters-${kind}` }));
-    }
+    group.add(plain(fittings, metal, { name: 'lamp-fittings' }));
+    const heads = baked(street.map((l) => [emitter, upright(p.copy(l.head).setY(l.head.y - 0.005), inwardYaw(l)), l.spec.color.map((c) => c * l.spec.head)]));
+    emitterMeshes.poled = plain(heads, emitters.poled, { shadow: false, name: 'lamp-emitters' });
+    group.add(emitterMeshes.poled);
+    for (const g of [pole, arm, housing, emitter]) g.dispose();
   }
   const tunnel = byKind('tunnel');
   if (tunnel.length) {
     const housing = new THREE.BoxGeometry(0.42, 0.16, 1.3);
     const emitter = new THREE.PlaneGeometry(0.32, 1.15).rotateX(Math.PI / 2);
     const bracket = footBox();
-    group.add(
-      row(housing, metal, tunnel.map((l) => upright(p.copy(l.head).setY(l.head.y + 0.08), l.yaw)), { shadow: false, name: 'tunnel-lamp-housings' }),
-      row(bracket, metal, tunnel.map((l) => upright(p.copy(l.head).setY(l.head.y + 0.16), l.yaw, 0.06, 0.5, 0.06)), { shadow: false, name: 'tunnel-lamp-brackets' }),
-      row(emitter, emitters.tunnel, tunnel.map((l) => upright(p.copy(l.head).setY(l.head.y - 0.005), l.yaw)), { shadow: false, name: 'tunnel-lamp-emitters' }),
+    const fittings = baked(
+      tunnel.flatMap((l) => [
+        [housing, upright(p.copy(l.head).setY(l.head.y + 0.08), l.yaw)],
+        [bracket, upright(p.copy(l.head).setY(l.head.y + 0.16), l.yaw, 0.06, 0.5, 0.06)],
+      ]),
     );
+    group.add(plain(fittings, metal, { shadow: false, name: 'tunnel-lamp-fittings' }));
+    const heads = baked(tunnel.map((l) => [emitter, upright(p.copy(l.head).setY(l.head.y - 0.005), l.yaw)]));
+    emitterMeshes.tunnel = plain(heads, emitters.tunnel, { shadow: false, name: 'tunnel-lamp-emitters' });
+    group.add(emitterMeshes.tunnel);
+    for (const g of [housing, emitter, bracket]) g.dispose();
   }
 
   // ---- the glow on the ground: a patch of the corridor's surface under each lamp
-  // (picture lane) one mesh per kind, so that a kind switched off (the street lamps by day) is not drawn at all
-  const glowGeometries = Object.keys(LAMP_KINDS).map((kind) => [kind, byKind(kind)]).filter(([, l]) => l.length).map(([kind, l]) => [kind, buildGlowGeometry(track, l)]);
+  // (picture lane) one mesh per kind that switches, so that a kind switched off (the street lamps by day) is not drawn
+  // at all; (finish lane) the street lamps and the floodlights switch together, so they are one mesh
+  const glowGeometries = [
+    ['street', street],
+    ['tunnel', tunnel],
+  ]
+    .filter(([, l]) => l.length)
+    .map(([kind, l]) => [kind, buildGlowGeometry(track, l)]);
   const glowMaterial = new THREE.ShaderMaterial({
     defines: { ...targetDefines(caps) },
     uniforms: { ...atmosphere.uniforms, uShares: sharesUniform, uAlbedo: { value: GROUND_ALBEDO }, uWet: WET_UNIFORMS.uWet },
@@ -397,6 +423,8 @@ void main() {
     glows,
     /** The cones of light under the lamps on poles (null without any). */
     cones,
+    /** The poled lamps' emitters (null without any): the road's mirror sees their halos instead. */
+    heads: emitterMeshes.poled ?? null,
     /**
      * The heads' halos for the road's mirror (null without lamps on poles): shown only while the mirror is drawn,
      * with `height` the mirror picture's height in pixels.
@@ -420,10 +448,11 @@ void main() {
       on.tunnel = time.lamps.tunnel;
       writeShares();
       for (const glow of glows) glow.visible = on[glow.userData.kind] > 0;
-      for (const [kind, material] of Object.entries(emitters)) {
-        const spec = LAMP_KINDS[kind];
-        material.color.setRGB(...spec.color.map((c) => c * spec.head * on[kind]));
-      }
+      // (the poled emitters' colour and radiance are in their vertex colours; a lamp switched off is not drawn)
+      emitters.poled.color.setScalar(on.street);
+      const tunnelSpec = LAMP_KINDS.tunnel;
+      emitters.tunnel.color.setRGB(...tunnelSpec.color.map((c) => c * tunnelSpec.head * on.tunnel));
+      if (emitterMeshes.poled) emitterMeshes.poled.visible = on.street > 0;
       coneGain.value = CONE.radiance * (time.lamps.haze ?? 0);
       if (cones) cones.visible = coneGain.value > 0 && on.street > 0;
     },
@@ -581,4 +610,31 @@ function buildGlowGeometry(track, lamps) {
   geometry.setIndex(index);
   geometry.computeBoundingSphere();
   return geometry;
+}
+
+/**
+ * (finish lane) One geometry of many placed copies: each [geometry, matrix, colour?] is transformed by its matrix (and
+ * coloured, if a colour is given: an attribute `color` on every vertex) and all are merged.
+ * @param {Array<[THREE.BufferGeometry, THREE.Matrix4, number[]?]>} parts
+ */
+function baked(parts) {
+  const list = parts.map(([geometry, matrix, colour]) => {
+    const g = geometry.clone().applyMatrix4(matrix);
+    if (colour) g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(g.attributes.position.count).fill(colour).flat(), 3));
+    return g;
+  });
+  const out = mergeGeometries(list);
+  for (const g of list) g.dispose();
+  out.computeBoundingSphere();
+  return out;
+}
+
+/** A plain mesh of a baked geometry, casting shadows unless told not to, receiving them. */
+function plain(geometry, material, { shadow = true, name = '' } = {}) {
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = shadow;
+  mesh.receiveShadow = true;
+  mesh.matrixAutoUpdate = false;
+  mesh.name = name;
+  return mesh;
 }

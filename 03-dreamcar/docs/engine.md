@@ -194,7 +194,8 @@ far over any lamp, so a single wild pixel cannot light a blob.
 Only on medium and high. The flare source is one pixel that sums, over the
 first pyramid level no more than 48 texels wide, the light above 30 times
 white: where it is and how much. Only the sun gets there. Ghosts (discs and
-rings on the line from it through the middle) and the glare veil round it are
+rings on the line from it to the middle, all on its side of the middle, so
+that none lands on the car a chase view is centred on) and the glare veil round it are
 drawn in the final pass as shapes from that pixel. `look.flare` lets a sun
 just outside the frame still flare if the edge of the view nearest it shows
 open sky.
@@ -293,7 +294,7 @@ beside D1 and A, golden hour beside D4 and D2, night beside B):
 | `grain` | 0.5 | 0.6 | 1.2 |
 | `bloom` | 0.05 | 0.09 | 0.15 |
 | `halo` | 0 | 0.05 | 0.15 |
-| `ghosts` | 0.0003 (faint: D1 shows glare and glints, not rings) | 0.0003 | 0 |
+| `ghosts` | 0.00015 (faint: D1 shows glare and glints, not rings) | 0.0002 | 0 |
 | `glare` | 0.015 (more greys the whole sky round the sun) | 0.03 | 0 |
 | `flare` | the sun, light 1.0, reach 0.6, sky 0.3 | the low sun, light 0.6, reach 0.5, sky 0.1 | none |
 | `star` | 0.02 (sun glints on paint and glass) | 0.015 | 0.015 |

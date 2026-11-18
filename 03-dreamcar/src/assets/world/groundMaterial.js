@@ -20,6 +20,34 @@ import * as THREE from 'three';
 import { fieldTexture, gradientField, normalTexture, valueField, worleyField } from '../../engine/noise.js';
 import { extend, withBake } from './shading.js';
 
+/**
+ * (finish lane) The one green of the grass, linear albedo: the meadow (lush where it is damp, drier and a little
+ * straw-coloured where it is not), the mown verge's two stripes, the light the blades let through against a low sun,
+ * and the tufts, bushes and the wood's floor that stand on it (groundCover.js, forest.js read it). Early autumn: an
+ * olive green a little less saturated than the trees' greens, so that the trees, not the grass, carry the colour. It
+ * was a yellow-green at about a third of blue to green, and the light through the blades was ten times what the
+ * blades reflect, which against the sun glowed neon; now about 40 % blue to green, and the light through them two
+ * to three times what they reflect.
+ */
+export const GRASS = {
+  lush: [0.042, 0.064, 0.026],
+  dry: [0.054, 0.07, 0.03],
+  /** dry straw among the meadow's grass */
+  straw: [0.072, 0.072, 0.04],
+  mown: [
+    [0.05, 0.074, 0.03],
+    [0.057, 0.082, 0.034],
+  ],
+  /** what the blades let through towards the eye, per unit of the light behind them (verge; the meadow 0.6 of it) */
+  through: [0.03, 0.044, 0.015],
+  /** a tuft's tint over the cover texture (green .. dry), a bush's, and the wood's floor's (over its own painting) */
+  tuft: [0.045, 0.065, 0.027],
+  tuftDry: [0.07, 0.07, 0.034],
+  bush: [0.046, 0.064, 0.028],
+  floor: [0.2, 0.19, 0.36],
+};
+const v3 = (c) => `vec3( ${c.map((x) => x.toFixed(4)).join(', ')} )`;
+
 /** Metres one repeat of the detail texture covers, and of the large field. */
 const DETAIL_SCALE = 6.4;
 const LARGE_SCALE = 560;
@@ -197,11 +225,11 @@ float gForest = smoothstep( 0.3, 0.6, vMask.x + ( gMid.b - 0.5 ) * 0.5 + ( gLarg
 float gSnow = 0.0 * smoothstep( 290.0, 350.0, vGroundPos.y + 70.0 * ( gLarge.a - 0.5 ) ) * ( 1.0 - smoothstep( 0.45, 0.7, gSlope ) );
 
 // meadow: lush where gLarge.r is low, dry and paler where it is high, higher up a little browner
-vec3 gLush = vec3( 0.036, 0.062, 0.02 );
-vec3 gDry = vec3( 0.045, 0.068, 0.024 );
+vec3 gLush = ${v3(GRASS.lush)};
+vec3 gDry = ${v3(GRASS.dry)};
 vec3 gGrass = mix( gLush, gDry, smoothstep( 0.45, 0.85, gLarge.r + vGroundPos.y * 0.001 ) );
 gGrass *= 0.78 + 0.44 * gDet.r;
-gGrass = mix( gGrass, vec3( 0.075, 0.08, 0.04 ) * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.6, 0.85, gMid.b ) * 0.5 );
+gGrass = mix( gGrass, ${v3(GRASS.straw)} * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.6, 0.85, gMid.b ) * 0.5 );
 gGrass *= 0.72 + 0.56 * gMid.r;
 // forest floor near, the canopy's colour far away
 vec3 gFloor = vec3( 0.04, 0.034, 0.024 ) * ( 0.7 + 0.6 * gDet.a );
@@ -228,18 +256,20 @@ if ( gVerge > 0.0 ) {
   float vd = vVerge.x;
   float vAa = 0.6 * ( abs( dFdx( vd ) ) + abs( dFdy( vd ) ) ) + 1.0e-3;
   // the mower's passes: bands about 1.6 m wide whose blades lean one way or the other (a shade apart, no more:
-  // frame D1's verge is evenly mown), (render lane) an autumn green, not a neon yellow-green
+  // frame D1's verge is evenly mown), (render lane, finish lane) an autumn green, GRASS.mown
   float pass = abs( fract( vd / 3.2 ) * 2.0 - 1.0 );
   float stripe = clamp( ( pass - 0.5 ) / max( vAa / 1.6, 1.0e-3 ) + 0.5, 0.0, 1.0 );
   stripe = mix( stripe, 0.5, smoothstep( 0.3, 1.0, vAa / 1.6 ) );
-  vec3 mown = mix( vec3( 0.056, 0.088, 0.03 ), vec3( 0.066, 0.1, 0.034 ), stripe ) * ( 0.85 + 0.3 * gDet.r ) * ( 0.88 + 0.24 * gMid.r );
+  vec3 mown = mix( ${v3(GRASS.mown[0])}, ${v3(GRASS.mown[1])}, stripe ) * ( 0.85 + 0.3 * gDet.r ) * ( 0.88 + 0.24 * gMid.r );
   // a wide run-off is mown to the kerb but for a ragged strip of worn earth along it (D1); a narrow verge with a
   // wall close by is rough grass in tufts with bare earth between them, most of it by the road (D3)
   float vWidth = vd - vVerge.z;
   float narrow = 1.0 - smoothstep( 4.5, 6.0, vWidth );
   float rag = 0.55 + 0.5 * ( gDet.b - 0.5 ) + 0.6 * ( gLarge.b - 0.5 ) + 0.4 * ( gDet2.r - 0.5 );
   float earth = 1.0 - smoothstep( rag - 0.15, rag + 0.15, vd );
-  float bare = smoothstep( 0.42, 0.6, 0.55 * gDet2.r + 0.45 * gMid.a + 0.35 * ( 1.0 - smoothstep( 0.0, 2.2, vd ) ) - 0.2 * gDet.r );
+  // (finish lane) a little less bare earth than it had: without the glow of the light through the blades, a narrow
+  // verge under the woods read as all earth and leaves
+  float bare = smoothstep( 0.5, 0.68, 0.55 * gDet2.r + 0.45 * gMid.a + 0.35 * ( 1.0 - smoothstep( 0.0, 2.2, vd ) ) - 0.2 * gDet.r );
   earth = max( earth, narrow * bare );
   vec3 earthCol = mix( vec3( 0.075, 0.058, 0.04 ), vec3( 0.15, 0.125, 0.095 ), gDet.b ) * ( 0.75 + 0.4 * gDet2.g );
   // a few stones thrown out onto the grass beyond it
@@ -250,7 +280,7 @@ if ( gVerge > 0.0 ) {
   vec3 vergeCol = mix( mown, roughCol, rough );
   vergeCol = mix( vergeCol, earthCol, max( earth, stones * 0.8 ) );
   // fallen leaves drifted against the barrier's foot under woods (frame D4)
-  float leaves = gWoodBehind * smoothstep( -2.2, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
+  float leaves = gWoodBehind * smoothstep( -1.6, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
   vergeCol = mix( vergeCol, mix( vec3( 0.2, 0.075, 0.02 ), vec3( 0.09, 0.04, 0.015 ), gDet.b ), leaves );
   gGrass = mix( gGrass, vergeCol, gVerge );
   gVergeEarth = gVerge * max( earth, stones * 0.8 );
@@ -264,7 +294,8 @@ if ( gVerge > 0.0 ) {
     vec2 fp = mat2( 0.92, 0.39, -0.39, 0.92 ) * vGroundPos.xz / vec2( 130.0, 75.0 );
     vec2 fc = floor( fp );
     float fh = fract( sin( dot( fc, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
-    vec3 crop = fh < 0.35 ? vec3( 0.04, 0.07, 0.02 ) : fh < 0.6 ? vec3( 0.055, 0.075, 0.024 ) : fh < 0.85 ? vec3( 0.032, 0.055, 0.017 ) : vec3( 0.06, 0.066, 0.03 );
+    // (finish lane) the crops round the grass's own green: a damper meadow, a drier one, a darker pasture, stubble
+    vec3 crop = fh < 0.35 ? gLush * 1.05 : fh < 0.6 ? gDry * 1.08 : fh < 0.85 ? gLush * 0.82 : ${v3(GRASS.straw)};
     vec2 fe = min( fract( fp ), 1.0 - fract( fp ) ) * vec2( 130.0, 75.0 );
     float fAa = fwidth( vGroundPos.x ) + fwidth( vGroundPos.z ) + 0.5;
     float hedge = 1.0 - smoothstep( 2.0, 2.0 + fAa, min( fe.x, fe.y ) );
@@ -276,11 +307,11 @@ if ( gVerge > 0.0 ) {
 float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) );
 gForest = max( gForest, gClump );
 vec3 gAlbedo = gGrass;
-// blades let through a bright yellow-green, the mown verge most (bare earth none)
+// blades let some light through, the mown verge most (bare earth none)
 groundGrass = ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * ( 1.0 - gVergeEarth );
-// (render lane) the light through the blades is a natural green, not the neon yellow-green it was: against the
-// low sun the verge still glows, but as autumn grass
-groundThrough = mix( vec3( 0.13, 0.26, 0.07 ), vec3( 0.15, 0.24, 0.07 ), gVerge ) * ( 0.6 + 0.6 * gVerge ) * groundGrass * gFade;
+// (render lane, finish lane) the light through the blades is the grass's own green (GRASS.through), about twice
+// what the blades reflect: against the low sun the verge is brighter, as autumn grass, not a neon glow
+groundThrough = ${v3(GRASS.through)} * ( 0.6 + 0.4 * gVerge ) * groundGrass * gFade;
 gAlbedo = mix( gAlbedo, vec3( 0.03, 0.045, 0.02 ) * ( 0.7 + 0.6 * gDet.r ), gScrub * 0.85 );
 gAlbedo = mix( gAlbedo, gForestCol, gForest );
 // (seen from the road a clump is crowns, not forest floor)

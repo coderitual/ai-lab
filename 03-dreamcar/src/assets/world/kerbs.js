@@ -16,11 +16,15 @@
 // along the road edge, rubber smeared on where cars ride them, the concrete
 // showing through worn paint, dust and earth thrown up along the verge side.
 // Wet (night) it darkens and turns glossy.
+// (finish lane) The white paint has glass beads in it, as a road's lines do: in a car's head lamps it sends light
+// back towards the lamps (retro.js), brightest on the teeth's faces that look at the car and in specks where a bead
+// sits proud; red paint, worn paint, rubber and dirt do not.
 
 import * as THREE from 'three';
 import { roadTextures } from './roadTextures.js';
 import { WET_UNIFORMS, extend, withBake } from './shading.js';
 import { canopyOpen } from './canopy.js';
+import { retroReflective } from './retro.js';
 
 /**
  * The kerb's shape: the same numbers as KERB in game/trackLayout.js (the world never imports from game/). The
@@ -31,6 +35,8 @@ const KERB_FALLBACK = { rise: 0.04, tooth: 0.25, pitch: 0.9 };
 const DETAIL = { low: { rows: 0.5, cols: 3 }, medium: { rows: 2, cols: 3 }, high: { rows: 2, cols: 5 } };
 /** The teeth are drawn this much steeper in the shading than they are, so that they read at a glance. */
 const TOOTH_SHADE = 3;
+/** (finish lane) The white paint's beads against engineering-grade sheeting (retro.js): about what the road's lines send back. */
+const KERB_BEADS = 0.2;
 
 /**
  * @param {object} options
@@ -121,6 +127,7 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
       .replace('#include <normal_fragment_maps>', KERB_NORMAL);
   });
   withBake(material);
+  retroReflective(material, KERB_BEADS, { weight: 'kBeads' });
   atmosphere.patch(material);
 
   const mesh = new THREE.Mesh(geometry, material);
@@ -195,6 +202,10 @@ kCol *= mix( 1.0, 0.6, uWet );
 kerbRough = mix( mix( 0.5, 0.75, kWorn ), 0.55, kRubber );
 kerbRough = mix( kerbRough, 0.12 + 0.2 * kWorn, smoothstep( 0.05, 0.4, uWet ) );
 diffuseColor.rgb *= kCol;
+// (finish lane) how much of the pixel is beaded white paint, in specks (retro.js reads it as its weight); a kerb
+// stands proud of the water, so the wet road drowns only some of the beads
+float kBeads = ( 1.0 - kRed ) * ( 1.0 - 0.85 * kWorn ) * ( 1.0 - kRubber ) * ( 1.0 - 0.65 * kDirt ) * ( 1.0 - kSeam )
+  * ( 0.35 + 2.2 * smoothstep( 0.6, 0.92, kAgg.r ) ) * ( 1.0 - 0.3 * uWet );
 `;
 
 const KERB_NORMAL = /* glsl */ `

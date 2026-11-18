@@ -65,6 +65,7 @@ import { BIG_TILE, ROUGH_GAIN, VARIANCE_GAIN, roadTextures } from './roadTexture
 import { BORE_UNIFORMS, WET_UNIFORMS, extend, withBake } from './shading.js';
 import { GLINTS } from './lamps.js';
 import { canopyOpen } from './canopy.js';
+import { PIECE } from './terrain.js';
 
 /** The edge line: its width (m), its outer edge on the pavement's edge. */
 const EDGE_LINE = 0.28;
@@ -138,7 +139,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
   const co = corridorOf(track);
   const history = roadHistory({ track, rng: rng.fork('history'), tier });
 
-  // ---- the mesh, in chunks of about 150 m
+  // ---- the mesh, in chunks of PIECE m (terrain.js: 400, 240 and 160 m by tier)
   const ACROSS = [1, pave, half, ...(INNER[tier] ?? INNER.medium), -half, -pave, -1]; // ±1: the outer columns, filled below
   const cols = ACROSS.length;
   const geometries = [];
@@ -147,7 +148,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
   const rows = [];
   for (let i = 0; i < n; i += rowStep) rows.push(i);
   rows.push(n); // the lap closes on its first row again, with s = length
-  const CHUNK = Math.round(150 / (ds * rowStep));
+  const CHUNK = Math.round((PIECE[tier] ?? 160) / (ds * rowStep));
   const byte = (v) => Math.round(255 * Math.min(1, Math.max(0, v)));
   for (let a = 0; a < rows.length - 1; a += CHUNK) {
     const list = rows.slice(a, Math.min(rows.length, a + CHUNK + 1));

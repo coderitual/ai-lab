@@ -1,6 +1,8 @@
 // Guard rails: wherever the Track's solid edge is a RAIL, a circuit's steel
 // barrier: two galvanised W-beams stacked on posts, its face standing exactly at the edge distance (that is where the
 // physics stops a car), with a reflector every few posts.
+// (finish lane) The reflectors are not objects: a patch of sheeting on the upper beam's face over every fourth post,
+// painted and made retro-reflective in the beam's own shader (railSteel, retro.js), so they cost no draw call.
 //
 // The beam is one profile swept along each run, closer in bends than on the
 // straight; its texture coordinates are metres of road, so the splices and
@@ -10,7 +12,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { EDGE, along, levelFrame, row, runsOf, stripGeometry, upright } from './furniture.js';
+import { EDGE, along, levelFrame, runsOf, stripGeometry, upright } from './furniture.js';
 import { retroReflective } from './retro.js';
 import { extend } from './shading.js';
 
@@ -58,8 +60,12 @@ const SECTION = { low: [12, 4], medium: [4, 2], high: [4, 2] };
 /** Posts: spacing (m) by tier, and where they stand behind the beam. */
 const POST_SPACING = { low: 6, medium: 2, high: 2 };
 const POST_OUT = 0.16;
-/** A reflector on every this many posts. */
-const REFLECTOR_EVERY = 1e9; // (a circuit's barrier carries none)
+/**
+ * (finish lane) The reflectors on the beam: every `every` metres of road (over every fourth post), `length` m long, on
+ * the upper beam's flat face towards the road between heights `y0` and `y1` (BEAM), white sheeting of `gain`
+ * against the steel's colour.
+ */
+const REFLECTOR = { every: 8, length: 0.14, y0: 0.835, y1: 0.865, gain: 2.5 };
 /** The terminals: metres over which a free end goes down into the ground, and how far it turns away. */
 const RAMP = 7;
 const FLARE = 0.5;
@@ -78,18 +84,16 @@ const RAMP_TYRE = 4;
 export function createRails({ track, tier, atmosphere }) {
   const group = new THREE.Group();
   group.name = 'rails';
-  const steel = railSteel(
-    atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xa9afb3, metalness: 0.85, roughness: 0.36, side: THREE.DoubleSide })),
+  const steel = retroReflective(
+    railSteel(atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xa9afb3, metalness: 0.85, roughness: 0.36, side: THREE.DoubleSide }))),
+    REFLECTOR.gain,
+    { weight: 'railReflector()' },
   );
-  const postSteel = atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0x8f959a, metalness: 0.8, roughness: 0.5 }));
-  const reflectorMaterial = retroReflective(atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })), 1);
 
   const frame = {};
   const base = new THREE.Vector3();
   const beams = [];
   const posts = [];
-  const reflectors = [];
-  const reflectorColors = [];
   const n = track.count;
   let metres = 0;
 
@@ -148,7 +152,7 @@ export function createRails({ track, tier, atmosphere }) {
       }
       beams.push(stripGeometry(rows));
 
-      // posts behind it, and a reflector on every few
+      // posts behind it
       const spacing = POST_SPACING[tier] ?? 2;
       along(
         track,
@@ -165,25 +169,11 @@ export function createRails({ track, tier, atmosphere }) {
           // a post under a single beam is cut down to it
           const single = coverOf(track.boards, su, side, 2) > 0.5;
           posts.push(upright(new THREE.Vector3(x, y - 0.45, z), frame.yaw, 1, single ? 0.78 : 1, 1));
-          if (k % REFLECTOR_EVERY === 3 && into === 0) {
-            const [rx, ry, rz] = place(su, 0.04, 0.8, 0);
-            reflectors.push(upright(new THREE.Vector3(rx, ry, rz), frame.yaw));
-            // white on the left of the way the road is driven, red on the right
-            reflectorColors.push(side > 0 ? [1, 1, 1] : [1, 0.06, 0.02]);
-          }
         },
         { ends: true },
       );
     }
   }
-
-  const beamGeometry = mergeGeometries(beams);
-  for (const g of beams) g.dispose();
-  const beam = new THREE.Mesh(beamGeometry, steel);
-  beam.name = 'rail-beams';
-  beam.castShadow = true;
-  beam.receiveShadow = true;
-  group.add(beam);
 
   // a C-section post, a spacer block in front of it at the beam's height
   const postGeometry = tier === 'low' ? new THREE.BoxGeometry(0.11, 1.55, 0.14).translate(0, 0.775, 0.03) : mergeGeometries([
@@ -191,18 +181,22 @@ export function createRails({ track, tier, atmosphere }) {
     new THREE.BoxGeometry(0.1, 0.3, 0.1).translate(0, 1.05, 0),
     new THREE.BoxGeometry(0.1, 0.3, 0.1).translate(0, 1.39, 0),
   ]);
-  group.add(row(postGeometry, postSteel, posts, { name: 'rail-posts' }));
+  // (finish lane) the posts in the beams' own mesh and material, so that a piece of barrier is one draw call in each
+  // pass, not two: their texture coordinate v is -1, which railSteel paints as the posts' darker, rougher steel
+  postGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(new Array(postGeometry.attributes.position.count).fill([0, -1]).flat(), 2));
+  const postCopies = posts.map((m) => postGeometry.clone().applyMatrix4(m));
+  const beamGeometry = mergeGeometries([...beams, ...postCopies]);
+  for (const g of [...beams, ...postCopies, postGeometry]) g.dispose();
+  const beam = new THREE.Mesh(beamGeometry, steel);
+  beam.name = 'rail-beams';
+  beam.castShadow = true;
+  beam.receiveShadow = true;
+  group.add(beam);
 
-  const reflectorMesh = row(new THREE.BoxGeometry(0.05, 0.1, 0.02).translate(0, 0.05, 0), reflectorMaterial, reflectors, {
-    shadow: false,
-    name: 'rail-reflectors',
-  });
-  reflectorColors.forEach((c, i) => reflectorMesh.setColorAt(i, new THREE.Color(...c)));
-  group.add(reflectorMesh);
 
   return {
     group,
-    stats: { metres: Math.round(metres), posts: posts.length, reflectors: reflectors.length },
+    stats: { metres: Math.round(metres), posts: posts.length, reflectors: Math.floor(metres / REFLECTOR.every) },
   };
 }
 
@@ -216,11 +210,26 @@ function railSteel(material) {
       .replace('#include <common>', '#include <common>\nvarying vec2 vRail;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRail = uv;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vRail;')
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec2 vRail;
+// 1 on a reflector's sheeting, 0 elsewhere (REFLECTOR), anti-aliased along the road
+float railReflector() {
+  float aaX = fwidth(vRail.x) + 1.0e-3;
+  float along = abs(fract(vRail.x / ${REFLECTOR.every.toFixed(1)} + 0.5) - 0.5) * ${REFLECTOR.every.toFixed(1)};
+  float x = 1.0 - smoothstep(${(REFLECTOR.length / 2).toFixed(3)} - aaX, ${(REFLECTOR.length / 2).toFixed(3)} + aaX, along);
+  float y = step(${REFLECTOR.y0.toFixed(3)}, vRail.y) * step(vRail.y, ${REFLECTOR.y1.toFixed(3)});
+  return x * y;
+}`,
+      )
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-{
+if (vRail.y < -0.5) {
+  // a post (v = -1): darker, rougher steel than the beams (0x8f959a against 0xa9afb3)
+  diffuseColor.rgb *= 0.69;
+} else {
   float splice = smoothstep(0.2, 0.14, abs(fract(vRail.x / 4.0 + 0.5) - 0.5) * 4.0);
   float aaX = fwidth(vRail.x) + 1.0e-3;
   // bolt heads on the beams' flat middles: over each post (every 2 m), and a group at each splice
@@ -233,11 +242,13 @@ function railSteel(material) {
   diffuseColor.rgb *= mix(1.0, 0.78, splice) * mix(0.82, 1.0, smoothstep(0.44, 0.7, vRail.y));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.29, 0.25), 0.35 * spray);
   diffuseColor.rgb *= 1.0 - 0.6 * bolt;
+  // the reflector's sheeting: white by day
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.75), railReflector());
 }`,
       )
       .replace(
         '#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\nroughnessFactor = mix( roughnessFactor, 0.62, smoothstep( 0.7, 0.44, vRail.y ) );',
+        '#include <roughnessmap_fragment>\nroughnessFactor = vRail.y < -0.5 ? 0.5 : mix( roughnessFactor, 0.62, smoothstep( 0.7, 0.44, vRail.y ) );',
       );
   });
 }

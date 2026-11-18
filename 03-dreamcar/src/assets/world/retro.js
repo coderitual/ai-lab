@@ -96,11 +96,15 @@ float retroReturn(vec3 P, vec3 N) {
 /**
  * Makes a standard material retro-reflective: its colour (times `gain`) is also the colour it sends back. Works with
  * instanced meshes. The sheeting's own colour lies in `material.color` (and its map, if it has one).
+ * (finish lane) `weight`, a GLSL float expression evaluated in the fragment shader after the colour is known, says
+ * how much of each pixel is sheeting: the beaded white paint of a kerb's teeth, a reflector on a rail's beam. It
+ * costs no light and no draw call: the beams are uniforms the road reads already.
  * @template {THREE.MeshStandardMaterial} T @param {T} material @param {number} [gain] 1: engineering-grade sheeting
+ * @param {{ weight?: string }} [options]
  * @returns {T}
  */
-export function retroReflective(material, gain = 1) {
-  return extend(material, `retro${gain}`, (shader) => {
+export function retroReflective(material, gain = 1, { weight = '1.0' } = {}) {
+  return extend(material, `retro${gain}|${weight}`, (shader) => {
     Object.assign(shader.uniforms, RETRO_UNIFORMS);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vRetroWorld;\nvarying float vRetroEye;')
@@ -121,7 +125,7 @@ vRetroEye = abs( abs( projectionMatrix[ 1 ][ 1 ] ) - 1.0 ) < 1.0e-3 && abs( abs(
         `#include <emissivemap_fragment>
 {
   vec3 worldNormal = normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );
-  totalEmissiveRadiance += diffuseColor.rgb * ${gain.toFixed(3)} * retroReturn( vRetroWorld, worldNormal );
+  totalEmissiveRadiance += diffuseColor.rgb * ${gain.toFixed(3)} * ( ${weight} ) * retroReturn( vRetroWorld, worldNormal );
 }`,
       );
   });

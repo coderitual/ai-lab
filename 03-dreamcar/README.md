@@ -13,7 +13,7 @@ a lit tunnel, out onto a road on piers across the valley, round a slow
 banked carousel, over a crest, down a plunge and a ledge, across a second
 bridge and through a long right back to the shore. The car is a model of a
 real one, made in code from photographs, in a hot dream tune: 0 to 100 km/h in
-3.9 s, 284 km/h, about 1.3 g. It is quick and planted, and it can be driven
+3.7 s, 284 km/h, about 1.3 g. It is quick and planted, and it can be driven
 flat out with a keyboard or one thumb in the first minute.
 
 | | |

@@ -583,8 +583,15 @@ function placeFurniture(track, plan) {
       // in a bend on its inside (it lights the apex, and the chase camera, which swings wide, never meets its pole);
       // on the straighter stretches alternating
       const curve = track.curvature[Math.round(s / track.ds) % track.count];
-      const here = Math.abs(curve) > 1 / lap.inside ? Math.sign(curve) : side;
-      track.lamps.push({ s, side: here, lat: here * track.edgeAt(s, here), height: lap.height, kind: 'lap' });
+      let here = Math.abs(curve) > 1 / lap.inside ? Math.sign(curve) : side;
+      // behind a rail or among the trees it stands back from the edge; at a rock face, a wall or a parapet, at it.
+      // (finish lane) A rock face beside the road leaves no room behind it: the pole goes to the other side if a rail
+      // or the trees are there, where it can stand back (at a rock face it stood close beside the chase camera).
+      const kindOf = (side) => (side > 0 ? track.kindL : track.kindR)[Math.round(s / track.ds) % track.count];
+      const open = (k) => k === EDGE.RAIL || k === EDGE.TREES;
+      if (kindOf(here) === EDGE.ROCK && open(kindOf(-here))) here = -here;
+      const back = open(kindOf(here)) ? (lap.setback ?? 0) : 0;
+      track.lamps.push({ s, side: here, lat: here * (track.edgeAt(s, here) + back), height: lap.height, kind: 'lap' });
       side = -here;
     }
   }

@@ -62,7 +62,7 @@ import { parseParams } from './params.js';
  * @property {number} grain film grain, in 8-bit steps
  * @property {number} bloom how much of the picture is replaced by its own glow, 0..1 (0.1: a mist filter)
  * @property {number} ghosts lens ghosts: the share of the brightest light in the view (the sun) that each of the
- *   ghosts on the line from it through the middle of the view carries (0: none; a few thousandths; not drawn on the
+ *   ghosts on the line from it to the middle of the view carries (0: none; a few thousandths; not drawn on the
  *   low tier)
  * @property {{ dir: number[], light: number, reach?: number, sky?: number }} [flare] (look lane) a light that flares
  *   even from just outside the frame (the sun): its world direction, its light as the flare source would measure it
@@ -641,10 +641,12 @@ ${GRAIN_GLSL}
 
 #ifdef LENS
 // LOOK LANE (day stage): lens ghosts and glare, drawn from the flare source (its centroid f on the view and its
-// light e). The ghosts lie on the line from it through the middle of the view, at -k times its offset from the
-// middle: soft discs and rings of a few sizes, blue-violet with a slight colour fringe (each channel's edge a few
-// per cent apart). Each carries the same share of the light, spread over its own area, so the small ones are the
-// brighter. The glare is a broad warm veil round the source itself.
+// light e). The ghosts lie on the line from it to the middle of the view, at k times its offset from the middle:
+// soft discs and rings of a few sizes, blue-violet with a slight colour fringe (each channel's edge a few per cent
+// apart). Each carries the same share of the light, spread over its own area, so the small ones are the brighter.
+// (finish lane) Every k is between 0.45 and 0.86: the ghosts stay on the source's side of the middle. Ghosts mirrored
+// through the middle (k < 0) fell on whatever the view is centred on, in a chase view the car and the road under it.
+// The glare is a broad warm veil round the source itself.
 float ghostDisc(float d, float r) { return 1.0 - smoothstep(r * 0.72, r, d); }
 float ghostRing(float d, float r) { return smoothstep(r * 0.62, r * 0.9, d) * (1.0 - smoothstep(r * 0.9, r, d)) + 0.18 * ghostDisc(d, r); }
 vec3 ghostShape(vec2 uv, vec2 f, float k, float r, float ring) {
@@ -660,13 +662,12 @@ vec3 ghosts(vec2 uv) {
   float e = src.z;
   if (e <= 0.0) return vec3(0.0);
   vec2 f = src.xy;
-  vec3 sum = ghostShape(uv, f, -0.30, 0.095, 0.0) * vec3(0.55, 0.5, 1.0)
-    + ghostShape(uv, f, -0.44, 0.026, 1.0) * vec3(0.7, 0.55, 1.0) * 0.7
-    + ghostShape(uv, f, -0.50, 0.012, 0.0) * vec3(0.75, 0.5, 1.0) * 0.35
-    + ghostShape(uv, f, -0.64, 0.062, 1.0) * vec3(0.6, 0.55, 1.0)
-    + ghostShape(uv, f, -0.84, 0.075, 1.0) * vec3(0.5, 0.5, 1.0)
-    + ghostShape(uv, f, -1.02, 0.060, 1.0) * vec3(0.6, 0.5, 1.0)
-    + ghostShape(uv, f, -1.06, 0.018, 0.0) * vec3(0.5, 0.55, 1.0) * 0.5;
+  vec3 sum = ghostShape(uv, f, 0.86, 0.022, 0.0) * vec3(0.75, 0.5, 1.0) * 0.35
+    + ghostShape(uv, f, 0.77, 0.050, 1.0) * vec3(0.6, 0.55, 1.0)
+    + ghostShape(uv, f, 0.69, 0.016, 0.0) * vec3(0.5, 0.55, 1.0) * 0.5
+    + ghostShape(uv, f, 0.61, 0.026, 1.0) * vec3(0.7, 0.55, 1.0) * 0.7
+    + ghostShape(uv, f, 0.53, 0.070, 0.0) * vec3(0.55, 0.5, 1.0)
+    + ghostShape(uv, f, 0.45, 0.055, 1.0) * vec3(0.5, 0.5, 1.0);
   // the glare: a white core about a fifth of the view across that washes out the sky round the source, and a
   // weak warm tail that reaches the far side of the view without greying it
   float d = length((uv - f) * vec2(uGhosts.z, 1.0));

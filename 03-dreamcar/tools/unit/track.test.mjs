@@ -822,8 +822,12 @@ test('lamps: street lamps along the straight, floodlights round the lap, rows in
     const lamp = lap[k];
     expect(track.sectionAt(lamp.s).id !== 'straight' || street.every((l) => Math.abs(track.delta(l.s, lamp.s)) > 20), `a floodlight at s = ${fmt(lamp.s, 0)} stands among the street lamps`);
     expect(!track.tunnels.some((t) => lamp.s > t.s0 - 20 && lamp.s < t.s1 + 20), `a floodlight at s = ${fmt(lamp.s, 0)} is in or at a tunnel`);
-    const atEdge = Math.abs(Math.abs(lamp.lat) - track.edgeAt(lamp.s, lamp.side)) < 1e-6 && Math.sign(lamp.lat) === lamp.side;
-    expect(atEdge, 'a floodlight is not at the solid edge');
+    // at the solid edge, or set back behind a rail or among trees (layout.lapLamps.setback)
+    const kind = (lamp.side > 0 ? track.kindL : track.kindR)[Math.round(lamp.s / track.ds) % track.count];
+    const back = kind === EDGE.RAIL || kind === EDGE.TREES ? track.layout.lapLamps.setback : 0;
+    const atEdge = Math.abs(Math.abs(lamp.lat) - track.edgeAt(lamp.s, lamp.side) - back) < 1e-6 && Math.sign(lamp.lat) === lamp.side;
+    expect(atEdge, `a floodlight is not at the solid edge or ${back} m behind it`);
+    expect(back === 0 || back >= 2, 'a floodlight set back less than 2 m');
     if (k > 0) expect(lamp.s - lap[k - 1].s > 45, `floodlights ${fmt(lamp.s - lap[k - 1].s, 0)} m apart`);
   }
   for (let k = 0; k < street.length; k++) {

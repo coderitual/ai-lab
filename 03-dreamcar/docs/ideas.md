@@ -66,9 +66,11 @@ comparison stills and strike what is done.
 - **A red pool behind a braking car** is still strong (the tail lamps'
   specular on the rough wet asphalt), and the bloom round the brake lamps
   tints the boot lid red.
-- **The floodlights' cones** are drawn as surfaces of a cone: from very
-  close beside one (the sky road's inside) a pole and the cone's top cross the
-  frame. The cones fade out within 6 to 24 m of the eye.
+- **The floodlights' cones** are drawn as surfaces of a cone, faded out
+  within 36 to 12 m of the eye; the poles behind rails stand 2.5 m back and
+  12 m high. At the sky road's parapets and at rock faces they still stand
+  at the edge: from close beside one there a pole can still come near the
+  frame's edge (not seen in the finish lane's stills).
 - **Trackside boards have no lamps of their own**; at night they are dark.
 - **The car's paint is dark** where nothing bright is near it.
 - **The tunnel's exit** at night and by day (the bloom of the portal) has not
@@ -82,9 +84,19 @@ from straight behind, the silver going warm in a low sun.
 
 ### Phones
 
-- The low tier was over its budget (draw calls and triangles) at the merged
-  head. The biggest shares were the terrain, the rails, the lamps, the
-  ghost car and the far mountains: cut those first.
+- **Draw calls** are inside the budgets at the four moments counted (low
+  133 to 149 of 150 by day, medium 228 to 291 of 300 by night: spec.md),
+  with little room left. The car is now the biggest share (about 25 calls in
+  each of the scene and the mirror, 14 in the shadow map): merging its
+  meshes by material is the CAR lane's to do. Triangles are still over on
+  every tier: the nearest trees, the terrain and the car's mirror image.
+- **The verge under the woods** reads olive and brown at the chase camera's
+  distance (bare earth, fallen leaves) now that the light through the grass
+  no longer glows; whether that is the autumn of frame D4 or too dead a
+  green has not been judged beside the reference.
+- **The floodlights at rock faces** go to the other side of the road where
+  there is a rail; the stretch of the bend at t = 60 of the autopilot run
+  that one used to light is darker at night now.
 - Nobody has played it on a phone. Do that before anything else on this
   list.
 

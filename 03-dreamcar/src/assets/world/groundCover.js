@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { alphaMips, chainTexture } from './forestTextures.js';
 import { plantMaterial } from './treeMaterial.js';
 import { planeNoise } from './shading.js';
+import { GRASS } from './groundMaterial.js';
 
 const SURFACE_GRASS = 2;
 const EDGE = { RAIL: 0, ROCK: 1, WALL: 2, PARAPET: 3, TREES: 4 };
@@ -295,9 +296,11 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         track.pointAt(s + r.range(-0.3, 0.3), lat, point);
         if (!ownStretch(s, point.x, point.z)) continue;
         const h = r.range(0.2, 0.45);
-        const v = r.range(0.9, 1.35);
-        const dry = r.next();
-        grassItems.push(make(point.x, g.y - 0.03, point.z, r.range(0, Math.PI), [h * 2.2, h, h * 2.2], [(0.035 + 0.05 * dry) * v, (0.07 + 0.025 * dry) * v, 0.022 * v], h));
+        const v = r.range(0.85, 1.25);
+        // (finish lane) the grass's own green (groundMaterial.js GRASS), a few tufts gone to straw
+        const dry = r.next() ** 2;
+        const tint = GRASS.tuft.map((c, k) => (c + (GRASS.tuftDry[k] - c) * dry) * v);
+        grassItems.push(make(point.x, g.y - 0.03, point.z, r.range(0, Math.PI), [h * 2.2, h, h * 2.2], tint, h));
       }
     }
     if (T.bushes) {
@@ -314,7 +317,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const y = terrain.heightOnTrack(s, lat);
         const h = r.range(0.5, 1.3);
         const v = r.range(0.7, 1.2);
-        bushItems.push(make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], [0.06 * v, 0.085 * v, 0.03 * v], h));
+        bushItems.push(make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c) => c * v), h));
       }
     }
     // rocks: fallen at the foot of the rock faces, and boulders on the slopes beyond the rails
@@ -349,7 +352,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
   const coverMaterial = plantMaterial({ map: texture, atmosphere, uniforms, wind: { height: 1, sway: 0.04 } });
   const rockMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, flat: true });
   const parts = [];
-  if (grassItems.length) parts.push(scatter({ geometry: cards(2, 1, 1, 0.02, 0.48), material: coverMaterial, items: grassItems, reach: T.grassReach, name: 'cover-grass', group }));
+  // (finish lane) three cards a tuft, not two: two crossed cards read as flat cut-outs from most angles along the road
+  if (grassItems.length) parts.push(scatter({ geometry: cards(3, 1, 1, 0.02, 0.48), material: coverMaterial, items: grassItems, reach: T.grassReach, name: 'cover-grass', group }));
   if (bushItems.length) parts.push(scatter({ geometry: cards(3, 1, 1, 0.52, 0.98), material: coverMaterial, items: bushItems, reach: T.bushReach, name: 'cover-bushes', group }));
   const rocks = scatter({ geometry: boulder(rng.fork('boulder')), material: rockMaterial, items: rockItems, reach: T.rockReach, name: 'cover-rocks', group });
   rocks.mesh.castShadow = tier !== 'low';

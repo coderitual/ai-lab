@@ -48,7 +48,9 @@ export function createDressing({ track, terrain, caps, tier, atmosphere, rng }) 
   // two sets of patches: what casts shadows (boards, buildings, the gantry), and what is low, small or stands
   // under something else (tyre walls, posts, huts, fences, the pit lane) and casts none
   const b = createBuilder();
-  const nb = createBuilder();
+  // (finish lane) on the low tier one set: the low things cast shadows too (the low tier's shadow reaches 46 m), and
+  // a chase view draws half as many patches
+  const nb = tier === 'low' ? b : createBuilder();
   const start = createStart({ track, terrain, b, signs, atmosphere });
   const trackside = buildTrackside({ track, terrain, tier, b, nb, signs });
   buildPits({ track, terrain, tier, b, nb, signs });
@@ -58,7 +60,7 @@ export function createDressing({ track, terrain, caps, tier, atmosphere, rng }) 
   merged.name = 'dressing-patches';
   const low = new THREE.Group();
   low.name = 'dressing-low';
-  const patches = b.build(material, merged) + nb.build(material, low, { shadow: false, name: 'dressing-low' });
+  const patches = b.build(material, merged) + (nb === b ? 0 : nb.build(material, low, { shadow: false, name: 'dressing-low' }));
   group.add(low);
   group.add(merged, start.group);
   const town = createTown({ track, terrain, tier, atmosphere, rng: rng.fork('town') });
@@ -70,7 +72,7 @@ export function createDressing({ track, terrain, caps, tier, atmosphere, rng }) 
     /** What the wet road's mirror leaves out: the low and small things and the far town (the gantry, its lamps,
      * the boards and the lit pit building stay: they are what the wet asphalt mirrors at night). */
     mirrorHidden: town ? [low, town.group] : [low],
-    stats: { patches, triangles: b.triangles + nb.triangles, casting: b.triangles, boards: trackside.boards, town: town?.stats },
+    stats: { patches, triangles: b.triangles + (nb === b ? 0 : nb.triangles), casting: b.triangles, boards: trackside.boards, town: town?.stats },
     setStartLights: (n) => start.setStartLights(n),
     update(dt) {
       start.update(dt);

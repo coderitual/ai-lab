@@ -38,7 +38,7 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng, 
     clock = now;
   };
 
-  const lamps = createLamps({ track, caps, tier, atmosphere, glints });
+  const lamps = createLamps({ track, terrain, caps, tier, atmosphere, glints });
   lap('lamps');
   const tunnels = createTunnels({ track, terrain, atmosphere, lamps });
   lap('tunnel');
@@ -60,14 +60,17 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng, 
     /** What the cars' reflection probes leave out. */
     // (picture lane) on the low tier a probe's face is 64 texels across 90 degrees: posts, rails and the glow under
     // the lamps are less than a texel in it, and each cost a draw call
-    probeHidden: tier === 'low' ? [...dressing.probeHidden, rails.group, posts.group, ...lamps.glows] : dressing.probeHidden,
+    // (finish lane) on medium too the rails (a few texels of a 128-texel face; a draw call per piece in every face)
+    probeHidden: tier === 'low' ? [...dressing.probeHidden, rails.group, posts.group, ...lamps.glows] : [...dressing.probeHidden, rails.group],
     /** The lamps' halos, which only the road's mirror shows (lamps.js). */
     halos: lamps.halos,
     /**
      * What the wet road's mirror leaves out (the lamps' glow lies on the road, which the mirror leaves out too; the
      * rails, posts and beams, 30 to 40 thousand triangles, are dark lines low beside it that its streaks smear away).
      */
-    mirrorHidden: [...dressing.mirrorHidden, ...lamps.glows, rails.group],
+    // (finish lane) and the viaducts (their deck is the road, their rails low beside it and their piers under it), the
+    // lamps' cones and their heads, which the mirror sees as their halos (lamps.js HALO): ten to twenty draw calls
+    mirrorHidden: [...dressing.mirrorHidden, ...lamps.glows, rails.group, viaducts.group, ...[lamps.cones, lamps.heads].filter(Boolean)],
     stats: { ms, lamps: lamps.stats, rails: rails.stats, walls: walls.stats, posts: posts.stats, viaducts: viaducts.stats, dressing: dressing.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {

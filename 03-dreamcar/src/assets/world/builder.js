@@ -10,8 +10,12 @@
 
 import * as THREE from 'three';
 
-/** Side of the square patches the dressing is merged by (m). */
-const CELL = 160;
+/**
+ * Side of the square patches the dressing is merged by (m). (finish lane) The same 400 m as the pieces the rails,
+ * kerbs and lamps are cut into (world/index.js): at 160 m a chase view drew ten to twenty patches of dressing, each
+ * a draw call, for a few thousand triangles more culled.
+ */
+const CELL = 400;
 
 const V = new THREE.Vector3();
 const N = new THREE.Vector3();

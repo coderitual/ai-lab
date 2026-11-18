@@ -9,7 +9,7 @@ parts work. Written for whoever changes it next.
 | --- | --- |
 | [design.md](design.md) | What is this meant to be? The car, the circuit, a run, how it should feel, the camera, the look of each time of day and the reference frames it answers to. These are the targets. |
 | [spec.md](spec.md) | What does the build do, in numbers? The circuit section by section, the car and its handling table, the rules, controls, cameras, HUD, options, URL parameters, the times of day, the passes and tiers, sound, storage. |
-| [techniques.md](techniques.md) | How do the tricky parts work: the Track from straights and arcs, the terrain conformed to it, the vehicle and why it runs in Node, the autopilot's speed plan, the trees, the sky and the massif, the asphalt, the frame, determinism, the staging camera. |
+| [techniques.md](techniques.md) | How do the tricky parts work: the Track from straights and arcs, the terrain conformed to it, the vehicle and why it runs in Node, the autopilot's speed plan, the trees, the sky and the massif, the asphalt, the frame, what each pass draws (the budget), the lamps at night, determinism, the staging camera. |
 | [car.md](car.md) | The car: its files, how the skin, the paint, the glass, the lamps, the wheels and the plates are made, what each tier costs, what still differs from the photographs. |
 | [engine.md](engine.md) | The frame: every pass and target per tier, the tone curve and the grade, the probe and the mirror, split screen, how to add a pass, what is easy to break. |
 | [tools.md](tools.md) | The dev scripts: tests, screenshots, the page handle, and what has and has not been verified. |

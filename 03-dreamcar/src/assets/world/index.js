@@ -1,23 +1,23 @@
 // The world the car drives through: createWorld() builds it from the Track
-// and returns the one object the game talks to.
-//
-// So far this file assembles the light (everything that later stages are lit
-// by) round a placeholder ground:
-//   lighting.js     the numbers, one table per time of day
+// and returns the one object the game talks to. It assembles:
+//   lighting.js     the numbers, one table per time of day (sky, fog, lamps, wetness, exposure, the grade)
 //   atmosphere.js   haze: the helper every world material is patched with
 //   sky.js          the dome, the clouds, the stars
 //   environment.js  the sky as an environment map, one per time of day
 //   sun.js          the sun or moon, its shadow, the fill light
-//   terrain.js, groundMaterial.js   the mountain (height field, band, grid, far land, baked light)
-//   road.js         the pavement and its asphalt
+//   terrain.js, groundMaterial.js   the mountain (height field, band, grid, far land, baked light), its one
+//                   ground material and the grass's one green (GRASS)
+//   road.js         the pavement and its asphalt, its wetness and the wet road's mirror (with PlanarMirror)
 //   kerbs.js        the red and white kerbs on the margins, from track.kerbs
 //   rock.js         the cut rock faces at the rock edges
 //   lake.js         the water beside the straight
 //   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
-//   groundCover.js  grass, bushes and rocks along the verges and under the trees
 //   forest.js       the trees (treeGeometry.js, forestTextures.js), planted from the Track and the ground
-//   studs.js        lit road studs on the lines through the bends and the tunnel
-//   structures.js  what people built: lamps, tunnel, viaduct, rails, posts and chevrons, the start
+//   groundCover.js  grass, bushes and rocks along the verges and under the trees
+//   structures.js   what people built: lamps (lamps.js), tunnels, viaducts, rails, walls and the circuit's
+//                   dressing (dressing.js: the start, boards, tyre walls, pits, town)
+//   studs.js        lit road studs (none on the circuit: the Track has no stud lines)
+// Whatever runs the length of the lap in one mesh (structures, kerbs, rock) is cut into 400 m pieces here.
 //
 // Three rules the parts keep between them:
 //  - The scene always holds the same lights. setTime changes what they are,
@@ -59,6 +59,23 @@ import { TIERS } from '../../engine/caps.js';
  * targets.
  */
 const MIRROR = { medium: { scale: 0.35, far: 220, streak: 0.3 }, high: { scale: 0.5, far: 320, streak: 0.3 } };
+
+/**
+ * (finish lane) How far from the eye (m) the small things along the road are drawn, per tier: rail posts and beams,
+ * kerbs, the lamps' poles, arms and housings, the low dressing (tyre walls, huts, fences). A piece (400 m) whose
+ * sphere lies wholly beyond this is not drawn in any pass of that view. At these distances a post or a kerb is less
+ * than a pixel on a phone and lies in the haze; each piece was a draw call. The lamps' heads, cones and glow, the
+ * boards and the buildings are not in the list: they read from far away.
+ */
+const SMALL_REACH = { low: 300, medium: 500, high: 800 };
+/** Which (by name), and how many times SMALL_REACH: the barriers are long lines that read further than a post. */
+const SMALL = new Map([
+  ['rail-beams', 2],
+  ['viaduct-rails', 2],
+  ['kerbs', 1],
+  ['lamp-fittings', 1],
+  ['viaduct-joints', 1],
+]);
 
 /**
  * @typedef {object} Beam one car's head lamps, for whatever answers them (reflectors), and its tail lamps (the wet
@@ -166,6 +183,19 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   // into 400 m pieces, so that each pass draws only the pieces it can see (engine/chunks.js). Smaller pieces cull
   // more triangles but cost more draw calls: the low tier has 150 of those.
   const chunked = [structures.group, kerbs.mesh, rock.group].map((root) => chunk(root, { cell: 400, minRadius: 300 }));
+  // the pieces of the small things, and the low dressing's patches, each with its sphere (SMALL_REACH)
+  const small = [];
+  for (const root of [structures.group, kerbs.mesh]) {
+    root.traverse((o) => {
+      const piece = o.parent?.userData.chunked && SMALL.has(o.parent.name);
+      const lowDressing = o.isMesh && o.parent?.name === 'dressing-low';
+      if (!piece && !lowDressing) return;
+      const sphere = (o.isInstancedMesh ? o.boundingSphere : o.geometry.boundingSphere)?.clone();
+      if (sphere) small.push({ object: o, sphere: sphere.applyMatrix4(o.matrixWorld), reach: SMALL.get(o.parent.name) ?? 1 });
+    });
+  }
+  const smallReach = SMALL_REACH[tier] ?? SMALL_REACH.medium;
+  const eye = new THREE.Vector3();
   scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
@@ -199,11 +229,26 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     return track.sky[a] + (track.sky[b] - track.sky[a]) * (spot.s / track.ds - a);
   }
 
+  function probeLeavesOut() {
+    const list = [kerbs.mesh, cover.group];
+    if (tier === 'low') {
+      forest.group.traverse((o) => {
+        if (/^forest-(reduced|full|floor)-/.test(o.name)) list.push(o);
+      });
+      // and the small things along the road (SMALL): less than a texel of a 64-texel face
+      for (const p of small) list.push(p.object);
+    }
+    return list;
+  }
+
   /** @type {World} */
   const world = {
     scene,
     time: null,
-    probeHidden: [sky.stars, ...structures.probeHidden],
+    // (finish lane) the probe's faces leave out the kerbs and the ground cover, and on the low tier (64 texels) the
+    // near trees (the impostors stay) and the small things: a face cost thirty to fifty draw calls, a sixth of the
+    // frame's budget
+    probeHidden: [sky.stars, ...structures.probeHidden, ...probeLeavesOut()],
     /** The wet road's planar reflection (null on the low tier): its target, camera, last cost (`ms`). */
     mirror,
     atmosphere,
@@ -211,7 +256,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     /** The trees (forest.js): where they stand (woodAt, turnedAt), single trees for the viewer (specimen). */
     forest,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, chunked, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
+    stats: { ms, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -253,6 +298,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     },
 
     prepareView(camera, focus, beams, hidden = null) {
+      eye.setFromMatrixPosition(camera.matrixWorld);
+      for (const p of small) p.object.visible = p.sphere.center.distanceTo(eye) - p.sphere.radius < smallReach * p.reach;
       sun.prepareView(camera, focus);
       forest.prepareView(camera, focus);
       cover.prepareView(camera);

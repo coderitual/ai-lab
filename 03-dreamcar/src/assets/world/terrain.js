@@ -44,6 +44,12 @@ const BORE_HEIGHT = 7.2;
 const CELL = { low: 14, medium: 6, high: 5 };
 /** Band rows: one every this many Track samples, per tier. */
 export const ROW_STEP = { low: 3, medium: 1, high: 1 };
+/**
+ * (finish lane) Metres of road per piece of the band (and of the road, road.js), per tier: a piece is a draw call in
+ * every pass that sees it. The low tier's rows are three times as far apart, so its pieces can be longer for the
+ * same triangles culled; a chase view there drew five to ten pieces of each. Medium's are half as long again.
+ */
+export const PIECE = { low: 400, medium: 240, high: 160 };
 /** The land-shape field's cell (m). */
 const MACRO = 16;
 /** How far the grid reaches beyond the course's bounds (m). */
@@ -463,7 +469,7 @@ const FOOT = 0.8;
   const cols = 3 + 4 + BAND_OUT.length; // pavement edge, solid edge, the foot, four up the cliff, the rest
   const ext = [new Float32Array(n), new Float32Array(n)]; // per sample and side: how far out the band reaches (|lat|)
   const pt = new THREE.Vector3();
-  /** The band's geometries, in chunks of about 160 m (after the bake: its vertices carry it). */
+  /** The band's geometries, in chunks of PIECE m (after the bake: its vertices carry it). */
   function buildBands() {
     const out = [];
     const rows = [];
@@ -485,8 +491,8 @@ const FOOT = 0.8;
       const first = runs.shift();
       runs[runs.length - 1].push(...first);
     } else if (runs.length === 1 && runs[0].length === rows.length) runs[0].push(0);
-    // each run in chunks of about 160 m, so that the renderer can cull them
-    const CHUNK = Math.round(160 / (ds * bandStep));
+    // each run in chunks of PIECE m, so that the renderer can cull them
+    const CHUNK = Math.round((PIECE[tier] ?? 160) / (ds * bandStep));
     for (const r of runs) {
       for (let a = 0; a < r.length - 1; a += CHUNK) out.push(buildBand(r.slice(a, Math.min(r.length, a + CHUNK + 1))));
     }
@@ -750,7 +756,9 @@ const FOOT = 0.8;
     }
   }
   const gridGeometries = [];
-  const CH = 48; // cells per chunk side
+  // cells per chunk side: (finish lane) about 400 m on medium as on low (it was 288 m: fifteen pieces of grid in a
+  // view at night), 240 m on high
+  const CH = tier === 'medium' ? 64 : 48;
   let gridTriangles = 0;
   for (let cj = 0; cj < gh - 1; cj += CH) {
     for (let ci = 0; ci < gw - 1; ci += CH) {
