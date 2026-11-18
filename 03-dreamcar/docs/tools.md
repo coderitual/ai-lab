@@ -205,13 +205,17 @@ Read this before believing anything above about a device.
   (tier `medium`, before the fixed touch controls): they show that it ran and
   how it looked then, nothing about frame rates, heat or the current build.
   Touch has only been simulated by Playwright on phone-sized viewports, with
-  synthetic pointer events: no real thumb has used the slider or the pedals,
+  synthetic pointer events: no real thumb has used the pad, the slider or the
+  pedals (the pad's size, place, travels, red-arc threshold and the thumb's
+  22 to 50 ms follow were tuned by the scripted thumb in Node and by eye on
+  stills), tilt has only been fed synthetic deviceorientation events (it is
+  untested on a real phone, its iOS permission prompt has never been met, and
+  the option's hint says so), `navigator.vibrate` has never buzzed anything
+  (iOS has none: the guard keeps it quiet there),
   iOS Safari's own gestures (the bottom toolbar, the home bar swipe, edge
   swipes for back) have not been met, and the safe-area insets were stood in
-  for by setting the HUD's variables. The slider's travel, the pedals' sizes
-  and the thumb's curve are untuned by hand. Two players on half an upright
-  phone with the throttle on manual stacks the pedals into the picture; that
-  combination is not in the HUD check. Whether `medium` or `low` is fast
+  for by setting the HUD's variables. The controls' sizes and the thumb's
+  curve are untuned by a real hand. Whether `medium` or `low` is fast
   enough on any phone, whether a phone overheats, whether the buttons are
   where a thumb is, and whether the capability probe's guesses for Apple,
   Adreno and Mali GPUs are right are all unknown.

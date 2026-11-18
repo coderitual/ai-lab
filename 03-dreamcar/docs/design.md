@@ -204,27 +204,39 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   the address wins; auto is what the capability probe chose), sound, time of
   day, speed in km/h or mph (`dreamcar.units`), the map shown or hidden
   (`dreamcar.map`), the driving help (Full, Sport, Off; `dreamcar.assists`,
-  applied to every car at once), and on touch screens the steering (slider
-  or arrows; `dreamcar.steering`) and the throttle (auto or manual;
+  applied to every car at once), and on touch screens the steering (pad,
+  slider, arrows or tilt; `dreamcar.steering`), the holding hand (right or
+  left; `dreamcar.hand`) and the throttle (auto or manual;
   `dreamcar.throttle`). Keys reach every button by Tab and Enter, a
   pad by its d-pad and A; touch targets are at least 44 px (the driving
   buttons 64 px and more).
 - **Controls, each device as if it were the only one.** Keys: W A S D or the
   arrows, Space the handbrake. Pad: triggers, left stick, A or RB the
-  handbrake. Touch (a phone upright or on its side, one thumb each side):
-  fixed controls that never move. At the bottom left a steering slider: a
-  track with its centre marked; the steering is how far the thumb is from
-  that centre, so a thumb landing off it steers at once and the knob springs
-  back when it lifts (or, as an option, two arrow buttons that steer as keys
-  do). At the bottom right the pedals: BRAKE, DRIFT (the handbrake) above
-  it, and with the throttle on manual GAS in the corner. Power does not
-  depend on touching the steering: on auto (the default) the car drives by
-  itself from the green light and lifts only while BRAKE or DRIFT is held; on
-  manual only GAS drives. Nothing else on the screen drives the car. The
-  controls are outlined and named on the first touch run. In split screen
-  each half has all of it, laid out for the half. (This replaced a floating
-  stick whose centre followed the thumb, with the power on only while the
-  steering was touched: the owner, on an upright iPhone, found both wrong.)
+  handbrake. Touch: the owner plays on an iPhone held upright in one hand,
+  and asked for controls that are "one-hand friendly and super smooth and
+  precise". So the default is one thumb on a fixed analog pad at the bottom
+  corner of the holding hand's side (Hand: Right or Left), within the
+  thumb's natural arc: drawn like a finished game's stick (a dark glass disc
+  with a light rim, its centre and full lock marked, an amber brake arc
+  along its foot that fills as the brake is pressed, a red arc below it).
+  Across is the steering; the car drives itself, and pulling the thumb down
+  first lifts and then brakes, so one thumb can trail the brake into a bend;
+  pulled on into the red arc it yanks the handbrake, like a lever, and the
+  knob clicks into the arc: brake, flick into a slide and steer through it
+  with one thumb. A round HANDBRAKE button stands in the other bottom corner
+  for a second thumb. The pad's centre never moves, so a thumb landing off
+  it steers at once and the knob springs back when it lifts; nothing else on
+  the screen drives the car. Options: the slider (a track with a marked
+  centre) or two arrows, each with the pedals (BRAKE, DRIFT, and GAS on
+  manual); tilt (the phone rolled like a wheel, the pad still braking;
+  untested on a real phone). Throttle manual makes the pad's up the
+  throttle. The controls are outlined and named on the first touch run, drawn
+  pressed with a glow the moment a finger lands, and step back to 45 % a few
+  seconds into a run so as not to sit over the picture. In split screen
+  each half has all of it, laid out for the half. (Round 1 of the controls
+  had the slider and pedals as the default; before that a floating stick
+  whose centre followed the thumb, with the power on only while the steering
+  was touched: the owner found both wrong.)
 - **A slide is seen and counted.** While the car slides beyond 12° its angle
   and a running score show just above the speed, fading a second after; the
   best slide of the run is on the results. The chase camera keeps nearer the

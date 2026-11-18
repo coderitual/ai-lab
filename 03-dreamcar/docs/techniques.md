@@ -140,12 +140,37 @@ keys, a hand catches the rear when it slides beyond the rear tyres' peak
 slip (counter-steer 0.75 rad per rad). A stick or a thumb is trusted and only
 given the same lock.
 
-On a touch screen the thumb is read against a fixed slider
-(`src/engine/Input.js`): the steering is the thumb's distance from the
-slider's centre over its half travel, worked out in the pointer handlers and
-stored, so the fixed step only reads a number. The slider itself is linear;
-the curve that makes small corrections easy at speed is the hands'
-(`HANDS.thumb.expo`, the same place as a stick's). Every control owns the
+On a touch screen the default is a one-thumb pad (`src/engine/Input.js`):
+a fixed disc whose centre never moves, so the thumb's offset from it is an
+absolute position, not a gesture. `padControls(dx, dy, scale, manual,
+tripped)` turns that offset into everything the car needs, and is pure, so the
+scripted thumb of the Node tests drives through the very same function:
+across over 70 px is the steering; down, the first quarter of 56 px lifts
+the throttle (a thumb can trim speed without braking) and the rest brakes,
+fully at 56 px; on beyond 74 px is the handbrake, held until the thumb comes
+back above 62 px, so a hard stab at the brake does not trip it and a held
+slide does not flicker off; the knob is drawn clicked into the red arc while
+it is pulled. The values are worked out in the pointer handlers and stored,
+so the fixed step only reads numbers. The pad and the slider are linear; the
+curve that makes small corrections easy at speed is the hands'
+(`HANDS.thumb.expo`, the same place as a stick's), and so is the smoothing:
+for a thumb, two equal lags in a row (`order: 2`, a critically damped
+follow: no overshoot of its own, about twice the lag to most of the way),
+22 ms standing to 50 ms at speed, and 30 ms on the pad's pedals. That takes a
+shaky thumb's jitter out without a lag a hand feels; a single lag long
+enough to do the same was either sluggish or let the jitter through, and a
+shorter one made the yaw overshoot by 26 % at 250 km/h (the turn-in test
+holds it under 22 %).
+
+Tilt reads `deviceorientation`'s beta and gamma as the world's up in the
+device's frame (`rollOf`), turned into the screen's frame by the screen's
+angle, and the roll is the angle of that up within the screen: so the same
+formula serves an upright phone and one on its side, and does not go through
+the Euler angles' gimbal lock when the phone is held upright (where gamma
+swings wildly for a small roll). Where gravity lies mostly out of the screen
+(the phone flat) there is no roll to read and the last one stands. The zero
+is the roll at the start of a run and at Recentre; ±30° is full lock; the
+hands' smoothing does the rest. Every control owns the
 pointer id that took it (`setPointerCapture`, then a map of pointer id to
 pedal), so two or three fingers never steal from each other, and anything
 that can lose a finger's lift (pointercancel, lostpointercapture, blur, a

@@ -27,7 +27,7 @@ import { canopyOpen } from '../assets/world/canopy.js';
 import { TIMES } from '../assets/world/lighting.js';
 import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
-import { Input } from '../engine/Input.js';
+import { Input, buzz } from '../engine/Input.js';
 import { ReflectionProbe } from '../engine/ReflectionProbe.js';
 import { TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
@@ -40,7 +40,7 @@ import { Ghost } from './Ghost.js';
 import { Hud } from './Hud.js';
 import { Race, medalOf } from './Race.js';
 import { TEXT } from './text.js';
-import { createTrack } from './track.js';
+import { SURFACE, createTrack } from './track.js';
 import { Vehicle, collideVehicles } from './vehicle/Vehicle.js';
 
 // SEAM for the sound lane: game/Sound.js and engine/Audio.js are wired when they are there (an empty match when not).
@@ -85,12 +85,14 @@ const UNITS_KEY = 'dreamcar.units';
 const MAP_KEY = 'dreamcar.map';
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /**
- * The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual') and steering ('slider' |
- * 'arrows'), and the touch controls' first-run naming.
+ * The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual'), steering (STEERINGS, the
+ * first the default) and holding hand ('right' | 'left'), and the touch controls' first-run naming.
  */
 const ASSISTS_KEY = 'dreamcar.assists';
 const THROTTLE_KEY = 'dreamcar.throttle';
 const STEERING_KEY = 'dreamcar.steering';
+const HAND_KEY = 'dreamcar.hand';
+const STEERINGS = ['pad', 'slider', 'arrows', 'tilt'];
 const ZONES_KEY = 'dreamcar.zones.v1';
 
 /** Read a kept choice (null when there is none or no storage). */
@@ -145,7 +147,10 @@ export class Game {
     const help = kept(ASSISTS_KEY);
     this.assists = help && ASSISTS.levels[help] ? help : ASSISTS.default;
     this.throttle = kept(THROTTLE_KEY) === 'manual' ? 'manual' : 'auto';
-    this.steering = kept(STEERING_KEY) === 'arrows' ? 'arrows' : 'slider';
+    this.steering = STEERINGS.includes(kept(STEERING_KEY)) ? kept(STEERING_KEY) : STEERINGS[0];
+    this.hand = kept(HAND_KEY) === 'left' ? 'left' : 'right';
+    /** Why tilt is not steering ('' | 'refused' | 'unavailable'): the options say so. */
+    this.tiltNote = '';
     this._zonesSeen = kept(ZONES_KEY) === '1';
     engine.setMaxPixelRatio(TIERS[this.tier].pixelRatio);
     this.rng = createRng(params.seed);
@@ -171,6 +176,20 @@ export class Game {
     this.input = new Input(container);
     this.input.throttle = this.throttle;
     this.input.steering = this.steering;
+    this.input.hand = this.hand;
+    // tilt refused or not there: the pad steers instead, and the options say why
+    this.input.onTiltFail = (why) => {
+      this.tiltNote = why;
+      if (this.steering === 'tilt') {
+        this.steering = this.input.steering = STEERINGS[0];
+        this.input.release();
+      }
+    };
+    // a control taken or let go is drawn pressed at once, not a frame later
+    this.input.onTouchChange = (input) => {
+      if (!input.isTouch || this.phase === 'title') return;
+      this.views.forEach((view, i) => view.hud.setControls(input.controlsOf(i)));
+    };
     this.input.onAction = (name, driver) => this.action(name, driver);
     this.input.onAnyInput = () => {
       this._woke = true;
@@ -437,6 +456,8 @@ export class Game {
     });
     this.phase = 'countdown';
     this._resets.clear();
+    // tilt: straight ahead is however the device is held at the start
+    this.input.recentre();
     this.effects.reset();
     this.ghost.begin();
     this.world.setStartLights(0);
@@ -525,10 +546,24 @@ export class Game {
       return;
     }
     if (name.startsWith('steering:')) {
-      this.steering = name.slice(9) === 'arrows' ? 'arrows' : 'slider';
+      const want = name.slice(9);
+      this.steering = STEERINGS.includes(want) ? want : STEERINGS[0];
       this.input.steering = this.steering;
       this.input.release();
       keep(STEERING_KEY, this.steering);
+      // (tilt: asked for here, in the choosing click, where Safari allows the asking; refused, the pad steers)
+      if (this.steering === 'tilt') {
+        this.tiltNote = '';
+        this.input.askTilt();
+      }
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
+    if (name.startsWith('hand:')) {
+      this.hand = name.slice(5) === 'left' ? 'left' : 'right';
+      this.input.hand = this.hand;
+      this.input.release();
+      keep(HAND_KEY, this.hand);
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
@@ -586,6 +621,10 @@ export class Game {
         break;
       case 'reset':
         if (this.phase === 'run' && !paused) this._resets.add(d);
+        break;
+      case 'recentre':
+        // tilt: wherever the device is now is straight ahead
+        this.input.recentre();
         break;
       case 'time': {
         // the next time of day in lighting.js's order (read each time: the table may grow)
@@ -1074,6 +1113,8 @@ export class Game {
       assistLevels: Object.keys(ASSISTS.levels),
       throttle: this.throttle,
       steering: this.steering,
+      hand: this.hand,
+      tiltNote: this.tiltNote,
     });
     hud.setFade(1 - this._fadeLevel);
     // the board: on the title and the pause sheet (and in the results), never over the run
@@ -1103,7 +1144,8 @@ export class Game {
         h.setWarn(warn);
         const how = input.source[i] === 'touch' ? TEXT.resetTouch : split ? TEXT.resetSplit(i === 0 ? 'R' : '/') : TEXT.resetKeys;
         h.setOffer(racer.offer, how);
-        const device = input.source[i] === 'touch' && this.throttle === 'manual' ? 'touchManual' : input.source[i];
+        const pad = this.steering === 'pad' || this.steering === 'tilt';
+        const device = input.source[i] !== 'touch' ? input.source[i] : pad ? (this.steering === 'tilt' ? 'touchTilt' : 'touchPad') : this.throttle === 'manual' ? 'touchManual' : 'touch';
         h.setHint(!this._hinted && !c.finished && !racer.offer && !warn ? TEXT.hint[device] || TEXT.hint.keys : '');
       }
       h.setSpeed(v.speed * 3.6);
@@ -1125,7 +1167,16 @@ export class Game {
       const slide = v.slide;
       if (slide) h.setDrift(slide.angle, slide.score, slide.angle >= 12);
       // touch: the steering at the bottom left, the pedals at the bottom right; named on the first touch run
-      if (input.isTouch) h.setControls(input.controlsOf(i));
+      if (input.isTouch) {
+        h.setControls(input.controlsOf(i));
+        // a few seconds into a run the controls step back (45 %) so as not to sit over the picture; a finger on any
+        // of them brings them back
+        h.setControlsDim(!!race && race.clock > HUD.controlsDimAfter && !input.touched(i));
+        // a kerb under a wheel: a short buzz where the device can (render-side: it changes nothing of the run)
+        const kerb = v.wheels.some((w) => w.surface === SURFACE.KERB && w.grounded);
+        if (kerb && !racer._onKerb && racer.driver === racer.player && input.source[i] === 'touch' && this.phase === 'run' && Math.abs(v.speed) > 8) buzz();
+        racer._onKerb = kerb;
+      }
       const naming = input.isTouch && !this._zonesSeen && !!race && race.clock < HUD.zonesFor;
       h.setZoneHint(naming);
       if (input.isTouch && !this._zonesSeen && race && race.clock >= HUD.zonesFor) this._noteZones();
