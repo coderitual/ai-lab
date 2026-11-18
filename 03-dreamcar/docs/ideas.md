@@ -103,6 +103,15 @@ from straight behind, the silver going warm in a low sun.
 - **More circuits.** The Track takes any closed layout of straights and arcs;
   the world builds from it. A second layout, or the same circuit reversed,
   is mostly data and a new set of medal times from the autopilot.
+- **Tilt steering on phones.** A third Steering option: the phone's roll
+  (DeviceOrientation; iOS asks permission on a gesture) read against the
+  angle it was held at when the run started, with a dead zone and the same
+  `HANDS.thumb` curve, and a recentre button. Needs a real phone to tune; the
+  slider and the pedals stay as they are.
+- **The touch controls on a real phone.** The slider's travel (56 + 0.05 ×
+  width, 48 to 92 px), the pedals' sizes and `HANDS.thumb.expo` were set in
+  headless Chromium and by the scripted thumb in `tools/unit`; an afternoon
+  with an iPhone and a mid-range Android, both ways up, should set them.
 - **A photo mode.** The staging camera (`__dreamcar.photo`) already exists;
   it needs a pause-sheet entry, a free orbit with touch and stick, and a
   high-tier render at a larger size.

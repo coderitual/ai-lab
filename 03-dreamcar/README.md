@@ -29,9 +29,9 @@ and nothing is fetched at run time.
 
 | | keyboard | gamepad | touch |
 | --- | --- | --- | --- |
-| drive, brake | W, S (or ↑, ↓) | right, left trigger | automatic throttle; pull down to brake |
-| steer | A, D (or ←, →) | left stick | drag where the thumb lands |
-| handbrake | Space | A | |
+| drive, brake | W, S (or ↑, ↓) | right, left trigger | the car drives itself (or GAS, with Throttle: Manual); BRAKE, bottom right |
+| steer | A, D (or ←, →) | left stick | the slider at the bottom left: its centre is fixed (or two arrows, in the options) |
+| handbrake | Space | A | DRIFT, above BRAKE |
 | camera | C | Y | button |
 | look back | B | X | |
 | put back on the road | R | B | button |

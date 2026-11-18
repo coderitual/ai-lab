@@ -759,7 +759,7 @@ export function hamfistDriver(track, params = CAR) {
  * A person, with a person's limits. What they see is REACTION s old, and they allow for it (they steer for where
  * the car will be). Keys are down or up and none changes more often than a finger can. A thumb on the glass has
  * `range` px of travel to full lock, moves at up to `speed` px/s and wavers by `shake` px (a slow wander, the same
- * every run), through the curve and dead zone engine/Input.js gives that device; a stick the same in shares of its
+ * every run), through the curve and dead zone of the device itself (the touch slider is linear); a stick the same in shares of its
  * travel. A thumb has the throttle on by itself and the brake under the other thumb; triggers are pressed part-way.
  * `rearG`, `frontG`: what the person has learnt the car does in a slide (the sideways g with the front wheels
  * pointing where it goes, and what steering into the bend adds).
@@ -767,7 +767,7 @@ export function hamfistDriver(track, params = CAR) {
 export const HUMAN = {
   reaction: 0.15,
   keys: { hold: 0.07 },
-  thumb: { range: 62, speed: 900, shake: 3, curve: 1.25, dead: 0 },
+  thumb: { range: 76, speed: 900, shake: 3, curve: 1, dead: 0 },
   pad: { range: 1, speed: 9, shake: 0.02, curve: 1.6, dead: 0.12 },
   rearG: 0.7,
   frontG: 0.62,

@@ -197,18 +197,27 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   the address wins; auto is what the capability probe chose), sound, time of
   day, speed in km/h or mph (`dreamcar.units`), the map shown or hidden
   (`dreamcar.map`), the driving help (Full, Sport, Off; `dreamcar.assists`,
-  applied to every car at once), and on touch screens the throttle (auto or
-  manual; `dreamcar.throttle`). Keys reach every button by Tab and Enter, a
+  applied to every car at once), and on touch screens the steering (slider
+  or arrows; `dreamcar.steering`) and the throttle (auto or manual;
+  `dreamcar.throttle`). Keys reach every button by Tab and Enter, a
   pad by its d-pad and A; touch targets are at least 44 px (the driving
   buttons 64 px and more).
 - **Controls, each device as if it were the only one.** Keys: W A S D or the
   arrows, Space the handbrake. Pad: triggers, left stick, A or RB the
-  handbrake. Touch (a phone on its side, one thumb each side): the left 55 %
-  of the view steers with a floating stick (sideways only, 96 px for full
-  lock); anywhere on the right brakes; a round DRIFT button under the right
-  thumb is the handbrake; the car drives itself while the left thumb steers
-  (or with the GAS button, with the throttle on manual). The zones are named
-  on the first touch run. In split screen each half has all of it.
+  handbrake. Touch (a phone upright or on its side, one thumb each side):
+  fixed controls that never move. At the bottom left a steering slider: a
+  track with its centre marked; the steering is how far the thumb is from
+  that centre, so a thumb landing off it steers at once and the knob springs
+  back when it lifts (or, as an option, two arrow buttons that steer as keys
+  do). At the bottom right the pedals: BRAKE, DRIFT (the handbrake) above
+  it, and with the throttle on manual GAS in the corner. Power does not
+  depend on touching the steering: on auto (the default) the car drives by
+  itself from the green light and lifts only while BRAKE or DRIFT is held; on
+  manual only GAS drives. Nothing else on the screen drives the car. The
+  controls are outlined and named on the first touch run. In split screen
+  each half has all of it, laid out for the half. (This replaced a floating
+  stick whose centre followed the thumb, with the power on only while the
+  steering was touched: the owner, on an upright iPhone, found both wrong.)
 - **A slide is seen and counted.** While the car slides beyond 12° its angle
   and a running score show just above the speed, fading a second after; the
   best slide of the run is on the results. The chase camera keeps nearer the
@@ -230,7 +239,8 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   and the lamps of ABS, traction and stability control under it (bottom
   right); a small map that can be hidden (bottom left); on touch screens four
   small buttons (camera, lamps, put back, pause) together under the time to
-  beat. The best-laps board is on the title, the pause sheet and the results,
+  beat, and the bottom corners left to the thumbs' controls (the speed moves
+  to the top middle, or above the steering on an upright phone). The best-laps board is on the title, the pause sheet and the results,
   not on the run. A faint ghost of your best lap drives with you.
 - **Results.** Lap times, the best lap, a medal against three target times,
   and the five best laps set on this device for that time of day; the camera
