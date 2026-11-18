@@ -292,6 +292,10 @@ Read this before believing anything above about a device.
   sea's cost on a real GPU is unknown. The coast road after round 2 was
   judged at the medium tier in `e1` only and at the low tier in the chase
   camera only (the high tier there, and the bonnet and far cameras, were not
-  looked at).
+  looked at). The low crossing and its big swell were seen in one medium
+  still each by day, golden hour and night and in the chase camera at
+  393x700 on the low tier; `?photo=waves`'s pose was not staged; frame D1
+  was checked after the far massif's change at a later moment of the run
+  than its preset (its skyline unchanged).
 - **Accessibility** beyond keyboard reachability of the buttons (screen
   readers, colour blindness, reduced motion) has not been considered.
