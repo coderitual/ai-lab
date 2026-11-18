@@ -87,6 +87,10 @@ export const SIDES = {
   // (sea lane) the sea side of the coast road after the sky road (`coast`): a steel rail on white posts with ochre
   // gravel beyond it and nothing growing that would hide the sea. The corridor is the preset's it replaces (edge,
   // slope, verge, kind, far: highDown, highRun, open), so the course and what the cars hit are exactly as they were.
+  // (sea lane, round 2) the long right down to the shore, whose second half is the low crossing (terrain.js CAUSEWAY):
+  // the presets it had (lowRun, lowUp) with nothing growing behind the rails, so the water shows on both sides
+  shoreRun: { kind: 'rail', edge: [8, 10], slope: -0.02, far: -0.2, verge: 'grass', wood: null },
+  shoreUp: { kind: 'rail', edge: [3, 5], slope: 0.04, far: 0.3, verge: 'grass', wood: null },
   coastDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.35, verge: 'grass', wood: null, coast: true },
   // (sea lane, round 2: frame E1) round the carousel and over the crest the verge is a broad apron of ochre gravel
   // (run-off: the grip and the sound of gravel) out to the rail; beyond the rail terrain.js puts a lip of dry grass and
@@ -183,7 +187,7 @@ const SEGMENTS = [
 
   // The long right: down to the shore and onto the straight.
   { id: 'approach', sec: 'sweepback', len: 100, ease: 60, g: -7.8, L: 'lowDown', R: 'lowUp' },
-  { id: 'back', sec: 'sweepback', r: -300, deg: 90, ease: 140, bank: 9, g: 0, gk: [[0.78, -6.5]], L: 'lowRun', R: 'lowUp', runoff: 'L' },
+  { id: 'back', sec: 'sweepback', r: -300, deg: 90, ease: 140, bank: 9, g: 0, gk: [[0.78, -6.5]], L: 'shoreRun', R: 'shoreUp', runoff: 'L' },
 
   { id: 'finish', sec: 'straight', len: 340, ease: 140, g: 0, L: 'shore', R: 'paddock' },
   { id: 'pitIn', sec: 'straight', len: 110, g: 0, L: 'shore', R: 'town' },

@@ -566,7 +566,8 @@ comes from behind the camera's left and lights the face.
   and a rubble bank into the water, across the mouth of a lagoon on the
   inside of the bend (120 m wide, 9 m deep at most) with the bay on the
   outside. The rails are the open steel rails the corridor already had; the
-  course is untouched. Off the outer side the swell runs big (waves.js
+  course is untouched, but nothing grows behind the long right's rails any
+  more (`shoreRun`, `shoreUp`: the woods hid the water). Off the outer side the swell runs big (waves.js
   `BOOST`): its three long waves 2.5 times their height at the middle of a
   circle of 360 m, so that sets of rollers about 3 to 5 m from crest to
   trough come in beside the road and bunch up into foam behind their crests;
