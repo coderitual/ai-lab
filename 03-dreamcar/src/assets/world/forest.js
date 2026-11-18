@@ -52,12 +52,14 @@ export const CASTER_LAYER = 3;
 
 /**
  * Per tier: full detail out to (m), reduced detail out to, impostors out to, share of the general forest kept,
- * foliage tile and bark tile (texels), impostor picture (texels), whether trees cast shadow.
+ * foliage tile and bark tile (texels), impostor picture (texels), whether trees cast shadow; and how far a tree's
+ * `detail` may stretch the full and the reduced distances (the trees the reference frames look at have detail over 1:
+ * D4's wall stands 70 to 150 m from the grid).
  */
 const TIER = {
-  low: { full: 0, reduced: 55, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: true },
-  medium: { full: 58, reduced: 80, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
-  high: { full: 80, reduced: 110, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
+  low: { full: 0, reduced: 55, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: true, fullCap: 1, redCap: 1.6 },
+  medium: { full: 58, reduced: 80, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 1.6, redCap: 2.8 },
+  high: { full: 80, reduced: 110, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 2, redCap: 2.8 },
 };
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
 const BLEND = 8;
@@ -406,11 +408,13 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   if (straight) {
     const span = (track.delta(straight.s0, straight.s1) + track.length) % track.length;
     const WALL = [
-      { off: [0.2, 1.6], step: [5.6, 7.4], r: 4.0, height: [14, 19], fir: [8, 11], detail: 1, inside: 0.05, slim: 0.74 },
-      { off: [5.8, 8.2], step: [5.6, 7.6], r: 4.2, height: [16, 21], fir: [10, 13], detail: 0.85, inside: 0.3, slim: 0.74 },
-      { off: [12, 15.5], step: [6, 8], r: 4.4, height: [18, 23], detail: 0.7, inside: 0.45, slim: 0.74 },
-      { off: [19, 23.5], step: [6, 8.5], r: 4.4, height: [20, 25], detail: 0.55, inside: 0.55, slim: 0.7 },
-      { off: [27, 33], step: [6.5, 9], r: 4.4, height: [22, 27], detail: 0.45, inside: 0.6, slim: 0.7 },
+      { off: [0.2, 1.6], step: [5.6, 7.4], r: 4.0, height: [14, 19], fir: [8, 11], detail: 2.8, inside: 0.05, slim: 0.74 },
+      { off: [5.8, 8.2], step: [5.6, 7.6], r: 4.2, height: [16, 21], fir: [10, 13], detail: 2.6, inside: 0.3, slim: 0.74 },
+      { off: [12, 15.5], step: [6, 8], r: 4.4, height: [18, 24], detail: 2.2, inside: 0.45, slim: 0.74 },
+      { off: [19, 23.5], step: [6, 8.5], r: 4.4, height: [21, 27], detail: 1.6, inside: 0.55, slim: 0.7 },
+      { off: [27, 33], step: [6.5, 9], r: 4.4, height: [24, 30], detail: 1.1, inside: 0.6, slim: 0.7 },
+      // (the wood rising behind: from the grid no sky over the crowns)
+      { off: [37, 45], step: [7, 10], r: 4.6, height: [26, 33], detail: 0.7, inside: 0.65, slim: 0.7 },
     ];
     // nearly all maples; a lime here and there; a dark fir or two in the first rows
     plantRows(straight.s0, span, -1, WALL, wallAt, (r) => {
@@ -425,10 +429,10 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     // (not a closed wood: a row at the wall, a thinner one behind it and single trees up the sunlit bank, so that the
     // sun, which stands behind them by day, comes through between the crowns and lies in patches on the road)
     const BANK = [
-      { off: [-0.9, 0.4], step: [7.5, 11], r: 4.5, height: [16, 21], detail: 1, inside: 0, lean: [0.14, 0.27] },
-      { off: [5.5, 9], step: [11, 17], r: 5, height: [17, 22], detail: 0.9, inside: 0.1, lean: [0.03, 0.12] },
-      { off: [14, 22], step: [16, 26], r: 6, height: [16, 23], detail: 0.7, inside: 0.1 },
-      { off: [28, 44], step: [18, 30], r: 6, height: [16, 24], detail: 0.6, inside: 0.1 },
+      { off: [-0.9, 0.4], step: [6, 8.5], r: 4, height: [16, 21], detail: 2, inside: 0, lean: [0.14, 0.27] },
+      { off: [5, 9], step: [8, 12], r: 4.5, height: [17, 22], detail: 1.7, inside: 0.1, lean: [0.03, 0.12] },
+      { off: [13, 21], step: [11, 17], r: 5.5, height: [16, 23], detail: 1.2, inside: 0.1 },
+      { off: [28, 44], step: [18, 30], r: 6, height: [16, 24], detail: 0.9, inside: 0.1 },
     ];
     plantRows(ledge.s0 - 30, 350, -1, BANK, bankAt, (r) => {
       const roll = plantRng.next();
@@ -871,8 +875,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         }
         // (trees behind others, the undergrowth and the mass of the forest go to the simpler levels sooner)
         const detail = trees[i].detail;
-        const fD = fullD * detail;
-        const rD = redD * (0.4 + 0.6 * detail);
+        const fD = fullD * Math.min(detail, T.fullCap);
+        const rD = redD * (0.4 + 0.6 * Math.min(detail, T.redCap));
         const d = flat ? rD - blend - 1 : sphere.center.distanceTo(eye);
         if (d < fD) {
           const a = blend ? Math.min(1, (fD - d) / blend) : 1;

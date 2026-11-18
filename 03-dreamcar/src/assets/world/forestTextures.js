@@ -126,15 +126,17 @@ export function alphaMips(base, width, height, { regions = [[0, 0, width, height
         const wc = raw[c + 3] + 1;
         const wd = raw[d + 3] + 1;
         const sum = wa + wb + wc + wd;
+        // (one division per texel: start-up time)
+        const inv = 1 / sum;
         const o = (y * nw + x) * 4;
-        next[o] = (raw[a] * wa + raw[b] * wb + raw[c] * wc + raw[d] * wd) / sum + 0.5;
-        next[o + 1] = (raw[a + 1] * wa + raw[b + 1] * wb + raw[c + 1] * wc + raw[d + 1] * wd) / sum + 0.5;
-        next[o + 2] = (raw[a + 2] * wa + raw[b + 2] * wb + raw[c + 2] * wc + raw[d + 2] * wd) / sum + 0.5;
+        next[o] = (raw[a] * wa + raw[b] * wb + raw[c] * wc + raw[d] * wd) * inv + 0.5;
+        next[o + 1] = (raw[a + 1] * wa + raw[b + 1] * wb + raw[c + 1] * wc + raw[d + 1] * wd) * inv + 0.5;
+        next[o + 2] = (raw[a + 2] * wa + raw[b + 2] * wb + raw[c + 2] * wc + raw[d + 2] * wd) * inv + 0.5;
         next[o + 3] = (sum - 4 + 2) >> 2;
         for (let r = 0; r < rawRiders.length; r++) {
           const src = rawRiders[r];
           const dst = nextRiders[r];
-          for (let k = 0; k < 4; k++) dst[o + k] = (src[a + k] * wa + src[b + k] * wb + src[c + k] * wc + src[d + k] * wd) / sum + 0.5;
+          for (let k = 0; k < 4; k++) dst[o + k] = (src[a + k] * wa + src[b + k] * wb + src[c + k] * wc + src[d + k] * wd) * inv + 0.5;
         }
       }
     }
@@ -181,7 +183,6 @@ export function alphaMips(base, width, height, { regions = [[0, 0, width, height
  */
 function spread(data, width, height, riders) {
   const REACH = 6;
-  const all = [data, ...riders];
   const known = new Uint8Array(width * height);
   for (let i = 0; i < width * height; i++) known[i] = data[i * 4 + 3] > 24 ? 1 : 0;
   const sweep = (start, step, count, lines, lineStep) => {
@@ -194,12 +195,18 @@ function spread(data, width, height, riders) {
           from = i;
           left = REACH;
         } else if (from >= 0 && left > 0 && known[i] === 0) {
-          for (const d of all) {
-            d[i * 4] = d[from * 4];
-            d[i * 4 + 1] = d[from * 4 + 1];
-            d[i * 4 + 2] = d[from * 4 + 2];
+          const o = i * 4;
+          const f = from * 4;
+          data[o] = data[f];
+          data[o + 1] = data[f + 1];
+          data[o + 2] = data[f + 2];
+          for (let r = 0; r < riders.length; r++) {
+            const d = riders[r];
+            d[o] = d[f];
+            d[o + 1] = d[f + 1];
+            d[o + 2] = d[f + 2];
+            d[o + 3] = d[f + 3];
           }
-          for (const r of riders) r[i * 4 + 3] = r[from * 4 + 3];
           known[i] = 2;
           left--;
         } else if (known[i] === 2) left = 0;
@@ -209,8 +216,39 @@ function spread(data, width, height, riders) {
   sweep(0, 1, width, height, width);
   sweep(width - 1, -1, width, height, width);
   for (let i = 0; i < known.length; i++) if (known[i] === 2) known[i] = 1;
-  sweep(0, width, height, width, 1);
-  sweep((height - 1) * width, -width, height, width, 1);
+  // the columns, a row at a time (the same rule as sweep, but walking the memory in order: start-up time)
+  const from = new Int32Array(width);
+  const left = new Int32Array(width);
+  const columns = (y0, dy) => {
+    from.fill(-1);
+    left.fill(0);
+    for (let n = 0, y = y0; n < height; n++, y += dy) {
+      for (let x = 0, i = y * width; x < width; x++, i++) {
+        const k = known[i];
+        if (k === 1) {
+          from[x] = i;
+          left[x] = REACH;
+        } else if (k === 0 && from[x] >= 0 && left[x] > 0) {
+          const o = i * 4;
+          const f = from[x] * 4;
+          data[o] = data[f];
+          data[o + 1] = data[f + 1];
+          data[o + 2] = data[f + 2];
+          for (let r = 0; r < riders.length; r++) {
+            const d = riders[r];
+            d[o] = d[f];
+            d[o + 1] = d[f + 1];
+            d[o + 2] = d[f + 2];
+            d[o + 3] = d[f + 3];
+          }
+          known[i] = 2;
+          left[x]--;
+        } else if (k === 2) left[x] = 0;
+      }
+    }
+  };
+  columns(0, 1);
+  columns(height - 1, -1);
 }
 
 /** A DataTexture from a mip chain made here. */
