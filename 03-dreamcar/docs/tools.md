@@ -31,10 +31,10 @@ SwiftShader on four busy cores. Times below are from that machine.
 
 | script | what it does | checks | time here |
 | --- | --- | --- | --- |
-| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (111 821 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). | 3 files | 1.5 to 2 min |
+| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (112 166 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). `drift.test.mjs`: the feel: each device's turn-in time, the three assist levels, slides asked for, held and let go on every device, what the default level never lets happen, people's laps on the real road (7 tests). | 4 files | about 1 min |
 | `node tools/handling.mjs` | The car measured the way a road test would; prints the table of spec.md. `--json`, `--no-laps`. | (a table, not checks) | 6 s |
 | `node tools/trackmap.mjs out.svg` | Draws the circuit from above with its height, gradient and speed envelope, and prints its numbers (sections, structures, kerbs, dressing, lamps, sectors, pieces). `--png out.png`, `--fit a,b` (close the loop after an edit). | | under 1 s |
-| `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the steering part, the brake part, DRIFT, the automatic throttle and its moment after, GAS on manual, the zones' naming, both split halves), slide (a handbrake turn through the keys, the readout, the driving help kept and applied), window, hud (now with the DRIFT and GAS buttons), options, start, photo, determinism, params, tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
+| `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the steering part, the brake part, DRIFT, the automatic throttle and its moment after, GAS on manual, the zones' naming, both split halves), slide (a handbrake turn through the keys, the readout, the driving help kept and applied), window, hud (now with the DRIFT and GAS buttons), options, start, photo, determinism, params, tiers. Any console error, page error or WebGL warning fails that page. | 296 | an hour or more |
 | `node tools/soundtest.cjs [URL] [outDir]` | Renders scenarios offline with the game's own audio code (the dev server's `sound.html`) and measures them: partials, levels, sides, tails, jumps, gestures, mute. With `outDir` it keeps the WAV files so that someone can listen. | 62 | about 45 s idle |
 | `node tools/frametest.cjs` | The tone curve's numbers (no browser); with `--url` milliseconds per frame for variants of a page (`--vary "ao=0\|ao=1"`), the pipeline's targets, and a pair of frames 1/60 s apart for a flicker check (`--pair`). | | |
 | `node tools/screenshots.cjs` | Regenerates every picture of the README and these documents, and `public/og.jpg`. `--list`, `--only day,night` (page loads or picture names), `--base URL` (default 5190), `--q medium`, `--out dir`. | | 45 to 60 min |
@@ -116,13 +116,15 @@ machine without a GPU, and only what is listed here.
   metre; `frameAt` and `locate` invert each other; the surface the wheels
   read equals the profile exactly; vertical acceleration at the fastest
   possible speed at most 0.9 g; gradients, radii, banking, kerbs, lamps and
-  sector lines as spec.md says. Run for this document on 2026-11-17: passed.
+  sector lines as spec.md says. Run on 2026-11-18 at the finish lane's head:
+  112 166 checks, passed.
 - **The car** (`tools/unit.mjs`, vehicle; `tools/handling.mjs`): every number
   of spec.md's handling table, and clean laps of the real road by the
   autopilot at paces 1.0, 0.9 and 0.7, a thumb, a pad, keys and a ham-fisted
   keyboard driver (scripted drivers, in Node). Run for this document:
   passed.
 - **The rules** (`tools/unit.mjs`, race): 82 checks, passed.
+- **The feel** (`tools/unit.mjs`, drift): 7 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
   Of the six failures, five came from the HUD overlap layout and one from a
@@ -176,11 +178,14 @@ machine without a GPU, and only what is listed here.
 
 Read this before believing anything above about a device.
 
-- **Real phones and tablets.** Nobody has run this on one. Touch has only
-  been simulated by Playwright on phone-sized viewports. Whether the low tier
-  is fast enough on any phone, whether a phone overheats, whether the
-  buttons are where a thumb is, and whether the capability probe's guesses
-  for Apple, Adreno and Mali GPUs are right are all unknown.
+- **Real phones and tablets.** The only evidence from a real device is the
+  owner's own screenshots from his iPhone, held upright, of an older build
+  (tier `medium`): they show that it ran and how it looked then, nothing
+  about frame rates, heat or the current build. Every test and picture here
+  simulates touch with Playwright on phone-sized viewports. Whether `medium`
+  or `low` is fast enough on any phone, whether a phone overheats, whether
+  the buttons are where a thumb is, and whether the capability probe's
+  guesses for Apple, Adreno and Mali GPUs are right are all unknown.
 - **Frame rates.** Every cost here is from software WebGL, where a medium
   frame of the full world takes tens of seconds to draw. No frame rate on
   any real GPU has been measured. The adaptive render scale has been seen to
@@ -190,9 +195,14 @@ Read this before believing anything above about a device.
   and 150), medium at 0.67 to 1.04 M by day and up to 1.31 M by night
   (budget 600 k). Both are still over. Whether a phone draws them at a
   usable frame rate is unknown.
-- **Browsers.** Only Chromium. Safari (desktop and iOS) and Firefox are
-  untested, including WebGL 2 on older iOS, half-float targets, the
+- **Browsers.** Only headless Chromium. Safari (desktop and iOS: the owner's
+  iPhone screenshots aside, which say nothing about its correctness) and
+  Firefox are untested, including WebGL 2 on older iOS, half-float targets, the
   multisampled half-float probe (`caps.msaaHdr`) and audio unlocking.
+- **Real networks.** Every page here was loaded from a server on the same
+  machine. How long the 1.3 MB script takes over a phone's connection, and
+  what GitHub Pages' caching does to a returning player, have not been
+  measured. (There is nothing online in the game itself.)
 - **Real input devices.** No real gamepad has been plugged in (the playtest
   uses a stand-in for the Gamepad API); no real touch screen; no keyboard
   with another layout. Two players on one keyboard have only been simulated.

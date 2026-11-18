@@ -71,7 +71,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | marshal posts | 12 |
 | start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |
 | street lamps | 23, 9 m high, every 30.4 m on alternating sides along the whole straight |
-| floodlights | 69, 10 m high, every 55 m round the rest of the lap (`lapLamps`): on the inside of bends tighter than 1500 m, alternating elsewhere; none in the tunnel or within 25 m of its portals, none on `ledge1` (frame D3's place) |
+| floodlights | 69, 12 m high, every 55 m round the rest of the lap (`lapLamps`): on the inside of bends tighter than 1500 m, alternating elsewhere; none in the tunnel or within 25 m of its portals, none on `ledge1` (frame D3's place); 2.5 m behind the edge where it is a rail (47 of them; a lamp due at a rock face goes to the other side if a rail is there), at the edge in rock cuttings (4) and at parapets (18) |
 | tunnel lamps | 29 rows of two, every 12 m |
 | sector lines | s = 1881.8 m (37 %, just out of the tunnel) and 3420.0 m (67 %, the start of the ledge); the third is the line |
 | grid | 12 boxes behind the line (`track.grid`) |
@@ -313,7 +313,7 @@ and the moon are placed against the start straight's heading by
 | street lamps and floodlights / tunnel / windows / cones in the air | 0 / 1 / 0 / 0 | 1 / 1 / 0.7 / 0 | 1 / 1 / 1 / 1 |
 | car lamps | running lights | low beam | low beam |
 | clouds cover | 0.45 | 0.45 | 0.3 |
-| bloom / glare / ghosts | 0.05 / 0.015 / 0.0003 | 0.09 / 0.03 / 0.0003 | 0.15 / 0 / 0 |
+| bloom / glare / ghosts | 0.05 / 0.015 / 0.00015 | 0.09 / 0.03 / 0.0002 | 0.15 / 0 / 0 |
 | contrast / saturation | 1.14 / 1.18 | 1.2 / 1.16 | 1.12 / 0.94 |
 
 N, or the title's choice, fades to black and back (0.25 s each way) to switch.

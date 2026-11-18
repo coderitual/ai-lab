@@ -201,8 +201,11 @@ export const LAYOUT = {
    * edge, `spacing` metres apart, everywhere outside the tunnels and the straight's own lamps (lamps keep `clear`
    * metres from a portal): on the inside of every bend tighter than `inside` metres, alternating sides elsewhere.
    * None stand on the pieces in `skip`: the ledge's first bend is frame D3's place, which has no poles.
+   * (finish lane) Where the edge is a rail or the trees, a pole stands `setback` metres behind it, so that it is never
+   * between the chase camera and the car, and `height` m high; one due at a rock face goes to the other side if that is
+   * a rail or the trees; at a rock face, a wall or a parapet it stands at the edge.
    */
-  lapLamps: { spacing: 55, height: 10, clear: 25, inside: 1500, skip: ['ledge1'] },
+  lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1'] },
   tunnelLamps: { spacing: 12, drop: 0.55, inset: 0.45 },
   /** Kerbs: on the inside of every bend tighter than `inside` metres from entry to exit, and on the outside at the exit of every bend tighter than `outside`. */
   kerbs: { inside: 800, outside: 500, exit: 0.4, width: SHOULDER },

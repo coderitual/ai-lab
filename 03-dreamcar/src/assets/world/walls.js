@@ -19,6 +19,7 @@
 //    quiet, its top a level dark band.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { EDGE, levelFrame, runsOf, stripGeometry } from './furniture.js';
 import { extend } from './shading.js';
 
@@ -84,14 +85,16 @@ export function createWalls({ track, atmosphere }) {
   }
   if (!strips.length) return { group, stats: { metres: 0 } };
   const material = wallPaint(atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0 })));
-  for (const geometry of strips) {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = 'wall';
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.matrixAutoUpdate = false;
-    group.add(mesh);
-  }
+  // (finish lane) every run in one mesh (world/index.js cuts it into 400 m pieces): a run was a draw call of its own
+  const geometry = strips.length > 1 ? mergeGeometries(strips) : strips[0];
+  if (strips.length > 1) for (const g of strips) g.dispose();
+  geometry.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'wall';
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.matrixAutoUpdate = false;
+  group.add(mesh);
   return { group, stats: { metres: Math.round(metres), meshes: strips.length } };
 }
 

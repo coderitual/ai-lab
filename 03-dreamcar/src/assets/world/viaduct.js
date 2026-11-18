@@ -148,6 +148,15 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
     }
   }
 
+  // (finish lane) the abutments in the deck's mesh and the rail posts in the rails' (same materials): each piece of
+  // viaduct is two draw calls fewer in every pass
+  const baked = (geometry, matrices) => matrices.map((m) => geometry.clone().applyMatrix4(m));
+  const block = footBox();
+  const post = new THREE.BoxGeometry(0.05, 0.26, 0.05).translate(0, 0.13, 0);
+  deckParts.push(...baked(block, blocks));
+  railParts.push(...baked(post, railPosts));
+  block.dispose();
+  post.dispose();
   if (deckParts.length) {
     const deck = new THREE.Mesh(mergeGeometries(deckParts), concrete);
     deck.name = 'viaduct-deck';
@@ -175,8 +184,6 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
   group.add(
     row(pier, pierConcrete, piers, { name: 'viaduct-piers' }),
     row(capital, pierConcrete, caps, { name: 'viaduct-pier-caps' }),
-    row(footBox(), concrete, blocks, { name: 'viaduct-abutments' }),
-    row(new THREE.BoxGeometry(0.05, 0.26, 0.05).translate(0, 0.13, 0), steel, railPosts, { shadow: false, name: 'viaduct-rail-posts' }),
   );
 
   return { group, stats: { piers: piers.length, posts: railPosts.length } };

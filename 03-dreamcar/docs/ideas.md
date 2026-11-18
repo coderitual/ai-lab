@@ -66,9 +66,11 @@ comparison stills and strike what is done.
 - **A red pool behind a braking car** is still strong (the tail lamps'
   specular on the rough wet asphalt), and the bloom round the brake lamps
   tints the boot lid red.
-- **The floodlights' cones** are drawn as surfaces of a cone: from very
-  close beside one (the sky road's inside) a pole and the cone's top cross the
-  frame. The cones fade out within 6 to 24 m of the eye.
+- **The floodlights' cones** are drawn as surfaces of a cone, faded out
+  within 36 to 12 m of the eye; the poles behind rails stand 2.5 m back and
+  12 m high. At the sky road's parapets and at rock faces they still stand
+  at the edge: from close beside one there a pole can still come near the
+  frame's edge (not seen in the finish lane's stills).
 - **Trackside boards have no lamps of their own**; at night they are dark.
 - **The car's paint is dark** where nothing bright is near it.
 - **The tunnel's exit** at night and by day (the bloom of the portal) has not

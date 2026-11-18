@@ -115,9 +115,16 @@ as a long streak (`ASPHALT_SHEEN`). The kerbs (kerbs.js) are red and white
 painted concrete, one colour per tooth, on `track.kerbs`, exactly on
 `track.profile()` (on low, rows at every second tooth top). Beyond the margin
 the terrain's band carries the verge: mown stripes 1.6 m wide, a ragged strip
-of worn earth along the kerbs, longer grass at the barrier. Barriers: two
+of worn earth along the kerbs, longer grass at the barrier, with tufts of
+three crossed cards standing in it on medium and high. All grass (meadow,
+verge, tufts, bushes, the wood's floor) is one early-autumn olive green
+(`GRASS` in groundMaterial.js), a little less saturated than the trees, and
+lets through against the low sun two to three times the light it reflects: brighter,
+never neon. The kerbs' white paint is beaded and sparkles in the car's head
+lamps (retro.js), as the road's lines do. Barriers: two
 stacked W-beams on posts (one beam where trackside panels stand behind it;
-set back behind tyre walls), low concrete walls 0.93 m high on the straight
+set back behind tyre walls; a reflector painted on the upper beam over every
+fourth post, which blazes in the head lamps at night), low concrete walls 0.93 m high on the straight
 (walls.js, precast blocks painted white and teal), cut faces of bedded
 limestone where the edge is rock. Viaduct piers are slender eight-sided
 shafts under flared capitals; the short bridge spans a V-shaped gully across
@@ -352,7 +359,8 @@ with a short `advance` after loading.
   lower third. Exposure for sunlit asphalt, closing by about 2.5 stops inside
   the tunnel and recovering over a second on the way out.
 - **Day has the sun in it.** Heading into the low sun it blooms into a soft
-  glare, faint lens ghosts lie across the frame (medium and high), the sky
+  glare, faint lens ghosts lie between it and the middle of the frame, never
+  on the car or the road under it (medium and high), the sky
   stays blue up to it and the road shines towards the light.
 - **Dusk is golden hour** (references D4, D2), late: the sun 2° up, 125° left
   of the start straight's heading, out over the lake behind the left shoulder of a car on the start

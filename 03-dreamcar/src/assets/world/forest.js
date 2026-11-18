@@ -39,6 +39,7 @@ import { TILE, createBarkTextures, createFoliageAtlas, tileRect } from './forest
 import { layBy } from './gantry.js';
 import { bakeImpostors } from './impostors.js';
 import { planeNoise, smoothstep } from './shading.js';
+import { GRASS } from './groundMaterial.js';
 import { growTrees } from './treeGeometry.js';
 import { createTreeUniforms, impostorDepthMaterial, impostorMaterial, plantMaterial, treeDepthMaterial, treeMaterial } from './treeMaterial.js';
 import { SPECIES, SPECIES_DATA, VARIANTS, VARIANTS_OF } from './treeSpecies.js';
@@ -690,7 +691,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       if (!t.road) return;
       const reach = Math.max(2.5, Math.min(7, t.h * 0.42));
       const g = floorRng.range(0.8, 1.15);
-      add(i, 0, t.x + floorRng.range(-1, 1), t.z + floorRng.range(-1, 1), reach * 1.6, [0.3 * g, 0.4 * g, 0.16 * g]);
+      // (finish lane) the grass's green (groundMaterial.js GRASS.floor over the floor's own painting)
+      add(i, 0, t.x + floorRng.range(-1, 1), t.z + floorRng.range(-1, 1), reach * 1.6, GRASS.floor.map((c) => c * g));
       if (t.turned > 0.4) {
         const k = i * 3;
         add(i, 1, t.x + floorRng.range(-1.5, 1.5), t.z + floorRng.range(-1.5, 1.5), reach * 1.9, [tints[k] * 0.8, tints[k + 1] * 0.8, tints[k + 2] * 0.8]);

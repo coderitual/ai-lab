@@ -386,21 +386,41 @@ off (the street lamps by day).
 ## The lamps at night
 
 `src/assets/world/lamps.js`. 150 lamps: 23 street lamps on the straight
-(warm), 69 floodlights 10 m high every 55 m round the rest of the lap (a
+(warm), 69 floodlights 12 m high every 55 m round the rest of the lap (a
 cooler white; on the inside of every bend tighter than 1500 m, alternating
 elsewhere; none in the tunnels or within 25 m of a portal, none on the ledge's
-first bend, frame D3's place), 58 in the tunnel. The scene still has the same
+first bend, frame D3's place; the 47 behind a rail stand 2.5 m back from it,
+on the ground there, so that no pole is ever between the chase camera and the
+car; one that would stand at a rock face goes to the other side if there is a
+rail there; the 4 in rock cuttings and the 18 at parapets stand at the edge),
+58 in the tunnel. The scene still has the same
 fixed pool of real spot lights (2, 4 or 6 by tier); everything else a lamp
 does is drawn: its head (an emitter that blooms), its glow on the ground
 (worked out per pixel from the same spot light, darker on wet ground), its
 cone in the damp air (lighting.js `lamps.haze`: an open cone from the head to
 the ground, additive, as bright as the length of air a ray crosses in it,
-fading towards the ground and when the eye comes within 6 to 24 m of it), its
+fading towards the ground and when the eye comes within 36 to 12 m of it), its
 halo in the road's mirror, and its streak in the wet road. How far each lamp
 is on and its share of the pool are one texel each of a small texture
 (`shares`), read by the glow, the cones, the halos and the tunnel's bore:
 150 lamps as two uniform arrays would be more uniforms than a phone's shader
 holds.
+
+Drawn as few meshes as there are materials: every pole, arm and housing is
+baked into one geometry (`lamp-fittings`, the tunnel's into
+`tunnel-lamp-fittings`), the street lamps' and floodlights' emitters into one
+mesh whose vertex colours carry each kind's colour and radiance, and their
+glow into one mesh (they switch together); world/index.js cuts each into the
+400 m pieces. A piece of lamps costs a draw call per material, not per part.
+
+What answers the head lamps without a light of its own (retro.js): the road's
+lines (road.js), the kerbs' white paint (beaded, in specks, brightest on the
+teeth's faces that look at the car) and a reflector painted on the rail's
+upper beam over every fourth post. Each is a term in its own shader from the
+cars' lamp positions and directions (`beams`, uniforms), sending back towards
+the eye what the beam lays on it times a coefficient that falls steeply with
+the angle between the lamp and the eye; the reflection probe's faces see none
+of it. No light is added and no draw call.
 
 ## Determinism
 

@@ -243,9 +243,11 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
         const veil = new THREE.Mesh(sheet, light);
         veil.name = 'tunnel-mouth-light';
         veil.renderOrder = 2;
-        veil.frustumCulled = false;
+        // (finish lane) culled like anything else, and not drawn at all while it adds nothing (prepareView): four
+        // veils were four draw calls in every pass, anywhere on the lap
+        sheet.computeBoundingSphere();
         group.add(veil);
-        veils.push({ light, at, outward: ahead });
+        veils.push({ light, at, outward: ahead, mesh: veil });
         disposables.push(sheet, light);
       }
       const portal = buildPortal(track, terrain, s, out, W);
@@ -276,6 +278,7 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
         const inside = -(eye.x - v.at.x) * v.outward.x - (eye.z - v.at.z) * v.outward.z;
         const k = Math.min(1, Math.max(0, (inside - MOUTH.near) / (MOUTH.far - MOUTH.near)));
         const show = MOUTH.veil * k * k * (3 - 2 * k);
+        v.mesh.visible = show > 1e-4;
         v.light.color.setRGB(
           show * (haze.x + (grey - haze.x) * MOUTH.grey),
           show * (haze.y + (grey - haze.y) * MOUTH.grey),
