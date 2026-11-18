@@ -52,12 +52,14 @@ export const CASTER_LAYER = 3;
 
 /**
  * Per tier: full detail out to (m), reduced detail out to, impostors out to, share of the general forest kept,
- * foliage tile and bark tile (texels), impostor picture (texels), whether trees cast shadow.
+ * foliage tile and bark tile (texels), impostor picture (texels), whether trees cast shadow; and how far a tree's
+ * `detail` may stretch the full and the reduced distances (the trees the reference frames look at have detail over 1:
+ * D4's wall stands 70 to 150 m from the grid).
  */
 const TIER = {
-  low: { full: 0, reduced: 55, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: true },
-  medium: { full: 58, reduced: 80, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
-  high: { full: 80, reduced: 110, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true },
+  low: { full: 0, reduced: 55, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: true, fullCap: 1, redCap: 2.6 },
+  medium: { full: 58, reduced: 80, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 2.2, redCap: 2.8 },
+  high: { full: 80, reduced: 110, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 2, redCap: 2.8 },
 };
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
 const BLEND = 8;
@@ -127,10 +129,15 @@ export function createTreeKit({ renderer, tier, coverage, rng, atmosphere }) {
   };
   const T = TIER[tier] ?? TIER.high;
   const foliage = createFoliageAtlas(T.tile, rng.fork('foliage'));
+  lap('foliage');
   const bark = createBarkTextures(T.bark, rng.fork('bark'));
-  lap('textures');
-  // (the full trees are grown on every tier: the impostors are pictures of them, even where they are never drawn)
-  const models = growTrees(VARIANTS, SPECIES_DATA, rng.fork('grow'), { full: true, barkSize: T.bark });
+  lap('bark');
+  ms.textures = ms.foliage + ms.bark;
+  ms.atlas = foliage.ms;
+  // (the impostors are pictures of the full trees; the low tier, which never draws a full one, grows only the
+  // conifers' (cheap, and their reduced boughs are too sparse for a picture) and pictures the broadleaves' reduced
+  // ones: half the growing time there)
+  const models = growTrees(VARIANTS, SPECIES_DATA, rng.fork('grow'), { full: T.full > 0 ? true : (v) => v.kind === 'conifer', barkSize: T.bark });
   lap('grow');
   const atlas = bakeImpostors({ renderer, models, foliage: foliage.texture, bark: bark.map, cell: T.cell, rings: T.rings });
   lap('bake');
@@ -403,11 +410,13 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   if (straight) {
     const span = (track.delta(straight.s0, straight.s1) + track.length) % track.length;
     const WALL = [
-      { off: [0.2, 1.6], step: [5.6, 7.4], r: 4.0, height: [14, 19], fir: [8, 11], detail: 1, inside: 0.05, slim: 0.74 },
-      { off: [5.8, 8.2], step: [5.6, 7.6], r: 4.2, height: [16, 21], fir: [10, 13], detail: 0.85, inside: 0.3, slim: 0.74 },
-      { off: [12, 15.5], step: [6, 8], r: 4.4, height: [18, 23], detail: 0.7, inside: 0.45, slim: 0.74 },
-      { off: [19, 23.5], step: [6, 8.5], r: 4.4, height: [20, 25], detail: 0.55, inside: 0.55, slim: 0.7 },
-      { off: [27, 33], step: [6.5, 9], r: 4.4, height: [22, 27], detail: 0.45, inside: 0.6, slim: 0.7 },
+      { off: [0.2, 1.6], step: [5.6, 7.4], r: 4.0, height: [14, 19], fir: [8, 11], detail: 2.8, inside: 0.05, slim: 0.74 },
+      { off: [5.8, 8.2], step: [5.6, 7.6], r: 4.2, height: [16, 21], fir: [10, 13], detail: 2.6, inside: 0.3, slim: 0.74 },
+      { off: [12, 15.5], step: [6, 8], r: 4.4, height: [18, 24], detail: 2.2, inside: 0.45, slim: 0.74 },
+      { off: [19, 23.5], step: [6, 8.5], r: 4.4, height: [21, 27], detail: 1.6, inside: 0.55, slim: 0.7 },
+      { off: [27, 33], step: [6.5, 9], r: 4.4, height: [24, 30], detail: 1.1, inside: 0.6, slim: 0.7 },
+      // (the wood rising behind: from the grid no sky over the crowns)
+      { off: [37, 45], step: [7, 10], r: 4.6, height: [26, 33], detail: 0.7, inside: 0.65, slim: 0.7 },
     ];
     // nearly all maples; a lime here and there; a dark fir or two in the first rows
     plantRows(straight.s0, span, -1, WALL, wallAt, (r) => {
@@ -422,10 +431,10 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     // (not a closed wood: a row at the wall, a thinner one behind it and single trees up the sunlit bank, so that the
     // sun, which stands behind them by day, comes through between the crowns and lies in patches on the road)
     const BANK = [
-      { off: [-0.9, 0.4], step: [7.5, 11], r: 4.5, height: [16, 21], detail: 1, inside: 0, lean: [0.14, 0.27] },
-      { off: [5.5, 9], step: [11, 17], r: 5, height: [17, 22], detail: 0.9, inside: 0.1, lean: [0.03, 0.12] },
-      { off: [14, 22], step: [16, 26], r: 6, height: [16, 23], detail: 0.7, inside: 0.1 },
-      { off: [28, 44], step: [18, 30], r: 6, height: [16, 24], detail: 0.6, inside: 0.1 },
+      { off: [-0.9, 0.4], step: [6, 8.5], r: 4, height: [16, 21], detail: 2, inside: 0, lean: [0.14, 0.27] },
+      { off: [5, 9], step: [8, 12], r: 4.5, height: [17, 22], detail: 1.7, inside: 0.1, lean: [0.03, 0.12] },
+      { off: [13, 21], step: [11, 17], r: 5.5, height: [16, 23], detail: 1.2, inside: 0.1 },
+      { off: [28, 44], step: [18, 30], r: 6, height: [16, 24], detail: 0.9, inside: 0.1 },
     ];
     plantRows(ledge.s0 - 30, 350, -1, BANK, bankAt, (r) => {
       const roll = plantRng.next();
@@ -519,6 +528,25 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const Z0 = b.minZ - 250;
   const X1 = b.maxX + 250;
   const Z1 = b.maxZ + 250;
+  // Which parts of the map lie near a road (a coarse grid): only there do the road's rules apply, and only there is
+  // the nearest point of the road looked for, which is the dear part of planting. Far from every road the wood is
+  // only ever seen as cards on a hillside, and half as many trees stand there.
+  const NEAR = 48;
+  const nearW = Math.ceil((X1 - X0) / NEAR) + 1;
+  const nearH = Math.ceil((Z1 - Z0) / NEAR) + 1;
+  const nearRoad = new Uint8Array(nearW * nearH);
+  for (let s = 0; s < track.length; s += 16) {
+    track.pointAt(s, 0, point);
+    const cx = Math.floor((point.x - X0) / NEAR);
+    const cz = Math.floor((point.z - Z0) / NEAR);
+    for (let dz = -4; dz <= 4; dz++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        const ix = cx + dx;
+        const iz = cz + dz;
+        if (ix >= 0 && iz >= 0 && ix < nearW && iz < nearH) nearRoad[iz * nearW + ix] = 1;
+      }
+    }
+  }
   for (let z = Z0; z < Z1; z += LATTICE) {
     for (let x = X0; x < X1; x += LATTICE) {
       const px = x + plantRng.range(-0.45, 0.45) * LATTICE;
@@ -527,6 +555,18 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       const rank = plantRng.next();
       // (the cheap tests first: start-up time)
       if (rank > T.keep) continue;
+      if (!nearRoad[Math.floor((pz - Z0) / NEAR) * nearW + Math.floor((px - X0) / NEAR)]) {
+        // far from every road
+        if (rank > T.keep * 0.5 || keepOut(px, pz)) continue;
+        const f = terrain.forestAt(px, pz);
+        if (roll > Math.min(0.92, f * 1.15) && roll > 0.015) continue;
+        const y = terrain.heightAt(px, pz);
+        if (y < lakeLevel + 1 || plantRng.next() < 0.8 * smoothstep(75, 115, y)) continue;
+        const slope = Math.abs(terrain.heightAt(px + 2, pz + 2) - y) / 2.8;
+        if (slope > 0.9 || !free(px, pz, 2.8)) continue;
+        addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies('mixed', y, false, 0.05), { road: false, turned: 0.05, inside: 0.75, detail: 0.5 });
+        continue;
+      }
       if (px > valleyBox[0] - VALLEY_REACH && px < valleyBox[2] + VALLEY_REACH && pz > valleyBox[1] - VALLEY_REACH && pz < valleyBox[3] + VALLEY_REACH && inValley(px, pz)) continue;
       const f = terrain.forestAt(px, pz);
       // dense where the forest is, a few strays at its edges and on the meadows
@@ -837,8 +877,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         }
         // (trees behind others, the undergrowth and the mass of the forest go to the simpler levels sooner)
         const detail = trees[i].detail;
-        const fD = fullD * detail;
-        const rD = redD * (0.4 + 0.6 * detail);
+        const fD = fullD * Math.min(detail, T.fullCap);
+        const rD = redD * (0.4 + 0.6 * Math.min(detail, T.redCap));
         const d = flat ? rD - blend - 1 : sphere.center.distanceTo(eye);
         if (d < fD) {
           const a = blend ? Math.min(1, (fD - d) / blend) : 1;
