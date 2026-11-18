@@ -106,7 +106,7 @@ const SHADER = { low: { tier: 0 }, medium: { tier: 1 }, high: { tier: 2 } };
  * `across` wide across the plane of incidence and `along` long in it (the streak; both as the length of the
  * difference of unit vectors, about radians), at `gain` of the head's radiance, less on a merely damp surface.
  */
-const GLINT = { across: 0.012, along: 0.16, gain: 0.5 };
+const GLINT = { across: 0.006, along: 0.12, gain: 0.12 };
 /**
  * The cars' tail lamps in the wet road, on every tier: the same lobe as GLINT, wider and longer (a tail lamp is a
  * broad source close to the road, its streak reaches from under the bumper towards the eye), `radiance` of the

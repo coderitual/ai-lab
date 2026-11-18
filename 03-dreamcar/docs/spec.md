@@ -365,6 +365,13 @@ massif; the glow's coarser grid; skid marks drawn only where laid):
 | ledge bend (t = 79) | 480 k | 323 k | 1.73 M | 929 k | 1.17 M |
 
 Draw calls after: low 168 to 230, medium 197 to 279 (by night 265 to 375).
+
+Night, medium, the same four moments at 393x852 and device scale 1, before
+and after the night lane (floodlights round the lap, their cones and the
+mirror's halos and streaked copy; the rails, the contact shadows and the
+spray left out of the mirror): 1.05 / 1.31 / 0.84 / 1.17 M triangles before,
+1.02 / 1.27 / 0.81 / 1.12 M after (the mirror's own 167 to 245 k down to 130
+to 200 k); draw calls 237 to 330 before, 273 to 371 after.
 **Still over budget**: low by up to 30 %, medium by up to 75 %. What is left
 on medium: the scene's own triangles, 420 to 780 k (the nearest trees at full
 detail, up to 185 k among the conifers of the esses; the terrain 60 to 130 k;

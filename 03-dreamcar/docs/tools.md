@@ -157,6 +157,17 @@ machine without a GPU, and only what is listed here.
   after; `node tools/unit.mjs` passed and `node tools/handling.mjs` was run
   for spec.md. Not looked at on `high`; the playtest was not run; frame times
   were not measured, only triangles and draw calls.
+- **The night lane's changes** (floodlights round the lap with cones in the
+  damp air, the shares texture, the mirror's streaked copy and halos, the wet
+  film, the tail lamps' and the low tier's analytic streaks, the night's sky,
+  moon and wetness, the canopy term, the warmer asphalt): stills on software
+  WebGL at `medium`, 1280x720, at the grid, the forest of the sweep, the
+  tunnel's exit and the sky road, before and after, by eye; the grid and the
+  sky road at phone shape (393x700, scale 1); the grid and the forest on
+  `low`; d3 and d1 by day. Triangles counted per pass at phone shape
+  (spec.md). `node tools/unit.mjs` passed. Not looked at on `high`, at golden
+  hour, in split screen or in motion; the playtest and the soundtest were not
+  run.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
