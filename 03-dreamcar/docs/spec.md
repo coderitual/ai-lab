@@ -304,14 +304,15 @@ and the moon are placed against the start straight's heading by
 
 | | day | dusk (golden hour) | night |
 | --- | --- | --- | --- |
-| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 3.5° up; colour [1, 0.6, 0.3], 3.4 | the moon 8° left, 17° up; 0.08 |
-| exposure (tunnel) | 0.72 (5.6) | 3.2 (6) | 18 (8) |
+| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | the moon 8° left, 17° up; 0.08 |
+| exposure (tunnel) | 0.68 (5.6) | 4.2 (6) | 22 (8) |
+| sky's light on the scene: environment / fill | 0.6 / 0.13 | 0.6 / 0.014 | 1 / 0.009 |
 | wetness | 0 | 0 | 0.65 |
 | street lamps / tunnel / windows | 0 / 1 / 0 | 1 / 1 / 0.7 | 1 / 1 / 1 |
 | car lamps | running lights | low beam | low beam |
-| clouds cover | 0.4 | 0.38 | 0.3 |
+| clouds cover | 0.45 | 0.45 | 0.3 |
 | bloom / glare / ghosts | 0.05 / 0.015 / 0.0003 | 0.09 / 0.03 / 0.0003 | 0.15 / 0 / 0 |
-| contrast / saturation | 1.18 / 1.04 | 1.12 / 1.12 | 1.12 / 0.94 |
+| contrast / saturation | 1.14 / 1.18 | 1.2 / 1.16 | 1.12 / 0.94 |
 
 N, or the title's choice, fades to black and back (0.25 s each way) to switch.
 
