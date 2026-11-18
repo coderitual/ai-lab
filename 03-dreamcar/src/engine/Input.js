@@ -9,16 +9,29 @@
 // not fight it.
 //
 // Touch is cut into zones, one per view rectangle, so that two people can
-// share a tablet. In a zone the left part (TOUCH.steerShare) steers: the first
-// finger there is a stick that appears where it lands and reads sideways
-// travel only (a second finger there is ignored). Anywhere in the right part
-// is the brake, except two round buttons at its bottom right that the HUD
-// draws: DRIFT (the handbrake while held) and, with the throttle on manual,
-// GAS. With the throttle on auto (the default) the car drives while the
-// steering thumb is down, or was a moment ago (TOUCH.grace s, counted in the
-// fixed step by step()), and not while the brake or DRIFT is held. Holding
-// the brake at a standstill reverses (the vehicle does that; this only
-// reports the brake).
+// share a tablet, and every zone has the same fixed controls, laid out for its
+// size by layoutOf() (which the HUD draws from, so a finger finds what it
+// sees). Four steering schemes:
+//
+// - 'pad' (the default), for one thumb: a fixed round pad on the side of the
+//   holding hand ('right' or 'left'). The thumb's offset from its centre, which
+//   never moves, is everything: across is the steering, down is the speed (the
+//   first quarter lifts, the rest brakes; on manual up is the throttle), and
+//   pulled on into the red arc at the pad's foot it pulls the handbrake (see
+//   padControls). A round HANDBRAKE button stands in the other bottom corner
+//   for a second thumb.
+// - 'tilt': the same pad for the speed, the steering from rolling the device
+//   (deviceorientation, ±TILT.full degrees from where it was at the start).
+// - 'slider' (a track with a marked centre) or 'arrows' (steering as keys do)
+//   at the bottom left, with the pedals at the bottom right: BRAKE, GAS (only
+//   with the throttle on manual) and DRIFT (the handbrake) above them.
+//
+// A thumb anywhere in the steering zone takes the steering; each control
+// keeps the pointer that took it until that pointer lifts or is cancelled,
+// wherever it slides; a touch anywhere else does nothing to the car. With the
+// throttle on auto (the default) the car drives by itself, touched or not,
+// and lifts while it brakes or the handbrake is pulled. Braking at a
+// standstill reverses (the vehicle does that; this only reports the brake).
 //
 // Steering, pedals and the held look back are read by the drivers in the
 // fixed step (read). Everything else is a moment: an action ('camera',
@@ -28,22 +41,97 @@
 
 import { clamp } from './math.js';
 
-const STEER_RANGE = 96; // px of thumb travel for full lock
-const STEER_CURVE = 1.15; // power of the thumb's response
 /**
- * The touch layout of a zone: the share of its width (from the left) that steers, the round buttons by their
- * radius and their centre's distance from the zone's right and bottom edges (CSS px, inside the safe area), and
- * how long the automatic throttle stays on after the steering thumb lifts (s).
+ * The touch controls of a zone, in CSS px inside the safe area (see layoutOf). The steering zone is the zone's
+ * left `steerShare` below `steerTop` of its height. The slider's half travel is `half.base + half.perWidth` × the
+ * zone's width, from `half.min` to `half.max`; it is shortened to stay clear of the pedals down to `half.ok`, and
+ * beyond that the pedals in its way stand above it instead (BRAKE beside GAS on an upright phone; all of them on
+ * half of one). Its knob's radius, and its centre `lift` px above the bottom edge. The arrows' and the pedals' radii; `gap` between controls and
+ * `margin` from the edges. On a zone lower than `lowBelow` px (a stacked half on a phone) or narrower than
+ * `thinBelow` (half an upright phone) DRIFT stands beside the pedals instead of above them; there, on manual, every
+ * pedal has the radius `small`. A finger finds a pedal within `slop` px more than its drawn radius.
  */
 export const TOUCH = {
-  steerShare: 0.55,
-  drift: { r: 38, right: 64, bottom: 150 },
-  gas: { r: 44, right: 64, bottom: 56 },
-  /** On a zone lower than `lowBelow` px (a stacked half on a phone) DRIFT stands beside GAS instead, at the bottom. */
+  steerShare: 0.5,
+  steerTop: 0.45,
+  margin: 18,
+  gap: 12,
+  half: { base: 56, perWidth: 0.05, min: 48, ok: 70, max: 92 },
+  knob: 26,
+  lift: 26,
+  arrow: 38,
+  gas: 44,
+  brake: 40,
+  drift: 34,
+  small: 32,
   lowBelow: 330,
-  driftLow: { r: 38, right: 160, bottom: 56 },
-  grace: 0.4,
+  thinBelow: 300,
+  slop: 8,
+  /**
+   * The one-thumb pad: its radius is `share` of the zone's shorter side, `min` to `max` px; its centre stands
+   * radius + `side` × (radius / max) px from the zone's side edge (inside the safe area). Every distance below is in px at the full radius (`max`) and
+   * scales with the pad: full lock `steer` px across; down, the first `lift` of `brake` px lifts the throttle and the
+   * rest brakes to the full at `brake`; on beyond `trip` px the handbrake is pulled, let go above `untrip` px. On
+   * manual, `brake` px up is the full throttle. The knob's radius; `up`: the centre's height above the bottom edge,
+   * `upShare` of the zone's height, `up` px at most and the radius + `upMin` at least. The HANDBRAKE button's radius
+   * `hand`; the steering zone round the pad: the lower `zoneShare` of the pad's half of the zone. In a half of a split
+   * screen the radius is `splitShare` of the shorter side, `splitMax` at most. On an upright view the pad's top stays
+   * below `below` of the height (where the car's tail is), the centre `up` or less above the bottom if need be.
+   */
+  pad: { share: 0.21, splitShare: 0.155, min: 50, max: 80, splitMax: 64, below: 0.75, side: 25, steer: 70, lift: 0.25, brake: 56, trip: 74, untrip: 62, knob: 30, up: 150, upShare: 0.176, upMin: 22, hand: 34, zoneShare: 0.45 },
 };
+
+/** Tilt steering: full lock at `full` degrees of roll from the zero; a roll measured where gravity is at least `minG` of itself in the screen's plane. */
+export const TILT = { full: 30, minG: 0.25 };
+
+/**
+ * What a thumb on the pad asks for: `dx`, `dy` its offset from the pad's centre (px, + = right, down), `s` the pad's
+ * scale (radius / TOUCH.pad.max), `manual` the throttle, `tripped` whether the handbrake was pulled a moment ago
+ * (the threshold has hysteresis). Pure: the scripted thumb of the Node tests uses it too.
+ * @returns {{ steer: number, throttle: number, brake: number, handbrake: number, tripped: boolean }}
+ */
+export function padControls(dx, dy, s, manual, tripped, out = {}) {
+  const P = TOUCH.pad;
+  const trip = tripped ? dy >= P.untrip * s : dy >= P.trip * s;
+  const y = clamp(dy / (P.brake * s), -1, 1);
+  out.steer = clamp(dx / (P.steer * s), -1, 1);
+  out.tripped = trip;
+  out.handbrake = trip ? 1 : 0;
+  if (trip) {
+    out.throttle = 0;
+    out.brake = 0;
+  } else if (manual) {
+    out.throttle = Math.max(0, -y);
+    out.brake = Math.max(0, y);
+  } else {
+    out.throttle = y <= 0 ? 1 : Math.max(0, 1 - y / P.lift);
+    out.brake = y <= P.lift ? 0 : (y - P.lift) / (1 - P.lift);
+  }
+  return out;
+}
+
+/** The roll (degrees, + = clockwise, steering right) of a device from a deviceorientation's beta and gamma, for a screen turned `screenAngle` degrees; null when the device lies too flat to tell. */
+export function rollOf(beta, gamma, screenAngle) {
+  const r = Math.PI / 180;
+  // the world's up in the device's frame (x right, y up the portrait screen, z out of it)
+  const ux = -Math.sin(gamma * r) * Math.cos(beta * r);
+  const uy = Math.sin(beta * r);
+  const a = (screenAngle || 0) * r;
+  // into the screen's own frame as it is shown
+  const sx = ux * Math.cos(a) - uy * Math.sin(a);
+  const sy = ux * Math.sin(a) + uy * Math.cos(a);
+  if (Math.hypot(sx, sy) < TILT.minG) return null;
+  return Math.atan2(-sx, sy) / r;
+}
+
+/** A short buzz where the device can (not on iOS, which has no vibrate). */
+export function buzz(ms = 8) {
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(ms);
+  } catch {
+    /* not allowed here: no buzz */
+  }
+}
 const PAD_DEAD = 0.12; // of the stick's travel that does nothing
 const PAD_CURVE = 1.6; // power of the stick's response: fine near the centre, all of the lock at the edge
 const PAD_PEDAL_DEAD = 0.04;
@@ -107,17 +195,36 @@ export class Input {
     /** Touch zones as fractions of the surface from its top left: { left, top, width, height } per driver. */
     this.zones = [{ left: 0, top: 0, width: 1, height: 1 }];
     /**
-     * Per zone: the stick { id, originX, originY, x, y }, the fingers on the brake (pointer ids), on DRIFT and on
-     * GAS, and how long the automatic throttle has left after the stick went (s of simulated time).
+     * Per zone: the steering thumb { id, x, value } (client x, and the steering it asks for, -1..1, worked out as
+     * it moves) or null, and the fingers on the pedals (pointer id -> 'brake' | 'gas' | 'drift').
      */
     this.touch = [this._zone(), this._zone()];
-    /** The throttle on touch: 'auto' (the car drives while a thumb steers) or 'manual' (the GAS button). */
+    /** The throttle on touch: 'auto' (the car drives by itself, BRAKE lifts) or 'manual' (only while GAS is held). */
     this.throttle = 'auto';
-    /** The safe area's right and bottom insets (CSS px), which the buttons stand inside (set by the game). */
-    this.insets = { right: 0, bottom: 0 };
+    /** The steering on touch: 'pad' (one thumb), 'tilt', 'slider' or 'arrows' (see the header). */
+    this.steering = 'pad';
+    /** The pad's side: the holding hand, 'right' or 'left'. */
+    this.hand = 'right';
+    /**
+     * Tilt: the last roll read (degrees, or null before any), the zero it is measured from (set at the start of a run
+     * and by recentre()), and the permission: '' not asked, 'asking', 'granted', 'refused', 'unavailable'.
+     */
+    this.tilt = { roll: null, zero: null, state: '' };
+    /** (state) when tilt is refused or unavailable. */
+    this.onTiltFail = null;
+    this._orient = (e) => {
+      if (e.beta === null || e.gamma === null || e.beta === undefined) return;
+      const angle = (typeof screen !== 'undefined' && screen.orientation && screen.orientation.angle) ?? (typeof window.orientation === 'number' ? window.orientation : 0);
+      const roll = rollOf(e.beta, e.gamma, angle);
+      if (roll === null) return;
+      this.tilt.roll = roll;
+      if (this.tilt.zero === null) this.tilt.zero = roll;
+    };
+    /** The safe area's insets (CSS px), which the controls stand inside (set by the game). */
+    this.insets = { left: 0, right: 0, bottom: 0 };
     /** (name, driver) for each action as it happens. */
     this.onAction = null;
-    /** (input) whenever a stick appears, moves or goes, for drawing it. */
+    /** (input) whenever a control is taken, moved or let go, for drawing it. */
     this.onTouchChange = null;
     /** (kind) on any input at all: 'key', 'pad', 'touch' (sound unlock, idle timers). */
     this.onAnyInput = null;
@@ -142,12 +249,17 @@ export class Input {
     this._keyup = (e) => this.keys.delete(e.code);
     this._blur = () => {
       this.keys.clear();
-      for (let i = 0; i < this.touch.length; i++) this.touch[i] = this._zone();
-      this._notify();
+      this.release();
+    };
+    // a hidden tab or a turned device: no finger is still where it was
+    this._hidden = () => {
+      if (document.hidden) this._blur();
     };
     window.addEventListener('keydown', this._keydown);
     window.addEventListener('keyup', this._keyup);
     window.addEventListener('blur', this._blur);
+    window.addEventListener('orientationchange', this._blur);
+    document.addEventListener('visibilitychange', this._hidden);
 
     const opts = { passive: false };
     surface.addEventListener('pointerdown', (e) => this._down(e), opts);
@@ -204,7 +316,13 @@ export class Input {
   }
 
   _zone() {
-    return { stick: null, brakes: new Set(), drift: null, gas: null, grace: 0 };
+    return { steer: null, pedals: new Map() };
+  }
+
+  /** Every finger let go: the knob back at the centre, no pedal held. */
+  release() {
+    for (let i = 0; i < this.touch.length; i++) this.touch[i] = this._zone();
+    this._notify();
   }
 
   /** The zone's rectangle in client pixels. */
@@ -214,18 +332,159 @@ export class Input {
     return { left: r.left + z.left * r.width, top: r.top + z.top * r.height, width: z.width * r.width, height: z.height * r.height };
   }
 
-  /** Which of a zone's round buttons (TOUCH.drift, TOUCH.gas) is under a point, or ''. */
-  _buttonAt(i, x, y) {
+  /**
+   * Where zone `i`'s touch controls are, in CSS px from the zone's top left (`x0`, `y0`: the zone's own top left in
+   * client px): the steering zone { x1, y0 } (left of x1, below y0), the slider { cx, cy, half, knob } or the arrows
+   * { left, right } ({ x, y, r } each), and the pedals { brake, gas (null on auto), drift }. The HUD draws them from
+   * this, so a finger finds what it sees.
+   */
+  layoutOf(i) {
     const zr = this._rectOf(i);
-    const hit = (b) => {
-      const cx = zr.left + zr.width - this.insets.right - b.right;
-      const cy = zr.top + zr.height - this.insets.bottom - b.bottom;
-      // a little more than the drawn circle, never less than a 64 px target
-      return Math.hypot(x - cx, y - cy) <= Math.max(32, b.r + 6);
-    };
-    if (hit(zr.height < TOUCH.lowBelow ? TOUCH.driftLow : TOUCH.drift)) return 'drift';
-    if (this.throttle === 'manual' && hit(TOUCH.gas)) return 'gas';
+    const z = this.zones[i] || this.zones[0];
+    const ins = this.insets;
+    const key = `${zr.left},${zr.top},${zr.width},${zr.height},${ins.left},${ins.right},${ins.bottom},${this.throttle},${this.steering},${this.hand},${z.left},${z.width},${z.top},${z.height}`;
+    if (this._layouts && this._layouts[i] && this._layouts[i].key === key) return this._layouts[i];
+    const T = TOUCH;
+    const w = zr.width;
+    const h = zr.height;
+    if (this.steering === 'pad' || this.steering === 'tilt') {
+      const out = this._padLayout(zr, z, key);
+      if (!this._layouts) this._layouts = [];
+      this._layouts[i] = out;
+      return out;
+    }
+    // the safe area's insets only where the zone meets the screen's edge
+    const left = (z.left < 0.001 ? ins.left : 0) + T.margin;
+    const right = w - (z.left + z.width > 0.999 ? ins.right : 0) - T.margin;
+    const bottom = h - (z.top + z.height > 0.999 ? ins.bottom : 0) - T.margin;
+    // the pedals: the corner is GAS's on manual (BRAKE to its left), BRAKE's on auto; DRIFT above the corner, or
+    // beside the row on a low zone
+    const manual = this.throttle === 'manual';
+    // (half an upright phone on manual: the pedals at their smallest, `small`, so that they stay below the car)
+    const tight = manual && (w < T.thinBelow || z.width < 0.999 || z.height < 0.999);
+    const gasR = tight ? T.small : T.gas;
+    const brakeR = tight ? T.small : T.brake;
+    const driftR = tight ? T.small : T.drift;
+    const c = manual ? gasR : brakeR;
+    const corner = { x: right - c, y: bottom - c, r: c };
+    const gas = manual ? corner : null;
+    const brake = manual ? { x: corner.x - c - T.gap - brakeR, y: bottom - brakeR, r: brakeR } : corner;
+    const low = h < T.lowBelow || w < T.thinBelow;
+    const leftmost = manual ? brake : corner;
+    const drift = low
+      ? { x: leftmost.x - leftmost.r - T.gap - driftR, y: bottom - driftR, r: driftR }
+      : { x: corner.x, y: corner.y - c - T.gap - driftR, r: driftR };
+    // (too narrow for GAS and BRAKE side by side: GAS in the corner, BRAKE above it and DRIFT beside BRAKE where
+    // there is room for both, else above it)
+    // (a half of a split screen, neither thin nor low: one column at the edge, clear of the car in the middle)
+    const column = tight && w >= T.thinBelow && h >= T.lowBelow;
+    if (manual && (brake.x - brake.r < left || column)) {
+      Object.assign(brake, { x: corner.x, y: corner.y - c - T.gap - brakeR });
+      if (column) Object.assign(drift, { x: corner.x, y: brake.y - brakeR - T.gap / 2 - driftR });
+      else if (brake.x - brakeR - 2 * T.gap - 2 * driftR >= left) Object.assign(drift, { x: brake.x - brakeR - T.gap - driftR, y: brake.y });
+      else Object.assign(drift, { x: corner.x, y: brake.y - brakeR - T.gap - driftR });
+    }
+    // (no room for DRIFT beside the row: above the corner)
+    if (drift.x - drift.r < left) Object.assign(drift, { x: corner.x, y: Math.min(corner.y - c, brake.y - brake.r) - (tight ? T.gap / 2 : T.gap) - driftR });
+    const pedals = [gas, brake, drift].filter(Boolean);
+    const leftOf = (list) => Math.min(...list.map((b) => b.x - b.r)) - T.gap;
+    // the steering: the slider's travel for the zone's width; the arrows side by side
+    const k = T.knob;
+    const want = Math.max(Math.min(T.half.min, (right - left - 2 * k) / 2), Math.min(T.half.max, T.half.base + T.half.perWidth * w, (right - left - 2 * k) / 2));
+    const fits = (leftOf(pedals) - left - 2 * k) / 2;
+    const a = T.arrow;
+    const arrows = { left: { x: left + a, y: bottom - a, r: a }, right: { x: left + 3 * a + T.gap, y: bottom - a, r: a } };
+    const half = this.steering === 'arrows' || fits >= Math.min(want, T.half.ok) ? Math.max(Math.min(want, fits), Math.min(want, T.half.min)) : want;
+    const slider = { cx: left + k + half, cy: bottom - T.lift, half, knob: k };
+    const steerRight = this.steering === 'arrows' ? arrows.right.x + a : slider.cx + half + k;
+    const steerTop = this.steering === 'arrows' ? bottom - 2 * a : slider.cy - k;
+    // pedals in the steering's way (BRAKE beside GAS on an upright phone; all of them on half an upright phone)
+    // stand above it: the corner's pedal takes the ones above it along
+    const lift = bottom - (steerTop - T.gap);
+    const inWay = (b) => b.x - b.r - T.gap < steerRight;
+    if (inWay(corner)) for (const b of pedals) b.y -= lift;
+    else for (const b of pedals) if (b !== corner && b.y > steerTop - b.r && inWay(b)) b.y = Math.min(b.y, steerTop - T.gap - b.r);
+    const x1 = Math.max(w * T.steerShare, steerRight + T.gap);
+    const out = { key, x0: zr.left, y0: zr.top, w, h, steering: this.steering, hand: 'left', zone: { x0: 0, x1, y0: h * T.steerTop }, slider, arrows, pad: null, brake, gas, drift };
+    if (!this._layouts) this._layouts = [];
+    this._layouts[i] = out;
+    return out;
+  }
+
+  /**
+   * The pad's layout (steering 'pad' or 'tilt'): the pad { cx, cy, r, s, knob } on the holding hand's side, its centre
+   * radius + side px from that edge and `up` above the bottom; the HANDBRAKE button (`drift`) in the other bottom
+   * corner, or above the pad where the zone is too narrow for both side by side; no pedals.
+   */
+  _padLayout(zr, z, key) {
+    const T = TOUCH;
+    const P = T.pad;
+    const ins = this.insets;
+    const w = zr.width;
+    const h = zr.height;
+    const l = z.left < 0.001 ? ins.left : 0;
+    const rgt = w - (z.left + z.width > 0.999 ? ins.right : 0);
+    const bot = h - (z.top + z.height > 0.999 ? ins.bottom : 0);
+    // (a half of a split screen: a smaller pad, clear of its car)
+    const split = z.width < 0.999 || z.height < 0.999;
+    const r = clamp(Math.min(w, h) * (split ? P.splitShare : P.share), P.min, split ? P.splitMax : P.max);
+    const s = r / P.max;
+    const right = this.hand !== 'left';
+    const cx = right ? rgt - r - P.side * s : l + r + P.side * s;
+    let cy = bot - Math.max(r + P.upMin, Math.min(P.up, h * P.upShare));
+    // an upright view: the car's tail reaches down to about `below` of the height; the pad stays under it
+    const tall = h > w * 1.2;
+    if (tall) cy = Math.min(bot - r - P.upMin, Math.max(cy, h * P.below + r));
+    const b = P.hand;
+    const drift = { x: right ? l + T.margin + b : rgt - T.margin - b, y: bot - T.margin - b, r: b };
+    // (the button's box and the pad's too close: the pad stands above the button's top if it can stay under the car,
+    // else the button stands above the pad)
+    const clash = () => Math.abs(drift.x - cx) < r + b + T.gap && Math.abs(drift.y - cy) < r + b + T.gap;
+    if (clash()) {
+      const up = drift.y - b - T.gap - r;
+      if (!tall || up - r >= h * P.below) cy = up;
+      else Object.assign(drift, { x: cx, y: cy - r - T.gap - b });
+    }
+    const pad = { cx, cy, r, s, knob: P.knob * s };
+    const zone = right ? { x0: Math.min(w * 0.5, cx - r - T.gap), x1: w } : { x0: 0, x1: Math.max(w * 0.5, cx + r + T.gap) };
+    zone.y0 = Math.min(h * (1 - P.zoneShare), cy - r - T.gap);
+    return { key, x0: zr.left, y0: zr.top, w, h, steering: this.steering, hand: right ? 'right' : 'left', zone, pad, slider: null, arrows: null, brake: null, gas: null, drift };
+  }
+
+  /** Which of a zone's pedals is under a point (client px), or ''. */
+  _pedalAt(i, x, y) {
+    const L = this.layoutOf(i);
+    const hit = (b) => b && Math.hypot(x - L.x0 - b.x, y - L.y0 - b.y) <= Math.max(32, b.r + TOUCH.slop);
+    if (hit(L.gas)) return 'gas';
+    if (hit(L.brake)) return 'brake';
+    if (hit(L.drift)) return 'drift';
     return '';
+  }
+
+  /** The steering a thumb at client x asks for in zone `i`, -1..1 (+ = right) (the slider and the arrows). */
+  _steerAt(i, x) {
+    const L = this.layoutOf(i);
+    const u = x - L.x0;
+    if (L.steering === 'arrows') return u < (L.arrows.left.x + L.arrows.right.x) / 2 ? -1 : 1;
+    return clamp((u - L.slider.cx) / L.slider.half, -1, 1);
+  }
+
+  /** The steering thumb `st` at client (x, y) in zone `i`: its value, and on the pad everything else it asks for. */
+  _place(i, st, x, y) {
+    const L = this.layoutOf(i);
+    st.x = x;
+    st.y = y;
+    if (!L.pad) {
+      st.value = this._steerAt(i, x);
+      return;
+    }
+    const was = st.tripped;
+    st.dx = x - L.x0 - L.pad.cx;
+    st.dy = y - L.y0 - L.pad.cy;
+    padControls(st.dx, st.dy, L.pad.s, this.throttle === 'manual', was, st.pad);
+    st.tripped = st.pad.tripped;
+    st.value = st.pad.steer;
+    if (st.tripped && !was) buzz();
   }
 
   _down(e) {
@@ -234,36 +493,42 @@ export class Input {
     this.isTouch = true;
     const zi = this._zoneAt(e.clientX, e.clientY);
     if (zi < 0) return;
-    try {
-      this.surface.setPointerCapture(e.pointerId);
-    } catch {
-      /* not capturable: the moves still arrive while the finger is over the surface */
-    }
-    const z = this.touch[zi];
-    const zr = this._rectOf(zi);
-    const button = this._buttonAt(zi, e.clientX, e.clientY);
-    if (button === 'drift') z.drift = e.pointerId;
-    else if (button === 'gas') z.gas = e.pointerId;
-    else if ((e.clientX - zr.left) / Math.max(1, zr.width) < TOUCH.steerShare) {
-      // the left part steers: the first finger is the stick, wherever it lands; another one there is ignored
-      if (!z.stick) z.stick = { id: e.pointerId, originX: e.clientX, originY: e.clientY, x: e.clientX, y: e.clientY };
-    } else z.brakes.add(e.pointerId);
     this.source[zi] = 'touch';
-    this._notify();
     if (this.onAnyInput) this.onAnyInput('touch');
+    if (this.steering === 'tilt' && this.tilt.state === '') this.askTilt();
+    const z = this.touch[zi];
+    const L = this.layoutOf(zi);
+    const pedal = this._pedalAt(zi, e.clientX, e.clientY);
+    const u = e.clientX - L.x0;
+    const v = e.clientY - L.y0;
+    let took = false;
+    if (pedal) {
+      if (pedal === 'drift' && !this._held(zi, 'drift')) buzz();
+      z.pedals.set(e.pointerId, pedal);
+      took = true;
+    } else if (!z.steer && u >= L.zone.x0 && u < L.zone.x1 && v >= L.zone.y0) {
+      // the steering zone: the first thumb there steers at once by where it is from the fixed centre
+      z.steer = { id: e.pointerId, x: 0, y: 0, dx: 0, dy: 0, value: 0, tripped: false, pad: {} };
+      this._place(zi, z.steer, e.clientX, e.clientY);
+      took = true;
+    }
+    // anywhere else (or a second thumb on the steering) does nothing to the car
+    if (took) {
+      try {
+        this.surface.setPointerCapture(e.pointerId);
+      } catch {
+        /* not capturable: the moves still arrive while the finger is over the surface */
+      }
+    }
+    this._notify();
   }
 
   _move(e) {
-    for (const z of this.touch) {
-      const s = z.stick;
+    for (let i = 0; i < this.touch.length; i++) {
+      const s = this.touch[i].steer;
       if (!s || s.id !== e.pointerId) continue;
       e.preventDefault();
-      s.x = e.clientX;
-      s.y = e.clientY;
-      // the origin trails the thumb, so reversing direction answers at once
-      if (s.x - s.originX > STEER_RANGE) s.originX = s.x - STEER_RANGE;
-      if (s.x - s.originX < -STEER_RANGE) s.originX = s.x + STEER_RANGE;
-      s.originY = s.y;
+      this._place(i, s, e.clientX, e.clientY);
       this._notify();
     }
   }
@@ -271,47 +536,51 @@ export class Input {
   _up(e) {
     let changed = false;
     for (const z of this.touch) {
-      if (z.stick && z.stick.id === e.pointerId) {
-        z.stick = null;
+      if (z.steer && z.steer.id === e.pointerId) {
+        z.steer = null;
         changed = true;
       }
-      if (z.brakes.delete(e.pointerId)) changed = true;
-      if (z.drift === e.pointerId) {
-        z.drift = null;
-        changed = true;
-      }
-      if (z.gas === e.pointerId) {
-        z.gas = null;
-        changed = true;
-      }
+      if (z.pedals.delete(e.pointerId)) changed = true;
     }
+    // (Safari grants the sensors only from a gesture's end as reliably as from a click)
+    if (this.steering === 'tilt' && this.tilt.state === '') this.askTilt();
     if (changed) this._notify();
-  }
-
-  /** Once per fixed step: the automatic throttle's moment after the steering thumb lifts runs out. */
-  step(dt) {
-    for (const z of this.touch) z.grace = z.stick ? TOUCH.grace : Math.max(0, z.grace - dt);
   }
 
   _notify() {
     if (this.onTouchChange) this.onTouchChange(this);
   }
 
-  /** The stick of zone `i` as drawn: { x, y, originX, originY } in client pixels, or null. */
-  stickOf(i) {
-    return this.touch[i] ? this.touch[i].stick : null;
+  /** Whether zone `i` has a finger on that pedal. */
+  _held(i, name) {
+    const z = this.touch[i];
+    if (!z) return false;
+    for (const p of z.pedals.values()) if (p === name) return true;
+    return false;
   }
 
-  /** How hard zone `i`'s fingers brake right now, 0 or 1. */
-  brakeOf(i) {
+  /**
+   * Zone `i`'s controls as drawn: the layout, the steering the thumb asks for (-1..1, or null with no thumb) and
+   * which pedals are held.
+   */
+  controlsOf(i) {
     const z = this.touch[i];
-    return z && z.brakes.size ? 1 : 0;
+    const st = z && z.steer;
+    const L = this.layoutOf(i);
+    return {
+      layout: L,
+      steer: st ? st.value : null,
+      // the pad's knob: the thumb's offset from the centre (px), and whether it has pulled the handbrake
+      knob: st && L.pad ? { dx: st.dx, dy: st.dy, tripped: st.tripped } : null,
+      tilt: L.steering === 'tilt' ? this._tiltSteer() : null,
+      held: { brake: this._held(i, 'brake'), gas: this._held(i, 'gas'), drift: this._held(i, 'drift') },
+    };
   }
 
-  /** Which of zone `i`'s buttons are held: { drift, gas } (for drawing them pressed). */
-  heldOf(i) {
+  /** Whether any finger holds any control of zone `i`. */
+  touched(i) {
     const z = this.touch[i];
-    return { drift: !!(z && z.drift !== null), gas: !!(z && z.gas !== null) };
+    return !!z && (!!z.steer || z.pedals.size > 0);
   }
 
   /** The pad driver `d` holds, or null. */
@@ -410,23 +679,30 @@ export class Input {
   _readTouch(out, zone) {
     const i = this.touch[zone] ? zone : 0;
     const z = this.touch[i];
-    const s = z.stick;
-    let steer = 0;
-    if (s) {
-      const v = clamp((s.x - s.originX) / STEER_RANGE, -1, 1);
-      steer = Math.sign(v) * Math.pow(Math.abs(v), STEER_CURVE);
+    const drift = this._held(i, 'drift') ? 1 : 0;
+    const manual = this.throttle === 'manual';
+    out.lookBack = false;
+    out.device = 'touch';
+    if (this.steering === 'pad' || this.steering === 'tilt') {
+      // the pad: the thumb's offset from the centre is the steering, the speed and the handbrake (padControls); with
+      // no thumb on it the car drives on (auto) with the steering straight; the HANDBRAKE button lifts as the pad's does
+      const c = z.steer && z.steer.pad && z.steer.pad.steer !== undefined ? z.steer.pad : null;
+      const tilt = this.steering === 'tilt' ? this._tiltSteer() : null;
+      out.steer = tilt ?? (c ? c.steer : 0);
+      out.brake = c ? c.brake : 0;
+      out.handbrake = drift || (c && c.handbrake) ? 1 : 0;
+      out.throttle = drift ? 0 : c ? c.throttle : manual ? 0 : 1;
+      out.analog = true;
+      return out;
     }
-    const brake = this.brakeOf(i);
-    const drift = z.drift !== null ? 1 : 0;
-    out.steer = steer;
+    const brake = this._held(i, 'brake') ? 1 : 0;
+    out.steer = z.steer ? z.steer.value : 0;
     out.brake = brake;
     out.handbrake = drift;
-    // auto: the car drives while a thumb steers (and a moment after), not while the brake or DRIFT is held;
-    // manual: only while GAS is held
-    out.throttle = this.throttle === 'manual' ? (z.gas !== null ? 1 : 0) : (s || z.grace > 0) && !brake && !drift ? 1 : 0;
-    out.lookBack = false;
-    out.analog = true;
-    out.device = 'touch';
+    // auto: the car drives by itself, and lifts while BRAKE or DRIFT is held; manual: only while GAS is held
+    out.throttle = manual ? (this._held(i, 'gas') ? 1 : 0) : !brake && !drift ? 1 : 0;
+    // the slider is a stick (its curve and smoothing are the hands', HANDS.thumb); the arrows are keys
+    out.analog = this.steering !== 'arrows';
     return out;
   }
 
@@ -434,8 +710,55 @@ export class Input {
     window.removeEventListener('keydown', this._keydown);
     window.removeEventListener('keyup', this._keyup);
     window.removeEventListener('blur', this._blur);
+    window.removeEventListener('orientationchange', this._blur);
+    window.removeEventListener('deviceorientation', this._orient);
+    document.removeEventListener('visibilitychange', this._hidden);
+  }
+
+  /**
+   * Tilt wanted: listen to the device's orientation, asking first where the browser wants that asked (Safari: from a
+   * user gesture, so this is called from the option's click and from the first touch of a run).
+   */
+  askTilt() {
+    const t = this.tilt;
+    if (t.state === 'granted' || t.state === 'asking') return;
+    const Ev = typeof window !== 'undefined' ? window.DeviceOrientationEvent : undefined;
+    const fail = (state) => {
+      t.state = state;
+      if (this.onTiltFail) this.onTiltFail(state);
+    };
+    if (!Ev) return fail('unavailable');
+    const listen = () => {
+      t.state = 'granted';
+      window.removeEventListener('deviceorientation', this._orient);
+      window.addEventListener('deviceorientation', this._orient);
+    };
+    if (typeof Ev.requestPermission === 'function') {
+      t.state = 'asking';
+      let asked;
+      try {
+        asked = Ev.requestPermission();
+      } catch {
+        return fail('refused');
+      }
+      Promise.resolve(asked).then(
+        (r) => (r === 'granted' ? listen() : fail('refused')),
+        () => fail('refused'),
+      );
+    } else listen();
+  }
+
+  /** The tilt's zero is wherever the device is now (the start of a run, the pause sheet's Recentre). */
+  recentre() {
+    this.tilt.zero = this.tilt.roll;
+  }
+
+  /** The steering tilt asks for, -1..1, or null with no reading. */
+  _tiltSteer() {
+    const t = this.tilt;
+    if (t.roll === null || t.zero === null) return null;
+    let d = t.roll - t.zero;
+    d -= Math.round(d / 360) * 360;
+    return clamp(d / TILT.full, -1, 1);
   }
 }
-
-/** Thumb travel for full lock (px): the drawn stick's ring is this wide either side. */
-export { STEER_RANGE as STICK_RANGE };

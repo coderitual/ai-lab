@@ -132,10 +132,19 @@ export class PlayerDriver {
       // lock), and smoothed a little, more at speed, so that a hand's shake and its haste do not set the car darting
       const h = HANDS[this.device];
       const fine = Math.sign(want) * Math.abs(want) ** (1 + at(h.expo, fast));
-      this._steer += (fine - this._steer) * (1 - Math.exp(-dt / at(h.lag, fast)));
-      this._wheel = this._steer;
-      this._throttle = clamp01(+raw.throttle || 0);
-      this._brake = clamp01(+raw.brake || 0);
+      const k = 1 - Math.exp(-dt / at(h.lag, fast));
+      if (h.order === 2) {
+        // a thumb on the glass: a critically damped follow (two equal lags in a row), which takes a shaky thumb's
+        // jitter out without an overshoot or a lag a hand would feel
+        this._steer += (fine - this._steer) * k;
+        this._wheel += (this._steer - this._wheel) * k;
+      } else {
+        this._steer += (fine - this._steer) * k;
+        this._wheel = this._steer;
+      }
+      const kp = h.pedalLag ? 1 - Math.exp(-dt / h.pedalLag) : 1;
+      this._throttle += (clamp01(+raw.throttle || 0) - this._throttle) * kp;
+      this._brake += (clamp01(+raw.brake || 0) - this._brake) * kp;
     } else {
       // a key: wind the wheel on, quicker when it is being reversed, and let it run back when released
       const k = HANDS.keys;

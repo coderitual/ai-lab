@@ -82,6 +82,7 @@ export class ReflectionProbe {
       return camera;
     });
     this._next = 0;
+    this._far = far;
     this._filled = false;
     this._wasVisible = [];
   }
@@ -92,8 +93,10 @@ export class ReflectionProbe {
    * @param {THREE.Vector3} position where the probe stands, world space
    * @param {THREE.Object3D[]} [hidden] not drawn into the probe (the car it belongs to, small things)
    * @param {number} [faces] how many faces to redraw now, 1..6; the first update draws all six
+   * @param {number} [far] the faces' far plane for this update (m), if not the one it was made with: an enclosed
+   *   place (a tunnel) sees no further, and whatever lies beyond is culled
    */
-  update(scene, position, hidden = [], faces = 1) {
+  update(scene, position, hidden = [], faces = 1, far = this._far) {
     const { renderer, target, texture } = this;
     const count = this._filled ? Math.min(6, Math.max(1, Math.round(faces))) : 6;
 
@@ -111,6 +114,10 @@ export class ReflectionProbe {
       this._next = (this._next + 1) % 6;
       const camera = this._cameras[face];
       camera.position.copy(position);
+      if (camera.far !== far) {
+        camera.far = far;
+        camera.updateProjectionMatrix();
+      }
       // The shadow maps are the main view's and stay as they are. Only when the whole cube is drawn at once
       // (the very first frame may not have any yet) does the first face draw them.
       renderer.shadowMap.autoUpdate = shadowUpdate && !this._filled && k === 0;

@@ -24,7 +24,7 @@
 // Words come from text.js.
 
 import './hud.css';
-import { STICK_RANGE, TOUCH } from '../engine/Input.js';
+import { TOUCH } from '../engine/Input.js';
 import { formatMs } from './Race.js';
 import { TEXT } from './text.js';
 import { CAR } from './vehicle/params.js';
@@ -104,7 +104,45 @@ const ICONS = {
   lights: '<path d="M11 6c-4 0-7 2.5-7 6s3 6 7 6z"/><path d="M14 8h7M14 12h7M14 16h7"/>',
   reset: '<path d="M5 12a7 7 0 1 0 2-5"/><path d="M4 4v4h4"/>',
   pause: '<path d="M9 6v12M15 6v12"/>',
+  // the handbrake: a lever on its pivot, pulled up, with its button at the tip
+  hand: '<path d="M6.5 19.5L16 7"/><circle cx="6.5" cy="19.5" r="2.2"/><path d="M14.2 5.2l3.6 2.9"/><path d="M3 22h8"/>',
+  // the pedals: a foot pedal's face, ribbed (brake), and an arrow up (gas)
+  brake: '<rect x="5" y="4" width="14" height="16" rx="3"/><path d="M8.5 9h7M8.5 12h7M8.5 15h7"/>',
+  gas: '<path d="M12 19V6M7 11l5-5 5 5"/>',
 };
+
+/**
+ * The one-thumb pad, drawn in a box of ±100 units (its radius is 100): the glass base and its rim, the steering's
+ * full lock marked either side, the brake's arc along the foot of the rim (lit as far as the brake is pressed, from
+ * the middle out), and below it the red arc that is the handbrake. The marks are where Input's TOUCH.pad puts them.
+ */
+function stickSvg() {
+  const P = TOUCH.pad;
+  const u = 100 / P.max; // units per px at the full size
+  const lock = P.steer * u;
+  const trip = P.trip * u;
+  const arc = (r, a0, a1) => {
+    const p0 = [r * Math.cos((a0 * Math.PI) / 180), r * Math.sin((a0 * Math.PI) / 180)];
+    const p1 = [r * Math.cos((a1 * Math.PI) / 180), r * Math.sin((a1 * Math.PI) / 180)];
+    return `M${p0[0].toFixed(2)} ${p0[1].toFixed(2)}A${r} ${r} 0 0 ${a1 > a0 ? 1 : 0} ${p1[0].toFixed(2)} ${p1[1].toFixed(2)}`;
+  };
+  return (
+    `<defs><radialGradient id="glass" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="#2a3a47" stop-opacity="0.55"/>` +
+    `<stop offset="1" stop-color="#05090d" stop-opacity="0.5"/></radialGradient></defs>` +
+    `<circle class="base" r="96"/>` +
+    `<circle class="ring" r="${(lock * 0.55).toFixed(1)}"/>` +
+    `<path class="axis" d="M${-lock} 0H-14M14 0H${lock}"/>` +
+    `<path class="tick" d="M${-lock} -9V9M${lock} -9V9"/>` +
+    `<path class="chev" d="M${-lock - 2} -5l-6 5 6 5M${lock + 2} -5l6 5-6 5"/>` +
+    `<path class="up" d="M-6 ${-lock * 0.62}l6 -7 6 7"/>` +
+    `<circle class="mid" r="4.5"/>` +
+    `<path class="brakearc" d="${arc(88, 90, 52)}" pathLength="100"/><path class="brakearc" d="${arc(88, 90, 128)}" pathLength="100"/>` +
+    `<path class="brakefill" d="${arc(88, 90, 52)}" pathLength="100" stroke-dasharray="0 100"/>` +
+    `<path class="brakefill" d="${arc(88, 90, 128)}" pathLength="100" stroke-dasharray="0 100"/>` +
+    `<path class="hand" d="${arc(trip + 8 * u, 62, 118)}"/>` +
+    `<path class="handmark" d="M-6 ${(trip + 8 * u + 1).toFixed(1)}h12"/>`
+  );
+}
 function iconButton(parent, name, label, onClick) {
   const b = button(parent, '', onClick, 'icon');
   b.setAttribute('aria-label', label);
@@ -254,28 +292,40 @@ export class ViewHud {
     this.driftScore = cell('span', 'score', this.drift.el, '0');
     this._driftOn = false;
 
-    // under the right thumb (touch only): the DRIFT button and, with the throttle on manual, GAS. They are drawn
-    // here; Input finds them by the same numbers (TOUCH), so a finger on them never reaches the page's buttons
-    this.pads = cell('div', 'pads', el);
-    const pad = (name, b, label) => {
-      const c = cell('div', `pad ${name}`, this.pads.el, label);
-      const st = c.el.style;
-      st.width = st.height = `${2 * b.r}px`;
-      st.right = `calc(var(--sr) + ${b.right - b.r}px)`;
-      st.bottom = `calc(var(--sb) + ${b.bottom - b.r}px)`;
-      return c;
-    };
-    this.padDrift = pad('drift', TOUCH.drift, TEXT.pads.drift);
-    this.padGas = pad('gas', TOUCH.gas, TEXT.pads.gas);
-    this.padGas.show(false);
-
-    // the first run on a touch screen: the three zones named for a few seconds, ghosted
-    this.zoneHint = cell('div', 'zonehint', el);
-    const zs = this.zoneHint.el.style;
-    zs.setProperty('--steer', `${TOUCH.steerShare * 100}%`);
-    make('span', 'steer', this.zoneHint.el, TEXT.pads.steer);
-    make('span', 'brake', this.zoneHint.el, TEXT.pads.brake);
-    this.zoneHint.show(false);
+    // the touch controls, fixed (touch only): the steering at the bottom left (a slider with a marked centre, or two
+    // arrows), the pedals at the bottom right, each with its word. Placed from Input's layoutOf(), the same numbers a
+    // finger is found by; on the first touch run the steering is named too and all of them are outlined (setZoneHint)
+    this.controls = cell('div', 'controls', el);
+    const ctl = this.controls.el;
+    const named = (c, name) => make('span', 'name', c.el, name);
+    // the one-thumb pad: its glass base and marks (SVG), the knob over it
+    this.stick = cell('div', 'stick', ctl);
+    const base = make('svg:svg', 'face', this.stick.el);
+    base.setAttribute('viewBox', '-112 -112 224 224');
+    base.innerHTML = stickSvg();
+    this.brakeFill = [...base.querySelectorAll('.brakefill')];
+    this.stickKnob = make('i', 'knob', this.stick.el);
+    named(this.stick, TEXT.pads.pad);
+    this._stickKey = '';
+    this.slider = cell('div', 'slider', ctl);
+    make('b', 'rail', this.slider.el);
+    make('b', 'mid', this.slider.el);
+    this.knob = make('i', 'knob', this.slider.el);
+    named(this.slider, TEXT.pads.steer);
+    this.arrowL = cell('div', 'arrow left', ctl);
+    this.arrowR = cell('div', 'arrow right', ctl);
+    named(this.arrowL, TEXT.pads.steer);
+    this.pedal = {};
+    for (const name of ['brake', 'gas', 'drift']) {
+      const c = cell('div', `pedal ${name}`, ctl);
+      const icon = make('svg:svg', 'icon', c.el);
+      icon.setAttribute('viewBox', '0 0 24 24');
+      icon.innerHTML = ICONS[name === 'drift' ? 'hand' : name];
+      make('span', 'word', c.el, TEXT.pads[name]);
+      this.pedal[name] = c;
+    }
+    this._ctlKey = '';
+    this._knobKey = '';
 
     // the buttons: camera, lights, reset, pause, small and together (at a desk only pause shows)
     this.touchCol = cell('div', 'touchcol', el);
@@ -284,13 +334,6 @@ export class ViewHud {
     iconButton(this.touchCol.el, 'reset', TEXT.buttons.reset, () => act('reset', index));
     iconButton(this.touchCol.el, 'pause', TEXT.buttons.pause, () => act('pause', index));
 
-    // the stick under the thumb (placed in page pixels, so it lives in the root, not the view)
-    this.stick = cell('div', 'stick', root);
-    this.stick.el.style.setProperty('--r', `${STICK_RANGE}px`);
-    make('b', 'brake', this.stick.el);
-    this.knob = make('i', '', this.stick.el);
-    this.stick.show(false);
-    this._stickKey = '';
   }
 
   /**
@@ -312,17 +355,11 @@ export class ViewHud {
     // and stay in the corners, clear of the car in the middle; an upright picture gets a little more
     const u = tall ? w / 62 : (Math.min(w, (h * 16) / 9) / 100) * 0.72;
     s.setProperty('--u', `${Math.max(3.6, Math.min(u, 10)).toFixed(2)}px`);
-    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330).flag('low', h < TOUCH.lowBelow);
-    // a low view (a stacked half on a phone): DRIFT stands beside GAS at the bottom, as Input finds it
-    const b = h < TOUCH.lowBelow ? TOUCH.driftLow : TOUCH.drift;
-    const ds = this.padDrift.el.style;
-    ds.right = `calc(var(--sr) + ${b.right - b.r}px)`;
-    ds.bottom = `calc(var(--sb) + ${b.bottom - b.r}px)`;
+    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330).flag('low', h < TOUCH.lowBelow).flag('thin', w < TOUCH.thinBelow).flag('squat', !tall && h < 450);
   }
 
   setVisible(on) {
     this.cell.show(on);
-    if (!on) this.stick.show(false);
   }
 
   /** Split screen or not, and whether thumbs drive (the touch buttons show). */
@@ -478,16 +515,117 @@ export class ViewHud {
     this.driftScore.text(Math.round(score));
   }
 
-  /** The touch pads: whether GAS shows (the throttle on manual), and which are held. */
-  setPads(manual, held) {
-    this.padGas.show(manual);
-    this.padDrift.flag('held', held.drift);
-    this.padGas.flag('held', held.gas);
+  /**
+   * The touch controls: where they are (Input's layoutOf, px from the view's top left), the steering the thumb asks
+   * for (-1..1, or null: the knob at the centre) and which pedals are held.
+   * @param {{ layout: object, steer: number|null, held: { brake: boolean, gas: boolean, drift: boolean } }} c
+   */
+  setControls(c) {
+    const L = c.layout;
+    const arrows = L.steering === 'arrows';
+    const pad = !!L.pad;
+    this.cell.flag('manual', !!L.gas).flag('pad', pad).flag('handleft', pad && L.hand === 'left');
+    if (L.key !== this._ctlKey) {
+      this._ctlKey = L.key;
+      this._stickKey = this._knobKey = '';
+      const place = (cellOf, x, y, w, h) => {
+        const st = cellOf.el.style;
+        st.left = `${(x - w / 2).toFixed(1)}px`;
+        st.top = `${(y - h / 2).toFixed(1)}px`;
+        st.width = `${w.toFixed(1)}px`;
+        st.height = `${h.toFixed(1)}px`;
+        writes++;
+      };
+      const vs = this.el.style;
+      if (pad) {
+        const p = L.pad;
+        place(this.stick, p.cx, p.cy, 2 * p.r, 2 * p.r);
+        this.stick.el.style.setProperty('--knob', `${p.knob.toFixed(1)}px`);
+        // where the readouts may stand: above the pad on its side, above the handbrake button on the other (px from the view's bottom)
+        const d = L.drift;
+        const right = L.hand === 'right';
+        vs.setProperty('--sticktop', `${(L.h - (p.cy - p.r)).toFixed(0)}px`);
+        vs.setProperty('--stickside', `${(right ? L.w - (p.cx - p.r) : p.cx + p.r) + TOUCH.gap}px`);
+        vs.setProperty('--handtop', `${(L.h - (d.y - d.r)).toFixed(0)}px`);
+        vs.setProperty('--handside', `${(right ? d.x + d.r : L.w - (d.x - d.r)) + TOUCH.gap}px`);
+      } else {
+        const sl = L.slider;
+        place(this.slider, sl.cx, sl.cy, 2 * (sl.half + sl.knob), 2 * sl.knob);
+        this.slider.el.style.setProperty('--k', `${sl.knob}px`);
+        this.slider.el.style.setProperty('--half', `${sl.half}px`);
+        for (const [a, b] of [
+          [this.arrowL, L.arrows.left],
+          [this.arrowR, L.arrows.right],
+        ])
+          place(a, b.x, b.y, 2 * b.r, 2 * b.r);
+      }
+      this.stick.show(pad);
+      this.slider.show(!pad && !arrows);
+      this.arrowL.show(arrows);
+      this.arrowR.show(arrows);
+      for (const name of ['brake', 'gas', 'drift']) {
+        const b = L[name];
+        this.pedal[name].show(!!b);
+        if (b) place(this.pedal[name], b.x, b.y, 2 * b.r, 2 * b.r);
+      }
+    }
+    const v = c.steer;
+    if (pad) {
+      // the knob: where the thumb is (no further than the rim), clicked into the red arc while the handbrake is
+      // pulled; with no thumb, back at the centre (an eased spring, hud.css), or across by the tilt
+      const p = L.pad;
+      const k = c.knob;
+      let x = 0;
+      let y = 0;
+      if (k) {
+        x = k.dx;
+        y = k.dy;
+        const len = Math.hypot(x, y);
+        const most = p.r * 0.78;
+        if (k.tripped) {
+          // on the arc, no more than 28 degrees either side of straight down
+          const a = Math.max(-0.49, Math.min(0.49, Math.atan2(x, Math.max(1, y))));
+          const rr = (TOUCH.pad.trip + 8) * p.s; // (the red arc: stickSvg)
+          x = rr * Math.sin(a);
+          y = rr * Math.cos(a);
+        } else if (len > most) {
+          x *= most / len;
+          y *= most / len;
+        }
+      } else if (c.tilt !== null && c.tilt !== undefined) x = c.tilt * TOUCH.pad.steer * p.s;
+      const brake = k && !k.tripped ? Math.max(0, Math.min(1, (k.dy / (TOUCH.pad.brake * p.s) - TOUCH.pad.lift) / (1 - TOUCH.pad.lift))) : 0;
+      const key = `${x.toFixed(1)},${y.toFixed(1)},${brake.toFixed(2)},${!!k}`;
+      if (key !== this._stickKey) {
+        this._stickKey = key;
+        this.stickKnob.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+        const dash = `${(brake * 100).toFixed(1)} 100`;
+        for (const f of this.brakeFill) f.setAttribute('stroke-dasharray', dash);
+        writes++;
+      }
+      this.stick.flag('held', !!k).flag('tripped', !!k && k.tripped).flag('braking', brake > 0);
+    } else {
+      // the slider's knob: where the thumb asks, at the centre when there is none
+      const knob = `${arrows ? '' : v === null ? 0 : v.toFixed(3)}`;
+      if (knob !== this._knobKey) {
+        this._knobKey = knob;
+        if (!arrows) this.knob.style.transform = `translateX(${((v || 0) * L.slider.half).toFixed(1)}px)`;
+        writes++;
+      }
+      this.slider.flag('held', v !== null);
+    }
+    this.arrowL.flag('held', arrows && v !== null && v < 0);
+    this.arrowR.flag('held', arrows && v !== null && v > 0);
+    for (const name of ['brake', 'gas', 'drift']) this.pedal[name].flag('held', c.held[name]);
   }
 
-  /** The first-run naming of the touch zones. */
+  /** The touch controls stepped back (45 %, hud.css) while no finger is on them, a few seconds into a run. */
+  setControlsDim(on) {
+    this.controls.flag('dim', on);
+  }
+
+  /** The first-run naming of the touch controls. */
   setZoneHint(on) {
-    this.zoneHint.show(on);
+    this.controls.flag('naming', on);
   }
 
   setWarn(wrongWay) {
@@ -537,29 +675,8 @@ export class ViewHud {
     if (d) d.attr('transform', `translate(${Math.round(x * 2) / 2} ${Math.round(y * 2) / 2})`);
   }
 
-  // ---- the stick
-
-  /**
-   * @param {{ x: number, y: number, originX: number, originY: number }|null} stick client pixels
-   * @param {DOMRect} rect the page's box @param {number} brake 0..1
-   */
-  setStick(stick, rect, brake) {
-    this.stick.show(!!stick);
-    if (!stick) return;
-    const key = `${stick.originX},${stick.originY},${stick.x},${stick.y},${brake.toFixed(2)}`;
-    if (key === this._stickKey) return;
-    this._stickKey = key;
-    const s = this.stick.el.style;
-    s.transform = `translate(${stick.originX - rect.left}px, ${stick.originY - rect.top}px)`;
-    s.setProperty('--brake', brake.toFixed(2));
-    this.knob.style.transform = `translate(${stick.x - stick.originX}px, ${stick.y - stick.originY}px)`;
-    this.stick.flag('braking', brake > 0.05);
-    writes += 3;
-  }
-
   dispose() {
     this.el.remove();
-    this.stick.el.remove();
   }
 }
 
@@ -649,6 +766,8 @@ export class Hud {
     const prow = make('div', 'buttons column', this.pause.el);
     this.resumeButton = button(prow, TEXT.resume, () => this.act('pause'), 'primary');
     button(prow, TEXT.restart, () => this.act('again'));
+    // tilt steering: straight ahead is wherever the device is when this is pressed
+    this.recentreButton = new Cell(button(prow, TEXT.recentre, () => this.act('recentre')));
     button(prow, TEXT.options, () => this.openOptions(), 'opt-open');
     button(prow, TEXT.menu, () => this.act('leave'));
     this.pauseBoard = cell('div', 'boardlist', this.pause.el);
@@ -664,6 +783,9 @@ export class Hud {
     this.optTime = choiceRow(o, TEXT.timeOfDay, [], [], () => {});
     // the driving help (one button per ASSISTS level, made in setState) and, on touch, the throttle
     this.optAssists = choiceRow(o, TEXT.drivingHelp, [], [], () => {});
+    this.optSteering = choiceRow(o, TEXT.steering, ['pad', 'slider', 'arrows', 'tilt'], [TEXT.pad, TEXT.slider, TEXT.arrows, TEXT.tilt], (v) => this.act(`steering:${v}`));
+    this.steeringNote = cell('div', 'optnote', o);
+    this.optHand = choiceRow(o, TEXT.hand, ['right', 'left'], [TEXT.right, TEXT.left], (v) => this.act(`hand:${v}`));
     this.optThrottle = choiceRow(o, TEXT.throttle, ['auto', 'manual'], [TEXT.auto, TEXT.manual], (v) => this.act(`throttle:${v}`));
     this.optUnits = choiceRow(o, TEXT.units, ['kmh', 'mph'], [TEXT.kmh, TEXT.mph], (v) => this.act(`units:${v}`));
     this.optMap = choiceRow(o, TEXT.map, ['on', 'off'], [TEXT.shown, TEXT.hidden], (v) => this.act(`map:${v}`));
@@ -686,16 +808,18 @@ export class Hud {
     this._results = '';
   }
 
-  /** The safe area's right and bottom insets in CSS px (where the touch pads stand inside), measured once. */
+  /**
+   * The safe area's left, right and bottom insets in CSS px (where the touch controls stand inside), measured on
+   * every layout (they change when the device is turned). Read through the HUD's own --sl, --sr, --sb, so that what
+   * the CSS places and what the controls are placed by agree.
+   */
   insets() {
-    if (!this._insets) {
-      const probe = make('div', '', this.root);
-      probe.style.cssText = 'position:absolute;visibility:hidden;padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
-      const cs = getComputedStyle(probe);
-      this._insets = { right: parseFloat(cs.paddingRight) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };
-      probe.remove();
-    }
-    return this._insets;
+    const probe = make('div', '', this.root);
+    probe.style.cssText = 'position:absolute;visibility:hidden;padding-left:var(--sl);padding-right:var(--sr);padding-bottom:var(--sb)';
+    const cs = getComputedStyle(probe);
+    const out = { left: parseFloat(cs.paddingLeft) || 0, right: parseFloat(cs.paddingRight) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };
+    probe.remove();
+    return out;
   }
 
   /** DOM writes so far (all views and panels): the HUD's cost, for tests. */
@@ -785,7 +909,7 @@ export class Hud {
    */
   setState(s) {
     const times = s.times || [s.time];
-    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.assists}|${s.throttle}|${this.optionsOpen}`;
+    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.assists}|${s.throttle}|${s.steering}|${s.hand}|${s.tiltNote}|${this.optionsOpen}`;
     this._s = s;
     if (key === this._state) return;
     const [wasPhase, wasPaused] = this._state.split('|');
@@ -829,6 +953,15 @@ export class Hud {
     pick(this.optAssists, s.assists);
     pick(this.optThrottle, s.throttle);
     this.optThrottle.row.hidden = !touch;
+    pick(this.optSteering, s.steering);
+    this.optSteering.row.hidden = !touch;
+    // under the steering: what the choice does, or why tilt is not steering
+    const note = s.tiltNote ? TEXT.tiltNote[s.tiltNote] : TEXT.steeringNote[s.steering] || '';
+    this.steeringNote.text(note).show(touch && !!note);
+    pick(this.optHand, s.hand);
+    // (the hand places the pad: tilt uses it too)
+    this.optHand.row.hidden = !touch || !(s.steering === 'pad' || s.steering === 'tilt');
+    this.recentreButton.show(touch && s.steering === 'tilt');
     pick(this.optQuality, s.quality);
     pick(this.optSound, s.muted ? 'off' : 'on');
     pick(this.optUnits, s.units);

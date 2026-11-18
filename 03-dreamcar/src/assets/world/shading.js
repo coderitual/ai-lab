@@ -15,6 +15,9 @@
 import * as THREE from 'three';
 
 /** Shared by every baked material: which of the two baked channels is the light now showing (day, night). */
+/** The least share of the sky's light that baked ground keeps, whatever hides the sky (see the shader below). */
+export const BAKE_SKY_FLOOR = 0.7;
+
 export const BAKE_UNIFORMS = { uBakeSel: { value: new THREE.Vector3(1, 0, 0) } };
 
 /**
@@ -37,7 +40,15 @@ export const WET_UNIFORMS = { uWet: { value: 0 } };
  * it from its own lamps and paint, and the asphalt under that roof mirrors it at a glancing angle (road.js), as it
  * mirrors the sky outside.
  */
-export const BORE_UNIFORMS = { uBoreGlow: { value: new THREE.Vector3() } };
+export const BORE_UNIFORMS = {
+  uBoreGlow: { value: new THREE.Vector3() },
+  // (tunnel lane) the two lines of luminaires along the haunches, for the road's reflection of them (road.js
+  // TUNNEL_SHEEN): lat of the lines, their height over the road, their radiance (a bar's, against the colour), 0
+  uBoreLines: { value: new THREE.Vector4(0, 6, 0, 0) },
+  uBoreLineColor: { value: new THREE.Vector3(1, 1, 1) },
+  // where the tunnel is (s0, s1) and the share of the interior's length that is lit, and the exit zone's length
+  uBoreZone: { value: new THREE.Vector4(0, -1, 0.2, 36) },
+};
 
 /**
  * Adds an edit to a material's shader, after whatever edits it already has, and gives it a cache key of its own.
@@ -81,7 +92,9 @@ export function withBake(material) {
       .replace('#include <lights_fragment_begin>', LIGHT_LOOP)
       .replace(
         '#include <aomap_fragment>',
-        '#include <aomap_fragment>\nreflectedLight.indirectDiffuse *= vBake.z;\nreflectedLight.indirectSpecular *= mix( 1.0, vBake.z, 0.75 );',
+        // the sky's share never falls under BAKE_SKY_FLOOR of the open sky's: light bounces about a valley and a wood, and
+        // ground that keeps a twentieth of the sky is a black hole in the picture, not shade
+        `#include <aomap_fragment>\nfloat bakedSky = mix( ${BAKE_SKY_FLOOR.toFixed(2)}, 1.0, vBake.z );\nreflectedLight.indirectDiffuse *= bakedSky;\nreflectedLight.indirectSpecular *= mix( 1.0, bakedSky, 0.75 );`,
       );
   });
 }

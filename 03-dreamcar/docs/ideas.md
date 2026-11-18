@@ -74,7 +74,20 @@ comparison stills and strike what is done.
 - **Trackside boards have no lamps of their own**; at night they are dark.
 - **The car's paint is dark** where nothing bright is near it.
 - **The tunnel's exit** at night and by day (the bloom of the portal) has not
-  been judged.
+  been judged against a reference: the video shows the exit only as a small
+  white rectangle from far inside.
+- **The tunnel against the owner's video** (design.md, "The tunnel"): the road
+  in the box is the circuit's dark asphalt, not the video's pale grey; the
+  walls are smoother and the ceiling plainer (no beams, no marks); the cutting
+  has no lamp posts; the gantry's signals are arrows only; the screens are
+  shading on flat panels, not slats. At night the first second inside is
+  white while the exposure closes (EXPOSURE.close); a slower close at night
+  only would read better.
+- **The car in the tunnel**: the probe stands at the middle of the car, so the
+  lines of fittings mirrored in the flanks sit a little wide; a ceiling-plane
+  correction in the car's materials (as `carGround` does for the road) would
+  put them right. The flake layer's rough read of the probe shows the fittings
+  as soft blotches on the rear bumper's corners.
 
 ### The car
 
@@ -115,6 +128,25 @@ from straight behind, the silver going warm in a low sun.
 - **More circuits.** The Track takes any closed layout of straights and arcs;
   the world builds from it. A second layout, or the same circuit reversed,
   is mostly data and a new set of medal times from the autopilot.
+- **Tilt on a real phone.** Tilt steering is built (`rollOf`, Recentre on the
+  pause sheet) and tested only with synthetic deviceorientation events: its
+  ±30° of full lock, whether it wants a small dead zone, and iOS's permission
+  prompt need a real iPhone.
+- **The touch controls on a real phone.** The pad's size and place (160 px,
+  105 px from the side, 150 px up), its travels (70 px across, 56 down, the
+  red arc at 74), `HANDS.thumb` (curve and the 22 to 50 ms follow), the
+  slider's travel and the pedals' sizes were set in headless Chromium and by
+  the scripted thumb in `tools/unit`; an afternoon with an iPhone and a
+  mid-range Android, both ways up, should set them. The pad could also learn
+  where the thumb rests (a centre that settles to the thumb's habit between
+  runs, never during one).
+- **The second half's wet road in split screen** (tools.md, "water on the
+  track"): at night one half of a split can show the wet road as a sheet of
+  water where the other does not; it follows the camera's place. Look at
+  which lamps light each view (lamps.js chooses them by the eye).
+- **Analog pedals for the slider and the arrows.** Where on BRAKE or GAS the
+  finger is could set the pressure (the pad already gives an analog brake);
+  not done: the pad came first.
 - **A photo mode.** The staging camera (`__dreamcar.photo`) already exists;
   it needs a pause-sheet entry, a free orbit with touch and stick, and a
   high-tier render at a larger size.

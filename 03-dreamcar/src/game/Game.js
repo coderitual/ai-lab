@@ -23,11 +23,11 @@ import * as THREE from 'three';
 import { createCar } from '../assets/car/index.js';
 import { LAMPS as CAR_LAMPS } from '../assets/car/spec.js';
 import { createWorld } from '../assets/world/index.js';
-import { canopyOpen } from '../assets/world/canopy.js';
+import { CANOPY, canopyOpen } from '../assets/world/canopy.js';
 import { TIMES } from '../assets/world/lighting.js';
 import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
-import { Input } from '../engine/Input.js';
+import { Input, buzz } from '../engine/Input.js';
 import { ReflectionProbe } from '../engine/ReflectionProbe.js';
 import { TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
@@ -40,7 +40,7 @@ import { Ghost } from './Ghost.js';
 import { Hud } from './Hud.js';
 import { Race, medalOf } from './Race.js';
 import { TEXT } from './text.js';
-import { createTrack } from './track.js';
+import { SURFACE, createTrack } from './track.js';
 import { Vehicle, collideVehicles } from './vehicle/Vehicle.js';
 
 // SEAM for the sound lane: game/Sound.js and engine/Audio.js are wired when they are there (an empty match when not).
@@ -84,9 +84,15 @@ const QUALITY_KEY = 'dreamcar.quality';
 const UNITS_KEY = 'dreamcar.units';
 const MAP_KEY = 'dreamcar.map';
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
-/** The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual'), and the touch zones' first-run naming. */
+/**
+ * The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual'), steering (STEERINGS, the
+ * first the default) and holding hand ('right' | 'left'), and the touch controls' first-run naming.
+ */
 const ASSISTS_KEY = 'dreamcar.assists';
 const THROTTLE_KEY = 'dreamcar.throttle';
+const STEERING_KEY = 'dreamcar.steering';
+const HAND_KEY = 'dreamcar.hand';
+const STEERINGS = ['pad', 'slider', 'arrows', 'tilt'];
 const ZONES_KEY = 'dreamcar.zones.v1';
 
 /** Read a kept choice (null when there is none or no storage). */
@@ -141,6 +147,10 @@ export class Game {
     const help = kept(ASSISTS_KEY);
     this.assists = help && ASSISTS.levels[help] ? help : ASSISTS.default;
     this.throttle = kept(THROTTLE_KEY) === 'manual' ? 'manual' : 'auto';
+    this.steering = STEERINGS.includes(kept(STEERING_KEY)) ? kept(STEERING_KEY) : STEERINGS[0];
+    this.hand = kept(HAND_KEY) === 'left' ? 'left' : 'right';
+    /** Why tilt is not steering ('' | 'refused' | 'unavailable'): the options say so. */
+    this.tiltNote = '';
     this._zonesSeen = kept(ZONES_KEY) === '1';
     engine.setMaxPixelRatio(TIERS[this.tier].pixelRatio);
     this.rng = createRng(params.seed);
@@ -165,8 +175,22 @@ export class Game {
 
     this.input = new Input(container);
     this.input.throttle = this.throttle;
+    this.input.steering = this.steering;
+    this.input.hand = this.hand;
+    // tilt refused or not there: the pad steers instead, and the options say why
+    this.input.onTiltFail = (why) => {
+      this.tiltNote = why;
+      if (this.steering === 'tilt') {
+        this.steering = this.input.steering = STEERINGS[0];
+        this.input.release();
+      }
+    };
+    // a control taken or let go is drawn pressed at once, not a frame later
+    this.input.onTouchChange = (input) => {
+      if (!input.isTouch || this.phase === 'title') return;
+      this.views.forEach((view, i) => view.hud.setControls(input.controlsOf(i)));
+    };
     this.input.onAction = (name, driver) => this.action(name, driver);
-    this.input.onTouchChange = () => (this._touchDirty = true);
     this.input.onAnyInput = () => {
       this._woke = true;
       this._unlockSound();
@@ -217,7 +241,6 @@ export class Game {
     this._resets = new Set();
     /** The day-night fade: { t, to, switched } or null. */
     this._fade = null;
-    this._touchDirty = false;
     this._hinted = false;
     try {
       this._hinted = localStorage.getItem(HINT_KEY) === '1';
@@ -433,6 +456,8 @@ export class Game {
     });
     this.phase = 'countdown';
     this._resets.clear();
+    // tilt: straight ahead is however the device is held at the start
+    this.input.recentre();
     this.effects.reset();
     this.ghost.begin();
     this.world.setStartLights(0);
@@ -520,6 +545,28 @@ export class Game {
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
+    if (name.startsWith('steering:')) {
+      const want = name.slice(9);
+      this.steering = STEERINGS.includes(want) ? want : STEERINGS[0];
+      this.input.steering = this.steering;
+      this.input.release();
+      keep(STEERING_KEY, this.steering);
+      // (tilt: asked for here, in the choosing click, where Safari allows the asking; refused, the pad steers)
+      if (this.steering === 'tilt') {
+        this.tiltNote = '';
+        this.input.askTilt();
+      }
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
+    if (name.startsWith('hand:')) {
+      this.hand = name.slice(5) === 'left' ? 'left' : 'right';
+      this.input.hand = this.hand;
+      this.input.release();
+      keep(HAND_KEY, this.hand);
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
     if (name.startsWith('units:')) {
       this.units = name.slice(6) === 'mph' ? 'mph' : 'kmh';
       keep(UNITS_KEY, this.units);
@@ -574,6 +621,10 @@ export class Game {
         break;
       case 'reset':
         if (this.phase === 'run' && !paused) this._resets.add(d);
+        break;
+      case 'recentre':
+        // tilt: wherever the device is now is straight ahead
+        this.input.recentre();
         break;
       case 'time': {
         // the next time of day in lighting.js's order (read each time: the table may grow)
@@ -659,7 +710,10 @@ export class Game {
   /** What the exposure settles at where this car is: the open sky's, the tunnel's, or between at the portals. */
   _exposureFor(vehicle) {
     const time = this.world.time;
-    return lerp(time.tunnelExposure, time.exposure, vehicle.sky);
+    // under the woods the eye opens up as it does in a tunnel, only less: the shade of a forest road by day is a road
+    // one can read, not a black one (how much of the sky the woods hide: canopy.js; how far it opens: lighting.js)
+    const shade = clamp((1 - canopyOpen(this.track, vehicle.s, vehicle.lat)) / (1 - CANOPY.floor), 0, 1);
+    return lerp(time.tunnelExposure, time.exposure * 2 ** ((time.shadeEv || 0) * shade), vehicle.sky);
   }
 
   /** Put a car back on the road where it is, pointing along it, at rest; the clock keeps running. */
@@ -685,7 +739,6 @@ export class Game {
 
   update(dt, simTime) {
     this._tickFade(dt);
-    this.input.step(dt);
     if (this.phase === 'title') this._attractStep(dt);
     const { race, racers } = this;
     const time = this.world.time;
@@ -1062,12 +1115,14 @@ export class Game {
       assists: this.assists,
       assistLevels: Object.keys(ASSISTS.levels),
       throttle: this.throttle,
+      steering: this.steering,
+      hand: this.hand,
+      tiltNote: this.tiltNote,
     });
     hud.setFade(1 - this._fadeLevel);
     // the board: on the title and the pause sheet (and in the results), never over the run
     if (this.phase === 'title' || this.engine.paused) hud.setBoard(this._boardTable(), RULES.medals, this.world.time.name);
     if (this.phase === 'title') return;
-    const rect = this._touchDirty ? this.container.getBoundingClientRect() : null;
     const split = this.racers.length > 1;
     const map = this._map;
     // the first-time hint: until the first run in which the car has got going
@@ -1092,7 +1147,9 @@ export class Game {
         h.setWarn(warn);
         const how = input.source[i] === 'touch' ? TEXT.resetTouch : split ? TEXT.resetSplit(i === 0 ? 'R' : '/') : TEXT.resetKeys;
         h.setOffer(racer.offer, how);
-        h.setHint(!this._hinted && !c.finished && !racer.offer && !warn ? TEXT.hint[input.source[i]] || TEXT.hint.keys : '');
+        const pad = this.steering === 'pad' || this.steering === 'tilt';
+        const device = input.source[i] !== 'touch' ? input.source[i] : pad ? (this.steering === 'tilt' ? 'touchTilt' : 'touchPad') : this.throttle === 'manual' ? 'touchManual' : 'touch';
+        h.setHint(!this._hinted && !c.finished && !racer.offer && !warn ? TEXT.hint[device] || TEXT.hint.keys : '');
       }
       h.setSpeed(v.speed * 3.6);
       h.setRev(v.rpm, v.gear);
@@ -1109,20 +1166,27 @@ export class Game {
         const q = k === i ? p : this.racers[k].car.object.position;
         h.setDot(k, (q.x - map.x0) * map.k, (q.z - map.z0) * map.k);
       }
-      if (rect) h.setStick(input.stickOf(i), rect, input.brakeOf(i));
       // the slide: its angle and running score while it lasts (beyond 12 degrees), fading after
       const slide = v.slide;
       if (slide) h.setDrift(slide.angle, slide.score, slide.angle >= 12);
-      // touch: DRIFT (and GAS on manual) under the right thumb; the zones named on the first touch run
-      h.setPads(this.throttle === 'manual', input.heldOf(i));
+      // touch: the steering at the bottom left, the pedals at the bottom right; named on the first touch run
+      if (input.isTouch) {
+        h.setControls(input.controlsOf(i));
+        // a few seconds into a run the controls step back (45 %) so as not to sit over the picture; a finger on any
+        // of them brings them back
+        h.setControlsDim(!!race && race.clock > HUD.controlsDimAfter && !input.touched(i));
+        // a kerb under a wheel: a short buzz where the device can (render-side: it changes nothing of the run)
+        const kerb = v.wheels.some((w) => w.surface === SURFACE.KERB && w.grounded);
+        if (kerb && !racer._onKerb && racer.driver === racer.player && input.source[i] === 'touch' && this.phase === 'run' && Math.abs(v.speed) > 8) buzz();
+        racer._onKerb = kerb;
+      }
       const naming = input.isTouch && !this._zonesSeen && !!race && race.clock < HUD.zonesFor;
       h.setZoneHint(naming);
       if (input.isTouch && !this._zonesSeen && race && race.clock >= HUD.zonesFor) this._noteZones();
     });
-    this._touchDirty = false;
   }
 
-  /** The touch zones have been named once: not again on this device. */
+  /** The touch controls have been named once: not again on this device. */
   _noteZones() {
     this._zonesSeen = true;
     keep(ZONES_KEY, '1');
@@ -1182,7 +1246,8 @@ export class Game {
         }
       }
       const probeEvery = view.still ? (table.stillEvery ?? 1) : table.every;
-      const probeFaces = view.still ? table.stillFaces : table.faces;
+      const inTunnel = view.racer.vehicle.sky < PROBE.tunnelSky;
+      const probeFaces = view.still ? table.stillFaces : inTunnel ? (table.tunnelFaces ?? table.faces) : table.faces;
       if (view.probe && this.engine.frame % (probeEvery * n) === i * probeEvery) {
         probeAt.copy(car.box.center).applyMatrix4(car.object.matrixWorld);
         probeHidden.length = 0;
@@ -1194,7 +1259,7 @@ export class Game {
         if (this.ghostCar) probeHidden.push(this.ghostCar.object);
         // smoke and sparks in a reflection would smear over the whole car
         probeHidden.push(...this.effects.objects);
-        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces);
+        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces, inTunnel ? PROBE.tunnelFar : undefined);
       }
       this.pipeline.render(this.world.scene, view.camera, view.rect, view.frame);
       view.rig.cut = false;

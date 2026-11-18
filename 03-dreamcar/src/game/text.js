@@ -72,9 +72,27 @@ export const TEXT = {
 
   lamps: { abs: 'ABS', tc: 'TC', esc: 'ESC', hand: 'P', high: 'High beam' },
   buttons: { camera: 'Camera', lights: 'High beam', reset: 'Reset', pause: 'Pause' },
-  pads: { steer: 'Steer', brake: 'Brake', drift: 'Drift', gas: 'Gas' },
+  pads: { steer: 'Steer', brake: 'Brake', drift: 'Drift', gas: 'Gas', pad: 'Steer · brake · drift' },
   drivingHelp: 'Driving help',
   throttle: 'Throttle',
+  steering: 'Steering',
+  slider: 'Slider',
+  arrows: 'Arrows',
+  pad: 'Pad',
+  tilt: 'Tilt',
+  hand: 'Hand',
+  right: 'Right',
+  left: 'Left',
+  recentre: 'Recentre tilt',
+  /** Under the steering choice: what it is (tilt: not yet tried on a real phone). */
+  steeringNote: {
+    pad: 'One thumb: across steers, down brakes, into the red pulls the handbrake',
+    tilt: 'Turn the phone like a wheel; the pad brakes. Untested on a real phone',
+  },
+  tiltNote: {
+    refused: 'Tilt was not allowed: the pad steers',
+    unavailable: 'No tilt sensor here: the pad steers',
+  },
   auto: 'Auto',
   manual: 'Manual',
   bestSlide: 'Best slide',
@@ -82,7 +100,10 @@ export const TEXT = {
   assistName: (id) => ({ full: 'Full', sport: 'Sport', off: 'Off' })[id] || id.charAt(0).toUpperCase() + id.slice(1),
 
   hint: {
-    touch: 'Left thumb steers, right thumb brakes, Drift slides',
+    touchPad: 'Slide to steer, pull back to brake, pull to the red to drift',
+    touchTilt: 'Tilt to steer, pull back on the pad to brake',
+    touch: 'The car drives itself: steer bottom left, hold Brake to slow',
+    touchManual: 'Hold Gas to drive, steer bottom left, Brake to slow',
     keys: 'W or ↑ to drive, A D or ← → to steer, S or ↓ to brake',
     pad: 'Right trigger to drive, left stick to steer, left trigger to brake',
   },
@@ -117,9 +138,10 @@ export const TEXT = {
       ['Start', 'pause'],
     ],
     touch: [
-      ['Left side', 'steer (the car drives itself)'],
-      ['Right side', 'brake'],
+      ['Bottom left', 'steer (the centre is fixed)'],
+      ['Brake', 'slow down, reverse when stopped'],
       ['Drift', 'handbrake'],
+      ['Gas', 'drive (Throttle: Manual; on Auto the car drives itself)'],
     ],
   },
 };

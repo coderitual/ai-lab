@@ -76,6 +76,9 @@ export const SIDES = {
   bank: { kind: 'wall', edge: [3.5, 5], slope: 0.07, far: 0.12, verge: 'grass', wood: 'broadleaf' },
   // the road cut into the hill: a narrow verge, then the rock face
   rock: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null },
+  // (tunnel lane) the cutting out of the tunnel: a lower cut (the terrain's cliff is 2 + 5 far m: 5 m), faced in
+  // concrete with acoustic screens on top for its first stretch (tunnel.js), rock after; the ground beyond rises gently
+  cutting: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 0.6, verge: 'grass', wood: null },
   // structures: paved right up to the wall or the parapet
   wallUp: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: 0.7, verge: 'asphalt', wood: null },
   wallDown: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: -0.45, verge: 'asphalt', wood: null },
@@ -138,7 +141,7 @@ const SEGMENTS = [
   // The tunnel: a rock cutting, then the bore through the spur, bending gently right.
   { id: 'cutting', sec: 'tunnel', len: 70, ease: 70, g: 3.5, L: 'rock', R: 'rock' },
   { id: 'tunnel', sec: 'tunnel', r: -1000, deg: 20, ease: 60, g: 3, L: 'wallDown', R: 'wallUp', tunnel: true },
-  { id: 'mouth', sec: 'tunnel', len: 177.7441, ease: 50, g: 3.5, L: 'rock', R: 'rock' },
+  { id: 'mouth', sec: 'tunnel', len: 177.7441, ease: 50, g: 3.5, L: 'cutting', R: 'cutting' },
 
   // The sky road: out of the mountain onto piers, a long banked left across the valley.
   { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapet', bridge: true, drop: 42 },
@@ -206,7 +209,14 @@ export const LAYOUT = {
    * a rail or the trees; at a rock face, a wall or a parapet it stands at the edge.
    */
   lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1'] },
-  tunnelLamps: { spacing: 12, drop: 0.55, inset: 0.45 },
+  /**
+   * (tunnel lane) The tunnel's lamp rows: the light of the lines of fittings along the haunches (tunnel.js draws the
+   * fittings), `drop` under the ceiling and `inset` in from the kerb's face (over the shoulder: from there the light
+   * falls evenly down the far wall and the road, and the near wall below the fittings is lit low and dark high). Each lamp carries a
+   * `gain` on its kind's light: the entrance zone (the first `entrance[0]` m) is lit `entrance[1]` times as brightly as
+   * the interior, falling to it over the next `transition` m; the last `exit[0]` m before the way out `exit[1]` times.
+   */
+  tunnelLamps: { spacing: 12, drop: 0.3, inset: 0.9, entrance: [60, 2.4], transition: 70, exit: [36, 1.4] },
   /** Kerbs: on the inside of every bend tighter than `inside` metres from entry to exit, and on the outside at the exit of every bend tighter than `outside`. */
   kerbs: { inside: 800, outside: 500, exit: 0.4, width: SHOULDER },
   /** The lake's surface (the straight runs along its shore at y = 0). */

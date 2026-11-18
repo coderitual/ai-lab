@@ -103,12 +103,15 @@
  *
  * @property {number} exposure under the open sky
  * @property {number} tunnelExposure inside the tunnel; the game eases between the two with track.sky
+ * @property {number} [shadeEv] stops the exposure opens under the densest roadside wood (canopy.js says how dense)
  *
  * @property {import('../../engine/FramePipeline.js').Look} look the grade of the finished picture
  *
- * @property {{ street: number, tunnel: number, windows: number, haze?: number }} lamps how far each kind of lamp is
- *   turned up, 0..1 (the floodlights round the lap go with the street lamps); `haze`: how much of their light the
- *   air shows as a cone under each lamp on a pole (0: none; the damp night after rain: 1)
+ * @property {{ street: number, tunnel: number, windows: number, haze?: number, entrance?: number }} lamps how far each kind
+ *   of lamp is turned up, 0..1 (the floodlights round the lap go with the street lamps); `haze`: how much of their
+ *   light the air shows as a cone under each lamp on a pole (0: none; the damp night after rain: 1); `entrance`: how
+ *   much of the tunnel's entrance and exit zones' extra light is on (the Track's lamp gains: by day all of it, at night
+ *   none, as a real tunnel's are dimmed to the interior's level after dark)
  * @property {number} wetness 0..1 how wet the road is (world.wetness defaults to it; ?wet= overrides): the night
  *   is the night after rain, the road a dark mirror with puddles in the wheel tracks and low spots
  * @property {'drl'|'low'} carLights what a car's automatic lamps do under the open sky (in the tunnel: always low)
@@ -208,15 +211,18 @@ export const TIMES = {
     env: { intensity: 0.6 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
-    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.13 },
+    // (lead) 0.13 left the shade of a forest road at a tenth of the sunlit road and black in the picture; a real
+    // road in open shade keeps a fifth
+    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.3 },
     fog: { color: [0.26, 0.35, 0.52], sun: [0.06, 0.04, 0.02], sunLobe: 16, density: 0.0001, heightFalloff: 0.011, air: 0.00006 },
     exposure: 0.68,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
+    shadeEv: 1.0,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.14, saturation: 1.18, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.00015, glare: 0.015, ao: 0.8, star: 0.02 },
-    lamps: { street: 0, tunnel: 1, windows: 0 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.09, saturation: 1.18, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.00015, glare: 0.015, ao: 0.8, star: 0.02 },
+    lamps: { street: 0, tunnel: 1, windows: 0, entrance: 1 },
     wetness: 0,
     carLights: 'drl',
   },
@@ -251,6 +257,7 @@ export const TIMES = {
     fog: { color: [0.1, 0.068, 0.042], sun: [0.4, 0.19, 0.06], sunLobe: 6, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
     exposure: 4.2,
     tunnelExposure: 6,
+    shadeEv: 0.6,
     look: {
       flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 },
       contrast: 1.2,
@@ -270,7 +277,7 @@ export const TIMES = {
       splitHighlights: [1.05, 1.0, 0.88],
       splitBalance: 0.45,
     },
-    lamps: { street: 1, tunnel: 1, windows: 0.7 },
+    lamps: { street: 1, tunnel: 1, windows: 0.7, entrance: 0.5 },
     wetness: 0,
     carLights: 'low',
   },
@@ -309,9 +316,10 @@ export const TIMES = {
     // (picture lane) was 18: away from the lamps the lower half of the frame was black (p10 of 4 levels)
     exposure: 22,
     // the lit tunnel is two stops brighter than the moonlit road outside
-    tunnelExposure: 8,
+    // (tunnel lane) the box is lit as by day inside (its entrance zone at the interior's level): was 8, a white glare
+    tunnelExposure: 5,
     look: { contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], lift: [0.0006, 0.0009, 0.0018], vignette: 0.32, chroma: 0.0012, grain: 1.2, bloom: 0.15, ghosts: 0, ao: 0.9, star: 0.015, halo: 0.15 },
-    lamps: { street: 1, tunnel: 1, windows: 1, haze: 1 },
+    lamps: { street: 1, tunnel: 1, windows: 1, haze: 1, entrance: 0 },
     // the night after rain (look reference B): wet asphalt, water standing in the ruts and the dips
     // (night lane: was 0.65, water only in the deepest dips; the references' road is a dark mirror)
     wetness: 0.8,

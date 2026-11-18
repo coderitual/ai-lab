@@ -168,5 +168,47 @@ test('people on the real road: the carousel sideways. Default: thrown in with th
   return notes.join('; ');
 });
 
+test('the one-thumb pad (the touch default): a lap near the keys\' with braking into the bends, a handbrake slide by the thumb alone, and a clumsy thumb that does not spin', () => {
+  const keys = D.driftLaps(track, 'keys', [], { level: L.full }).time;
+  // a tidy lap, counting the time the thumb is braking with the car turning at 0.3 g or more (trailing the brake into the bends)
+  const driver = M.humanDriver(track, 'thumb');
+  const car = new (M.makeCar().constructor)(track);
+  car.reset(track.grid(0, {}));
+  const c = { steer: 0, throttle: 0, brake: 0, handbrake: 0 };
+  let t = 0, trail = 0, braking = 0, laps = 0, last = car.s, start = 0, lap = 0;
+  while (laps < 3 && t < 400) {
+    driver.drive(car, M.DT, c);
+    car.step(M.DT, c);
+    t += M.DT;
+    if (laps === 2) {
+      if (c.brake > 0.1) braking += M.DT;
+      if (c.brake > 0.05 && Math.abs(car.angularVelocity.y * car.speed) > 0.3 * M.G) trail += M.DT;
+    }
+    if (car.s < last - track.length / 2) {
+      laps++;
+      if (laps === 3) lap = t - start;
+      start = t;
+    }
+    last = car.s;
+  }
+  check(lap < keys + 3, `the pad's lap ${f(lap)} s against the keys' ${f(keys)} s`);
+  check(trail > 1, `braking while turning for ${f(trail)} s of a lap`);
+  // the carousel sideways, the handbrake pulled by the steering thumb itself (the red arc) and by a second thumb
+  const bend = [{ id: 'carousel', start: 'handbrake', lead: 0 }];
+  const ways = {};
+  for (const hand of ['gesture', 'button']) {
+    const human = { ...M.HUMAN, thumb: { ...M.HUMAN.thumb, hand } };
+    const r = D.driftLaps(track, 'thumb', bend, { level: L.sport, human });
+    const z = r.zones.carousel;
+    check(!r.spun && r.impacts <= 2 && z.sideways >= 2.5, `sport, ${hand}: ${f(z.sideways)} s sideways, ${r.impacts} impacts${r.spun ? ', spun' : ''}`);
+    ways[hand] = `${f(z.sideways)} s at ${f(z.mean, 0)} deg (most ${f(z.most, 0)}), ${f(r.time)} s lap`;
+  }
+  // a clumsy thumb: slow (600 px/s), shaky (8 px), late (0.2 s), at the default level
+  const clumsy = { ...M.HUMAN, reaction: 0.2, thumb: { ...M.HUMAN.thumb, shake: 8, speed: 600 } };
+  const cl = D.driftLaps(track, 'thumb', [], { level: L[ASSISTS.default], human: clumsy, count: 2 });
+  check(!cl.spun && cl.impacts === 0, `clumsy: ${cl.impacts} impacts${cl.spun ? ', spun' : ''}`);
+  return `lap ${f(lap)} s (keys ${f(keys)} s), ${f(braking)} s braking of which ${f(trail)} s turning at 0.3 g or more; sport carousel by the arc ${ways.gesture}, by the button ${ways.button}; clumsy thumb ${f(cl.time)} s, ${cl.impacts} impacts, body ${f(cl.off, 2)} m beyond the pavement`;
+});
+
 console.log(failures ? `\n${failures} failures in ${results.length} tests` : `\nall ${results.length} passed`);
 if (failures) process.exitCode = 1;
