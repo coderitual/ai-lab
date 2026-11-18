@@ -25,6 +25,7 @@
 import * as THREE from 'three';
 import { fieldTexture, gradientField, valueField, worleyField } from '../../engine/noise.js';
 import { ATMOSPHERE_PARS } from './atmosphere.js';
+import { PROBE_LAYER } from '../../engine/ReflectionProbe.js';
 
 /** Stars drawn, per tier. The faintest magnitude follows from the number, so the bright ones are the same few. */
 const STARS = { low: 1800, medium: 3500, high: 6000 };
@@ -395,6 +396,15 @@ export function createSky({ tier, rng, atmosphere }) {
   const geometry = new THREE.SphereGeometry(1, 48, 24);
   const dome = new THREE.Mesh(geometry, domeMaterial(1));
   dome.frustumCulled = false;
+  // (probe lane) the reflection probes see the dome without the disc, as the environment map does: the disc's
+  // highlight on a surface is the sun's (or the moon's) own light, and a prefiltered probe would lay a second one
+  dome.onBeforeRender = (_renderer, _scene, camera) => {
+    const on = camera.layers.isEnabled(PROBE_LAYER) ? 0 : 1;
+    if (dome.material.uniforms.uDiscOn.value !== on) {
+      dome.material.uniforms.uDiscOn.value = on;
+      dome.material.uniformsNeedUpdate = true;
+    }
+  };
   dome.renderOrder = 1000; // after everything solid: only the pixels still empty are shaded
   const envDome = new THREE.Mesh(geometry, domeMaterial(0));
   envDome.frustumCulled = false;

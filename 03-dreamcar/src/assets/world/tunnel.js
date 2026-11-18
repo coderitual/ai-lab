@@ -49,6 +49,8 @@ import { DESIGN, paintBoard } from './signs.js';
 const CEILING = 6.4;
 /** The walkway behind the kerb (its face is the Track's solid edge): width and height (m). */
 const WALK = { width: 1.0, height: 0.22 };
+/** The bore as a box, for the cars' probes (game/Game.js): the walls stand `walk` beyond the solid edges, the ceiling `ceiling` over the road. */
+export const BORE = { ceiling: CEILING, walk: WALK.width };
 /** The chamfer where wall meets ceiling: how far across and how far down (m). */
 const HAUNCH = { across: 0.9, down: 0.7 };
 /** The wall's cast panels: length along the road, and the joint along them over the dado (m). */
