@@ -144,6 +144,19 @@ Laps of the real road (flying laps, Node, no drawing):
 | keys | 85.0 s | 0 impacts, stability control 6.8 s a lap |
 | ham-fisted keys (flat out, full keys, slow hands) | 85.4 s | 0 impacts, body 0.14 m beyond the pavement at worst |
 
+The one-thumb pad (`tools/unit/drift.test.mjs`, the scripted person of
+`manoeuvres.humanDriver` with its thumb on the pad, through Input's
+`padControls`: across and down together, 900 px/s, wavering 3 px, 0.15 s
+late): a tidy lap 86.3 s against the scripted keys' 86.3 s (autopilot 85.0
+s), 0 impacts, 9.2 s of braking a lap, 7.8 s of it while turning at 0.3 g or
+more (trailing the brake in); the carousel sideways at Sport, thrown in with
+the handbrake by the steering thumb's red arc: 3.4 s beyond 12° at 15° mean,
+38° at most, no touches (by the HANDBRAKE button: the same 3.4 s, 33° at
+most; both cost 1.4 s on the lap); at the default level the gesture kicks it
+to 22° and the help catches it (+0.6 s). A clumsy thumb (600 px/s, 8 px of
+waver, 0.2 s late) at the default level: 88.1 s, no impacts, no spin, the
+body 1.46 m beyond the pavement at worst.
+
 ### Assists
 
 Always on: ABS (`assists.abs`), traction control (`tc`) and stability control
@@ -193,9 +206,9 @@ key lock at speed do not spin the car.
 
 | | keyboard (solo) | split screen | gamepad (standard mapping) | touch |
 | --- | --- | --- | --- | --- |
-| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | Throttle auto (default): the car drives by itself from the green light, touched or not, and lifts while BRAKE or DRIFT is held; Throttle manual: only while GAS is held (88 px, in the corner). BRAKE: 80 px, in the corner on auto, left of GAS on manual (where that would shorten the slider below 70 px, as on an upright phone, BRAKE stands up and to the left of GAS, clear of it); held at a standstill it reverses |
-| steer | A D or ← → | A D and ← → | left stick | Steering slider (default): a fixed track at the bottom left with its centre marked; a thumb anywhere in the steering zone (the left half of the view below 45 % of its height) takes the knob, and the steering is its distance from the fixed centre over the half travel (56 + 0.05 × the view's width px, 48 to 92 px: 76 px on an upright phone, 92 px on its side), linear, clamped to full lock; let go, the knob is back at the centre. The curve is the hands' (`HANDS.thumb`: power 1.15 standing, 1.45 at 216 km/h and above). Steering arrows: two 76 px buttons, held as the A and D keys are (the same wind-on and run-back). A second thumb on the steering is ignored |
-| handbrake | Space | Space, right Shift | A or RB | DRIFT (68 px), above the corner pedal (beside the pedals on a view lower than 330 px or narrower than 300 px), held |
+| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | Steering Pad (default): the thumb's offset down from the pad's fixed centre: at or above the centre full power (Throttle auto, the default: with no thumb on the pad the car drives on too), the first 25 % of 56 px down lifts the throttle, the rest brakes, fully at 56 px; Throttle manual: up is the throttle (full at 56 px), the centre coasts, down brakes. Slider and Arrows: the pedals. Throttle auto: the car drives by itself and lifts while BRAKE or DRIFT is held; manual: only while GAS is held (88 px, in the corner). BRAKE: 80 px, in the corner on auto, left of GAS on manual (where that would shorten the slider below 70 px, as on an upright phone, BRAKE stands up and to the left of GAS, clear of it). Braking held at a standstill reverses |
+| steer | A D or ← → | A D and ← → | left stick | Pad (default): a fixed round pad (radius 0.21 × the view's shorter side, 50 to 80 px: 160 px across on a phone) on the side of the holding hand (Hand: Right, the default, or Left); its centre radius + 25 px (scaled with the pad) from that side and 150 px above the bottom on an upright phone (0.176 × the view's height, 150 at most, the radius + 22 at least). A thumb anywhere in its zone (that half of the view, its lower 45 %, and round the pad) takes the knob; the steering is its offset across from the fixed centre over 70 px, linear, clamped to full lock, no dead step. Tilt: the device rolled like a wheel, ±30° from how it was held at the start (or at Recentre on the pause sheet) is full lock, upright or on its side (deviceorientation, asked for in the option's click and on the first touch; refused or absent, the pad steers and the options say so); the pad still brakes. Slider: a fixed track at the bottom left; the steering is the thumb's distance from its centre over the half travel (56 + 0.05 × the view's width px, 48 to 92 px). Arrows: two 76 px buttons, held as the A and D keys are. For the pad, tilt and the slider the curve and smoothing are the hands' (`HANDS.thumb`: power 1.15 standing, 1.45 at 216 km/h and above; a critically damped follow, two lags of 22 ms standing to 50 ms at speed). A second thumb on the steering is ignored |
+| handbrake | Space | Space, right Shift | A or RB | Pad: pulled on down past 74 px (scaled) into the red arc at the pad's foot, let go above 62 px; and the round HANDBRAKE button (68 px) in the other bottom corner (above the pad where the view is too narrow), held. Slider and arrows: DRIFT (68 px), above the corner pedal (beside the pedals on a view lower than 330 px or narrower than 300 px), held. A short buzz (`navigator.vibrate(8)`, where there is one: not on iOS) when it is pulled and when a wheel strikes a kerb |
 | camera | C | C, `.` | Y | button |
 | look back | B (held) | B, `,` | X | |
 | put back | R | R, `/` | B | button |
@@ -210,18 +223,25 @@ Each driver reads whichever of their devices was used last. The touch
 controls are fixed and always drawn (`TOUCH` and `layoutOf` in
 `src/engine/Input.js`; the HUD draws them from the same layout, so a finger
 finds what it sees): 18 px from the edges inside the safe area (the notch and
-the home bar), 12 px apart; the slider's knob 52 px, resting on that bottom
-margin. Each control keeps the finger that took it until that finger
-lifts (sliding off a pedal keeps it); a cancelled pointer, the window losing
+the home bar), 12 px apart; the pad's knob 60 px (scaled with the pad), the
+slider's 52 px, resting on that bottom margin. Each control keeps the finger that took it until that finger
+lifts (sliding off a pedal keeps it; pulled past the pad's rim the knob stops
+at the rim, or clicks into the red arc while the handbrake is pulled; let go,
+it springs back to the centre in 0.16 s); a cancelled pointer, the window losing
 focus, a hidden tab or a turned device lets every control go. A touch
 anywhere else does nothing to the car; the HUD's own buttons keep working. On
 a view too narrow for the steering and the pedals side by side (half of an
 upright phone) the pedals stand above the steering, in one column. On a tablet in split
 screen each half of the screen is one driver's, with its own controls laid
-out for the half. On the first run on a touch screen the controls are
-outlined and the steering named (STEER; the pedals carry their words always)
-for the first 3 s of the race clock, then never again
-(`dreamcar.zones.v1`). Every button can be reached by Tab and Enter, or a
+out for the half (the pad shrinks to 50 px in a half of a phone). Every
+control is drawn pressed in the same frame as the touch (Input's
+onTouchChange), with a glow; 4 s into a run (`HUD.controlsDimAfter`) the
+controls step back to 45 % opacity while no finger is on any of them. On the
+first run on a touch screen the controls are outlined and the steering named
+(the pad: STEER · BRAKE · DRIFT; the slider: STEER; the pedals carry their
+words always) for the first 3 s of the race clock, then never again
+(`dreamcar.zones.v1`); the first-run hint for the pad reads "Slide to steer,
+pull back to brake, pull to the red to drift". Every button can be reached by Tab and Enter, or a
 pad's d-pad and A; the pedals and arrows are at least 64 px, the four small
 buttons 44 px.
 
@@ -260,7 +280,8 @@ unit per view:
   gear, the ABS / TC / ESC lamps (touch screens: see below);
 - bottom left: a small map (can be hidden; touch screens: see below);
 - just above the speed, only while the car slides 12° or more: the slide's angle and its running score (`vehicle.slide`; `Hud.setDrift`), fading out a second after the slide ends; the best slide of the run is on the results;
-- touch screens: the bottom corners are the thumbs' (the steering left, the pedals right) and nothing else stands there. A wide view: the speed just left of the pedals (110 px from the right on auto; on manual 108 px from the right and 110 px up, above BRAKE and left of DRIFT), the map 112 px up, above the steering; a narrow wide view (a side-by-side half on a phone): the speed 206 px up, above the pedals; a view lower than 330 px (a stacked half): the speed at the top beside the lap; an upright view: the speed 112 px up at the left, drawn at 0.86 of its size, the map above it; a view narrower than 300 px (half an upright phone): the speed under the lap, no map, DRIFT beside BRAKE;
+- touch screens, the pad: the bottom corners are the thumbs' (the pad on the holding hand's side, the HANDBRAKE button on the other) and nothing else stands there. The speed above the HANDBRAKE button at 0.86 of its size (the slide readout above it), the map above the pad, both mirrored for the left hand; a narrow half of a split screen has no map; on an upright view the pad's top stays below 75 % of the height, under the car's tail (133 px up on a 393x852 phone rather than 150); a view lower than 330 px (a stacked half) or narrower than 300 px (half an upright phone): the speed at the top, as for the pedals. Placed by `--sticktop`, `--stickside`, `--handtop`, `--handside` from the layout (`Hud.setControls`);
+- touch screens, the slider and the arrows: the steering left, the pedals right, and nothing else in those corners. A wide view: the speed just left of the pedals (110 px from the right on auto; on manual 108 px from the right and 110 px up, above BRAKE and left of DRIFT), the map 112 px up, above the steering; a narrow wide view (a side-by-side half on a phone): the speed 206 px up, above the pedals; a view lower than 330 px (a stacked half): the speed at the top beside the lap; an upright view: the speed 112 px up at the left, drawn at 0.86 of its size, the map above it; a view narrower than 300 px (half an upright phone): the speed under the lap, no map, DRIFT beside BRAKE;
 - touch screens: four small buttons together (camera, high beam, put back,
   pause);
 - the best-laps board on the title, the pause sheet and the results only.
@@ -273,8 +294,10 @@ measurement; `stats().hudWrites`).
 On the title and the pause sheet: quality (auto, low, medium, high; applied
 by reloading the page), sound on or off, time of day, driving help (Full,
 Sport, Off: `ASSISTS` in config.js, applied at once to every car and to every
-car made later), Steering (slider or arrows) and Throttle (auto or manual),
-both shown on touch screens, units
+car made later), Steering (Pad, Slider, Arrows or Tilt; under it what the
+choice does, or why tilt is not steering), Hand (Right or Left; with the pad
+or tilt) and Throttle (auto or manual), shown on touch screens; Recentre tilt
+on the pause sheet while tilt steers; units
 (km/h, mph), the map shown or hidden.
 
 ## URL parameters
@@ -453,7 +476,8 @@ stereo picture. Sound starts on the first touch or key (the browsers' rule).
 | `dreamcar.map` | the map on or off |
 | `dreamcar.assists` | the driving help: full, sport or off |
 | `dreamcar.throttle` | the touch throttle: auto or manual |
-| `dreamcar.steering` | the touch steering: slider or arrows |
+| `dreamcar.steering` | the touch steering: pad, slider, arrows or tilt |
+| `dreamcar.hand` | the hand that holds the phone (the pad's side): right or left |
 | `dreamcar.zones.v1` | the touch controls have been named once |
 | `dreamcar.muted` | sound off |
 | `dreamcar.hinted.v1` | the first-run hint has been shown |

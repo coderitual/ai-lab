@@ -128,15 +128,25 @@ from straight behind, the silver going warm in a low sun.
 - **More circuits.** The Track takes any closed layout of straights and arcs;
   the world builds from it. A second layout, or the same circuit reversed,
   is mostly data and a new set of medal times from the autopilot.
-- **Tilt steering on phones.** A third Steering option: the phone's roll
-  (DeviceOrientation; iOS asks permission on a gesture) read against the
-  angle it was held at when the run started, with a dead zone and the same
-  `HANDS.thumb` curve, and a recentre button. Needs a real phone to tune; the
-  slider and the pedals stay as they are.
-- **The touch controls on a real phone.** The slider's travel (56 + 0.05 ×
-  width, 48 to 92 px), the pedals' sizes and `HANDS.thumb.expo` were set in
-  headless Chromium and by the scripted thumb in `tools/unit`; an afternoon
-  with an iPhone and a mid-range Android, both ways up, should set them.
+- **Tilt on a real phone.** Tilt steering is built (`rollOf`, Recentre on the
+  pause sheet) and tested only with synthetic deviceorientation events: its
+  ±30° of full lock, whether it wants a small dead zone, and iOS's permission
+  prompt need a real iPhone.
+- **The touch controls on a real phone.** The pad's size and place (160 px,
+  105 px from the side, 150 px up), its travels (70 px across, 56 down, the
+  red arc at 74), `HANDS.thumb` (curve and the 22 to 50 ms follow), the
+  slider's travel and the pedals' sizes were set in headless Chromium and by
+  the scripted thumb in `tools/unit`; an afternoon with an iPhone and a
+  mid-range Android, both ways up, should set them. The pad could also learn
+  where the thumb rests (a centre that settles to the thumb's habit between
+  runs, never during one).
+- **The second half's wet road in split screen** (tools.md, "water on the
+  track"): at night one half of a split can show the wet road as a sheet of
+  water where the other does not; it follows the camera's place. Look at
+  which lamps light each view (lamps.js chooses them by the eye).
+- **Analog pedals for the slider and the arrows.** Where on BRAKE or GAS the
+  finger is could set the pressure (the pad already gives an analog brake);
+  not done: the pad came first.
 - **A photo mode.** The staging camera (`__dreamcar.photo`) already exists;
   it needs a pause-sheet entry, a free orbit with touch and stick, and a
   high-tier render at a larger size.

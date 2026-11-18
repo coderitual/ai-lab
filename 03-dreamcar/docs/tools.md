@@ -124,7 +124,7 @@ machine without a GPU, and only what is listed here.
   keyboard driver (scripted drivers, in Node). Run for this document:
   passed.
 - **The rules** (`tools/unit.mjs`, race): 82 checks, passed.
-- **The feel** (`tools/unit.mjs`, drift): 7 tests, passed (2026-11-18).
+- **The feel** (`tools/unit.mjs`, drift): 8 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
   Of the six failures, five came from the HUD overlap layout and one from a
@@ -144,6 +144,28 @@ machine without a GPU, and only what is listed here.
   before: intermittent, the banner and the car's top are a few px apart on
   a landscape phone. `node tools/unit.mjs` passed (the scripted thumb now
   drives a linear slider, `HUMAN.thumb` range 76 px).
+- **The one-thumb pad** (CONTROLS lane, round 2, 2026-11-18): touch, slide,
+  options, start and split against a production build: 201 of 201 (touch
+  130, slide 13, options 39, start 10, split 9); hud re-run after the last
+  layout change: 100 of 100 (the pad in either hand, solo and both splits,
+  auto and manual, and the slider with its pedals on manual in both splits).
+  In an earlier hud run the pad overlapped the car once on 393x852 with the
+  insets stood in for: the car's box was drawn 120 px lower than at the same
+  place in every other run (intermittent, not explained). `node
+  tools/unit.mjs` passed; drift.test.mjs now has 8 tests (the pad's lap,
+  braking while turning, the red-arc and button slides, a clumsy thumb).
+  Tilt is checked with synthetic deviceorientation events only.
+- **The two-player "water on the track"** (CONTROLS lane, round 2): reproduced
+  at night on low in a side-by-side split of an upright phone
+  (`?mode=split&time=night&t=14`, view.split wide, 393x852): the second
+  half's road reads as a sheet of water, the first half's beside it does not.
+  It does not depend on the order the halves are drawn in, on the wet road's
+  mirror (low has none; at medium night the mirror is drawn once per view
+  with that view's camera), on the cars' head lamp beams, or on which car's
+  half it is: drawn from the second camera's place, the first half shows it
+  too. So it follows where the camera stands, by a few metres; the likeliest
+  cause is the per-eye choice of lit lamps at night (lamps.js, the world's
+  lane), not fixed here (src/assets/ is another lane's).
 - **The sound** (`tools/soundtest.cjs`): 62 of 62 checks (audio lane). The
   squeal "stands out at the limit" passes at exactly its 12 dB threshold.
 - **The pictures**: the stills in `docs/images/` and the lanes' comparison
@@ -219,13 +241,17 @@ Read this before believing anything above about a device.
   (tier `medium`, before the fixed touch controls): they show that it ran and
   how it looked then, nothing about frame rates, heat or the current build.
   Touch has only been simulated by Playwright on phone-sized viewports, with
-  synthetic pointer events: no real thumb has used the slider or the pedals,
+  synthetic pointer events: no real thumb has used the pad, the slider or the
+  pedals (the pad's size, place, travels, red-arc threshold and the thumb's
+  22 to 50 ms follow were tuned by the scripted thumb in Node and by eye on
+  stills), tilt has only been fed synthetic deviceorientation events (it is
+  untested on a real phone, its iOS permission prompt has never been met, and
+  the option's hint says so), `navigator.vibrate` has never buzzed anything
+  (iOS has none: the guard keeps it quiet there),
   iOS Safari's own gestures (the bottom toolbar, the home bar swipe, edge
   swipes for back) have not been met, and the safe-area insets were stood in
-  for by setting the HUD's variables. The slider's travel, the pedals' sizes
-  and the thumb's curve are untuned by hand. Two players on half an upright
-  phone with the throttle on manual stacks the pedals into the picture; that
-  combination is not in the HUD check. Whether `medium` or `low` is fast
+  for by setting the HUD's variables. The controls' sizes and the thumb's
+  curve are untuned by a real hand. Whether `medium` or `low` is fast
   enough on any phone, whether a phone overheats, whether the buttons are
   where a thumb is, and whether the capability probe's guesses for Apple,
   Adreno and Mali GPUs are right are all unknown.

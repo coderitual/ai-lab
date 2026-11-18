@@ -4,6 +4,7 @@
 // URL parameters are described in engine/params.js.
 
 import { TIMES } from './assets/world/lighting.js';
+import { TOUCH } from './engine/Input.js';
 import { parseParams } from './engine/params.js';
 import { Game } from './game/Game.js';
 import * as config from './game/config.js';
@@ -66,6 +67,8 @@ try {
      * own top left in the page), for tests.
      */
     touchLayout: (i = 0) => game.input.layoutOf(i),
+    /** Input's TOUCH: the touch controls' numbers. */
+    touch: TOUCH,
     /** Change a number of the light or of the run by its path, and show the result. */
     set(path, value) {
       const keys = String(path).split('.');

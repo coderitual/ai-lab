@@ -7,6 +7,7 @@
 
 import { AutoDriver, PlayerDriver, analogFor, steerLimit } from '../../src/game/drivers.js';
 import { HANDS } from '../../src/game/config.js';
+import { TOUCH, padControls } from '../../src/engine/Input.js';
 import { Vehicle } from '../../src/game/vehicle/Vehicle.js';
 import { CAR } from '../../src/game/vehicle/params.js';
 import { createCurve, secant } from '../../src/game/vehicle/tyre.js';
@@ -767,7 +768,9 @@ export function hamfistDriver(track, params = CAR) {
 export const HUMAN = {
   reaction: 0.15,
   keys: { hold: 0.07 },
-  thumb: { range: 76, speed: 900, shake: 3, curve: 1, dead: 0 },
+  // the thumb is on the one-thumb pad (Input's padControls, at its full size): across steers, down lifts and brakes,
+  // and `hand` says how it pulls the handbrake: 'gesture' (on down into the red arc) or 'button' (the other thumb)
+  thumb: { range: TOUCH.pad.steer, speed: 900, shake: 3, curve: 1, dead: 0, hand: 'gesture' },
   pad: { range: 1, speed: 9, shake: 0.02, curve: 1.6, dead: 0.12 },
   rearG: 0.7,
   frontG: 0.62,
@@ -828,7 +831,8 @@ export function humanDriver(track, device = 'thumb', params = CAR, human = HUMAN
   const dev = human[device];
   const zones = (drifts || []).map((d) => ({ lead: 25, start: 'handbrake', ...d, s0: track.at(d.id, 0), s1: track.at(d.id, 1), state: 'before', t0: 0 }));
   for (const z of zones) z.way = Math.sign(track.curvature[Math.floor(track.wrap((z.s0 + z.s1) / 2) / track.ds) % n]) || 1; // + = a left-hander
-  let at = 0, t = 0, pos = 0, key = 0, held = 1, trim = 0, lastGoing = 0;
+  let at = 0, t = 0, pos = 0, key = 0, held = 1, trim = 0, lastGoing = 0, posY = 0, tripped = false;
+  const pad = {};
   let ghost = null;
   const me = {
     player, input, zones, device,
@@ -977,13 +981,26 @@ export function humanDriver(track, device = 'thumb', params = CAR, human = HUMAN
         s.device = device === 'thumb' ? 'touch' : 'pad';
         s.steer = size < dev.dead ? 0 : Math.sign(where) * ((size - dev.dead) / (1 - dev.dead)) ** dev.curve;
         if (device === 'thumb') {
-          s.brake = brake > 0.12 ? Math.min(1, 0.3 + brake) : 0; // a thumb on the brake presses it most of the way
-          s.throttle = s.brake > 0 ? 0 : 1; // (it accelerates by itself: there is no lift on a phone)
+          // the same thumb, down the pad: where it has to be for the lift or the brake wanted (or on into the red
+          // arc for the handbrake), as fast as a thumb moves, wavering; the pad says what that asks for
+          const P = TOUCH.pad;
+          let wantY = 0;
+          if (handbrake && dev.hand !== 'button') wantY = P.trip + 8;
+          else if (brake > 0.12) wantY = P.brake * (P.lift + (1 - P.lift) * Math.min(1, 0.15 + brake));
+          else if (throttle < 0.5) wantY = P.brake * P.lift * (1 - throttle * 2) * 0.8;
+          posY += Math.max(-dev.speed * dt, Math.min(dev.speed * dt, wantY - posY));
+          const shakeY = dev.shake * Math.sin(t * 1.9 + 2) * Math.sin(t * 0.53);
+          padControls(where * dev.range, posY + shakeY, 1, false, tripped, pad);
+          tripped = pad.tripped;
+          s.throttle = pad.throttle;
+          s.brake = pad.brake;
+          s.handbrake = Math.max(pad.handbrake, dev.hand === 'button' ? handbrake : 0);
+          if (s.handbrake) s.throttle = 0;
         } else {
           s.brake = brake > 0.05 ? Math.min(1, brake * 1.1) : 0;
           s.throttle = Math.min(1, throttle * 0.95);
         }
-        s.handbrake = handbrake;
+        if (device !== 'thumb') s.handbrake = handbrake;
       }
       return player.drive(car, dt, out);
     },
