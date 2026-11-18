@@ -515,20 +515,30 @@ With them the body is 1.866 over the flares, 46 mm more than the published
 published width and the tracks cannot both be right. `DIMS.width` (read by
 the physics) keeps the published figure.
 
+What still differs after round six: the side intakes on the car are taller
+still and the blade between them sweeps as a wide smile under the plate (ours
+is straighter); the photographs show no chrome strip on the lower lip, so
+none was added. The head lamps were judged at night from ahead and left as
+they were (eyebrow, projector domes). The tunnel was not staged (the chase
+camera at `t=33` of this build is outside it). At night the plate lamps light
+the dish round the plate brightly.
+
 ## What each tier costs
 
-Re-measured after round five (the tail's new corners and the finer grille
-stars cost about 1.3k triangles on the medium tier, which went over its
-113k budget; its edge length went from 55 to 56 mm). Measured in the viewer,
+Re-measured after round six (the arches' flare moves the net's points and
+adds none; the apron's bars and the re-cut slats are about the same as the
+slats were). Round five's tail corners and finer grille stars cost about 1.3k
+triangles on the medium tier, which went over its 113k budget; its edge
+length went from 55 to 56 mm. Measured in the viewer,
 one page at a time (headless Chromium on a 4-core machine, software WebGL;
 build time is `car.stats.buildMs`: everything from `createCar()` to the
 returned handle, shader compilation not included):
 
 | tier | triangles | draw calls (at rest) | build |
 | --- | --- | --- | --- |
-| low | 49.7k | 29 (25) | ~430 ms |
+| low | 49.8k | 29 (25) | ~415-430 ms |
 | medium | 111.0k | 31 (27) | ~680-870 ms |
-| high | 185.0k | 31 (27) | ~990 ms |
+| high | 185.2k | 31 (27) | ~1000 ms |
 | ghost (not re-measured since round two) | 92.5k | 10 | ~150-190 ms |
 
 Plus one draw call for the contact shadow. The four blur shells are hidden at
