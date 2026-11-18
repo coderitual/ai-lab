@@ -74,9 +74,11 @@ export const TOUCH = {
    * rest brakes to the full at `brake`; on beyond `trip` px the handbrake is pulled, let go above `untrip` px. On
    * manual, `brake` px up is the full throttle. The knob's radius; `up`: the centre's height above the bottom edge,
    * `upShare` of the zone's height, `up` px at most and the radius + `upMin` at least. The HANDBRAKE button's radius
-   * `hand`; the steering zone round the pad: the lower `zoneShare` of the pad's half of the zone.
+   * `hand`; the steering zone round the pad: the lower `zoneShare` of the pad's half of the zone. In a half of a split
+   * screen the radius is `splitShare` of the shorter side, `splitMax` at most. On an upright view the pad's top stays
+   * below `below` of the height (where the car's tail is), the centre `up` or less above the bottom if need be.
    */
-  pad: { share: 0.21, min: 50, max: 80, side: 25, steer: 70, lift: 0.25, brake: 56, trip: 74, untrip: 62, knob: 30, up: 150, upShare: 0.176, upMin: 22, hand: 34, zoneShare: 0.45 },
+  pad: { share: 0.21, splitShare: 0.155, min: 50, max: 80, splitMax: 64, below: 0.75, side: 25, steer: 70, lift: 0.25, brake: 56, trip: 74, untrip: 62, knob: 30, up: 150, upShare: 0.176, upMin: 22, hand: 34, zoneShare: 0.45 },
 };
 
 /** Tilt steering: full lock at `full` degrees of roll from the zero; a roll measured where gravity is at least `minG` of itself in the screen's plane. */
@@ -359,7 +361,7 @@ export class Input {
     // beside the row on a low zone
     const manual = this.throttle === 'manual';
     // (half an upright phone on manual: the pedals at their smallest, `small`, so that they stay below the car)
-    const tight = manual && w < T.thinBelow;
+    const tight = manual && (w < T.thinBelow || z.width < 0.999 || z.height < 0.999);
     const gasR = tight ? T.small : T.gas;
     const brakeR = tight ? T.small : T.brake;
     const driftR = tight ? T.small : T.drift;
@@ -374,13 +376,16 @@ export class Input {
       : { x: corner.x, y: corner.y - c - T.gap - driftR, r: driftR };
     // (too narrow for GAS and BRAKE side by side: GAS in the corner, BRAKE above it and DRIFT beside BRAKE where
     // there is room for both, else above it)
-    if (manual && brake.x - brake.r < left) {
+    // (a half of a split screen, neither thin nor low: one column at the edge, clear of the car in the middle)
+    const column = tight && w >= T.thinBelow && h >= T.lowBelow;
+    if (manual && (brake.x - brake.r < left || column)) {
       Object.assign(brake, { x: corner.x, y: corner.y - c - T.gap - brakeR });
-      if (brake.x - brakeR - 2 * T.gap - 2 * driftR >= left) Object.assign(drift, { x: brake.x - brakeR - T.gap - driftR, y: brake.y });
+      if (column) Object.assign(drift, { x: corner.x, y: brake.y - brakeR - T.gap / 2 - driftR });
+      else if (brake.x - brakeR - 2 * T.gap - 2 * driftR >= left) Object.assign(drift, { x: brake.x - brakeR - T.gap - driftR, y: brake.y });
       else Object.assign(drift, { x: corner.x, y: brake.y - brakeR - T.gap - driftR });
     }
     // (no room for DRIFT beside the row: above the corner)
-    if (drift.x - drift.r < left) Object.assign(drift, { x: corner.x, y: Math.min(corner.y - c, brake.y - brake.r) - T.gap - driftR });
+    if (drift.x - drift.r < left) Object.assign(drift, { x: corner.x, y: Math.min(corner.y - c, brake.y - brake.r) - (tight ? T.gap / 2 : T.gap) - driftR });
     const pedals = [gas, brake, drift].filter(Boolean);
     const leftOf = (list) => Math.min(...list.map((b) => b.x - b.r)) - T.gap;
     // the steering: the slider's travel for the zone's width; the arrows side by side
@@ -420,16 +425,27 @@ export class Input {
     const l = z.left < 0.001 ? ins.left : 0;
     const rgt = w - (z.left + z.width > 0.999 ? ins.right : 0);
     const bot = h - (z.top + z.height > 0.999 ? ins.bottom : 0);
-    const r = clamp(Math.min(w, h) * P.share, P.min, P.max);
+    // (a half of a split screen: a smaller pad, clear of its car)
+    const split = z.width < 0.999 || z.height < 0.999;
+    const r = clamp(Math.min(w, h) * (split ? P.splitShare : P.share), P.min, split ? P.splitMax : P.max);
     const s = r / P.max;
     const right = this.hand !== 'left';
     const cx = right ? rgt - r - P.side * s : l + r + P.side * s;
-    const cy = bot - Math.max(r + P.upMin, Math.min(P.up, h * P.upShare));
-    const pad = { cx, cy, r, s, knob: P.knob * s };
+    let cy = bot - Math.max(r + P.upMin, Math.min(P.up, h * P.upShare));
+    // an upright view: the car's tail reaches down to about `below` of the height; the pad stays under it
+    const tall = h > w * 1.2;
+    if (tall) cy = Math.min(bot - r - P.upMin, Math.max(cy, h * P.below + r));
     const b = P.hand;
     const drift = { x: right ? l + T.margin + b : rgt - T.margin - b, y: bot - T.margin - b, r: b };
-    // (no room beside the pad: above it)
-    if (Math.abs(drift.x - cx) < r + b + T.gap) Object.assign(drift, { x: cx, y: cy - r - T.gap - b });
+    // (the button's box and the pad's too close: the pad stands above the button's top if it can stay under the car,
+    // else the button stands above the pad)
+    const clash = () => Math.abs(drift.x - cx) < r + b + T.gap && Math.abs(drift.y - cy) < r + b + T.gap;
+    if (clash()) {
+      const up = drift.y - b - T.gap - r;
+      if (!tall || up - r >= h * P.below) cy = up;
+      else Object.assign(drift, { x: cx, y: cy - r - T.gap - b });
+    }
+    const pad = { cx, cy, r, s, knob: P.knob * s };
     const zone = right ? { x0: Math.min(w * 0.5, cx - r - T.gap), x1: w } : { x0: 0, x1: Math.max(w * 0.5, cx + r + T.gap) };
     zone.y0 = Math.min(h * (1 - P.zoneShare), cy - r - T.gap);
     return { key, x0: zr.left, y0: zr.top, w, h, steering: this.steering, hand: right ? 'right' : 'left', zone, pad, slider: null, arrows: null, brake: null, gas: null, drift };

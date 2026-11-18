@@ -532,7 +532,7 @@ const SECTIONS = {
       const { cx: px0, cy: py0, s } = L.pad;
       const cx = L.x0 + px0;
       const cy = L.y0 + py0;
-      if (w < h) check(`${w}x${h}: the pad's centre ${Math.round(w - cx)} px from the side, ${Math.round(h - cy)} px up (about 105 and 150)`, Math.abs(w - cx - 105) <= 4 && Math.abs(h - cy - 150) <= 4);
+      if (w < h) check(`${w}x${h}: the pad's centre ${Math.round(w - cx)} px from the side, ${Math.round(h - cy)} px up (about 105 and 150, under the car)`, Math.abs(w - cx - 105) <= 4 && h - cy >= 125 && h - cy <= 155 && cy - L.pad.r >= h * 0.75 - 1);
       check(`${w}x${h}: the HANDBRAKE button in the other bottom corner, at least 64 px`, L.drift.x < w / 2 && 2 * L.drift.r >= 64 && L.drift.y > h * 0.7);
       await toGo(p);
       check(`${w}x${h}: the controls are named on the first touch run`, await visible(p, '.hud .view .controls.naming .stick .name'));

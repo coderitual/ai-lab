@@ -831,6 +831,26 @@
   top: calc(var(--pad) + var(--st) + var(--u) * 37);
 }
 
+/* a narrow half of a split screen, the slider with the pedals on manual (one column at the edge): the speed above
+   the slider at the left, a little smaller; no map */
+.hud .view.touch.manual.split.narrow:not(.pad):not(.tall) .cluster {
+  right: auto;
+  top: auto;
+  left: calc(var(--pad) + var(--sl));
+  bottom: calc(var(--sb) + 82px);
+  transform: scale(0.86);
+  transform-origin: left bottom;
+}
+.hud .view.touch.manual.split.narrow:not(.pad):not(.tall) .slide {
+  right: auto;
+  top: auto;
+  left: calc(var(--pad) + var(--sl));
+  bottom: calc(var(--sb) + 82px + var(--u) * 19.5);
+}
+.hud .view.touch.manual.split.narrow:not(.pad):not(.tall) .map {
+  display: none;
+}
+
 /* ---- touch, the one-thumb pad: a fixed glass disc with a light rim (it reads over the day's bright road and the
    night's dark one), the steering's full lock marked either side, the brake's arc along its foot and the red arc of
    the handbrake under that; the knob follows the thumb and springs back when it lifts. The marks are drawn by
@@ -993,9 +1013,9 @@
 }
 
 /* ---- touch, the pad: where the readouts go (--sticktop, --stickside, --handtop, --handside: set by
-   Hud.setControls from the layout, px from the view's bottom and from its side). A wide view: the speed beside the
-   pad towards the middle, the map above the HANDBRAKE button. An upright view: the speed and the map above the
-   HANDBRAKE button. The hand on the left mirrors both. A low view (a stacked half) and a thin one (half an upright
+   Hud.setControls from the layout, px from the view's bottom and from its side). The speed above the HANDBRAKE
+   button (the slide readout above it), the map above the pad; the hand on the left mirrors both; a narrow half of a
+   split screen has no map. A low view (a stacked half) and a thin one (half an upright
    phone): the speed at the top, as for the pedals. */
 
 .hud .view.touch.pad .cluster {
@@ -1007,14 +1027,15 @@
   transform-origin: left bottom;
 }
 .hud .view.touch.pad .slide {
-  left: auto;
+  left: calc(var(--pad) + var(--sl));
   top: auto;
-  right: calc(var(--pad) + var(--sr));
-  bottom: calc(var(--sticktop) + 12px);
+  right: auto;
+  bottom: calc(var(--handtop) + 12px + var(--u) * 19.5);
 }
 .hud .view.touch.pad .map {
-  left: calc(var(--pad) + var(--sl));
-  bottom: calc(var(--handtop) + 12px + var(--u) * 21);
+  left: auto;
+  right: calc(var(--pad) + var(--sr));
+  bottom: calc(var(--sticktop) + 12px);
 }
 .hud .view.touch.pad.handleft .cluster {
   left: auto;
@@ -1022,36 +1043,16 @@
   transform-origin: right bottom;
 }
 .hud .view.touch.pad.handleft .slide {
-  right: auto;
-  left: calc(var(--pad) + var(--sl));
-}
-.hud .view.touch.pad.handleft .map {
-  bottom: calc(var(--sticktop) + 12px);
-}
-.hud .view.touch.pad.tall .cluster,
-.hud .view.touch.pad.tall .slide {
-  right: auto;
-  left: calc(var(--pad) + var(--sl));
-  bottom: calc(var(--handtop) + 12px);
-}
-.hud .view.touch.pad.tall .cluster {
-  transform: scale(0.86);
-  transform-origin: left bottom;
-}
-.hud .view.touch.pad.tall .slide {
-  bottom: calc(var(--handtop) + 12px + var(--u) * 19.5);
-}
-.hud .view.touch.pad.tall .map {
-  bottom: calc(var(--handtop) + 12px + var(--u) * 21);
-}
-.hud .view.touch.pad.tall.handleft .cluster,
-.hud .view.touch.pad.tall.handleft .slide {
   left: auto;
   right: calc(var(--pad) + var(--sr));
-  transform-origin: right bottom;
 }
-.hud .view.touch.pad.tall.handleft .map {
-  bottom: calc(var(--sticktop) + 12px);
+.hud .view.touch.pad.handleft .map {
+  right: auto;
+  left: calc(var(--pad) + var(--sl));
+}
+/* (a narrow half of a split screen: the map steps aside) */
+.hud .view.touch.pad.split.narrow .map {
+  display: none;
 }
 .hud .view.touch.pad.low .cluster,
 .hud .view.touch.pad.low.handleft .cluster {
@@ -1085,9 +1086,11 @@
 
 /* ---- the buttons: small and together, at the right under the time to beat, away from the thumbs and the figures */
 
-/* (a stacked half on a phone, the pad on the right: the buttons step left of it) */
+/* (a stacked half on a phone, the pad on the right: the buttons step left of it, two by two) */
 .hud .view.touch.pad.low:not(.handleft) .touchcol {
   right: var(--stickside);
+  flex-wrap: wrap;
+  width: 94px;
 }
 
 .hud .touchcol {
@@ -1149,11 +1152,12 @@
 .hud .view.tall.small.touch .lamps {
   top: 34%;
 }
-/* a low wide picture (a phone on its side): the lap's banner beside the line's gap, not under it, where the car's
+/* a low wide picture (a phone on its side): the lap's banner to the left of the line's gap, not under it, where the car's
    roof can be when the road climbs */
 .hud .view.squat.flashing .banner {
   top: calc(var(--pad) + var(--st));
-  left: calc(50% + var(--u) * 16);
+  left: auto;
+  right: calc(50% + var(--u) * 16);
   transform: none;
 }
 /* split screen: the line's gap says enough; the lap's banner would crowd a half */
