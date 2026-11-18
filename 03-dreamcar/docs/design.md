@@ -522,7 +522,13 @@ apron, the rail and the sea are on the right; the boards stand round the
 hairpin's outside. What our course cannot give: the sky road is behind this
 camera (it runs from the climb's foot back south-east to the tunnel), so the
 frame's viaduct is not in our picture; its piers stand in the sea where the
-driver sees them, from the tunnel's cutting, the sky road and the climb. And
+driver sees them, from the tunnel's cutting, the sky road and the climb.
+(Round 3) So that E1 has its bridge, a pale span on the viaduct's own piers
+stands out in the sea off the headland as scenery (viaduct.js `SEA_SPAN`,
+no road on it), crossing the water behind the hairpin from E1's camera; the
+camera stands low and close (2.2 m up, 7.5 m ahead of the car); round the
+hairpin three red and white boards stand, not a hoarding; and the coast
+road's asphalt is older and sun-bleached, a mid grey (`COAST_PALE`). And
 our day sun is fixed: 16 degrees up, due east (down the start straight); from
 E1's camera, looking a little east of north, it stands about 80 degrees to
 the left and very slightly ahead, so the cut face (facing west) is in its own
@@ -551,9 +557,9 @@ comes from behind the camera's left and lights the face.
   down into the sea (1.6 to 2.6 m down per metre out, rounded at its top, a
   talus at its foot 7 m under the water), so that open water lies some 40
   to 60 m beyond the solid edge and 85 to 110 m below the road. The land
-  side is cut 4 m deep (the coast's rust face) and rises gently beyond it
+  side is cut 6 m deep (the coast's rust face) and rises gently beyond it
   (at most 0.25 per metre), and the spur between the climb and the crest
-  rises as a hill up to about 22 m over the road, along a ridge from 80 to
+  rises as a hill up to about 32 m over the road, along a ridge from 80 to
   230 m down the tongue from the hairpin's centre, set towards the climb.
   It is low round the hairpin itself, on purpose: the day's sun stands on
   that side 16 degrees up, and with an 11 m cut and the rock preset's steep
@@ -580,8 +586,9 @@ comes from behind the camera's left and lights the face.
   outside. The rails are the open steel rails the corridor already had; the
   course is untouched, but nothing grows behind the long right's rails any
   more (`shoreRun`, `shoreUp`: the woods hid the water). Off the outer side the swell runs big (waves.js
-  `BOOST`): its three long waves 2.5 times their height at the middle of a
-  circle of 360 m (up to about 3 to 4 m from crest to trough in the sets);
+  `BOOST`): its three long waves 2.2, 3.4 and 4.2 times their height at the
+  middle of a circle of 360 m (round 3: the shorter ones most, so that they
+  read as steep rollers, about 3 to 5 m from crest to trough in the sets);
   the same factor moves the mesh (medium, high), shades the normals (low)
   and answers `sampleWaves`. It stops short of the straight, whose bay
   frames D1 and D4 look over. `?photo=waves` looks over the lagoon beside

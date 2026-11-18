@@ -121,9 +121,9 @@ const COAST = {
   steep: [1.6, 2.6],
   below: 7,
   ease: 30,
-  cut: 4,
+  cut: 6,
   landFar: 0.25,
-  knoll: { piece: 'carousel', rise: 22, along: 230, across: 40, shift: 0.8 },
+  knoll: { piece: 'carousel', rise: 32, along: 230, across: 44, shift: 0.65 },
 };
 
 /**

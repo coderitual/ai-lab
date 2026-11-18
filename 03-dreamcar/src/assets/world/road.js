@@ -79,6 +79,8 @@ const PIECE_MARKS = { viaduct: 'coast', climb: 'coast', carousel: 'coast', crest
 const MARK_CHANNEL = { coast: 0 };
 const MARK_EASE = 6;
 const YELLOW = { width: 0.12, gap: 0.12, color: [0.62, 0.43, 0.08] };
+/** (round 3) How much paler the 'coast' scheme's asphalt is (sun-bleached, frame E1's mid grey). */
+const COAST_PALE = 0.7;
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /**
@@ -890,7 +892,10 @@ for ( int i = 0; i < ${GRID_SLOTS}; i ++ ) {
 // worn: thin where the tyres run, gone in places, broken by the stones up close, newer where the road is
 float rWear = 0.55 + 0.25 * rBig.b + 0.2 * rMottle - 0.3 * rRubber + 0.2 * ( rAgg.g - 0.5 ) * rNear + 0.2 * ( 1.0 - rAge );
 // (sea lane, round 2) the per-piece markings (PIECE_MARKS): the coast road's double yellow centre line
-float rYellow = textureLod( uMarks, vec2( rS / uLength, 0.5 ), 0.0 ).r * roadCover( rA - ${(YELLOW.gap / 2 + YELLOW.width / 2).toFixed(3)}, ${(YELLOW.width / 2).toFixed(3)}, aaL );
+float rCoastRoad = textureLod( uMarks, vec2( rS / uLength, 0.5 ), 0.0 ).r;
+// (round 3, frame E1) the coast road's asphalt is older and sun-bleached: paler aggregate, a mid grey in the sun
+rCol *= 1.0 + ${COAST_PALE.toFixed(2)} * rCoastRoad;
+float rYellow = rCoastRoad * roadCover( rA - ${(YELLOW.gap / 2 + YELLOW.width / 2).toFixed(3)}, ${(YELLOW.width / 2).toFixed(3)}, aaL );
 rMarks += rYellow;
 roadPaint = clamp( rMarks, 0.0, 1.0 ) * rOnRoad * smoothstep( 0.14, 0.38, rWear ) * ( 1.0 - ftErase );
 vec3 rPaintCol = mix( vec3( 0.68, 0.68, 0.655 ), vec3( ${YELLOW.color.map((c) => c.toFixed(3)).join(', ')} ), clamp( rYellow, 0.0, 1.0 ) );
