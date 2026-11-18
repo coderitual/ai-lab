@@ -202,7 +202,7 @@ export const TIMES = {
     exposure: 0.68,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
-    shadeEv: 1.1,
+    shadeEv: 1.7,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
     look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.14, saturation: 1.18, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.00015, glare: 0.015, ao: 0.8, star: 0.02 },
@@ -241,7 +241,7 @@ export const TIMES = {
     fog: { color: [0.1, 0.068, 0.042], sun: [0.4, 0.19, 0.06], sunLobe: 6, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
     exposure: 4.2,
     tunnelExposure: 6,
-    shadeEv: 0.6,
+    shadeEv: 0.9,
     look: {
       flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 },
       contrast: 1.2,
