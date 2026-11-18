@@ -63,7 +63,9 @@ resolves a multisampled target after every render call and throws the samples
 away, so a second call into the same target would draw over garbage: anything
 that must be in the picture is in the scene. The sky dome is drawn last
 (`renderOrder` 1000) without writing depth, so a pixel whose depth is still 1
-shows the sky; the AO pass relies on that.
+shows the sky; the AO pass relies on that. The sea (sea.js) is one more
+mesh in it, drawn after the land (`renderOrder` 5), so the pixels the land
+hides are not shaded twice; it has no pass of its own and no mirror.
 
 ### Ambient occlusion (2-4)
 
@@ -409,6 +411,14 @@ every scale.
 - **Depth 1 is the sky.** The sky dome writes no depth. The AO gives depth 1
   exactly no occlusion; something drawn at the far plane that writes depth
   would be treated as a surface.
+- **The sea is a level plane round the eye, drawn everywhere** (sea.js): the
+  land covers it where it stands higher. Ground below the water's level that
+  is not the sea's (a hollow inland) would flood, so the terrain keeps it
+  just above the water (`keepDry` in terrain.js); a new shape of land must go
+  through the same height function. The disc follows each view's eye
+  (`world.prepareView`) and reaches 0.97 of the far plane, where it has
+  faded into the haze the sky dome shows under the horizon: a longer far
+  plane wants a larger disc, not a second mesh.
 - **Determinism.** Every pattern (blur jitter, AO rotation, dither) is a
   function of the pixel position; grain changes with the run's own time. No
   `Math.random`, no clock: `?manual&t=N` is the same picture every time.

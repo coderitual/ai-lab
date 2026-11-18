@@ -257,9 +257,9 @@ if ( uSeaBox.w > -1000.0 ) {
   gCoast = 1.0 - smoothstep( 160.0, 460.0, seaLandOff( gSea ) + 120.0 * ( gLarge.b - 0.5 ) );
   gWetBand = ( 1.0 - smoothstep( 0.4, 1.6 + 0.8 * gDet.g, vGroundPos.y - uSeaBox.w ) ) * smoothstep( 0.3, 0.6, gSea.a + gCoast );
 }
-vec3 gOchre = mix( vec3( 0.2, 0.105, 0.05 ), vec3( 0.29, 0.16, 0.075 ), 0.25 + 0.75 * gBedTone ) * ( 0.72 + 0.4 * gDetRock.g ) * ( 1.0 - 0.3 * gStreak );
+vec3 gOchre = mix( vec3( 0.15, 0.092, 0.055 ), vec3( 0.25, 0.16, 0.095 ), 0.25 + 0.75 * gBedTone ) * ( 0.7 + 0.45 * gDetRock.g ) * ( 1.0 - 0.4 * gStreak );
 gRockCol = mix( gRockCol, mix( gOchre * ( 0.75 + 0.25 * gLarge.g ), gOchre, gCut ), gCoast );
-gScreeCol = mix( gScreeCol, vec3( 0.25, 0.145, 0.075 ) * ( 0.7 + 0.55 * gDet.b ), gCoast );
+gScreeCol = mix( gScreeCol, vec3( 0.26, 0.175, 0.11 ) * ( 0.72 + 0.5 * gDet.b ), gCoast );
 vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 
 // (env lane) the verge: mown grass in stripes along the road, a strip of worn earth and loose stones along the

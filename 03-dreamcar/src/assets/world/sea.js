@@ -190,6 +190,7 @@ export function createSea({ caps, tier, atmosphere, sea, far, glints = null }) {
     uSeaFar: { value: outer },
     uSeaSunDir: { value: new THREE.Vector3(0, 1, 0) },
     uSeaSun: { value: new THREE.Vector3() },
+    uSeaSky: { value: 1 },
     uRipple: { value: ripples },
     uFoamTex: { value: foamTex },
     uSeaGlintPos: glints ? glints.pos : { value: [] },
@@ -234,6 +235,9 @@ export function createSea({ caps, tier, atmosphere, sea, far, glints = null }) {
     setTime(t) {
       uniforms.uSeaSunDir.value.fromArray(t.sun.dir).normalize();
       uniforms.uSeaSun.value.fromArray(t.sun.color).multiplyScalar(t.sun.intensity);
+      // the scene's environment map is the sky's light on things, set apart from the sky as drawn (env.intensity);
+      // a mirror shows the sky as drawn
+      uniforms.uSeaSky.value = 1 / Math.max(0.05, t.env.intensity);
     },
     update(simTime) {
       time = simTime;
@@ -280,6 +284,7 @@ uniform vec3 uSeaCentre;
 uniform float uSeaFar;
 uniform vec3 uSeaSunDir;
 uniform vec3 uSeaSun;      // the sun's (or the moon's) colour times its intensity
+uniform float uSeaSky;     // what turns the environment map's light on things back into the sky as drawn
 uniform sampler2D uRipple;
 uniform sampler2D uFoamTex;
 #if SEA_LAMPS > 0
@@ -375,6 +380,16 @@ seaScatter *= 1.0 - seaFoam;
 /** GLSL (after the lights): the light through the waves, and at night the lamps' streaks. */
 const SEA_LIGHT = /* glsl */ `
 reflectedLight.directDiffuse += seaScatter;
+// the sky as the water mirrors it: the environment map at the sky's own brightness; and where the highlight is wide
+// and looks low (far out), the bright air at the horizon, which the map's blur would mix with the ground under it
+{
+  vec3 hV = normalize( cameraPosition - vSeaWorld );
+  vec3 hR = reflect( - hV, seaN );
+  float hF = 0.02 + 0.98 * pow( 1.0 - clamp( dot( seaN, hV ), 0.0, 1.0 ), 5.0 );
+  float hLow = ( 1.0 - smoothstep( 0.04, 0.3, hR.y ) ) * smoothstep( 0.1, 0.35, seaRough );
+  reflectedLight.indirectSpecular *= uSeaSky;
+  reflectedLight.indirectSpecular = mix( reflectedLight.indirectSpecular, hazeColor( normalize( vec3( hR.x, max( hR.y, 0.02 ), hR.z ) ) ) * hF * ( 1.0 - seaFoam ), hLow );
+}
 #if SEA_LAMPS > 0
 {
   vec3 lV = normalize( cameraPosition - vSeaWorld );

@@ -73,7 +73,7 @@ Track: out to the solid edge it is the Track's own cross-section; beyond it,
 the hillside the Track asks for, with a cliff where the edge is rock (a rock
 face stands in front of it, `rock.js`); further out it blends over 10 to
 100 m into a field made on a 16 m grid from the road itself (rising inside
-the loop, falling towards the lake and the valleys, a ridge over the tunnel,
+the loop, falling towards the sea, the bay and the valleys, a ridge over the tunnel,
 a ravine under the sky road), with ridged noise on top; far away, mountains.
 
 It is drawn in three pieces that meet without cracks: a **band** that follows
@@ -355,6 +355,73 @@ vignette, a filmic tone curve, saturation, split toning, lift, sRGB, grain and
 dither. On low the blur is done inside the final pass and FXAA replaces the
 multisampling. Every pattern (blur jitter, AO rotation, dither) is a function
 of the pixel, grain of the run's own clock.
+
+## The sea (from demo 01)
+
+`src/engine/waves.js`, `src/assets/world/sea.js`, the coast in
+`src/assets/world/terrain.js`. Demo 01's sea brought into this frame: 03
+does not import from 01 (each demo builds alone); the port is 03's own, and
+inside 03 the sea is defined once: the waves in waves.js, where the water is
+in terrain.js (`terrain.sea`), how it looks in sea.js.
+
+**Where it is.** The terrain's height function makes the coast: outside the
+loop, at a bearing from the course's middle outside the mainland's
+(`SEA.mainland`), the land falls from the road's own height to the water
+55 to 170 m beyond the solid edge, steeply at the last (a cliff), and the
+seabed shelves away beyond (`coastAt`). Far from the road the valley itself
+sinks to the seabed in those bearings. The lake's ellipse, drawn out to the
+west, makes the bay. Which low ground is sea is decided by a flood from the
+open water over the 16 m field: whatever it does not reach is a hollow,
+which `keepDry` holds just above the water, because the water is one level
+plane drawn everywhere (the land covers it where it stands higher). Cells of
+the grid and the far land wholly 2 m under the water are not drawn (fewer
+triangles than the lake's world had, on every tier). At start-up the
+terrain also writes the **sea map** (512 x 512 over 4.8 km): the depth, and
+two chamfer distance fields (the land's distance from the water, the
+water's from the land). The water reads it for the shallows and the surf,
+the ground for its coastal colours. Seven sea stacks are bumps in the same
+height function, placed by `rng.fork('stacks')` in the open sea 30 to 120 m
+off the shore.
+
+**The surface** is 01's: a sum of trochoidal (Gerstner) waves with deep-water
+dispersion, the vertex stage moving a camera-centred radial grid (01's, rings
+spaced to keep the cells square) and the fragment stage summing the analytic
+slopes for the normal. Each wave is dropped from the mesh where the mesh has
+fewer than about five vertices per wavelength, and from the normals where it
+is smaller than a pixel (01's rule: at sqrt(570 h L) m for an eye h m over a
+wave L m long). New here: the slope variance a wave stops drawing is added
+to the highlight's (`lost`, alpha^2 = alpha0^2 + 2 sigma^2), and so is the
+ripple map's when it fades with the footprint of the pixel. Close to, the
+sun breaks into glitter on the facets; far out the same light is a smooth,
+wide path: no shimmer, no aliased sparks, with nothing to tune by distance.
+The swell is long and soft (150, 98, 63 m; seen from 30 to 80 m up its lines
+are what reads), the chop and the short waves are a light breeze's.
+
+**The shading** is a MeshStandardMaterial with the surface written into it
+(shading.js `extend`): the sun or moon, the sky's environment map, the fill,
+the shadow map and the haze reach the water as they reach the land, and the
+time of day's light is all the colour it has. 01's analytic sky becomes the
+environment map; 01's rule that a facet tipped past the horizon shows the sky
+just over it, not the ground under it, is kept (the normal is bent). The body
+is an albedo (what comes back up out of the water: deep blue, greener over
+the shallows by the sea map's depth), lighter at the tops of the waves, with
+01's light through the wave's top towards the sun as a small added term.
+Foam is 01's: the swell's Jacobian now and a moment ago leaves streaks behind
+crests; the surf is bands that run in with the swell over the last 14 to
+26 m of water (the sea map's distance to land), warped by the lace texture;
+far away the lace becomes a share of white. At night the six lamps the wet
+road glints with (lamps.js picks them per view) are drawn into the water as
+streaks, a lobe about the mirrored view narrow across the plane of
+incidence and long in it, widened by the roughness. Far out the water fades
+into `hazeColor` of its own direction, which is what the sky dome shows just
+under the horizon, so the disc's edge never shows. Not 01's: the wake, the
+mirror (a planar reflection would be a scene pass: the sea reflects the
+environment map only), caustics and the sandy bed.
+
+**Per tier**: low a flat disc (32 segments, four rings, 160 triangles) and
+the 7 longest waves in the normals; medium 96 segments moved by the swell,
+9 waves; high 160 segments, all 11. The clock is the run's (`world.update`),
+the eye's height sets the waves' reach in `prepareView`.
 
 ## What each pass draws (the budget)
 

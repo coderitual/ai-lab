@@ -19,11 +19,11 @@ cameras, the HUD's map, the sound) asks the Track.
 | | |
 | --- | --- |
 | length | 5136.1 m on the map, driven clockwise; sampled every 1.000 m (5136 samples) |
-| start | the line at the world's origin, driven towards +X along z = 0; the lake on the left (z < 0), the land on the right |
+| start | the line at the world's origin, driven towards +X along z = 0; the bay (the sea) on the left (z < 0), the land on the right |
 | paved width | 12 m (`HALF_WIDTH` 6) |
 | strip beyond each edge | 1.2 m (`SHOULDER`) in the pavement's banked plane: a kerb where the Track puts one, a paved margin elsewhere |
 | verge to the barrier | 1.5 m (tunnel walls, parapets) to 9.95 m (run-off); grass, wandering inside each side's range (`SIDES`), moving at most 0.12 m per metre |
-| height | 0 to 108.2 m above the line, top at s = 3111 m; the lake 1.8 m under the line |
+| height | 0 to 108.2 m above the line, top at s = 3111 m; the sea 1.8 m under the line (`lakeLevel`) |
 | gradient | -8.0 to +6.0 per cent |
 | tightest radius | 55 m (the carousel); 11 bends |
 | banking | by rule 9° x tanh(250 m / R), or the piece's own; at most 10° (the sky road) |
@@ -62,7 +62,8 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 
 | | |
 | --- | --- |
-| barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; walls in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
+| barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; walls in the tunnel and parapets on the bridges, 1.5 m beyond the pavement; on the sea side of the coast road (the climb, the carousel, the crest and the plunge: `coastDown`, `coastRun`, `coastTop`) the rail stands on white posts with ochre gravel beyond it and no trees (the corridor as the presets they replaced) |
+| the sea | outside the loop at bearings from the course's middle outside -115 to 50 degrees (0: the straight's heading), from 55 to 170 m beyond the solid edge; the bay beside the straight; level -1.8 m; seabed to 45 m; 7 sea stacks; no far shore (terrain.js `SEA`) |
 | structures | the tunnel's bore 349 m, ceiling 6.4 m over the road (`TUNNEL`); two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
 | tyre walls | 8 runs, on the outside of the fast bends |
@@ -317,6 +318,26 @@ and the moon are placed against the start straight's heading by
 | contrast / saturation | 1.14 / 1.18 | 1.2 / 1.16 | 1.12 / 0.94 |
 
 N, or the title's choice, fades to black and back (0.25 s each way) to switch.
+
+## The sea
+
+Defined once: the waves in `src/engine/waves.js`, where the water is in
+`src/assets/world/terrain.js` (`SEA`, `terrain.sea`), how it looks in
+`src/assets/world/sea.js` (`SEA_LOOK`). Tested by `tools/unit/sea.test.mjs`.
+
+| | |
+| --- | --- |
+| level | -1.8 m (`LAYOUT.lakeLevel`), 1.8 m under the start line |
+| coast | outside the loop at bearings from the course's middle outside -115 to 50 degrees (wandering 14 degrees), 55 to 170 m beyond the solid edge; the land's last fall a cliff rising 1.15 per metre; the seabed shelving 0.3 per metre to 45 m; the bay is the old lake's ellipse, 2.2 times as long to the west; open water within 90 to 205 m of the sea side of the sky road, the climb, the carousel, the crest and the plunge |
+| sea stacks | 7, 9 to 17 m across, 12 to 34 m high, in the open sea, at least 160 m apart |
+| sea map | 512 x 512 texels over 4.8 km (9.4 m a texel): depth, the land's distance from the water (to 500 m), the water's from the land (to 160 m), the sea's share |
+| waves | 11 trochoids, longest first: a swell of 150, 98 and 63 m (0.85, 0.55, 0.36 m), chop of 34 to 7.9 m, short waves of 5.1 to 1.7 m (normals only); crest to trough about 2.7 m; from the north-west; deep-water speeds |
+| mesh | a disc of rings round each view's eye to 0.97 of the far plane (4850 m): low 32 segments, 4 rings, 160 triangles, flat; medium 96 segments, 19.9 k triangles, moved by the swell; high 160 segments |
+| waves in the normals | low 7, medium 9, high 11; each dropped beyond sqrt(570 h L) m (h the eye's height over the water) and its slopes added to the roughness |
+| colours | body albedo deep [0.0016, 0.0062, 0.0135], over the shallows [0.012, 0.034, 0.031]; foam 0.62 to 0.66; F0 0.02; roughness 0.05 calm |
+| surf | bands over the last 14 to 26 m of water, running in with the swell |
+| at night | the 6 lamps the wet road glints with, drawn into the water as streaks |
+| draw calls | one in every pass that sees it (the scene, the probe's faces); not in the shadow map or the wet road's mirror |
 
 ## The picture
 

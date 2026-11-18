@@ -716,7 +716,7 @@ const FOOT = 0.8;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
           // (sea lane) beyond the barrier on the sea side of the coast road, a strip of gravel (ochre on the coast)
-          if (coast && k >= 1) mask[v * 2 + 1] = Math.max(mask[v * 2 + 1], 1 - smoothstep(6, 12, d));
+          if (coast && k >= 1) mask[v * 2 + 1] = Math.max(mask[v * 2 + 1], 1 - smoothstep(3, 7, d));
         }
         ext[half][i] = edge + offs[lastOwn];
         if (bandStep > 1) for (let b = 1; b < bandStep && i + b < n; b++) ext[half][i + b] = ext[half][i];
