@@ -33,7 +33,7 @@ export const PAINTS = {
   // metal and part pigment, so it takes the sun's light as a colour of its own as well as a broad sheen; the clear
   // coat above it carries the only sharp reflection, a lacquer's, strong at grazing angles only. At metalness 0.92
   // and roughness 0.27 the layer mirrored everything and the car read as chrome.
-  silver: { color: [0.6, 0.62, 0.665], metal: 0.82, rough: 0.42, flop: 0.4, flake: 1 },
+  silver: { color: [0.59, 0.615, 0.675], metal: 0.82, rough: 0.42, flop: 0.4, flake: 1 },
   graphite: { color: [0.16, 0.17, 0.18], metal: 1, rough: 0.34, flop: 0.45, flake: 1 },
   blue: { color: [0.018, 0.045, 0.19], metal: 0.85, rough: 0.32, flop: 0.35, flake: 1 },
   red: { color: [0.36, 0.014, 0.014], metal: 0.35, rough: 0.3, flop: 0.6, flake: 0.5 },
@@ -210,7 +210,7 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false)
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryClearcoatNormal), viewMatrix);
     ${ground ? 'r = carGround(r);' : ''}
     clearcoatRadiance = mix(clearcoatRadiance * carSky, carSane(probeSample(carProbe, r, max(material.clearcoatRoughness, ${FOOTPRINT})), clearcoatRadiance * carSky), carProbeOn);
-    ${soft ? 'clearcoatRadiance = mix(vec3(dot(clearcoatRadiance, vec3(0.2126, 0.7152, 0.0722))), clearcoatRadiance, 0.45);' : ''}
+    ${soft ? 'clearcoatRadiance = mix(vec3(dot(clearcoatRadiance, vec3(0.2126, 0.7152, 0.0722))), clearcoatRadiance, 0.3);' : ''}
   }
   #else
   clearcoatRadiance *= carSky;
@@ -550,6 +550,12 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   cMetal = paintMetal; cRough = paintRough; cCoat = 1.0; cEmit = vec3(0.0); cPaint = 1.0; cTilt = vec3(0.0);
   cHeight = 0.0;
   cAO = carOcclusion(p, vec3(abs(vCarNormal.x), vCarNormal.yz));
+  // the tail lamps' own light on the paint round them (the lamp spot in lamps.js cannot reach the car's own
+  // panels): a faint red within 3 cm of the lens, stronger with the brake light
+  if (p.z < -1.8 && A.a > 0.0) {
+    float near = 1.0 - smoothstep(0.0, 0.028, A.a);
+    cEmit += vec3(1.0, 0.03, 0.015) * near * near * (0.01 * carLampsA.w + 0.05 * carLampsB.x);
+  }
   // under the boot lid's lip (the shoulder's rail at the tail), 9 mm of undercut: a soft shade below the edge
   if (p.z < -2.2) {
     float under = (SHOULDER_V - vSkinUv.y) * EXTENT_V;
@@ -732,7 +738,7 @@ export function createGlassMaterial(shared, caps, channel) {
   });
   const pick = ['r', 'g', 'b', 'a'][channel & 3];
   patch(material, shared, caps, {
-    fragmentPars: 'float glassAlpha; float glassCover; vec3 glassTint = vec3(0.01); float heat = 0.0;',
+    fragmentPars: 'float glassAlpha; float glassCover; vec3 glassTint = vec3(0.01); float heat = 0.0; float glassRoof = 0.0;',
     replace: [
       [
         '#include <clipping_planes_fragment>',
@@ -746,7 +752,7 @@ export function createGlassMaterial(shared, caps, channel) {
   float transmit; float frit;
   ${
     channel === 0
-      ? `if (vCarPos.y > 1.36 && abs(vCarPos.x) < 0.56 && vCarPos.z < 0.05 && vCarPos.z > -1.25 && n.y > 0.6) { transmit = 0.06; frit = 0.015; }
+      ? `if (vCarPos.y > 1.36 && abs(vCarPos.x) < 0.56 && vCarPos.z < 0.05 && vCarPos.z > -1.25 && n.y > 0.6) { transmit = 0.06; frit = 0.015; glassRoof = 1.0; }
   else if (n.y > 0.45 && vCarPos.z > -0.1) { transmit = 0.55; frit = 0.025; }
   else if (n.y > 0.45) {
     // (the atlas holds distances to 30 mm: a band any wider would cover the whole pane)
@@ -779,6 +785,29 @@ export function createGlassMaterial(shared, caps, channel) {
       ],
       ['#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = glassTint;'],
       ['#include <lights_fragment_maps>', REFLECTIONS(false)],
+      [
+        '#include <lights_fragment_end>',
+        /* glsl */ `#include <lights_fragment_end>
+#if NUM_DIR_LIGHTS > 0
+  {
+    // The sun in a pane at roughness 0.02 is a peak tens of thousands of times a white wall in the sun: from the
+    // chase camera it lay on the glass roof as a blown blob, spread by the bloom (and, where a channel overflowed,
+    // tinted cyan). Mirrored glass shows the sun as a small clean spot: the peak is held to a few times the
+    // brightness of a sunlit white wall, the roof's to less.
+    const vec3 Y = vec3(0.2126, 0.7152, 0.0722);
+    float sunY = dot(directionalLights[0].color, Y);
+    float cap = sunY * mix(2.5, 0.9, glassRoof);
+    float l = dot(reflectedLight.directSpecular, Y);
+    if (l > cap) reflectedLight.directSpecular *= cap / l;
+    if (glassRoof > 0.0) {
+      // the panoramic roof is dark tinted glass with a coating: it mirrors its surroundings dimly, and the bright
+      // sky round the sun at a grazing angle is rolled off (above a tenth of the sun's light) instead of filling it
+      vec3 r = reflectedLight.indirectSpecular * 0.45;
+      reflectedLight.indirectSpecular = r / (1.0 + dot(r, Y) / (0.1 * sunY + 1e-6));
+    }
+  }
+#endif`,
+      ],
       [
         'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
         'vec3 outgoingLight = (totalDiffuse * glassAlpha + totalSpecular + totalEmissiveRadiance) * glassCover;\n  diffuseColor.a = glassAlpha * glassCover;',
@@ -935,7 +964,10 @@ void carLampPart() {
   vec3 amber = vec3(1.0, 0.41, 0.035);
   vec3 white = vec3(0.95, 0.97, 1.0);
   lBase = vec3(0.02); lMetal = 0.0; lRough = 0.15; lEmit = vec3(0.0);
-  if (f == ${F.thirdBrake}) { lBase = vec3(0.05, 0.004, 0.005); lEmit = red * 18.0 * carLampsB.x; }
+  if (f == ${F.thirdBrake}) {
+    // it shines backwards only: lit on every face, it glowed through the cabin and the windscreen from ahead
+    lBase = vec3(0.05, 0.004, 0.005); lEmit = red * 18.0 * carLampsB.x * step(vCarNormal.z, -0.5);
+  }
   else if (f == ${F.plate}) { lBase = vec3(0.3); lEmit = vec3(1.0, 0.97, 0.92) * 2.0 * carLampsA.w; }
   else if (f == ${F.screen}) { lBase = vec3(0.004); lRough = 0.06; lEmit = vec3(0.55, 0.7, 1.0) * 1.2 * carLampsC.x; }
   else if (f == ${F.brow}) {
@@ -954,10 +986,13 @@ void carLampPart() {
     lEmit = white * (carLampsA.z + 0.15 * carLampsA.y) * (0.8 + 4.0 * dots);
   } else if (f == ${F.blade}) {
     lBase = vec3(0.75, 0.024, 0.026); lMetal = 0.35; lRough = 0.2;
-    lEmit = red * (0.4 * carLampsA.w + 1.0 * carLampsB.x);
+    // lit, each blade is a slim slanted bar of light; the brake light brightens them too
+    lEmit = red * (0.55 * carLampsA.w + 2.2 * carLampsB.x);
   } else if (f == ${F.guide} || f == ${F.guideOuter}) {
     lBase = vec3(0.42, 0.018, 0.022); lRough = 0.45;
-    lEmit = red * (9.0 * carLampsB.x + 0.12 * carLampsA.w);
+    // the inner line: with the tail light alone a slim bright red line through the lamp (the light signature's
+    // spine, brighter than the blades); with the brake light the whole band, a white-hot core at night
+    lEmit = red * (9.0 * carLampsB.x + 1.4 * carLampsA.w);
     if (f == ${F.guideOuter}) lEmit = mix(lEmit, amber * 34.0, indicator);
   } else if (f == ${F.reverse}) {
     lBase = vec3(0.5); lMetal = 0.7; lRough = 0.15; lEmit = vec3(1.0, 0.98, 0.95) * 14.0 * carLampsB.y;
@@ -965,7 +1000,8 @@ void carLampPart() {
     // red chrome in fine horizontal steps: behind the clear red lens it is what makes the lamp read bright red by day
     lBase = vec3(0.78, 0.02, 0.024) * (0.65 + 0.35 * step(0.5, fract(vCarPos.y / 0.006)));
     lMetal = 0.85; lRough = 0.28;
-    lEmit = red * (0.05 * carLampsA.w + 0.3 * carLampsB.x);
+    // only a faint fill: lit any brighter, the whole housing glowed and the bloom made each lamp one red blob
+    lEmit = red * (0.012 * carLampsA.w + 0.08 * carLampsB.x);
   } else if (f == ${F.headHousing}) {
     lBase = vec3(0.012); lRough = 0.12; lEmit = white * beam * 0.006;
   } else if (f == ${F.bezel}) {

@@ -215,15 +215,18 @@ export const GRILLE_HALF = [[0, 0.71, 2.2675], [0.15, 0.708, 2.262], [0.3, 0.7, 
  */
 export const GRILLE_STARS = { y0: 0.476, dy: 0.024, dx: 0.032, arm: 0.008 };
 /** The side intake's opening (5.3), left, in front view [x, y]: upper inner, lower inner, lower outer, upper outer. */
-export const INTAKE_SIDE = [[0.43, 0.455], [0.47, 0.365], [0.8, 0.282], [0.79, 0.468]];
+export const INTAKE_SIDE = [[0.38, 0.448], [0.41, 0.372], [0.8, 0.3], [0.81, 0.47]];
 /**
  * The lower intake across the apron (5.3), left half in front view [x, y], from the middle of its upper edge.
  * Redrawn with INTAKE_SIDE from the daylight photograph straight on the nose (camera fitted, outlines projected
  * onto the skin): the side intakes are wedges under the grille's outer corners, tallest at the bumper's corner,
  * their lower edge rising inwards, and the painted blade between them and this black band sweeps under the plate
- * (the first outlines had the side intakes as tall trapezoids reaching down to the lip).
+ * (the first outlines had the side intakes as tall trapezoids reaching down to the lip). Round six, against the
+ * same photograph: the side intakes reach in under the grille's lower edge nearly to the plate, and the lower
+ * intake is as tall as the blade above it (it was a thin band), so the painted blade is a slim wing between two
+ * deep black openings.
  */
-export const INTAKE_CENTRE = [[0, 0.272], [0.5, 0.278], [0.66, 0.255], [0.68, 0.222], [0, 0.222]];
+export const INTAKE_CENTRE = [[0, 0.3], [0.52, 0.305], [0.68, 0.272], [0.7, 0.222], [0, 0.222]];
 
 /** Every outline. Pure arithmetic: the dev tools run it in Node too. */
 export function buildFeatures() {
