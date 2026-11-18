@@ -335,7 +335,7 @@ export const CAMERA = {
  * the car, looking forward and right at the land side with the gantry's lamps in the picture.
  */
 export const PHOTOS = {
-  d1: { back: 6.5, right: 3.2, up: 0.9, yaw: 17, pitch: 3.5, fov: 46, t: 100, time: 'day' },
+  d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
   d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
 };
