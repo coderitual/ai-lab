@@ -59,6 +59,34 @@ shoulder, the boot lid's lip, the foot of each screen) are rails placed close
 together, not kinks. The net is reflected in the centre plane, so the halves
 meet without a seam.
 
+Round the tail the sections fan from the last main section to the centre
+plane. That is where the surface is hardest to keep fair, and the game shows
+the tail all the time, so it follows four rules:
+
+- Every fan section stands in one upright plane through an axis on the centre
+  line (where the main sections end): the widest line is divided evenly, the
+  lower edge and the shoulder are cut by that plane.
+- The three lines it is cut from are smooth corners there: Lame curves,
+  sampled every 5 cm or so into the tables. Their plan curvature falls
+  steadily from the hip to the centre line; the earlier hand-placed points
+  changed its sign four times and every reflection in the tail wobbled.
+- The rails between the lines keep the proportions they have at the hip all
+  the way round. Proportions that changed round the fan gave every section a
+  different profile: dents beside the plate, a fold at the bumper's corner.
+- The boot lid's top is one height over the plan (`lidY` in `skin.js`: the
+  centre profile's height, crowned down to the lip by `SHAPE.lidCrown`), and
+  the lid's sections end on the centre line along `SECTIONS.lidCentre` to the
+  lip, not at one point. Crowned per section and all meeting at the lip's
+  centre, they made two dents and a crease from the star outwards.
+
+The lip itself is level across (0.925 at the corner to 1.008 on the centre
+line), with the lamps below it, as on the car; it used to dip 0.1 m to the
+lamps' upper edge, and the lamps stood on the crease like fins.
+
+To judge a change to the surface without a browser, the lane's tools render
+the skin alone in Node as a zebra (reflection bands) and as maps of its
+curvature along and across, where any concave patch shows at once.
+
 `body.js` samples the surface once per tier at an edge length of 95 / 55 /
 36 mm (low / medium / high), finer where rails crowd. Normals are the
 surface's own, so even the coarse mesh mirrors cleanly. The same vertices are
