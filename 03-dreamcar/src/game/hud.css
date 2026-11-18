@@ -803,7 +803,11 @@
   right: auto;
   left: calc(var(--pad) + var(--sl));
   bottom: calc(var(--sb) + 112px);
-  width: calc(var(--u) * 20);
+}
+/* (a little smaller, as a whole, so that it stays clear of the car in a tablet's upright half) */
+.hud .view.touch.tall .cluster {
+  transform: scale(0.86);
+  transform-origin: left bottom;
 }
 .hud .view.touch.tall .slide {
   bottom: calc(var(--sb) + 112px + var(--u) * 19.5);

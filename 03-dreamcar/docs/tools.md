@@ -135,9 +135,13 @@ machine without a GPU, and only what is listed here.
   The touch scheme and the slide readout are checked through the real
   pointer and key paths (touch 2 sizes plus split, slide).
 - **The fixed touch controls** (CONTROLS lane, 2026-11-18): touch, slide,
-  options and hud against a production build: 169 of 169 (touch 76, slide
-  10, options 35, hud 48); start 10 of 10; `node tools/unit.mjs` passed (the
-  scripted thumb now drives a linear slider, `HUMAN.thumb` range 76 px).
+  options, hud and start against a production build: 179 checks, 178
+  passed (touch 76, slide 10, options 35, start 10, hud 47 of 48). The one
+  failure, the lap banner over the car at 852x393 with the insets stood in
+  for, did not recur in a re-run of hud (48 of 48) and passed in the run
+  before: intermittent, the banner and the car's top are a few px apart on
+  a landscape phone. `node tools/unit.mjs` passed (the scripted thumb now
+  drives a linear slider, `HUMAN.thumb` range 76 px).
 - **The sound** (`tools/soundtest.cjs`): 62 of 62 checks (audio lane). The
   squeal "stands out at the limit" passes at exactly its 12 dB threshold.
 - **The pictures**: the stills in `docs/images/` and the lanes' comparison
