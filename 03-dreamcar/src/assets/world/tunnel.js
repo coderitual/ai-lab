@@ -101,7 +101,7 @@ function section(W) {
  * @param {object} options.track
  * @param {object} options.terrain terrain.js: heightAt, bakeAt, material
  * @param {import('./atmosphere.js').Atmosphere} options.atmosphere
- * @param {ReturnType<import('./lamps.js').createLamps>} options.lamps the lamp pool (its `real` weights)
+ * @param {ReturnType<import('./lamps.js').createLamps>} options.lamps the lamp pool (its `shares`: on and real weights per lamp)
  */
 export function createTunnels({ track, terrain, atmosphere, lamps }) {
   const group = new THREE.Group();
@@ -296,8 +296,7 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
 function boreShader(material, { lamps, first, rows, spacing, lampLat, lampH, leftFirst, spec }) {
   const cone = new THREE.Vector2(Math.cos(spec.angle), Math.cos(spec.angle * (1 - spec.penumbra)));
   const uniforms = {
-    uReal: lamps.real,
-    uOn: lamps.on,
+    uShares: lamps.shares,
     uBore: { value: new THREE.Vector4(rows, spacing, lampLat, lampH) },
     uBoreLamp: { value: new THREE.Vector4(spec.intensity, spec.range, cone.x, cone.y) },
     uBoreColor: { value: new THREE.Vector3(...spec.color) },
@@ -305,8 +304,7 @@ function boreShader(material, { lamps, first, rows, spacing, lampLat, lampH, lef
     // a lamp's axis in (along, lat, h), down and across the road by its tilt (lat's sign is the lamp's side)
     uBoreAxis: { value: new THREE.Vector3(0, Math.sin(spec.tilt), -Math.cos(spec.tilt)) },
   };
-  const count = Math.max(1, lamps.real.value.length);
-  return extend(material, `bore${count}`, (shader) => {
+  return extend(material, 'bore', (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec3 aLocal;\nattribute vec2 aLocalN;\nvarying vec3 vLocal;\nvarying vec2 vLocalN;')
@@ -321,8 +319,7 @@ ${SPOT_GLSL}
 varying vec3 vLocal;
 varying vec2 vLocalN;
 float boreGloss;         // 1 on the glazed lining
-uniform float uReal[${count}];
-uniform float uOn[${count}];
+uniform sampler2D uShares; // per lamp: on, share of the real pool
 uniform vec4 uBore;      // rows, spacing, lamp lat, lamp height
 uniform vec4 uBoreLamp;  // intensity, range, cos outer, cos inner
 uniform vec3 uBoreColor;
@@ -338,7 +335,8 @@ vec3 boreLampLight(vec3 P, vec3 N) {
     for (int side = 0; side < 2; side++) {
       float lat = (side == 0 ? ${leftFirst ? '1.0' : '-1.0'} : ${leftFirst ? '-1.0' : '1.0'}) * uBore.z;
       int index = uBoreFirst + int(k) * 2 + side;
-      float share = uOn[index] * (1.0 - uReal[index]);
+      vec2 lamp = texelFetch(uShares, ivec2(index, 0), 0).rg;
+      float share = lamp.r * (1.0 - lamp.g);
       // each lamp leans across the road, towards the far wall
       vec3 axis = uBoreAxis * vec3(0.0, -sign(lat), 1.0);
       sum += share * spotIrradiance(P, N, vec3(s, lat, uBore.w), axis, uBoreLamp.x, uBoreLamp.y, uBoreLamp.zw);
@@ -389,7 +387,7 @@ vec3 boreLampLight(vec3 P, vec3 N) {
         `#include <emissivemap_fragment>
 // the lamps' light, lamp by lamp, and what the bore's own pale walls send round (BOUNCE of a lamp's light on the
 // wall beside it: intensity over the square of the lamp's height above the road)
-totalEmissiveRadiance += diffuseColor.rgb * RECIPROCAL_PI * (boreLampLight(vLocal, vec3(0.0, vLocalN.x, vLocalN.y)) + uBoreColor * (${BOUNCE.toFixed(2)} * uBoreLamp.x / (uBore.w * uBore.w)) * uOn[uBoreFirst]);`,
+totalEmissiveRadiance += diffuseColor.rgb * RECIPROCAL_PI * (boreLampLight(vLocal, vec3(0.0, vLocalN.x, vLocalN.y)) + uBoreColor * (${BOUNCE.toFixed(2)} * uBoreLamp.x / (uBore.w * uBore.w)) * texelFetch(uShares, ivec2(uBoreFirst, 0), 0).r);`,
       )
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.38, boreGloss);');
   });

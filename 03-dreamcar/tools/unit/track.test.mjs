@@ -812,10 +812,20 @@ test('far from the road and inside bends, locate() still answers sensibly', () =
 
 // ---- furniture, lines, the grid -------------------------------------------------------------------------------------
 
-test('lamps: street lamps along the straight, rows in the tunnel', () => {
+test('lamps: street lamps along the straight, floodlights round the lap, rows in the tunnel', () => {
   const street = track.lamps.filter((lamp) => lamp.kind === 'street').sort((a, b) => track.delta(0, a.s) - track.delta(0, b.s));
   const hung = track.lamps.filter((lamp) => lamp.kind === 'tunnel');
-  expect(street.length >= 20 && street.length + hung.length === track.lamps.length, `${street.length} street lamps`);
+  const lap = track.lamps.filter((lamp) => lamp.kind === 'lap').sort((a, b) => a.s - b.s);
+  expect(street.length >= 20 && street.length + lap.length + hung.length === track.lamps.length, `${street.length} street lamps`);
+  expect(lap.length >= 50, `${lap.length} floodlights round the lap`);
+  for (let k = 0; k < lap.length; k++) {
+    const lamp = lap[k];
+    expect(track.sectionAt(lamp.s).id !== 'straight' || street.every((l) => Math.abs(track.delta(l.s, lamp.s)) > 20), `a floodlight at s = ${fmt(lamp.s, 0)} stands among the street lamps`);
+    expect(!track.tunnels.some((t) => lamp.s > t.s0 - 20 && lamp.s < t.s1 + 20), `a floodlight at s = ${fmt(lamp.s, 0)} is in or at a tunnel`);
+    const atEdge = Math.abs(Math.abs(lamp.lat) - track.edgeAt(lamp.s, lamp.side)) < 1e-6 && Math.sign(lamp.lat) === lamp.side;
+    expect(atEdge, 'a floodlight is not at the solid edge');
+    if (k > 0) expect(lamp.s - lap[k - 1].s > 45, `floodlights ${fmt(lamp.s - lap[k - 1].s, 0)} m apart`);
+  }
   for (let k = 0; k < street.length; k++) {
     const lamp = street[k];
     expect(track.sectionAt(lamp.s).id === 'straight', `a street lamp at s = ${fmt(lamp.s, 0)} is not on the straight`);

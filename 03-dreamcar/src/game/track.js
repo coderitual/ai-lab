@@ -553,7 +553,7 @@ function shapeHillside(track, far) {
   }
 }
 
-/** Street lamps along the straight, lamp rows in the tunnel, and the sector lines. */
+/** Street lamps along the straight, floodlights round the rest of the lap, lamp rows in the tunnel, and the sector lines. */
 function placeFurniture(track, plan) {
   const { layout } = track;
   const street = layout.streetLamps;
@@ -565,6 +565,28 @@ function placeFurniture(track, plan) {
     const s = track.wrap(from + ((k + 0.5) * run) / posts);
     const side = k % 2 === 0 ? 1 : -1;
     track.lamps.push({ s, side, lat: side * track.edgeAt(s, side), height: street.height, kind: 'street' });
+  }
+  // the rest of the lap, outside the straight's lamps and the tunnels (and clear of their portals)
+  const lap = layout.lapLamps;
+  if (lap) {
+    const free = (s) => {
+      for (const t of track.tunnels) if (track.delta(t.s0 - lap.clear, s) >= 0 && track.delta(s, t.s1 + lap.clear) >= 0) return false;
+      for (const id of lap.skip ?? []) if (track.delta(plan.at(id, 0), s) >= 0 && track.delta(s, plan.at(id, 1)) >= 0) return false;
+      return true;
+    };
+    const span = track.length - run;
+    const count = Math.max(1, Math.round(span / lap.spacing));
+    let side = 1;
+    for (let k = 0; k < count; k++) {
+      const s = track.wrap(from + run + ((k + 0.5) * span) / count);
+      if (!free(s)) continue;
+      // in a bend on its inside (it lights the apex, and the chase camera, which swings wide, never meets its pole);
+      // on the straighter stretches alternating
+      const curve = track.curvature[Math.round(s / track.ds) % track.count];
+      const here = Math.abs(curve) > 1 / lap.inside ? Math.sign(curve) : side;
+      track.lamps.push({ s, side: here, lat: here * track.edgeAt(s, here), height: lap.height, kind: 'lap' });
+      side = -here;
+    }
   }
   const hung = layout.tunnelLamps;
   for (const t of track.tunnels) {
@@ -757,7 +779,7 @@ export class Track {
     this.tunnels = [];
     /** @type {Array<{ s0: number, s1: number, drop: number }>} the deck, abutment to abutment; `drop`: the ravine under its middle */
     this.bridges = [];
-    /** @type {Array<{ s: number, side: number, lat: number, height: number, kind: 'street' | 'tunnel' }>} side +1 left, -1 right */
+    /** @type {Array<{ s: number, side: number, lat: number, height: number, kind: 'street' | 'lap' | 'tunnel' }>} side +1 left, -1 right */
     this.lamps = [];
     /** Sector lines (m from the start/finish line); the third line is the start/finish line itself. */
     this.sectors = [];

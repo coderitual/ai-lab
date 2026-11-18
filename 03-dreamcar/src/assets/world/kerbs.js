@@ -20,6 +20,7 @@
 import * as THREE from 'three';
 import { roadTextures } from './roadTextures.js';
 import { WET_UNIFORMS, extend, withBake } from './shading.js';
+import { canopyOpen } from './canopy.js';
 
 /**
  * The kerb's shape: the same numbers as KERB in game/trackLayout.js (the world never imports from game/). The
@@ -78,7 +79,7 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
         // s as laid (it may run past the line: never jumps inside a triangle), across 0..1, how much kerb, width
         kerb.push(sRaw, t, amount, k.width);
         (terrain.bake4At ?? terrain.bakeAt)(pt.x, pt.z, tmp, 0);
-        bake.push(tmp[0], tmp[1], tmp[2], tmp[3]);
+        bake.push(tmp[0], tmp[1], tmp[2] * canopyOpen(track, s, lat), tmp[3]);
         vertices++;
       }
     }

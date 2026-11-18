@@ -419,10 +419,11 @@ export const FX = {
   scrapeFrom: 0.08,
   scrapeRate: 90,
   /** What a car's lamps lay on its own smoke and spray (irradiance at 1 m, scene units): the two head lamps on
-   * dipped beam (2 x 3200 cd), main beam's gain, the tail lamps' red glow and the brake lamps' gain over it. */
+   * dipped beam (2 x 3200 cd), main beam's gain, the tail lamps' red glow and the brake lamps' gain over it.
+   * (night lane: the tail glow was 0.25, which lit the wet spray behind the rear wheels as two pink smears) */
   lampHead: 6400,
   highGain: 2.7,
-  lampTail: 0.25,
+  lampTail: 0.06,
   brakeGain: 4,
 };
 

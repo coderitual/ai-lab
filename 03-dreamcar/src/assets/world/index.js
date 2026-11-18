@@ -53,15 +53,20 @@ import { PlanarMirror } from '../../engine/PlanarMirror.js';
 import { TIERS } from '../../engine/caps.js';
 
 /**
- * The wet road's planar reflection, per tier: the target's height against the view's, and how far it reaches (m).
- * Low: none (the asphalt keeps its speculars and the environment map). Only with half-float targets.
+ * The wet road's planar reflection, per tier: the target's height against the view's, how far it reaches (m), and
+ * the length of its streaked copy (a share of its height: the long streaks of lamps in wet asphalt). Low: none (the
+ * asphalt keeps its speculars and the environment map, and glints with the nearest lamps). Only with half-float
+ * targets.
  */
-const MIRROR = { medium: { scale: 0.35, far: 220 }, high: { scale: 0.5, far: 320 } };
+const MIRROR = { medium: { scale: 0.35, far: 220, streak: 0.3 }, high: { scale: 0.5, far: 320, streak: 0.3 } };
 
 /**
- * @typedef {object} Beam one car's head lamps, for whatever answers them (reflectors)
+ * @typedef {object} Beam one car's head lamps, for whatever answers them (reflectors), and its tail lamps (the wet
+ *   road's red streaks)
  * @property {THREE.Vector3} pos @property {THREE.Vector3} dir
  * @property {number} low 0..1 @property {number} high 0..1
+ * @property {THREE.Vector3} [tailL] @property {THREE.Vector3} [tailR] the tail lamps' middles
+ * @property {number} [tail] 0..1 the tail lamps @property {number} [brake] 0..1 the brake lamps
  *
  * @typedef {object} World
  * @property {THREE.Scene} scene
@@ -69,10 +74,12 @@ const MIRROR = { medium: { scale: 0.35, far: 220 }, high: { scale: 0.5, far: 320
  * @property {(name: 'day'|'night') => import('./lighting.js').TimeOfDay} setTime switch the whole world: sun or moon,
  *   sky, haze, environment map, fill, lamps
  * @property {(dt: number, simTime: number) => void} update fixed step, deterministic (anything animated)
- * @property {(camera: THREE.Camera, focus: THREE.Vector3, beams?: Beam[]) => void} prepareView before each view is
- *   drawn (and before its reflection probe, if that is drawn first): puts the shadow map round `focus` (the view's
- *   car) and asks for it to be drawn again, sets the fog for this camera and shuts the sky's light out where the
- *   car is in the tunnel. A view drawn without it has last view's shadows.
+ * @property {(camera: THREE.Camera, focus: THREE.Vector3, beams?: Beam[], hidden?: THREE.Object3D[]) => void} prepareView
+ *   before each view is drawn (and before its reflection probe, if that is drawn first): puts the shadow map round
+ *   `focus` (the view's car) and asks for it to be drawn again, sets the fog for this camera, shuts the sky's light
+ *   out where the car is in the tunnel and draws the wet road's mirror, leaving out `hidden` as well (what lies on
+ *   the road and would hide the cars' own reflections: their contact shadows, smoke, spray). A view drawn without
+ *   it has last view's shadows.
  * @property {(n: number) => void} setStartLights the gantry's countdown lamps, 0..5 lit
  * @property {THREE.Object3D[]} probeHidden what to hide while a reflection probe is drawn
  * @property {number} wetness 0..1 road wetness: the time of day's (lighting.js), unless ?wet= or a setter overrides it
@@ -150,7 +157,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   const far = createFar({ track, terrain, caps, tier, rng: rng.fork('far'), atmosphere });
   far.setPixelRatio(renderer.getPixelRatio());
   lap('far');
-  const structures = createStructures({ track, terrain, caps, tier, atmosphere, rng: rng.fork('structures') });
+  const structures = createStructures({ track, terrain, caps, tier, atmosphere, rng: rng.fork('structures'), glints: road.glints });
   lap('structures');
   const studs = createStuds({ track, caps });
   lap('studs');
@@ -173,6 +180,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   let startLights = 0;
   /** What the wet road's mirror leaves out: the road itself and what lies under or far beyond it. */
   const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, lake.mesh, cover.group, far.group, ...structures.mirrorHidden];
+  /** mirrorHidden and what the caller of prepareView adds (the cars' contact shadows, smoke and spray). */
+  const mirrorHiddenAll = [];
   const mirrorPoint = new THREE.Vector3();
   const mirrorFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
   const drawing = new THREE.Vector2();
@@ -243,7 +252,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       structures.update(dt);
     },
 
-    prepareView(camera, focus, beams) {
+    prepareView(camera, focus, beams, hidden = null) {
       sun.prepareView(camera, focus);
       forest.prepareView(camera, focus);
       cover.prepareView(camera);
@@ -266,7 +275,13 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
           track.frameAt(s, mirrorFrame);
           track.pointAt(s, lat, mirrorPoint);
           mirror.uniforms.uMirrorPlane.value.set(mirrorFrame.up.x, mirrorFrame.up.y, mirrorFrame.up.z, -mirrorFrame.up.dot(mirrorPoint));
-          mirror.render(scene, camera, mirrorPoint, mirrorFrame.up, mirrorHidden, viewHeight);
+          mirrorHiddenAll.length = 0;
+          mirrorHiddenAll.push(...mirrorHidden);
+          if (hidden) mirrorHiddenAll.push(...hidden);
+          // the lamps' heads as soft halos, which only the mirror sees (lamps.js HALO)
+          structures.halos?.show(Math.max(16, Math.round(viewHeight * mirror.scale)));
+          mirror.render(scene, camera, mirrorPoint, mirrorFrame.up, mirrorHiddenAll, viewHeight);
+          structures.halos?.hide();
         } else mirror.uniforms.uMirrorOn.value = 0;
       }
     },

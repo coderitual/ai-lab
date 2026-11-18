@@ -31,6 +31,7 @@
 
 import * as THREE from 'three';
 import { planeNoise, smoothstep, withBake } from './shading.js';
+import { CANOPY, canopyOpen } from './canopy.js';
 
 // The Track's EDGE and SURFACE values (the world never imports from game/).
 const EDGE_ROCK = 1;
@@ -548,6 +549,8 @@ const FOOT = 0.8;
           pos[v * 3 + 1] = y;
           pos[v * 3 + 2] = pt.z;
           bake4At(pt.x, pt.z, bake, v * 4);
+          // the verge and the bank under the woods see less sky (canopy.js; under the crowns it has no meaning)
+          if (Math.abs(lat) < edge + CANOPY.clear) bake[v * 4 + 2] *= canopyOpen(track, s, lat);
           const slope = k >= 2 && k <= 6 && c.height > 0.01 ? 0.9 : 0;
           mask[v * 2] = k <= 1 ? 0 : forestOf(pt.x, pt.z, y, slope, s, lat, d);
           verge[v * 4] = Math.abs(lat) - pave;
