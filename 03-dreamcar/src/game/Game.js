@@ -119,6 +119,13 @@ const putAt = new THREE.Vector3();
 const shadowPoint = new THREE.Vector3();
 const shadowNormal = new THREE.Vector3();
 const surface = {};
+/** For the car's tunnel uniforms (CarModel.setBore): the road's frame at the car, and its axes in car space. */
+const boreFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
+const boreAhead = new THREE.Vector3();
+const boreFlat = new THREE.Vector3();
+const boreUp = new THREE.Vector3();
+const boreTo = new THREE.Vector3();
+const boreInverse = new THREE.Quaternion();
 const lookRead = { steer: 0, throttle: 0, brake: 0, handbrake: 0, analog: false, lookBack: false };
 
 export class Game {
@@ -937,6 +944,41 @@ export class Game {
     return map;
   }
 
+  /**
+   * The car's place in the tunnel's frame, for the paint's lines of luminaires (CarModel.setBore): its origin as
+   * drawn, in the road's level frame at its s (along, across, and height over the centre line's grade), that frame
+   * in car space, and how far it is under the roof (the Track's sky, which eases over the portals).
+   */
+  _poseBore(car, obj, vehicle) {
+    const track = this.track;
+    let near = false;
+    for (const t of track.tunnels) if (track.delta(t.s0 - PROBE.boreNear, vehicle.s) >= 0 && track.delta(vehicle.s, t.s1 + PROBE.boreNear) >= 0) near = true;
+    track.frameAt(vehicle.s, boreFrame);
+    boreAhead.set(boreFrame.tan.x, 0, boreFrame.tan.z).normalize();
+    boreFlat.set(boreFrame.left.x, 0, boreFrame.left.z).normalize();
+    const grade = boreFrame.tan.y / Math.max(Math.hypot(boreFrame.tan.x, boreFrame.tan.z), 1e-6);
+    boreTo.subVectors(obj.position, boreFrame.pos);
+    const along = boreTo.dot(boreAhead);
+    const lat = boreTo.dot(boreFlat);
+    const h = boreTo.y - grade * along;
+    boreInverse.copy(obj.quaternion).invert();
+    boreAhead.applyQuaternion(boreInverse);
+    boreFlat.applyQuaternion(boreInverse);
+    boreUp.set(0, 1, 0).applyQuaternion(boreInverse);
+    car.setBore({
+      lat,
+      h,
+      s: vehicle.s + along,
+      under: near ? clamp01(1 - vehicle.sky) : 0,
+      ahead: boreAhead,
+      flat: boreFlat,
+      up: boreUp,
+      grade,
+      speed: vehicle.speed,
+      near,
+    });
+  }
+
   // -------------------------------------------------------------- a frame
 
   /**
@@ -976,6 +1018,7 @@ export class Game {
       car.setLights(racer.lamps);
       // the car's sky: none in the tunnel, less under the woods (the same canopy the road beside it sees)
       car.setReflections({ cube: this.views[racer.index]?.probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat) });
+      if (car.setBore) this._poseBore(car, obj, vehicle);
 
       obj.updateMatrixWorld();
       sharp.prevMatrix.copy(sharp.matrix);

@@ -25,6 +25,8 @@ import { GLSL_HASH, GLSL_NOISE, GLSL_PROBE, targetDefines } from '../../engine/g
 import { RANGE } from './atlas.js';
 import { ARCHES, GRILLE_STARS, INTAKE_CENTRE, INTAKE_SIDE } from './features.js';
 import { DIMS, STATIONS } from './spec.js';
+import { BORE_UNIFORMS } from '../world/shading.js';
+import { LUMINAIRE } from '../world/tunnel.js';
 
 /** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
 export const PAINTS = {
@@ -72,6 +74,49 @@ export function createShared(atlas) {
     carLampsB: { value: new THREE.Vector4() },
     // interior, and three spare
     carLampsC: { value: new THREE.Vector4() },
+    // the tunnel (setBore): where the car is in the road's frame and that frame's axes in car space (GLSL_BORE)
+    carBoreAt: { value: new THREE.Vector4() },
+    carBoreAhead: { value: new THREE.Vector4(0, 0, 1, 0) },
+    carBoreFlat: { value: new THREE.Vector3(1, 0, 0) },
+    carBoreUp: { value: new THREE.Vector3(0, 1, 0) },
+    carBoreMove: { value: new THREE.Vector2() },
+    carBoreBars: { value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 1, 0, 0)) },
+    carBoreFrom: { value: new THREE.Vector4(1e9, 1e9, 1e9, 1e9) },
+    carBoreSpan: { value: new THREE.Vector2(0, -1) },
+    // where the lines of luminaires are, how bright, and the lining's radiance: the tunnel's own (shading.js)
+    uBoreLines: BORE_UNIFORMS.uBoreLines,
+    uBoreLineColor: BORE_UNIFORMS.uBoreLineColor,
+    uBoreZone: BORE_UNIFORMS.uBoreZone,
+    uBoreGlow: BORE_UNIFORMS.uBoreGlow,
+  };
+}
+
+/**
+ * The tunnel's luminaires as rows of bars along it, for GLSL_BORE: walked by the same spacing rule as tunnel.js's
+ * fittings (LUMINAIRE: pairs of short bars close together in the entrance zone, single bars spaced out further in,
+ * closer again before the exit). Returns up to four rows, each (first bar's distance into the tunnel, spacing, bar
+ * length, half the gap between a pair's bars or 0), the distance from which each row holds, and the first and last
+ * bars' distances.
+ * @param {number} length the tunnel's length (m)
+ */
+export function boreRows(length) {
+  const L = LUMINAIRE;
+  const spacingAt = (d, toExit) =>
+    d < L.entrance[0] ? L.entrance[1] : d < L.transition[0] || toExit < L.exit[0] ? L.transition[1] : L.interior;
+  const rows = [];
+  let last = 1.5;
+  for (let d = 1.5; d < length - 1; ) {
+    const spacing = spacingAt(d, length - d);
+    const pair = d < L.entrance[0];
+    const row = rows[rows.length - 1];
+    if (!row || row.spacing !== spacing || row.pair !== pair) rows.push({ start: d, spacing, pair, from: rows.length ? (last + d) / 2 : -1e9 });
+    last = d;
+    d += spacing;
+  }
+  return {
+    rows: rows.slice(0, 4).map((r) => [r.start, r.spacing, r.pair ? L.alongPair : L.along, r.pair ? L.pair / 2 : 0]),
+    from: rows.slice(0, 4).map((r) => r.from),
+    span: rows.length ? [rows[0].start, last] : [0, -1],
   };
 }
 
@@ -116,6 +161,112 @@ vec3 carGround(vec3 rWorld) {
 }
 `;
 
+/**
+ * The tunnel's two lines of luminaires in the car's mirrors, exactly (`carBoreLines`). While the car is in or near
+ * the tunnel they are straight rows of bars at a known place: along the road, `uBoreLines.x` either side of its
+ * centre line, `uBoreLines.y` over it (shading.js BORE_UNIFORMS, set by tunnel.js). A reflected ray from a point of
+ * the body is followed to their plane; where it meets it, across the road, says how much of a bar's width it sees
+ * (a box seen through a box filter as wide as the pixel's footprint there, plus the layer's own spread), and along
+ * it, how much of the row of bars (boreRows: the entrance's pairs, the spaced bars further in) over the same
+ * filter, plus the distance the car covers in a 90th of a second, so that the dashes stream past at speed rather
+ * than step. The probe sees the fittings only as broad stand-ins a few texels wide, a fifth of a second old: in the
+ * paint they were blotches and broken flecks. (The ray from outside the box counts only through its mouth.)
+ *
+ * The road's frame at the car (setBore, from the Game): `carBoreAt` the car's origin (lat, height over the centre
+ * line's grade, s) and how far the car is under the roof (0..1); `carBoreAhead` (xyz) the road's level heading in car
+ * space and (w) its grade; `carBoreFlat` its level left; `carBoreUp` the world's up. The box is upright and follows
+ * the grade, so a height over the ceiling is taken along the world's up less the grade times the distance along.
+ *
+ * `carBoreBox` turns a reflected ray that meets the box's walls or ceiling within 40 m into the direction from the
+ * probe to that point (a box-projected probe, as carGround is for the road's plane), faded in under the roof.
+ */
+const GLSL_BORE = /* glsl */ `
+uniform vec4 carBoreAt;
+uniform vec4 carBoreAhead;
+uniform vec3 carBoreFlat;
+uniform vec3 carBoreUp;
+uniform vec2 carBoreMove;
+uniform vec4 carBoreBars[4];
+uniform vec4 carBoreFrom;
+uniform vec2 carBoreSpan;
+uniform vec4 uBoreLines;
+uniform vec3 uBoreLineColor;
+uniform vec4 uBoreZone;
+uniform vec3 uBoreGlow;
+vec3 carToCar(vec3 rWorld) { return normalize(transpose(vCarToView) * (viewMatrix * vec4(rWorld, 0.0)).xyz); }
+vec3 carFromCar(vec3 rCar) { return inverseTransformDirection(vCarToView * rCar, viewMatrix); }
+/** How much of a box |x| < h is seen through a box filter b wide. */
+float carBoxSeen(float x, float h, float b) {
+  b = max(b, 1e-4);
+  return (clamp(x + h, -0.5 * b, 0.5 * b) - clamp(x - h, -0.5 * b, 0.5 * b)) / b;
+}
+/** The integral of a row of bars (len long, every period, the first starting at 0) up to y. */
+float carRowSum(float y, float period, float len) { return len * floor(y / period) + min(mod(y, period), len); }
+/** How much of the row of bars (row: first bar's centre, spacing, length) is seen at d through a filter b long. */
+float carRowSeen(float d, vec4 row, float b) {
+  b = max(b, 1e-3);
+  float y = d - row.x + 0.5 * row.z + 1000.0 * row.y;
+  return (carRowSum(y + 0.5 * b, row.y, row.z) - carRowSum(y - 0.5 * b, row.y, row.z)) / b;
+}
+/** The lines of luminaires seen from car-space point p along car-space direction r; spread: the layer's (m per m). */
+vec3 carBoreLines(vec3 p, vec3 r, float spread) {
+  if (carBoreMove.y < 0.5) return vec3(0.0);
+  float pa = dot(p, carBoreAhead.xyz);
+  float sP = carBoreAt.z + pa;
+  float latP = carBoreAt.x + dot(p, carBoreFlat);
+  float hP = carBoreAt.y + dot(p, carBoreUp) - carBoreAhead.w * pa;
+  float ds = dot(r, carBoreAhead.xyz);
+  float dl = dot(r, carBoreFlat);
+  float dh = dot(r, carBoreUp) - carBoreAhead.w * ds;
+  float t = max(uBoreLines.y - hP, 0.0) / max(dh, 0.02);
+  float lat = latP + dl * t;
+  float d = sP + ds * t - uBoreZone.x;
+  // the filters: the pixel's footprint on the plane, the layer's spread, and along the road the car's own motion
+  float bLat = min(fwidth(lat), 4.0) + spread * t;
+  float bS = min(fwidth(d), 8.0) + spread * t + carBoreMove.x;
+  vec4 row = carBoreBars[0];
+  if (d > carBoreFrom.y) row = carBoreBars[1];
+  if (d > carBoreFrom.z) row = carBoreBars[2];
+  if (d > carBoreFrom.w) row = carBoreBars[3];
+  float h = 0.5 * uBoreLines.w;
+  float across = carBoxSeen(abs(lat) - uBoreLines.x - row.w, h, bLat) + (row.w > 0.0 ? carBoxSeen(abs(lat) - uBoreLines.x + row.w, h, bLat) : 0.0);
+  float along = carRowSeen(d, row, bS) * carBoxSeen(d - 0.5 * (carBoreSpan.x + carBoreSpan.y), 0.5 * (carBoreSpan.y - carBoreSpan.x) + 0.5 * row.z, bS);
+  // only rays that go up to the plane, and from outside the box only through its mouth
+  float seen = step(0.02, dh) * step(0.0, uBoreLines.y - hP);
+  float sEdge = sP < uBoreZone.x ? uBoreZone.x : uBoreZone.y;
+  float tm = (sEdge - sP) / (abs(ds) > 1e-4 ? ds : 1e-4);
+  if (sP < uBoreZone.x || sP > uBoreZone.y) {
+    seen *= step(0.0, tm) * step(abs(latP + dl * tm), uBoreLines.x + ${LUMINAIRE.inset.toFixed(3)}) * step(hP + (dh) * tm, uBoreLines.y + 0.1);
+  }
+  return uBoreLineColor * (uBoreLines.z * across * along * seen);
+}
+/** A reflected ray (world) turned into the direction from the probe to where it meets the box's walls or ceiling. */
+vec3 carBoreBox(vec3 rWorld) {
+  if (carBoreAt.w <= 0.0) return rWorld;
+  vec3 r = carToCar(rWorld);
+  vec3 p = vCarPos;
+  float pa = dot(p, carBoreAhead.xyz);
+  float latP = carBoreAt.x + dot(p, carBoreFlat);
+  float hP = carBoreAt.y + dot(p, carBoreUp) - carBoreAhead.w * pa;
+  float dl = dot(r, carBoreFlat);
+  float dh = dot(r, carBoreUp) - carBoreAhead.w * dot(r, carBoreAhead.xyz);
+  float wall = uBoreLines.x + ${LUMINAIRE.inset.toFixed(3)};
+  float t = 1e4;
+  if (dh > 0.02) t = (uBoreLines.y + 0.1 - hP) / dh;
+  if (abs(dl) > 0.02) t = min(t, (sign(dl) * wall - latP) / dl);
+  if (t <= 0.0 || t > 60.0) return rWorld;
+  vec3 fixedCar = normalize(p + r * t - vec3(${PROBE_AT.map((v) => v.toFixed(4)).join(', ')}));
+  return normalize(mix(rWorld, carFromCar(fixedCar), carBoreAt.w * (1.0 - smoothstep(30.0, 60.0, t))));
+}
+/** Under the roof the probe's lamps and fittings are the analytic lines' (carBoreLines): what it sees is held to a few times the lining's radiance. */
+vec3 carBoreHold(vec3 seen) {
+  float cap = 6.0 * max(max(uBoreGlow.r, max(uBoreGlow.g, uBoreGlow.b)), 1e-4);
+  float peak = max(seen.r, max(seen.g, seen.b));
+  float keep = peak > cap ? cap * (1.0 + 0.25 * log(peak / cap)) / peak : 1.0;
+  return seen * mix(1.0, keep, carBoreAt.w);
+}
+`;
+
 const FRAGMENT_PARS = /* glsl */ `
 uniform sampler2D carAtlas0;
 uniform sampler2D carAtlas1;
@@ -135,6 +286,7 @@ ${GLSL_NOISE}
 ${GLSL_PROBE}
 ${GLSL_SANE}
 ${GLSL_GROUND}
+${GLSL_BORE}
 vec4 carAtlas(sampler2D t) { return (texture2D(t, vSkinUv) * 255.0 - 127.5) / 127.5 * carRange; }
 /** How much of the pixel is inside (distance < 0), antialiased by the distance's own footprint. */
 float carCover(float d) { return clamp(0.5 - d / max(fwidth(d), 1e-5), 0.0, 1.0); }
@@ -199,7 +351,13 @@ vec3 carSoftProbe(vec3 r, float rough, float foot) {
 }
 `;
 
-const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false) => /* glsl */ `
+/**
+ * The flake layer's share of the tunnel's lines (carBoreLines at the layer's own spread): a soft bright sheen round
+ * the clear coat's crisp lines, not a second mirror image.
+ */
+const BORE_SHEEN = 0.35;
+
+const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false, bore = false) => /* glsl */ `
 #include <lights_fragment_maps>
 #if defined( RE_IndirectSpecular )
   ${
@@ -209,8 +367,11 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false)
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryClearcoatNormal), viewMatrix);
     ${ground ? 'r = carGround(r);' : ''}
+    ${bore ? 'vec3 rBore = r;\n    r = carBoreBox(r);' : ''}
     clearcoatRadiance = mix(clearcoatRadiance * carSky, carSane(probeSample(carProbe, r, max(material.clearcoatRoughness, ${FOOTPRINT})), clearcoatRadiance * carSky), carProbeOn);
+    ${bore ? 'clearcoatRadiance = carBoreHold(clearcoatRadiance);' : ''}
     ${soft ? 'clearcoatRadiance = mix(vec3(dot(clearcoatRadiance, vec3(0.2126, 0.7152, 0.0722))), clearcoatRadiance, 0.3);' : ''}
+    ${bore ? 'clearcoatRadiance += carBoreLines(vCarPos, carToCar(rBore), 2.0 * material.clearcoatRoughness * material.clearcoatRoughness);' : ''}
   }
   #else
   clearcoatRadiance *= carSky;
@@ -224,6 +385,7 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false)
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryNormal), viewMatrix);
     ${ground ? 'r = carGround(r);' : ''}
+    ${bore ? 'vec3 rBore = r;\n    r = carBoreBox(r);' : ''}
     vec3 seen = carSane(${soft ? `carSoftProbe(r, material.roughness, ${FOOTPRINT})` : `probeSample(carProbe, r, max(material.roughness, ${FOOTPRINT}))`}, radiance * carSky);
     // The metal layer is a blurred mirror: a small fierce thing in the probe (the sun's glare on the road behind,
     // a lamp) must not wash a whole panel white. What it takes is held to a few times the probe's average round
@@ -232,7 +394,9 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false)
     float cap = 5.0 * max(max(around.r, max(around.g, around.b)), 1e-5);
     float peak = max(seen.r, max(seen.g, seen.b));
     if (peak > cap) seen *= (cap + 0.1 * (peak - cap)) / peak;
+    ${bore ? 'seen = carBoreHold(seen);' : ''}
     radiance = mix(radiance * carSky, seen, carProbeOn);
+    ${bore ? `radiance += ${(soft ? BORE_SHEEN : 1).toFixed(2)} * carBoreLines(vCarPos, carToCar(rBore), 2.0 * material.roughness * material.roughness);` : ''}
   }`
       : `
   radiance *= carSky;`
@@ -686,7 +850,7 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
       ],
       ['#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += cEmit;'],
       ['#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  material.clearcoat *= cCoat;'],
-      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN, false, true)],
+      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN, false, true, true)],
       [
         '#include <lights_fragment_end>',
         /* glsl */ `#include <lights_fragment_end>
@@ -784,7 +948,7 @@ export function createGlassMaterial(shared, caps, channel) {
   }`,
       ],
       ['#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = glassTint;'],
-      ['#include <lights_fragment_maps>', REFLECTIONS(false)],
+      ['#include <lights_fragment_maps>', REFLECTIONS(false, true, 1, false, false, true)],
       [
         '#include <lights_fragment_end>',
         /* glsl */ `#include <lights_fragment_end>
@@ -803,7 +967,8 @@ export function createGlassMaterial(shared, caps, channel) {
       // the panoramic roof is dark tinted glass with a coating: it mirrors its surroundings dimly, and the bright
       // sky round the sun at a grazing angle is rolled off (above a tenth of the sun's light) instead of filling it
       vec3 r = reflectedLight.indirectSpecular * 0.45;
-      reflectedLight.indirectSpecular = r / (1.0 + dot(r, Y) / (0.1 * sunY + 1e-6));
+      // (not under the tunnel's roof, where the lines of luminaires cross it: carBoreLines)
+      reflectedLight.indirectSpecular = r / (1.0 + dot(r, Y) / (max(0.1 * sunY, 30.0 * carBoreAt.w) + 1e-6));
     }
   }
 #endif`,
@@ -922,7 +1087,7 @@ export const LAMP_FN = {
 export function createTrimMaterial(shared, caps, { color, metal, rough, coat = 0, side = THREE.FrontSide }) {
   const material = new THREE.MeshPhysicalMaterial({ metalness: metal, roughness: rough, clearcoat: coat, clearcoatRoughness: 0.03, side });
   material.color.setRGB(color[0], color[1], color[2], THREE.LinearSRGBColorSpace);
-  patch(material, shared, caps, { replace: [['#include <lights_fragment_maps>', REFLECTIONS(coat > 0)]] });
+  patch(material, shared, caps, { replace: [['#include <lights_fragment_maps>', REFLECTIONS(coat > 0, coat <= 0, 1, false, false, true)]] });
   return material;
 }
 

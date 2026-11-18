@@ -34,7 +34,7 @@ between the axles; +Z forward, +Y up, +X the car's left. Metres.
 | `body.js` | the skin sampled into a mesh (per tier), the atlas layout, wheel-arch holes, lips and liners |
 | `features.js` | outlines of everything flush with the skin: glass, lenses, grille, intakes, shut lines, reflectors, arches |
 | `atlas.js` | bakes those outlines into two RGBA8 textures of signed distances over the skin |
-| `materials.js` | paint (and every flush region it turns into), glass and lenses, trim, lamp parts, plates, dark insides, ghost; how every car material reads the reflection probe |
+| `materials.js` | paint (and every flush region it turns into), glass and lenses, trim, lamp parts, plates, dark insides, ghost; how every car material reads the reflection probe; the tunnel's lines of luminaires in the paint and glass (`GLSL_BORE`) |
 | `parts.js` | the tools for small solid parts: rays at the skin, a list of triangles per material |
 | `details.js` | the solid small parts: stars, grille pins and louvre, intake slats, pipe trims, diffuser fins, mirrors, handle grips, wipers, plates and their frames, third brake light, plate lamps, cabin |
 | `lampUnits.js` | the head and tail lamp units behind their lenses, as geometry |
@@ -242,6 +242,59 @@ Two guards on every probe read (`REFLECTIONS` in `materials.js`):
 - `carGround` (written, switched off: `REFLECTIONS(..., ground)` defaults to
   false): a parallax correction for the road's plane. On a 64 to 256 cube it
   magnified the road's few texels into dark blotches on the bumper.
+
+### In the tunnel
+
+The tunnel is a bright box with two lines of LED bars along the haunches of
+its ceiling (`docs/design.md`, "The tunnel"), and a polished car under strip
+lights is two long, crisp lines of light running the length of the body,
+bending with it and streaming back as it moves. The probe cannot draw them:
+it sees each line as broad stand-ins a few texels wide (a 128 cube on medium,
+0.6 m bars), a face or two refreshed a frame, so the image in it is up to a
+fifth of a second (13 m) old. In the paint the bars came out as large soft
+blotches on the boot lid, the rear quarters and the bumper (the flake layer's
+blurred read of a radiance-48 stand-in, held only to five times its
+surroundings), and on the roof and the glass as small broken flecks.
+
+So under the tunnel's roof the lines are drawn exactly (`GLSL_BORE` in
+`materials.js`), and the probe gives everything else:
+
+- **Where they are** is the tunnel's own: `BORE_UNIFORMS` (shading.js: the
+  lines' distance from the centre line, their height, their radiance and
+  colour, where the tunnel begins and ends, all set by tunnel.js), and the
+  rows of bars from `LUMINAIRE` (tunnel.js, exported for this), walked by its
+  spacing rule into up to four rows (`boreRows`: the entrance's pairs every
+  2 m, single bars every 3 m, every 6 m inside, every 3 m before the exit).
+  Nothing of the tunnel is copied into the car.
+- **Where the car is**: each frame the game hands the car its place in the
+  road's level frame (`setBore`, from `Game._poseBore`: its origin as drawn
+  across and along the road and above the centre line's grade, the road's
+  heading, left and the world's up in car space, the grade, how far it is
+  under the roof, its speed).
+- **The lines** (`carBoreLines`): the reflected ray from the body's own point
+  is followed to the lines' plane; across the road, a box as wide as a bar
+  seen through a box filter as wide as the pixel's footprint there plus the
+  layer's own spread (2 roughness squared per metre travelled); along the
+  road, the row of bars through the same kind of filter, lengthened by the
+  car's travel in a 90th of a second so that the dashes stream rather than
+  step at speed. The entrance's pairs are two bars 0.34 m apart. From outside
+  the box a ray counts only through the mouth, so the lines appear as the
+  car nears the portal and nothing pops. The clear coat (and the glass, the
+  lenses, the gloss trims) take them at full radiance through their own
+  Fresnel: thin and crisp on the roof, the boot lid and the bonnet, drawn out
+  along the shoulders and flanks. The flake layer takes them at
+  `BORE_SHEEN` (0.35) through its roughness: a soft sheen round the crisp
+  line, not a second image.
+- **The probe under the roof** (`carBoreHold`): its fittings would double
+  the lines as blotches, so what it shows is held, in proportion to how far
+  the car is under the roof, to six times the lining's radiance
+  (`uBoreGlow`), rolling off slowly above it; what is left is the walls, the
+  ceiling, the walkway and the dado, the green lights. And it is
+  box-projected (`carBoreBox`): a reflected ray meeting a wall or the
+  ceiling within 60 m is turned into the direction from the probe to that
+  point, so the walls stand at their true distance in the flanks.
+- The glass roof's roll-off of bright reflections (a tenth of the sun's
+  light) does not apply under the roof, where the lines cross it.
 
 ### The glass
 
@@ -581,11 +634,11 @@ Most visible first:
   silver under a higher sun.
 - **Bloom** round the brake lamps is the frame pipeline's; at night it still
   tints the boot lid red.
-- **Tunnel lamp streaks**: the probe does see the tunnel's luminous panels
-  (they are ordinary meshes of the world, not in `probeHidden`); in a viewer
-  still in the bore (`s=1641`) they show as bright spots on the roof and the
-  glass. Whether they stretch into streaks at speed is the probe's refresh
-  and the frame's motion blur, not the car's.
+- **In the tunnel** the lines of luminaires are analytic (see "In the
+  tunnel"), but the wheels read the probe directly (`mirrorProbe`) and so
+  show the stand-ins' soft highlights; the haunches' chamfer, the services
+  under the ceiling and the jet fans are not in the box projection (it is
+  two walls and a flat ceiling).
 - In the light tunnel (`stripes=1&mirror=1`) the stripes pinch a little at
   the tail lamp's outer tip, where the shoulder, the lid's lip and the wing
   meet; the handle dishes' edges are slightly ragged as a plain mirror.

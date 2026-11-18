@@ -25,11 +25,15 @@ import {
   createPlateMaterial,
   createShared,
   createTrimMaterial,
+  boreRows,
 } from './materials.js';
 import { createContactShadow } from './shadow.js';
 import { RAIL, createSkin } from './skin.js';
 import { DIMS, STATIONS, WHEELS } from './spec.js';
 import { createWheel } from './wheel.js';
+
+/** How long the paint's mirror image of the tunnel's luminaires is smeared along the road: the car's travel in this many seconds. */
+const BORE_SHUTTER = 1 / 90;
 
 /** Atlas channels (features.js CHANNELS). */
 const GLASS = 0;
@@ -90,6 +94,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
   keep(archGeometry.liner);
 
   let shared = null;
+  let boreLength = 0;
   let shadow = null;
   let lights = null;
   let ghostMaterial = null;
@@ -230,6 +235,32 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       shared.carLampsA.value.set(level.drl, level.low, level.high, level.tail);
       shared.carLampsB.value.set(level.brake, level.reverse, level.indicatorL, level.indicatorR);
       shared.carLampsC.value.set(level.interior, 0, 0, 0);
+    },
+    /**
+     * The tunnel, for the paint's lines of luminaires and its box-projected probe (materials.js GLSL_BORE): the car's
+     * origin in the road's frame (`lat`, `h` over the centre line's grade, `s`), that frame's level heading `ahead`
+     * and level left `flat` and the world's up in car space, the road's `grade`, how far the car is under the roof
+     * (`under`, 0..1), its speed (m/s) and whether a tunnel is near at all (`near`; tunnel.js sets where it is).
+     */
+    setBore({ lat, h, s, under, ahead, flat, up, grade, speed, near }) {
+      if (!shared) return;
+      const zone = shared.uBoreZone.value;
+      const length = zone.y - zone.x;
+      if (length > 0 && length !== boreLength) {
+        boreLength = length;
+        const { rows, from, span } = boreRows(length);
+        for (let i = 0; i < 4; i++) {
+          const k = Math.min(i, rows.length - 1);
+          shared.carBoreBars.value[i].fromArray(rows[k] ?? [0, 1, 0, 0]);
+          shared.carBoreFrom.value.setComponent(i, i < rows.length ? from[i] : 1e9);
+        }
+        shared.carBoreSpan.value.fromArray(span);
+      }
+      shared.carBoreAt.value.set(lat, h, s, under);
+      shared.carBoreAhead.value.set(ahead.x, ahead.y, ahead.z, grade);
+      shared.carBoreFlat.value.copy(flat);
+      shared.carBoreUp.value.copy(up);
+      shared.carBoreMove.value.set(Math.abs(speed) * BORE_SHUTTER, near && length > 0 ? 1 : 0);
     },
     setReflections({ cube, sky }) {
       for (const wheel of wheels) wheel.setReflections({ cube, sky });

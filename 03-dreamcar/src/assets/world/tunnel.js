@@ -66,7 +66,7 @@ const BOUNCE = 0.45;
  * `entrance[0]` m, single bars every `transition[1]` m to `transition[0]` m in and over the last `exit[0]` m, and
  * every `interior` m between. Their radiance is LAMP_KINDS.tunnel.head times its colour.
  */
-const LUMINAIRE = { inset: 1.15, across: 0.24, along: 1.25, alongPair: 0.7, pair: 0.34, entrance: [60, 2.0], transition: [130, 3.0], exit: [36, 3.0], interior: 6 };
+export const LUMINAIRE = { inset: 1.15, across: 0.24, along: 1.25, alongPair: 0.7, pair: 0.34, entrance: [60, 2.0], transition: [130, 3.0], exit: [36, 3.0], interior: 6 };
 /**
  * What the cars' reflection probes see of the fittings instead (a stand-in on PROBE_LAYER): a bar as wide as `across`
  * (m) and `along` times as long, at `radiance` of the fittings' own. A fitting 0.24 m wide 5 m away is half a texel of a

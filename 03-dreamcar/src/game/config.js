@@ -451,6 +451,8 @@ export const PROBE = {
   high: { size: 256, faces: 2, every: 1, stillSize: 512, stillFaces: 3, stillEvery: 1, tunnelFaces: 3 },
   tunnelSky: 0.02,
   tunnelFar: 160,
+  /** (car lane) How far before and after a tunnel (m) the car's paint looks for its lines of luminaires (CarModel.setBore). */
+  boreNear: 250,
   stillBelow: 1.5,
   movingAbove: 4,
 };
