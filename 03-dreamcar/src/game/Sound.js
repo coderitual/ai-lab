@@ -315,7 +315,10 @@ class CarVoice {
     const wind = gain(0);
     this.wind = new Aim(wind.gain, 0);
     this.noise.connect(windBand);
-    windBand.connect(wind);
+    // the air's roar has no edge: a band's skirts reach far up, and at 200 km/h their hiss is the loudest sudden thing there is
+    const windSoft = filter('lowpass', 1400, 0.7);
+    windBand.connect(windSoft);
+    windSoft.connect(wind);
     wind.connect(out);
     const roadBand = filter('lowpass', 140, 0.7);
     this.roadBand = new Aim(roadBand.frequency, 140);
