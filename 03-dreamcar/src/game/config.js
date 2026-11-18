@@ -64,7 +64,7 @@ export const HUD = {
   banner: 4,
   /** Driving the wrong way this long before the warning shows (s). */
   wrongWay: 1.2,
-  /** On the first run on a touch screen the zones (steer, brake, drift) are named until this much of the race clock (s). */
+  /** On the first run on a touch screen the controls (steer, brake, drift, gas) are named until this much of the race clock (s). */
   zonesFor: 3,
   /** The first-time hint shows until the car has covered this much road in a run (m). */
   hintDistance: 25,
@@ -126,8 +126,12 @@ export const HANDS = {
   },
   /** A stick: the power added to its curve (finer near the centre), its smoothing (s), and `counter` as for keys. */
   pad: { expo: [0, 0.5], lag: [0.02, 0.09], counter: 0.6 },
-  /** A thumb on the glass: the same. */
-  thumb: { expo: [0, 0.4], lag: [0.03, 0.1], counter: 0.5 },
+  /**
+   * A thumb on the touch slider: the same. The slider reads the thumb's distance from its fixed centre linearly;
+   * the whole curve is here: a little finer than linear at a standstill, much finer at speed, so that a few px of
+   * thumb is a small correction on the straight and the end of the travel is still full lock.
+   */
+  thumb: { expo: [0.15, 0.45], lag: [0.03, 0.1], counter: 0.5 },
 };
 
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */

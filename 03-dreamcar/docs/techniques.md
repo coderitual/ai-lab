@@ -140,6 +140,20 @@ keys, a hand catches the rear when it slides beyond the rear tyres' peak
 slip (counter-steer 0.75 rad per rad). A stick or a thumb is trusted and only
 given the same lock.
 
+On a touch screen the thumb is read against a fixed slider
+(`src/engine/Input.js`): the steering is the thumb's distance from the
+slider's centre over its half travel, worked out in the pointer handlers and
+stored, so the fixed step only reads a number. The slider itself is linear;
+the curve that makes small corrections easy at speed is the hands'
+(`HANDS.thumb.expo`, the same place as a stick's). Every control owns the
+pointer id that took it (`setPointerCapture`, then a map of pointer id to
+pedal), so two or three fingers never steal from each other, and anything
+that can lose a finger's lift (pointercancel, lostpointercapture, blur, a
+hidden tab, orientationchange) lets every control go. The layout is worked
+out once per view size by `layoutOf` and drawn by the HUD from the same
+numbers. With the arrows the input reports keys (`analog: false`), so
+`PlayerDriver` winds the wheel exactly as for A and D.
+
 ## The autopilot's speed plan
 
 `AutoDriver` in `src/game/drivers.js`, what `?ap` runs and what the tests lap

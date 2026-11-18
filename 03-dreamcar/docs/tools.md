@@ -34,7 +34,7 @@ SwiftShader on four busy cores. Times below are from that machine.
 | `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (112 166 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). `drift.test.mjs`: the feel: each device's turn-in time, the three assist levels, slides asked for, held and let go on every device, what the default level never lets happen, people's laps on the real road (7 tests). | 4 files | about 1 min |
 | `node tools/handling.mjs` | The car measured the way a road test would; prints the table of spec.md. `--json`, `--no-laps`. | (a table, not checks) | 6 s |
 | `node tools/trackmap.mjs out.svg` | Draws the circuit from above with its height, gradient and speed envelope, and prints its numbers (sections, structures, kerbs, dressing, lamps, sectors, pieces). `--png out.png`, `--fit a,b` (close the loop after an edit). | | under 1 s |
-| `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the steering part, the brake part, DRIFT, the automatic throttle and its moment after, GAS on manual, the zones' naming, both split halves), slide (a handbrake turn through the keys, the readout, the driving help kept and applied), window, hud (now with the DRIFT and GAS buttons), options, start, photo, determinism, params, tiers. Any console error, page error or WebGL warning fails that page. | 296 | an hour or more |
+| `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the fixed controls upright and on its side, 76 checks: the slider's fixed centre, a thumb landing off it steering at once, no drift of the centre after a drag, the knob springing back; power with nothing touched on auto and only from GAS on manual; BRAKE lifting the power and reversing at a standstill; DRIFT; two and three fingers at once, a finger sliding off a pedal, pointercancel, blur and orientationchange; touches elsewhere doing nothing; the arrows; the first-run names; both halves of a tablet split), slide (a handbrake turn through the keys and one through the touch slider and DRIFT, the readout, the driving help kept and applied), window, hud (the touch controls among the boxes: at least 64 px, inside the safe area with a phone's insets stood in for, drawn where Input finds them; solo again on manual), options (with Steering and Throttle on touch, kept, and with no storage), start, photo, determinism, params, tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
 | `node tools/soundtest.cjs [URL] [outDir]` | Renders scenarios offline with the game's own audio code (the dev server's `sound.html`) and measures them: partials, levels, sides, tails, jumps, gestures, mute. With `outDir` it keeps the WAV files so that someone can listen. | 62 | about 45 s idle |
 | `node tools/frametest.cjs` | The tone curve's numbers (no browser); with `--url` milliseconds per frame for variants of a page (`--vary "ao=0\|ao=1"`), the pipeline's targets, and a pair of frames 1/60 s apart for a flicker check (`--pair`). | | |
 | `node tools/screenshots.cjs` | Regenerates every picture of the README and these documents, and `public/og.jpg`. `--list`, `--only day,night` (page loads or picture names), `--base URL` (default 5190), `--q medium`, `--out dir`. | | 45 to 60 min |
@@ -136,6 +136,14 @@ machine without a GPU, and only what is listed here.
   recur in the re-run, so it is intermittent and its source is not known.
   The touch scheme and the slide readout are checked through the real
   pointer and key paths (touch 2 sizes plus split, slide).
+- **The fixed touch controls** (CONTROLS lane, 2026-11-18): touch, slide,
+  options, hud and start against a production build: 179 checks, 178
+  passed (touch 76, slide 10, options 35, start 10, hud 47 of 48). The one
+  failure, the lap banner over the car at 852x393 with the insets stood in
+  for, did not recur in a re-run of hud (48 of 48) and passed in the run
+  before: intermittent, the banner and the car's top are a few px apart on
+  a landscape phone. `node tools/unit.mjs` passed (the scripted thumb now
+  drives a linear slider, `HUMAN.thumb` range 76 px).
 - **The sound** (`tools/soundtest.cjs`): 62 of 62 checks (audio lane). The
   squeal "stands out at the limit" passes at exactly its 12 dB threshold.
 - **The pictures**: the stills in `docs/images/` and the lanes' comparison
@@ -194,12 +202,19 @@ Read this before believing anything above about a device.
 
 - **Real phones and tablets.** The only evidence from a real device is the
   owner's own screenshots from his iPhone, held upright, of an older build
-  (tier `medium`): they show that it ran and how it looked then, nothing
-  about frame rates, heat or the current build. Every test and picture here
-  simulates touch with Playwright on phone-sized viewports. Whether `medium`
-  or `low` is fast enough on any phone, whether a phone overheats, whether
-  the buttons are where a thumb is, and whether the capability probe's
-  guesses for Apple, Adreno and Mali GPUs are right are all unknown.
+  (tier `medium`, before the fixed touch controls): they show that it ran and
+  how it looked then, nothing about frame rates, heat or the current build.
+  Touch has only been simulated by Playwright on phone-sized viewports, with
+  synthetic pointer events: no real thumb has used the slider or the pedals,
+  iOS Safari's own gestures (the bottom toolbar, the home bar swipe, edge
+  swipes for back) have not been met, and the safe-area insets were stood in
+  for by setting the HUD's variables. The slider's travel, the pedals' sizes
+  and the thumb's curve are untuned by hand. Two players on half an upright
+  phone with the throttle on manual stacks the pedals into the picture; that
+  combination is not in the HUD check. Whether `medium` or `low` is fast
+  enough on any phone, whether a phone overheats, whether the buttons are
+  where a thumb is, and whether the capability probe's guesses for Apple,
+  Adreno and Mali GPUs are right are all unknown.
 - **Frame rates.** Every cost here is from software WebGL, where a medium
   frame of the full world takes tens of seconds to draw. No frame rate on
   any real GPU has been measured. The adaptive render scale has been seen to

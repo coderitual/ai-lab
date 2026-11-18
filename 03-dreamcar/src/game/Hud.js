@@ -24,7 +24,7 @@
 // Words come from text.js.
 
 import './hud.css';
-import { STICK_RANGE, TOUCH } from '../engine/Input.js';
+import { TOUCH } from '../engine/Input.js';
 import { formatMs } from './Race.js';
 import { TEXT } from './text.js';
 import { CAR } from './vehicle/params.js';
@@ -254,28 +254,28 @@ export class ViewHud {
     this.driftScore = cell('span', 'score', this.drift.el, '0');
     this._driftOn = false;
 
-    // under the right thumb (touch only): the DRIFT button and, with the throttle on manual, GAS. They are drawn
-    // here; Input finds them by the same numbers (TOUCH), so a finger on them never reaches the page's buttons
-    this.pads = cell('div', 'pads', el);
-    const pad = (name, b, label) => {
-      const c = cell('div', `pad ${name}`, this.pads.el, label);
-      const st = c.el.style;
-      st.width = st.height = `${2 * b.r}px`;
-      st.right = `calc(var(--sr) + ${b.right - b.r}px)`;
-      st.bottom = `calc(var(--sb) + ${b.bottom - b.r}px)`;
-      return c;
-    };
-    this.padDrift = pad('drift', TOUCH.drift, TEXT.pads.drift);
-    this.padGas = pad('gas', TOUCH.gas, TEXT.pads.gas);
-    this.padGas.show(false);
-
-    // the first run on a touch screen: the three zones named for a few seconds, ghosted
-    this.zoneHint = cell('div', 'zonehint', el);
-    const zs = this.zoneHint.el.style;
-    zs.setProperty('--steer', `${TOUCH.steerShare * 100}%`);
-    make('span', 'steer', this.zoneHint.el, TEXT.pads.steer);
-    make('span', 'brake', this.zoneHint.el, TEXT.pads.brake);
-    this.zoneHint.show(false);
+    // the touch controls, fixed (touch only): the steering at the bottom left (a slider with a marked centre, or two
+    // arrows), the pedals at the bottom right, each with its word. Placed from Input's layoutOf(), the same numbers a
+    // finger is found by; on the first touch run the steering is named too and all of them are outlined (setZoneHint)
+    this.controls = cell('div', 'controls', el);
+    const ctl = this.controls.el;
+    const named = (c, name) => make('span', 'name', c.el, name);
+    this.slider = cell('div', 'slider', ctl);
+    make('b', 'rail', this.slider.el);
+    make('b', 'mid', this.slider.el);
+    this.knob = make('i', 'knob', this.slider.el);
+    named(this.slider, TEXT.pads.steer);
+    this.arrowL = cell('div', 'arrow left', ctl);
+    this.arrowR = cell('div', 'arrow right', ctl);
+    named(this.arrowL, TEXT.pads.steer);
+    this.pedal = {};
+    for (const name of ['brake', 'gas', 'drift']) {
+      const c = cell('div', `pedal ${name}`, ctl);
+      make('span', 'word', c.el, TEXT.pads[name]);
+      this.pedal[name] = c;
+    }
+    this._ctlKey = '';
+    this._knobKey = '';
 
     // the buttons: camera, lights, reset, pause, small and together (at a desk only pause shows)
     this.touchCol = cell('div', 'touchcol', el);
@@ -284,13 +284,6 @@ export class ViewHud {
     iconButton(this.touchCol.el, 'reset', TEXT.buttons.reset, () => act('reset', index));
     iconButton(this.touchCol.el, 'pause', TEXT.buttons.pause, () => act('pause', index));
 
-    // the stick under the thumb (placed in page pixels, so it lives in the root, not the view)
-    this.stick = cell('div', 'stick', root);
-    this.stick.el.style.setProperty('--r', `${STICK_RANGE}px`);
-    make('b', 'brake', this.stick.el);
-    this.knob = make('i', '', this.stick.el);
-    this.stick.show(false);
-    this._stickKey = '';
   }
 
   /**
@@ -312,17 +305,11 @@ export class ViewHud {
     // and stay in the corners, clear of the car in the middle; an upright picture gets a little more
     const u = tall ? w / 62 : (Math.min(w, (h * 16) / 9) / 100) * 0.72;
     s.setProperty('--u', `${Math.max(3.6, Math.min(u, 10)).toFixed(2)}px`);
-    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330).flag('low', h < TOUCH.lowBelow);
-    // a low view (a stacked half on a phone): DRIFT stands beside GAS at the bottom, as Input finds it
-    const b = h < TOUCH.lowBelow ? TOUCH.driftLow : TOUCH.drift;
-    const ds = this.padDrift.el.style;
-    ds.right = `calc(var(--sr) + ${b.right - b.r}px)`;
-    ds.bottom = `calc(var(--sb) + ${b.bottom - b.r}px)`;
+    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330).flag('low', h < TOUCH.lowBelow).flag('thin', w < TOUCH.thinBelow);
   }
 
   setVisible(on) {
     this.cell.show(on);
-    if (!on) this.stick.show(false);
   }
 
   /** Split screen or not, and whether thumbs drive (the touch buttons show). */
@@ -478,16 +465,60 @@ export class ViewHud {
     this.driftScore.text(Math.round(score));
   }
 
-  /** The touch pads: whether GAS shows (the throttle on manual), and which are held. */
-  setPads(manual, held) {
-    this.padGas.show(manual);
-    this.padDrift.flag('held', held.drift);
-    this.padGas.flag('held', held.gas);
+  /**
+   * The touch controls: where they are (Input's layoutOf, px from the view's top left), the steering the thumb asks
+   * for (-1..1, or null: the knob at the centre) and which pedals are held.
+   * @param {{ layout: object, steer: number|null, held: { brake: boolean, gas: boolean, drift: boolean } }} c
+   */
+  setControls(c) {
+    const L = c.layout;
+    const arrows = L.steering === 'arrows';
+    this.cell.flag('manual', !!L.gas);
+    if (L.key !== this._ctlKey) {
+      this._ctlKey = L.key;
+      const place = (cellOf, x, y, w, h) => {
+        const st = cellOf.el.style;
+        st.left = `${(x - w / 2).toFixed(1)}px`;
+        st.top = `${(y - h / 2).toFixed(1)}px`;
+        st.width = `${w.toFixed(1)}px`;
+        st.height = `${h.toFixed(1)}px`;
+        writes++;
+      };
+      const sl = L.slider;
+      place(this.slider, sl.cx, sl.cy, 2 * (sl.half + sl.knob), 2 * sl.knob);
+      this.slider.el.style.setProperty('--k', `${sl.knob}px`);
+      this.slider.el.style.setProperty('--half', `${sl.half}px`);
+      this.slider.show(!arrows);
+      for (const [a, b] of [
+        [this.arrowL, L.arrows.left],
+        [this.arrowR, L.arrows.right],
+      ]) {
+        place(a, b.x, b.y, 2 * b.r, 2 * b.r);
+        a.show(arrows);
+      }
+      for (const name of ['brake', 'gas', 'drift']) {
+        const b = L[name];
+        this.pedal[name].show(!!b);
+        if (b) place(this.pedal[name], b.x, b.y, 2 * b.r, 2 * b.r);
+      }
+    }
+    // the knob: where the thumb asks, at the centre when there is none
+    const v = c.steer;
+    const knob = `${arrows ? '' : v === null ? 0 : v.toFixed(3)}`;
+    if (knob !== this._knobKey) {
+      this._knobKey = knob;
+      if (!arrows) this.knob.style.transform = `translateX(${((v || 0) * L.slider.half).toFixed(1)}px)`;
+      writes++;
+    }
+    this.slider.flag('held', v !== null);
+    this.arrowL.flag('held', arrows && v !== null && v < 0);
+    this.arrowR.flag('held', arrows && v !== null && v > 0);
+    for (const name of ['brake', 'gas', 'drift']) this.pedal[name].flag('held', c.held[name]);
   }
 
-  /** The first-run naming of the touch zones. */
+  /** The first-run naming of the touch controls. */
   setZoneHint(on) {
-    this.zoneHint.show(on);
+    this.controls.flag('naming', on);
   }
 
   setWarn(wrongWay) {
@@ -537,29 +568,8 @@ export class ViewHud {
     if (d) d.attr('transform', `translate(${Math.round(x * 2) / 2} ${Math.round(y * 2) / 2})`);
   }
 
-  // ---- the stick
-
-  /**
-   * @param {{ x: number, y: number, originX: number, originY: number }|null} stick client pixels
-   * @param {DOMRect} rect the page's box @param {number} brake 0..1
-   */
-  setStick(stick, rect, brake) {
-    this.stick.show(!!stick);
-    if (!stick) return;
-    const key = `${stick.originX},${stick.originY},${stick.x},${stick.y},${brake.toFixed(2)}`;
-    if (key === this._stickKey) return;
-    this._stickKey = key;
-    const s = this.stick.el.style;
-    s.transform = `translate(${stick.originX - rect.left}px, ${stick.originY - rect.top}px)`;
-    s.setProperty('--brake', brake.toFixed(2));
-    this.knob.style.transform = `translate(${stick.x - stick.originX}px, ${stick.y - stick.originY}px)`;
-    this.stick.flag('braking', brake > 0.05);
-    writes += 3;
-  }
-
   dispose() {
     this.el.remove();
-    this.stick.el.remove();
   }
 }
 
@@ -664,6 +674,7 @@ export class Hud {
     this.optTime = choiceRow(o, TEXT.timeOfDay, [], [], () => {});
     // the driving help (one button per ASSISTS level, made in setState) and, on touch, the throttle
     this.optAssists = choiceRow(o, TEXT.drivingHelp, [], [], () => {});
+    this.optSteering = choiceRow(o, TEXT.steering, ['slider', 'arrows'], [TEXT.slider, TEXT.arrows], (v) => this.act(`steering:${v}`));
     this.optThrottle = choiceRow(o, TEXT.throttle, ['auto', 'manual'], [TEXT.auto, TEXT.manual], (v) => this.act(`throttle:${v}`));
     this.optUnits = choiceRow(o, TEXT.units, ['kmh', 'mph'], [TEXT.kmh, TEXT.mph], (v) => this.act(`units:${v}`));
     this.optMap = choiceRow(o, TEXT.map, ['on', 'off'], [TEXT.shown, TEXT.hidden], (v) => this.act(`map:${v}`));
@@ -686,16 +697,18 @@ export class Hud {
     this._results = '';
   }
 
-  /** The safe area's right and bottom insets in CSS px (where the touch pads stand inside), measured once. */
+  /**
+   * The safe area's left, right and bottom insets in CSS px (where the touch controls stand inside), measured on
+   * every layout (they change when the device is turned). Read through the HUD's own --sl, --sr, --sb, so that what
+   * the CSS places and what the controls are placed by agree.
+   */
   insets() {
-    if (!this._insets) {
-      const probe = make('div', '', this.root);
-      probe.style.cssText = 'position:absolute;visibility:hidden;padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
-      const cs = getComputedStyle(probe);
-      this._insets = { right: parseFloat(cs.paddingRight) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };
-      probe.remove();
-    }
-    return this._insets;
+    const probe = make('div', '', this.root);
+    probe.style.cssText = 'position:absolute;visibility:hidden;padding-left:var(--sl);padding-right:var(--sr);padding-bottom:var(--sb)';
+    const cs = getComputedStyle(probe);
+    const out = { left: parseFloat(cs.paddingLeft) || 0, right: parseFloat(cs.paddingRight) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };
+    probe.remove();
+    return out;
   }
 
   /** DOM writes so far (all views and panels): the HUD's cost, for tests. */
@@ -785,7 +798,7 @@ export class Hud {
    */
   setState(s) {
     const times = s.times || [s.time];
-    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.assists}|${s.throttle}|${this.optionsOpen}`;
+    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.assists}|${s.throttle}|${s.steering}|${this.optionsOpen}`;
     this._s = s;
     if (key === this._state) return;
     const [wasPhase, wasPaused] = this._state.split('|');
@@ -829,6 +842,8 @@ export class Hud {
     pick(this.optAssists, s.assists);
     pick(this.optThrottle, s.throttle);
     this.optThrottle.row.hidden = !touch;
+    pick(this.optSteering, s.steering);
+    this.optSteering.row.hidden = !touch;
     pick(this.optQuality, s.quality);
     pick(this.optSound, s.muted ? 'off' : 'on');
     pick(this.optUnits, s.units);
