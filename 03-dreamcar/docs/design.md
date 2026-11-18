@@ -444,45 +444,54 @@ car (car.md), which also stay out of the repository.
 
 ## The forest
 
-Early autumn: most broadleaves green, maples turned, birches yellowing, larch
-green-gold, spruce and fir dark. Built in `src/assets/world/`:
+Early autumn: most broadleaves green, the maples of the start turned, birches
+yellowing, larch green-gold, spruce and fir dark. Built in
+`src/assets/world/`:
 
-- `treeSpecies.js` seven species (spruce, fir, larch, birch, maple, lime,
-  hazel for the undergrowth), nine grown individuals; per species a `green`
-  tint, `autumn` tints and how readily it `turns`. The maple's autumn tints
-  and the broadleaf greens were set by measuring frames D4 and D3 (hue and
-  lightness of crown pixels) under our golden hour and day light.
-- `forestTextures.js` one atlas of 12 tiles: needles, leaf clusters, leaf
-  masses of many small leaves (for the reduced trees' big cards), fallen
-  leaves and grass-and-moss patches (the floor); broadleaf tiles painted
-  nearly grey; coverage-preserving mip levels.
-- `treeGeometry.js` grows each individual into a full and a reduced mesh;
-  crowns are leaf masses clumped round the last limbs, each clump a small
-  dome lit on top and darker below.
-- `treeMaterial.js` light through the leaves, `crownTone` (rust or blue-green
-  in the shade, gold or yellow-green in the light), wind, coverage. No hashed
-  or dithered transparency at any tier.
-- `impostors.js` pictures of each individual baked at start-up from the full
-  trees (every tier): 8 level and 8 raised views (8 on low), cells
-  160 / 160 / 192 px (low / medium / high), sampled with a mip bias of -0.6.
-- `forest.js` plants and draws. Where trees stand: `woodAt(track, noise, s,
-  side)` (the Track's `woodAt`); `turnedAt` (turned from the pit lane to
-  about 220 m past the line, green by the first bend; the ledge's first bend
-  kept green); on the straight a deep wall of tall turned maples (a fir or
-  two among them) wherever the Track says the side is wooded and turned;
-  none on the lake side but two tall dark conifers behind the first board
-  (frame D1); trees in D3's bend grown taller; where `woodAt` is null the
-  mass of the forest keeps 30 m away (140 m at the ledge, the valley view);
-  `createWorld({ keepOut })` keeps the pits and town free. Levels per tier
-  (m): full to 0 / 34 / 50, reduced to 60 / 95 / 130, impostors to 650 / 900
-  / 1200. The floor: a grass patch under every tree of the road's rows and a
-  patch of fallen leaves under every turned one (2 triangles each, to 70 /
-  110 / 150 m). Shadows (medium, high): impostor cards on a layer only the
-  sun's shadow camera sees.
+- `treeSpecies.js` eight species (spruce, fir, larch, birch, maple, lime,
+  hornbeam, hazel for the undergrowth), ten grown individuals; per species a
+  `green` tint, `autumn` tints and how readily it `turns`. The maple's ten
+  autumn tints are set from frame D4's crown pixels (hue shares there: red
+  12 %, orange 55 %, gold 31 %; ours from the d4 camera within a few points
+  of each), the broadleaf greens from D3.
+- `forestTextures.js` one atlas of 12 tiles: needles, leaf sprigs (four to a
+  tile), masses of small leaves for the reduced trees, fallen leaves and the
+  floor; broadleaf tiles painted grey (the tree's tint colours them);
+  coverage-preserving mip levels (`alphaMips`).
+- `treeGeometry.js` grows each individual: trunk, main limbs, a limb per
+  crown lobe, twigs, some 1300-1900 leaf cards on the lobes' shells, each
+  with a bent normal and its openness to the sky; the reduced mesh is every
+  third card at 1.7 times the size.
+- `treeMaterial.js` light through the leaves, `crownTone`, wind, coverage.
+  No hashed or dithered transparency at any tier: alpha-to-coverage where the
+  scene target is multisampled, a hard cut where it is not.
+- `impostors.js` pictures of each individual baked at start-up: 8 level and
+  8 raised views (8 only on low), cells up to 192 / 256 / 256 px (low /
+  medium / high), sampled with a mip bias of -0.75. Baked from the full trees;
+  on low, where no full broadleaf is ever drawn, from the reduced broadleaves
+  (only the conifers' full meshes are grown there).
+- `forest.js` plants and draws. Where trees stand: `woodAt` (the Track's);
+  `turnedAt` (turned from the line to about 230 m past it, green elsewhere
+  round the start and in the ledge's first bend, groups here and there round
+  the lap). The three places of the reference frames are planted by hand in
+  rows (`plantRows`): D4's wall on the land side beyond the line (six rows
+  14-19 m to 26-33 m tall from the barrier to 45 m back, nearly all maples,
+  a dark fir or two in front); D3's bank (open rows of hornbeams with limes
+  and maples, the first leaning out over the road, the valley side of the bend
+  kept to low growth); D1's middle distance (low round green trees behind the
+  rows of the first bend). Far from every road the forest is planted at half
+  the density, without asking the Track. Levels per tier (m): full to 0 / 58
+  / 80, reduced to 55 / 80 / 110, impostors to 650 / 900 / 1200; a tree's
+  `detail` scales its full and reduced distances, up to 1 / 1.6 / 2 times
+  and 1.6 / 2.8 / 2.8 times (`fullCap`, `redCap`): the wall and the bank have
+  detail 2-2.8 in their front rows, so that from the d4 camera the wall is
+  meshes out to some 150 m on medium. The floor: a grass patch under every
+  tree of the road's rows, fallen leaves under every turned one. Shadows:
+  impostor cards on a layer only the sun's shadow camera sees.
 
-Measured on software WebGL (chase view, 1280x720, one page at a time,
-earlier head): forest draw calls / triangles low 11 / 66 k, medium 21 / 256 k.
-High was not measured again after the last changes. Start-up of the forest
-on this machine has grown to several seconds (planting about 1.3-1.5 s,
-painting the atlas 0.7-2 s): over the 1.5 s budget, to be cut. Not measured
-on a real phone or a real GPU.
+Measured on software WebGL in this container (shared with other work, so the
+times scatter by a third), the forest alone in the main view:
+
+FOREST_NUMBERS
+
+Not measured on a real phone or a real GPU.

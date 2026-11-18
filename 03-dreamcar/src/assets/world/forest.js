@@ -57,8 +57,8 @@ export const CASTER_LAYER = 3;
  * D4's wall stands 70 to 150 m from the grid).
  */
 const TIER = {
-  low: { full: 0, reduced: 55, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: true, fullCap: 1, redCap: 1.6 },
-  medium: { full: 58, reduced: 80, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 1.6, redCap: 2.8 },
+  low: { full: 0, reduced: 55, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: true, fullCap: 1, redCap: 2.6 },
+  medium: { full: 58, reduced: 80, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 2.2, redCap: 2.8 },
   high: { full: 80, reduced: 110, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 2, redCap: 2.8 },
 };
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
@@ -134,8 +134,10 @@ export function createTreeKit({ renderer, tier, coverage, rng, atmosphere }) {
   lap('bark');
   ms.textures = ms.foliage + ms.bark;
   ms.atlas = foliage.ms;
-  // (the full trees are grown on every tier: the impostors are pictures of them, even where they are never drawn)
-  const models = growTrees(VARIANTS, SPECIES_DATA, rng.fork('grow'), { full: true, barkSize: T.bark });
+  // (the impostors are pictures of the full trees; the low tier, which never draws a full one, grows only the
+  // conifers' (cheap, and their reduced boughs are too sparse for a picture) and pictures the broadleaves' reduced
+  // ones: half the growing time there)
+  const models = growTrees(VARIANTS, SPECIES_DATA, rng.fork('grow'), { full: T.full > 0 ? true : (v) => v.kind === 'conifer', barkSize: T.bark });
   lap('grow');
   const atlas = bakeImpostors({ renderer, models, foliage: foliage.texture, bark: bark.map, cell: T.cell, rings: T.rings });
   lap('bake');
