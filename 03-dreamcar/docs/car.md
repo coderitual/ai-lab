@@ -87,7 +87,7 @@ To judge a change to the surface without a browser, the lane's tools render
 the skin alone in Node as a zebra (reflection bands) and as maps of its
 curvature along and across, where any concave patch shows at once.
 
-`body.js` samples the surface once per tier at an edge length of 95 / 55 /
+`body.js` samples the surface once per tier at an edge length of 95 / 56 /
 36 mm (low / medium / high), finer where rails crowd. Normals are the
 surface's own, so even the coarse mesh mirrors cleanly. The same vertices are
 drawn several times with different index lists: paint, glass, lenses, and a
@@ -485,19 +485,19 @@ What still differs:
 
 ## What each tier costs
 
-Re-measured after round two of the shape work (fewer, larger grille stars:
-the high tier fell by 2.4k triangles; the intakes, mirror and rails cost
-nothing). Measured in the viewer, one page at a time (headless Chromium on a 4-core
-machine, software WebGL; build time is
-`car.stats.buildMs`: everything from `createCar()` to the returned handle,
-shader compilation not included):
+Re-measured after round five (the tail's new corners and the finer grille
+stars cost about 1.3k triangles on the medium tier, which went over its
+113k budget; its edge length went from 55 to 56 mm). Measured in the viewer,
+one page at a time (headless Chromium on a 4-core machine, software WebGL;
+build time is `car.stats.buildMs`: everything from `createCar()` to the
+returned handle, shader compilation not included):
 
 | tier | triangles | draw calls (at rest) | build |
 | --- | --- | --- | --- |
-| low | 49.8k | 29 (25) | ~310-450 ms |
-| medium | 112.6k | 31 (27) | ~510-920 ms |
-| high | 185.6k | 31 (27) | ~750-970 ms |
-| ghost | 92.5k | 10 | ~150-190 ms |
+| low | 49.7k | 29 (25) | ~430 ms |
+| medium | 111.0k | 31 (27) | ~680-870 ms |
+| high | 185.0k | 31 (27) | ~990 ms |
+| ghost (not re-measured since round two) | 92.5k | 10 | ~150-190 ms |
 
 Plus one draw call for the contact shadow. The four blur shells are hidden at
 rest and the spokes at speed, so the count on the road is the smaller one.
