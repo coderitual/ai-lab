@@ -70,6 +70,21 @@ function settle(a, b, m, f) {
   return a + m * (f3 - 2 * f2 + f) + (b - a) * (3 * f2 - 2 * f3);
 }
 
+const smoother = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * t * (t * (t * 6 - 15) + 10));
+/** How far the wheel arches' flare (SHAPE.flare) pushes the flank's rail RAIL.lower + k out at z. */
+export function flareAt(z, k) {
+  let d = 0;
+  for (const a of SHAPE.flare) {
+    const w = a.rails[k] || 0;
+    if (!w) continue;
+    const s = Math.sign(a.z3 - a.z0); // the rear arch's table runs backwards
+    const t = (z - a.z0) * s;
+    if (t <= 0 || (z - a.z3) * s >= 0) continue;
+    d += w * a.d * smoother(((z - a.z0) * s) / ((a.z1 - a.z0) * s)) * (1 - smoother(((z - a.z2) * s) / ((a.z3 - a.z2) * s)));
+  }
+  return d;
+}
+
 /**
  * The control net: for every section, RAILS points [x, y, z].
  * @returns {{ points: number[][][], sections: Array<{ zone: 'nose'|'main'|'tail', q: number, z: number }> }}
@@ -107,6 +122,7 @@ export function buildNet() {
   // length, the three lines put the points of one section in different planes, and the twisted sections
   // were dents and creases all over the boot's face and the bumper.
   const zAxis = last - sweep(last);
+  const noseAxis = first - sweep(first);
   const bearing = (p) => Math.atan2(p[0], zAxis - p[2]); // pi/2 square across the car, 0 straight back
   const cut = (line, lo, a) => {
     let s0 = lo;
@@ -178,6 +194,19 @@ export function buildNet() {
       pts[RAIL.widest + 1 + k] = between(W, S, rail(q));
     });
     pts[RAIL.shoulder] = S;
+    // the arches' flare, outwards in plan (straight out along the sides; square to the plan curve round the ends)
+    SHAPE.flare[0].rails.forEach((_, k) => {
+      const P = pts[RAIL.lower + k];
+      const d = flareAt(P[2], k);
+      if (!d) return;
+      if (zone === 'main') P[0] += d;
+      else {
+        const along = zone === 'tail' ? P[2] - zAxis : P[2] - noseAxis;
+        const n = unit([P[0], 0, along]);
+        P[0] += d * n[0];
+        P[2] += d * n[2];
+      }
+    });
 
     // ---- above the shoulder
     const yc = centreTop(zc);

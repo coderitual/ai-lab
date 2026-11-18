@@ -23,7 +23,7 @@
  */
 export const DIMS = {
   length: 4.793,
-  width: 1.82, // body, without mirrors
+  width: 1.82, // body, without mirrors, as published; the model is 1.866 over its arch flares, which cover the tyres of these tracks (docs/car.md)
   widthWithMirrors: 2.033,
   height: 1.438,
   wheelbase: 2.865,

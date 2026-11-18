@@ -93,6 +93,16 @@ surface's own, so even the coarse mesh mirrors cleanly. The same vertices are
 drawn several times with different index lists: paint, glass, lenses, and a
 dark shell (every other vertex, BackSide) that shows through openings.
 
+The front wings and the rear hips flare out over the tyres (`SHAPE.flare` in
+`lines.js`, added to the flank's rails in `skin.js` by `flareAt`): an
+outward step of a few centimetres over each arch, rising and falling as a
+smootherstep along the car and weighted per rail, highest at the widest line
+and the rails just above it (the front has a second, higher step over its
+forward half, where the wing falls away to the head lamp). With it each
+tyre's outer face sits 9 to 15 mm inside its arch lip over the part of the
+lip that stands over the tyre (45 to 135 degrees round the arch; measured
+with `skin.sideX` along the lip's outline).
+
 Small forms a few millimetres high but sharp are not geometry; the paint
 shader shades them. The bonnet's power domes, the door's lower crease, the
 sill's groove and blade and the band round the arches are tilts of the normal
@@ -363,6 +373,7 @@ in the viewer.
 | --- | --- |
 | a dimension, wheel position, lamp position | `spec.js` (the physics reads it too) |
 | the body's shape | the tables in `lines.js`; check with `pin=` against the photographs |
+| how far the wings and hips stand out over the tyres | `SHAPE.flare` in `lines.js` |
 | how fine the mesh is | `MESH_EDGE` in `body.js` |
 | where a window, lens, shut line or opening is | its outline in `features.js` |
 | atlas resolution | `ATLAS_SIZE` in `atlas.js` |
@@ -467,14 +478,6 @@ pixels; they were left alone.
 
 What still differs:
 
-- **The wheels stand a little proud.** The body's widest point is 0.902 by
-  the front arch and 0.909 by the rear (1.818 overall, as published), but
-  the tyres' outer faces are at 0.9075 and 0.917 (`spec.js`: tracks 1.590 /
-  1.579 with 225 and 255 tyres). From ahead and to the side the front tyre
-  stands outside its arch. Tracks of about 1.574 / 1.559 would bring both
-  faces just inside the body; that changes the physics (`spec.js` is read
-  by it, and `docs/spec.md` holds its numbers), so it is left for whoever
-  owns the handling.
 - The front apron under the grille is simpler than the car's (deep black side
   intakes framed by a painted wing): ours has slatted intakes and a plain
   blade.
@@ -482,6 +485,18 @@ What still differs:
   olive band across the bonnet from low three-quarter views; the crowns in
   the probe are brighter and more yellow than the dark trees of the press
   picture.
+
+### Round six: the arches, the roof glass, the lamps, the apron
+
+| what | before | after |
+| --- | --- | --- |
+| wheel arches | body 0.902 wide (half) by the front arch, 0.909 by the rear: both tyres' faces (0.9075, 0.917) stood outside their lips by up to 34 mm | wings and hips flared (`SHAPE.flare`): 0.932 / 0.933, each tyre 9 to 15 mm inside its lip; the plan line falls smoothly from the hip into the bumper, which stays the widest thing below the lamps |
+
+The tracks (1.590 / 1.579, `spec.js`) and the tyres were left as they are.
+With them the body is 1.866 over the flares, 46 mm more than the published
+1.820: a 255 rear tyre on a 1.579 track is 1.834 over its faces, so the
+published width and the tracks cannot both be right. `DIMS.width` (read by
+the physics) keeps the published figure.
 
 ## What each tier costs
 
