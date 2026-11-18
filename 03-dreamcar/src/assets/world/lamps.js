@@ -27,7 +27,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ATMOSPHERE_PARS } from './atmosphere.js';
 import { GLSL_TARGET, targetDefines } from '../../engine/glsl.js';
-import { footBox, levelFrame, upright } from './furniture.js';
+import { levelFrame, upright } from './furniture.js';
 import { WET_UNIFORMS } from './shading.js';
 
 /**
@@ -44,7 +44,10 @@ export const LAMP_KINDS = {
   lap: { intensity: 18, range: 32, angle: 1.2, penumbra: 0.6, tilt: 0.44, head: 120, color: [0.84, 0.92, 1.0], arm: 2.2 },
   // (render lane) a warm white, not sodium orange: under the orange lamps the bore, the road and the car were one
   // murky brown; a little stronger, so that each lamp lays a pool on the road
-  tunnel: { intensity: 34, range: 18, angle: 1.3, penumbra: 0.5, tilt: 0.6, head: 55, color: [1.0, 0.85, 0.66], arm: 0 },
+  // (tunnel lane) a modern LED box tunnel (the owner's video): a neutral, slightly cool white, wide beams leaning
+  // across the road from the haunch. Each lamp's own `gain` (the Track's entrance and exit zones) scales it; its
+  // fittings are drawn by tunnel.js, `head` is their radiance against the colour
+  tunnel: { intensity: 34, range: 20, angle: 1.3, penumbra: 0.9, tilt: 0.5, head: 60, color: [0.9, 0.96, 1.0], arm: 0 },
 };
 /** Pool size per tier. */
 const POOL = { low: 2, medium: 4, high: 6 };
@@ -113,7 +116,7 @@ export function createLamps({ track, terrain = null, caps, tier, atmosphere, gli
     // (finish lane) a pole set back beyond the solid edge stands on the ground there, if that lies lower
     if (terrain && Math.abs(lat) > track.edgeAt(lamp.s, lamp.side) + 0.05) foot.y = Math.min(foot.y, terrain.heightAt(foot.x, foot.z) - 0.1);
     const dir = new THREE.Vector3(0, -1, 0).addScaledVector(inward, Math.tan(spec.tilt)).normalize();
-    return { index, kind, spec, s: lamp.s, side: lamp.side, lat, foot, head, dir, yaw: frame.yaw };
+    return { index, kind, spec, gain: lamp.gain ?? 1, s: lamp.s, side: lamp.side, lat, foot, head, dir, yaw: frame.yaw };
   });
   const byKind = (kind) => lamps.filter((l) => l.kind === kind);
 
@@ -121,7 +124,11 @@ export function createLamps({ track, terrain = null, caps, tier, atmosphere, gli
   const real = new Float32Array(Math.max(1, lamps.length));
   /** How far each kind is turned up (lighting.js lamps; the floodlights go with the street lamps). */
   const on = { street: 0, lap: 0, tunnel: 1 };
-  /** Per lamp: red how far it is on, green its share of the pool (read by the glow and by the bore's baked light). */
+  /** How much of a lamp's own gain over its kind's light is on (lighting.js lamps.entrance: the tunnel's zones). */
+  let boost = 1;
+  const gainOf = (lamp) => 1 + (lamp.gain - 1) * boost;
+  /** Per lamp: red how far it is on, green its share of the pool (read by the glow and by the bore's baked light), blue
+   * its gain over its kind's light, a quarter of it (the tunnel's zones: tunnel.js reads it). */
   const shareData = new Uint8Array(Math.max(1, lamps.length) * 4);
   const shares = new THREE.DataTexture(shareData, Math.max(1, lamps.length), 1, THREE.RGBAFormat, THREE.UnsignedByteType);
   shares.magFilter = shares.minFilter = THREE.NearestFilter;
@@ -130,6 +137,7 @@ export function createLamps({ track, terrain = null, caps, tier, atmosphere, gli
     for (let i = 0; i < lamps.length; i++) {
       shareData[i * 4] = Math.round(255 * on[lamps[i].kind]);
       shareData[i * 4 + 1] = Math.round(255 * real[i]);
+      shareData[i * 4 + 2] = Math.round(255 * Math.min(1, gainOf(lamps[i]) / 4));
     }
     shares.needsUpdate = true;
   };
@@ -140,10 +148,9 @@ export function createLamps({ track, terrain = null, caps, tier, atmosphere, gli
   // and the floodlights, which switch together, are one mesh whose vertex colours carry each kind's colour and
   // radiance. Five instanced rows per piece were five draw calls; this is two.
   const metal = atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0x585d63, roughness: 0.45, metalness: 0.7 }));
-  /** The emitters: the poled lamps' (street and lap, vertex colours) and the tunnel's; their colour is how far they are on. */
+  /** The emitters of the poled lamps (street and lap, vertex colours); their colour is how far they are on. */
   const emitters = {
     poled: atmosphere.patch(new THREE.MeshBasicMaterial({ color: 0x000000, vertexColors: true })),
-    tunnel: atmosphere.patch(new THREE.MeshBasicMaterial({ color: 0x000000 })),
   };
   const emitterMeshes = {};
   const street = lamps.filter((l) => l.kind === 'street' || l.kind === 'lap');
@@ -166,23 +173,8 @@ export function createLamps({ track, terrain = null, caps, tier, atmosphere, gli
     group.add(emitterMeshes.poled);
     for (const g of [pole, arm, housing, emitter]) g.dispose();
   }
+  // (tunnel lane) the tunnel's fittings and their emitters are tunnel.js's: one mesh with the rest of what glows there
   const tunnel = byKind('tunnel');
-  if (tunnel.length) {
-    const housing = new THREE.BoxGeometry(0.42, 0.16, 1.3);
-    const emitter = new THREE.PlaneGeometry(0.32, 1.15).rotateX(Math.PI / 2);
-    const bracket = footBox();
-    const fittings = baked(
-      tunnel.flatMap((l) => [
-        [housing, upright(p.copy(l.head).setY(l.head.y + 0.08), l.yaw)],
-        [bracket, upright(p.copy(l.head).setY(l.head.y + 0.16), l.yaw, 0.06, 0.5, 0.06)],
-      ]),
-    );
-    group.add(plain(fittings, metal, { shadow: false, name: 'tunnel-lamp-fittings' }));
-    const heads = baked(tunnel.map((l) => [emitter, upright(p.copy(l.head).setY(l.head.y - 0.005), l.yaw)]));
-    emitterMeshes.tunnel = plain(heads, emitters.tunnel, { shadow: false, name: 'tunnel-lamp-emitters' });
-    group.add(emitterMeshes.tunnel);
-    for (const g of [housing, emitter, bracket]) g.dispose();
-  }
 
   // ---- the glow on the ground: a patch of the corridor's surface under each lamp
   // (picture lane) one mesh per kind that switches, so that a kind switched off (the street lamps by day) is not drawn
@@ -220,8 +212,9 @@ uniform float uWet;
 varying vec3 vWorld; varying vec3 vNormal; varying vec3 vLampPos; varying vec3 vLampDir;
 varying vec4 vSpec; varying vec3 vColor; flat varying int vIndex;
 void main() {
-  vec2 lamp = texelFetch(uShares, ivec2(vIndex, 0), 0).rg;
-  float share = lamp.r * (1.0 - lamp.g);
+  vec3 lamp = texelFetch(uShares, ivec2(vIndex, 0), 0).rgb;
+  // (on, its share of the real pool, its gain over its kind's light / 4)
+  float share = lamp.r * (1.0 - lamp.g) * lamp.b * 4.0;
   float E = share * spotIrradiance(vWorld, normalize(vNormal), vLampPos, vLampDir, vSpec.x, vSpec.y, vSpec.zw);
   vec3 ray = vWorld - cameraPosition;
   // (night lane) wet ground is darker: its pores are full and what it does not soak up it mirrors (road.js)
@@ -379,7 +372,7 @@ void main() {
       light.target.position.copy(lamp.head).add(lamp.dir);
       light.target.updateMatrixWorld();
       light.color.setRGB(...spec.color);
-      light.intensity = spec.intensity * lit * w;
+      light.intensity = spec.intensity * gainOf(lamp) * lit * w;
       light.distance = spec.range;
       light.angle = spec.angle;
       light.penumbra = spec.penumbra;
@@ -446,12 +439,11 @@ void main() {
       on.street = time.lamps.street;
       on.lap = time.lamps.street;
       on.tunnel = time.lamps.tunnel;
+      boost = time.lamps.entrance ?? 1;
       writeShares();
       for (const glow of glows) glow.visible = on[glow.userData.kind] > 0;
       // (the poled emitters' colour and radiance are in their vertex colours; a lamp switched off is not drawn)
       emitters.poled.color.setScalar(on.street);
-      const tunnelSpec = LAMP_KINDS.tunnel;
-      emitters.tunnel.color.setRGB(...tunnelSpec.color.map((c) => c * tunnelSpec.head * on.tunnel));
       if (emitterMeshes.poled) emitterMeshes.poled.visible = on.street > 0;
       coneGain.value = CONE.radiance * (time.lamps.haze ?? 0);
       if (cones) cones.visible = coneGain.value > 0 && on.street > 0;

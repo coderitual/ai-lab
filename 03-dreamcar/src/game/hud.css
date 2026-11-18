@@ -627,110 +627,208 @@
   border-radius: calc(var(--u) * 0.5);
 }
 
-/* ---- touch: DRIFT (and GAS) under the right thumb; the speed steps left of them */
+/* ---- touch: fixed controls. The steering at the bottom left, the pedals at the bottom right, placed in px by
+   Hud.setControls from Input's layoutOf (the numbers a finger is found by). Translucent, readable over the day's
+   bright road and the night's dark one: a dark fill, a light rim, a shadow under the words. */
 
-.hud .pads {
+.hud .controls {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
-.hud .pad {
+.hud .view:not(.touch) .controls,
+.hud .view.done .controls {
+  display: none;
+}
+.hud .controls > div {
   position: absolute;
   box-sizing: border-box;
+}
+.hud .controls .name {
+  display: none;
+}
+.hud .pedal,
+.hud .arrow {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.55);
-  background: rgba(10, 16, 22, 0.42);
-  font-size: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: rgba(8, 13, 18, 0.4);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.hud .pedal .word {
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
-.hud .pad.held {
+.hud .pedal.gas {
+  border-color: rgba(140, 250, 180, 0.75);
+}
+.hud .pedal.held,
+.hud .arrow.held {
   background: rgba(255, 180, 60, 0.55);
   border-color: var(--amber);
 }
-.hud .pad.gas.held {
+.hud .pedal.gas.held {
   background: rgba(92, 240, 142, 0.5);
   border-color: var(--green);
 }
-.hud .view:not(.touch) .pads,
-.hud .view.done .pads {
-  display: none;
+/* an arrow: a chevron drawn by two borders of a turned square */
+.hud .arrow::before {
+  content: '';
+  width: 30%;
+  height: 30%;
+  border: solid rgba(255, 255, 255, 0.9);
+  border-width: 0 0 4px 4px;
+  transform: translateX(12%) rotate(45deg);
 }
-.hud .view.touch .cluster,
-.hud .view.touch .slide {
-  right: calc(var(--pad) + var(--sr) + 116px);
+.hud .arrow.right::before {
+  transform: translateX(-12%) rotate(-135deg);
 }
-/* a narrow, wide-shaped view (a side-by-side half): the speed stands above DRIFT instead */
-.hud .view.touch.narrow:not(.tall) .cluster {
-  right: calc(var(--pad) + var(--sr));
-  bottom: calc(var(--sb) + 200px);
-}
-.hud .view.touch.narrow:not(.tall) .slide {
-  right: calc(var(--pad) + var(--sr));
-  bottom: calc(var(--sb) + 200px + var(--u) * 19.5);
-}
-/* an upright view: the speed at the bottom left, the map above it, the right side free for the thumb's buttons */
-.hud .view.touch.tall .cluster,
-.hud .view.touch.tall .slide {
-  right: auto;
-  left: calc(var(--pad) + var(--sl));
-}
-.hud .view.touch.tall .map {
-  bottom: calc(var(--pad) + var(--sb) + var(--u) * 21);
-}
-.hud .view.touch.tall.small .cluster,
-.hud .view.touch.tall.small .slide {
-  left: 6px;
-  width: calc(var(--u) * 21);
-}
-/* a low view (a stacked half): DRIFT beside GAS at the bottom; the speed left of both */
-.hud .view.touch.low .cluster,
-.hud .view.touch.low .slide {
-  right: calc(var(--pad) + var(--sr) + 206px);
-}
-.hud .view.touch.low .cluster {
-  bottom: calc(var(--pad) + var(--sb));
-}
-.hud .view.touch.low .slide {
-  bottom: calc(var(--pad) + var(--sb) + var(--u) * 19.5);
-}
-/* the zones named on the first touch run, ghosted: STEER over the left part, BRAKE over the right */
-.hud .zonehint {
+/* the slider: a rail with the centre marked, the knob on it (moved by setControls; at the centre with no thumb) */
+.hud .slider .rail {
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-  animation: hud-fade-in 0.4s ease-out;
-}
-.hud .zonehint span {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  display: grid;
-  place-items: center;
-  font-size: max(16px, calc(var(--u) * 3));
-  font-weight: 800;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.07);
-  border: 2px dashed rgba(255, 255, 255, 0.35);
+  left: calc(var(--k) * 0.5);
+  right: calc(var(--k) * 0.5);
+  top: calc(50% - 6px);
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(8, 13, 18, 0.45);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
   box-sizing: border-box;
 }
-.hud .zonehint .steer {
-  left: 0;
-  width: var(--steer);
+.hud .slider .mid {
+  position: absolute;
+  left: calc(50% - 1.5px);
+  top: 10%;
+  width: 3px;
+  height: 80%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
 }
-.hud .zonehint .brake {
-  right: 0;
-  left: var(--steer);
+.hud .slider .knob {
+  position: absolute;
+  left: calc(50% - var(--k));
+  top: 0;
+  width: calc(var(--k) * 2);
+  height: calc(var(--k) * 2);
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: rgba(240, 246, 250, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.hud .slider.held .knob {
+  background: rgba(143, 220, 255, 0.55);
+  border-color: var(--ice);
+}
+/* the first touch run: every control outlined, the steering named above itself */
+.hud .controls.naming > div {
+  outline: 2px dashed rgba(255, 255, 255, 0.55);
+  outline-offset: 5px;
+  animation: hud-fade-in 0.4s ease-out;
+}
+.hud .controls.naming .slider,
+.hud .controls.naming .arrow {
+  border-radius: 999px;
+}
+.hud .controls.naming .name {
+  display: block;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.hud .controls.naming .arrow.right .name {
+  display: none;
 }
 @keyframes hud-fade-in {
   from {
     opacity: 0;
   }
+}
+
+/* ---- touch: where the readouts go. The bottom corners are the thumbs'; nothing else stands there.
+   A wide view: the speed just left of the pedals (on auto BRAKE alone is in the corner; on manual it stands
+   above BRAKE, left of DRIFT), the map above the steering. A narrow wide view (a side-by-side half on a phone):
+   the speed above the pedals. A low view (a stacked half): the speed at the top, beside the lap. An upright view:
+   the speed and the map above the steering; on a thin one (half of an upright phone) the speed under the lap and
+   no map. Every offset is the pedals' size in Input's TOUCH plus the gap. */
+
+.hud .view.touch .cluster,
+.hud .view.touch .slide {
+  right: calc(var(--sr) + 110px);
+}
+.hud .view.touch.manual .cluster {
+  right: calc(var(--sr) + 108px);
+  bottom: calc(var(--sb) + 110px);
+}
+.hud .view.touch.manual .slide {
+  right: calc(var(--sr) + 108px);
+  bottom: calc(var(--sb) + 110px + var(--u) * 19.5);
+}
+.hud .view.touch .map {
+  bottom: calc(var(--sb) + 112px);
+}
+.hud .view.touch.narrow:not(.tall) .cluster {
+  right: calc(var(--pad) + var(--sr));
+  bottom: calc(var(--sb) + 206px);
+}
+.hud .view.touch.narrow:not(.tall) .slide {
+  right: calc(var(--pad) + var(--sr));
+  bottom: calc(var(--sb) + 206px + var(--u) * 19.5);
+}
+.hud .view.touch.low .cluster {
+  right: auto;
+  bottom: auto;
+  left: calc(var(--pad) + var(--sl) + var(--u) * 30);
+  top: calc(var(--pad) + var(--st));
+}
+.hud .view.touch.low .slide {
+  right: auto;
+  bottom: auto;
+  left: calc(var(--pad) + var(--sl) + var(--u) * 30);
+  top: calc(var(--pad) + var(--st) + var(--u) * 19.5);
+}
+.hud .view.touch.tall .cluster,
+.hud .view.touch.tall .slide {
+  right: auto;
+  left: calc(var(--pad) + var(--sl));
+  bottom: calc(var(--sb) + 112px);
+}
+/* (a little smaller, as a whole, so that it stays clear of the car in a tablet's upright half) */
+.hud .view.touch.tall .cluster {
+  transform: scale(0.86);
+  transform-origin: left bottom;
+}
+.hud .view.touch.tall .slide {
+  bottom: calc(var(--sb) + 112px + var(--u) * 19.5);
+}
+.hud .view.touch.tall .map {
+  bottom: calc(var(--sb) + 112px + var(--u) * 21);
+}
+.hud .view.touch.tall.small .cluster,
+.hud .view.touch.tall.small .slide {
+  left: 6px;
+}
+.hud .view.touch.thin .map {
+  display: none;
+}
+.hud .view.touch.thin .cluster {
+  bottom: auto;
+  top: calc(var(--pad) + var(--st) + var(--u) * 18);
+}
+.hud .view.touch.thin .slide {
+  bottom: auto;
+  top: calc(var(--pad) + var(--st) + var(--u) * 37);
 }
 
 /* ---- the buttons: small and together, at the right under the time to beat, away from the thumbs and the figures */
@@ -811,59 +909,6 @@
 /* on a short picture (a stacked half on a phone) the map steps aside */
 .hud .view.short .map {
   display: none;
-}
-
-/* ---------------------------------------------------------------- the stick */
-
-.hud .stick {
-  position: absolute;
-  z-index: 1;
-  left: 0;
-  top: 0;
-  width: 0;
-  height: 0;
-}
-.hud .stick::before {
-  content: '';
-  position: absolute;
-  left: calc(var(--r) * -1);
-  top: calc(var(--r) * -1);
-  width: calc(var(--r) * 2);
-  height: calc(var(--r) * 2);
-  box-sizing: border-box;
-  border-radius: 50%;
-  border: 1.5px solid rgba(240, 246, 250, 0.55);
-  background: radial-gradient(circle, rgba(5, 9, 13, 0) 55%, rgba(5, 9, 13, 0.25));
-}
-.hud .stick.braking::before {
-  border-color: var(--amber);
-}
-.hud .stick i {
-  position: absolute;
-  left: -20px;
-  top: -20px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(240, 246, 250, 0.4);
-  border: 1.5px solid rgba(240, 246, 250, 0.85);
-  box-sizing: border-box;
-}
-.hud .stick .brake {
-  position: absolute;
-  left: calc(var(--r) * -0.6);
-  top: calc(var(--r) + 10px);
-  width: calc(var(--r) * 1.2);
-  height: 4px;
-  background: rgba(240, 246, 250, 0.2);
-}
-.hud .stick .brake::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--amber);
-  transform-origin: left;
-  transform: scaleX(var(--brake, 0));
 }
 
 /* ---------------------------------------------------------------- the page's panels */

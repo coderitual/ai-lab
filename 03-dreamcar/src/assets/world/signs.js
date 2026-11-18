@@ -45,6 +45,14 @@ const BOARDS = [
 ];
 /** Designs by index, for runs that want a palette of their own. */
 export const DESIGN = { varno: 0, torvel: 1, miralta: 2, brennik: 3, oskali: 4, lundar: 5, pellora: 6, calvenna: 7, arvent: 8, solmere: 9, terna: 10 };
+/**
+ * (tunnel lane) One trackside board's design painted into a 512 x 128 cell of a canvas of one's own (the banner over
+ * the tunnel's entrance): `index` in DESIGN's order.
+ */
+export function paintBoard(g, rect, index) {
+  drawBoard(g, rect, BOARDS[index % BOARDS.length]);
+}
+
 /** Board designs available (cells), and how many there are. */
 export const BOARD_COUNT = BOARDS.length;
 

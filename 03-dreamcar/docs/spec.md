@@ -41,7 +41,7 @@ run of `tools/handling.mjs`.
 | `straight` | Lakeside straight | 4686 to 250 (700 m) | finish 340 m, pitIn 110 m, the line, grid 40 m, gridRun 210 m; level | 225 to 279 |
 | `sweep` | Shore bend | 250 to 657 | right R 220 through 80°, banked 9°; 100 m straight climbing to 5 % | 196 to 225 |
 | `esses` | Forest esses | 657 to 1409 | right R 260 55° (bank 8°), left R 330 40° (7°), right R 240 65° (9°); 4 to 5.5 % | 204 to 240 |
-| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m; the bore 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m | 216 to 255 |
+| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens) | 216 to 255 |
 | `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers: left R 300 through 110°, banked 10°, ground 42 m under the middle | 229 to 257 |
 | `carousel` | The carousel | 2582 to 2915 | 150 m climb at 6 %, then right R 55 through 190°, banked 8° | 90 to 229 |
 | `crest` | The crest | 2915 to 3115 | 200 m straight over the top | 108 to 161 |
@@ -65,6 +65,9 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; walls in the tunnel and parapets on the bridges, 1.5 m beyond the pavement; on the sea side of the coast road (the climb, the carousel, the crest and the plunge: `coastDown`, `coastRun`, `coastTop`) the rail stands on white posts with ochre gravel beyond it and no trees (the corridor as the presets they replaced) |
 | the sea | outside the loop at bearings from the course's middle outside -115 to 50 degrees (0: the straight's heading), from 55 to 170 m beyond the solid edge; the bay beside the straight; level -1.8 m; seabed to 45 m; 7 sea stacks; no far shore (terrain.js `SEA`) |
 | structures | the tunnel's bore 349 m, ceiling 6.4 m over the road (`TUNNEL`); two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
+
+| barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; the walkways' kerb faces in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
+| structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
 | tyre walls | 8 runs, on the outside of the fast bends |
 | trackside boards | 11 runs, both walls of the straight included |
@@ -73,7 +76,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |
 | street lamps | 23, 9 m high, every 30.4 m on alternating sides along the whole straight |
 | floodlights | 69, 12 m high, every 55 m round the rest of the lap (`lapLamps`): on the inside of bends tighter than 1500 m, alternating elsewhere; none in the tunnel or within 25 m of its portals, none on `ledge1` (frame D3's place); 2.5 m behind the edge where it is a rail (47 of them; a lamp due at a rock face goes to the other side if a rail is there), at the edge in rock cuttings (4) and at parapets (18) |
-| tunnel lamps | 29 rows of two, every 12 m |
+| tunnel lamps | 29 rows of two, every 12 m, 0.6 m in from the kerb faces and 0.3 m under the ceiling; gain 2.4 over the first 60 m, easing to 1 by 130 m, 1.4 over the last 36 m (`tunnelLamps`); fittings drawn along both haunches at 95 places each (two bars every 2 m over the first 60 m, one every 3 m to 130 m and over the last 36 m, every 6 m between: 250 bars) |
 | sector lines | s = 1881.8 m (37 %, just out of the tunnel) and 3420.0 m (67 %, the start of the ledge); the third is the line |
 | grid | 12 boxes behind the line (`track.grid`) |
 
@@ -194,9 +197,9 @@ key lock at speed do not spin the car.
 
 | | keyboard (solo) | split screen | gamepad (standard mapping) | touch |
 | --- | --- | --- | --- | --- |
-| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | Throttle auto (default): the car drives while the steering thumb is down and 0.4 s after, not while the brake or DRIFT is held; Throttle manual: the GAS button (88 px, centre 64 px from the right, 56 px from the bottom). Brake: a finger anywhere in the right 45 % of the view (held at a standstill it reverses) |
-| steer | A D or ← → | A D and ← → | left stick | the left 55 % of the view: the first finger there is a stick where it lands, sideways only, 96 px for full lock, curve power 1.15, its origin trailing beyond that; a second finger there is ignored |
-| handbrake | Space | Space, right Shift | A or RB | the DRIFT button (76 px, centre 64 px from the right, 150 px from the bottom), held |
+| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | Throttle auto (default): the car drives by itself from the green light, touched or not, and lifts while BRAKE or DRIFT is held; Throttle manual: only while GAS is held (88 px, in the corner). BRAKE: 80 px, in the corner on auto, left of GAS on manual (where that would shorten the slider below 70 px, as on an upright phone, BRAKE stands up and to the left of GAS, clear of it); held at a standstill it reverses |
+| steer | A D or ← → | A D and ← → | left stick | Steering slider (default): a fixed track at the bottom left with its centre marked; a thumb anywhere in the steering zone (the left half of the view below 45 % of its height) takes the knob, and the steering is its distance from the fixed centre over the half travel (56 + 0.05 × the view's width px, 48 to 92 px: 76 px on an upright phone, 92 px on its side), linear, clamped to full lock; let go, the knob is back at the centre. The curve is the hands' (`HANDS.thumb`: power 1.15 standing, 1.45 at 216 km/h and above). Steering arrows: two 76 px buttons, held as the A and D keys are (the same wind-on and run-back). A second thumb on the steering is ignored |
+| handbrake | Space | Space, right Shift | A or RB | DRIFT (68 px), above the corner pedal (beside the pedals on a view lower than 330 px or narrower than 300 px), held |
 | camera | C | C, `.` | Y | button |
 | look back | B (held) | B, `,` | X | |
 | put back | R | R, `/` | B | button |
@@ -207,15 +210,24 @@ key lock at speed do not spin the car.
 | pause | P, Esc | P, Esc | Start | button |
 | start, menus | Enter, Tab | | A, d-pad | tap |
 
-Each driver reads whichever of their devices was used last. On a tablet in
-split screen each half of the screen is one driver's touch zone, with its own
-steering part, brake part and buttons. The DRIFT and GAS buttons stand inside
-the safe area; Input (`TOUCH` in `src/engine/Input.js`) finds them by the
-same numbers the HUD draws them with. On the first run on a touch screen the
-zones are named (STEER, BRAKE, and the DRIFT button) for the first 3 s of the
-race clock, then never again (`dreamcar.zones.v1`). Every button can be
-reached by Tab and Enter, or a pad's d-pad and A; DRIFT and GAS are at least
-64 px, the four small buttons 44 px.
+Each driver reads whichever of their devices was used last. The touch
+controls are fixed and always drawn (`TOUCH` and `layoutOf` in
+`src/engine/Input.js`; the HUD draws them from the same layout, so a finger
+finds what it sees): 18 px from the edges inside the safe area (the notch and
+the home bar), 12 px apart; the slider's knob 52 px, resting on that bottom
+margin. Each control keeps the finger that took it until that finger
+lifts (sliding off a pedal keeps it); a cancelled pointer, the window losing
+focus, a hidden tab or a turned device lets every control go. A touch
+anywhere else does nothing to the car; the HUD's own buttons keep working. On
+a view too narrow for the steering and the pedals side by side (half of an
+upright phone) the pedals stand above the steering, in one column. On a tablet in split
+screen each half of the screen is one driver's, with its own controls laid
+out for the half. On the first run on a touch screen the controls are
+outlined and the steering named (STEER; the pedals carry their words always)
+for the first 3 s of the race clock, then never again
+(`dreamcar.zones.v1`). Every button can be reached by Tab and Enter, or a
+pad's d-pad and A; the pedals and arrows are at least 64 px, the four small
+buttons 44 px.
 
 ## Cameras
 
@@ -249,10 +261,10 @@ unit per view:
   behind);
 - top right: the next time to beat (split screen: the place and the gap);
 - bottom right: the speed in large figures (km/h or mph), a rev arc, the
-  gear, the ABS / TC / ESC lamps;
-- bottom left: a small map (can be hidden);
+  gear, the ABS / TC / ESC lamps (touch screens: see below);
+- bottom left: a small map (can be hidden; touch screens: see below);
 - just above the speed, only while the car slides 12° or more: the slide's angle and its running score (`vehicle.slide`; `Hud.setDrift`), fading out a second after the slide ends; the best slide of the run is on the results;
-- touch screens: DRIFT (and GAS with the throttle on manual) under the right thumb; the speed steps 116 px left of them (a side-by-side half: above DRIFT; an upright view: bottom left, the map above it; a view lower than 330 px, a stacked half on a phone: DRIFT stands beside GAS at the bottom, 160 px from the right, and the speed 206 px left);
+- touch screens: the bottom corners are the thumbs' (the steering left, the pedals right) and nothing else stands there. A wide view: the speed just left of the pedals (110 px from the right on auto; on manual 108 px from the right and 110 px up, above BRAKE and left of DRIFT), the map 112 px up, above the steering; a narrow wide view (a side-by-side half on a phone): the speed 206 px up, above the pedals; a view lower than 330 px (a stacked half): the speed at the top beside the lap; an upright view: the speed 112 px up at the left, drawn at 0.86 of its size, the map above it; a view narrower than 300 px (half an upright phone): the speed under the lap, no map, DRIFT beside BRAKE;
 - touch screens: four small buttons together (camera, high beam, put back,
   pause);
 - the best-laps board on the title, the pause sheet and the results only.
@@ -265,7 +277,8 @@ measurement; `stats().hudWrites`).
 On the title and the pause sheet: quality (auto, low, medium, high; applied
 by reloading the page), sound on or off, time of day, driving help (Full,
 Sport, Off: `ASSISTS` in config.js, applied at once to every car and to every
-car made later), Throttle (auto or manual; shown on touch screens), units
+car made later), Steering (slider or arrows) and Throttle (auto or manual),
+both shown on touch screens, units
 (km/h, mph), the map shown or hidden.
 
 ## URL parameters
@@ -307,11 +320,11 @@ and the moon are placed against the start straight's heading by
 | | day | dusk (golden hour) | night |
 | --- | --- | --- | --- |
 | sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | the moon 8° left, 17° up; 0.12 |
-| exposure (tunnel) | 0.68 (5.6) | 4.2 (6) | 22 (8) |
+| exposure (tunnel) | 0.68 (5.6) | 4.2 (6) | 22 (5) |
 | sky's light on the scene: environment / fill | 0.6 / 0.13 | 0.6 / 0.014 | 1 / 0.013 |
 | sky at the zenith (radiance) | [0.22, 0.38, 0.78] | [0.02, 0.034, 0.068] | [0.0007, 0.0014, 0.0038] |
 | wetness | 0 | 0 | 0.8 |
-| street lamps and floodlights / tunnel / windows / cones in the air | 0 / 1 / 0 / 0 | 1 / 1 / 0.7 / 0 | 1 / 1 / 1 / 1 |
+| street lamps and floodlights / tunnel / windows / cones in the air / the tunnel's entrance and exit zones | 0 / 1 / 0 / 0 / 1 | 1 / 1 / 0.7 / 0 / 0.5 | 1 / 1 / 1 / 1 / 0 |
 | car lamps | running lights | low beam | low beam |
 | clouds cover | 0.45 | 0.45 | 0.3 |
 | bloom / glare / ghosts | 0.05 / 0.015 / 0.00015 | 0.09 / 0.03 / 0.0002 | 0.15 / 0 / 0 |
@@ -353,7 +366,7 @@ pass with their sizes. In short:
 | bloom levels | 4 | 5 | 6 |
 | lens (flare source, ghosts, glare, star) | no | yes | yes |
 | ambient occlusion | no | 8 samples, half size | 14 samples |
-| car's probe at speed / standing | 64 / 128 per face, a face every 2nd frame (standing too) | 128 / 256; a face every 2nd frame, standing 2 every 3rd | 256 / 512, 2 faces a frame, standing 3 |
+| car's probe at speed / standing | 64 / 128 per face, a face every 2nd frame (standing too) | 128 / 256; a face every 2nd frame (2 in the tunnel), standing 2 every 3rd | 256 / 512, 2 faces a frame (3 in the tunnel), standing 3; in the tunnel the faces see 160 m |
 | wet road mirror | none (the six nearest lamps' heads drawn into the water analytically) | 0.35 of the view's height, to 220 m, streaked copy 0.3 of its height | 0.5, to 320 m, streak 0.3 |
 | forest: full / reduced / impostor trees to | 0 / 60 / 650 m | 34 / 95 / 900 m | 50 / 130 / 1200 m |
 | effects: skid quads / soft particles / sparks | 800 / 192 / 48 | 1500 / 320 / 96 | 2000 / 400 / 128 |
@@ -420,6 +433,23 @@ places on the lap were not counted. Triangles hardly moved (low 293 to
 About a quarter of every pass's calls is the car (25 in the scene and in the
 mirror, 14 in the shadow map), which this lane did not touch.
 
+**Draw calls at the tunnel** (tunnel lane, 2026-11-18, the same counter, the
+last of four frames, from t = 34.5 of the autopilot run: the approach 120 m
+before the entrance, near the entrance, deep inside, at the exit), before and
+after the box tunnel:
+
+| t (place) | low, day, 393x852: calls, triangles before | after | medium, night, 1280x720: before | after |
+| --- | --- | --- | --- | --- |
+| 34.5 (approach) | 166, 363 k | 155, 345 k | 328, 1.40 M | 326, 1.40 M |
+| 37.3 (near the entrance) | 140, 329 k | 135, 313 k | 264, 1.09 M | 249, 1.15 M |
+| 39.5 (deep inside) | 155, 345 k | 136, 306 k | 301, 1.22 M | 253, 1.23 M |
+| 42.4 (at the exit) | 157, 360 k | 151, 341 k | 283, 1.19 M | 281, 1.19 M |
+
+In the tunnel by night the wet road's mirror is no longer drawn (the road
+there is dry) and its calls go to the probe's second face
+(`PROBE.tunnelFaces`). The approach was over both call budgets before the
+tunnel changed and still is.
+
 None of these was measured on a real GPU or phone.
 
 ## Sound
@@ -447,7 +477,8 @@ stereo picture. Sound starts on the first touch or key (the browsers' rule).
 | `dreamcar.map` | the map on or off |
 | `dreamcar.assists` | the driving help: full, sport or off |
 | `dreamcar.throttle` | the touch throttle: auto or manual |
-| `dreamcar.zones.v1` | the touch zones have been named once |
+| `dreamcar.steering` | the touch steering: slider or arrows |
+| `dreamcar.zones.v1` | the touch controls have been named once |
 | `dreamcar.muted` | sound off |
 | `dreamcar.hinted.v1` | the first-run hint has been shown |
 

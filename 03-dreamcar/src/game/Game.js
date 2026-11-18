@@ -84,9 +84,13 @@ const QUALITY_KEY = 'dreamcar.quality';
 const UNITS_KEY = 'dreamcar.units';
 const MAP_KEY = 'dreamcar.map';
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
-/** The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual'), and the touch zones' first-run naming. */
+/**
+ * The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual') and steering ('slider' |
+ * 'arrows'), and the touch controls' first-run naming.
+ */
 const ASSISTS_KEY = 'dreamcar.assists';
 const THROTTLE_KEY = 'dreamcar.throttle';
+const STEERING_KEY = 'dreamcar.steering';
 const ZONES_KEY = 'dreamcar.zones.v1';
 
 /** Read a kept choice (null when there is none or no storage). */
@@ -141,6 +145,7 @@ export class Game {
     const help = kept(ASSISTS_KEY);
     this.assists = help && ASSISTS.levels[help] ? help : ASSISTS.default;
     this.throttle = kept(THROTTLE_KEY) === 'manual' ? 'manual' : 'auto';
+    this.steering = kept(STEERING_KEY) === 'arrows' ? 'arrows' : 'slider';
     this._zonesSeen = kept(ZONES_KEY) === '1';
     engine.setMaxPixelRatio(TIERS[this.tier].pixelRatio);
     this.rng = createRng(params.seed);
@@ -165,8 +170,8 @@ export class Game {
 
     this.input = new Input(container);
     this.input.throttle = this.throttle;
+    this.input.steering = this.steering;
     this.input.onAction = (name, driver) => this.action(name, driver);
-    this.input.onTouchChange = () => (this._touchDirty = true);
     this.input.onAnyInput = () => {
       this._woke = true;
       this._unlockSound();
@@ -217,7 +222,6 @@ export class Game {
     this._resets = new Set();
     /** The day-night fade: { t, to, switched } or null. */
     this._fade = null;
-    this._touchDirty = false;
     this._hinted = false;
     try {
       this._hinted = localStorage.getItem(HINT_KEY) === '1';
@@ -520,6 +524,14 @@ export class Game {
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
+    if (name.startsWith('steering:')) {
+      this.steering = name.slice(9) === 'arrows' ? 'arrows' : 'slider';
+      this.input.steering = this.steering;
+      this.input.release();
+      keep(STEERING_KEY, this.steering);
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
     if (name.startsWith('units:')) {
       this.units = name.slice(6) === 'mph' ? 'mph' : 'kmh';
       keep(UNITS_KEY, this.units);
@@ -685,7 +697,6 @@ export class Game {
 
   update(dt, simTime) {
     this._tickFade(dt);
-    this.input.step(dt);
     if (this.phase === 'title') this._attractStep(dt);
     const { race, racers } = this;
     const time = this.world.time;
@@ -1062,12 +1073,12 @@ export class Game {
       assists: this.assists,
       assistLevels: Object.keys(ASSISTS.levels),
       throttle: this.throttle,
+      steering: this.steering,
     });
     hud.setFade(1 - this._fadeLevel);
     // the board: on the title and the pause sheet (and in the results), never over the run
     if (this.phase === 'title' || this.engine.paused) hud.setBoard(this._boardTable(), RULES.medals, this.world.time.name);
     if (this.phase === 'title') return;
-    const rect = this._touchDirty ? this.container.getBoundingClientRect() : null;
     const split = this.racers.length > 1;
     const map = this._map;
     // the first-time hint: until the first run in which the car has got going
@@ -1092,7 +1103,8 @@ export class Game {
         h.setWarn(warn);
         const how = input.source[i] === 'touch' ? TEXT.resetTouch : split ? TEXT.resetSplit(i === 0 ? 'R' : '/') : TEXT.resetKeys;
         h.setOffer(racer.offer, how);
-        h.setHint(!this._hinted && !c.finished && !racer.offer && !warn ? TEXT.hint[input.source[i]] || TEXT.hint.keys : '');
+        const device = input.source[i] === 'touch' && this.throttle === 'manual' ? 'touchManual' : input.source[i];
+        h.setHint(!this._hinted && !c.finished && !racer.offer && !warn ? TEXT.hint[device] || TEXT.hint.keys : '');
       }
       h.setSpeed(v.speed * 3.6);
       h.setRev(v.rpm, v.gear);
@@ -1109,20 +1121,18 @@ export class Game {
         const q = k === i ? p : this.racers[k].car.object.position;
         h.setDot(k, (q.x - map.x0) * map.k, (q.z - map.z0) * map.k);
       }
-      if (rect) h.setStick(input.stickOf(i), rect, input.brakeOf(i));
       // the slide: its angle and running score while it lasts (beyond 12 degrees), fading after
       const slide = v.slide;
       if (slide) h.setDrift(slide.angle, slide.score, slide.angle >= 12);
-      // touch: DRIFT (and GAS on manual) under the right thumb; the zones named on the first touch run
-      h.setPads(this.throttle === 'manual', input.heldOf(i));
+      // touch: the steering at the bottom left, the pedals at the bottom right; named on the first touch run
+      if (input.isTouch) h.setControls(input.controlsOf(i));
       const naming = input.isTouch && !this._zonesSeen && !!race && race.clock < HUD.zonesFor;
       h.setZoneHint(naming);
       if (input.isTouch && !this._zonesSeen && race && race.clock >= HUD.zonesFor) this._noteZones();
     });
-    this._touchDirty = false;
   }
 
-  /** The touch zones have been named once: not again on this device. */
+  /** The touch controls have been named once: not again on this device. */
   _noteZones() {
     this._zonesSeen = true;
     keep(ZONES_KEY, '1');
@@ -1182,7 +1192,8 @@ export class Game {
         }
       }
       const probeEvery = view.still ? (table.stillEvery ?? 1) : table.every;
-      const probeFaces = view.still ? table.stillFaces : table.faces;
+      const inTunnel = view.racer.vehicle.sky < PROBE.tunnelSky;
+      const probeFaces = view.still ? table.stillFaces : inTunnel ? (table.tunnelFaces ?? table.faces) : table.faces;
       if (view.probe && this.engine.frame % (probeEvery * n) === i * probeEvery) {
         probeAt.copy(car.box.center).applyMatrix4(car.object.matrixWorld);
         probeHidden.length = 0;
@@ -1194,7 +1205,7 @@ export class Game {
         if (this.ghostCar) probeHidden.push(this.ghostCar.object);
         // smoke and sparks in a reflection would smear over the whole car
         probeHidden.push(...this.effects.objects);
-        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces);
+        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces, inTunnel ? PROBE.tunnelFar : undefined);
       }
       this.pipeline.render(this.world.scene, view.camera, view.rect, view.frame);
       view.rig.cut = false;

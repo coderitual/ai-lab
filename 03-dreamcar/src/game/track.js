@@ -603,11 +603,22 @@ function placeFurniture(track, plan) {
       const s = t.s0 + ((k + 0.5) * (t.s1 - t.s0)) / rows;
       for (const side of [1, -1]) {
         const lat = side * (track.halfWidth + TUNNEL.wallOffset - hung.inset);
-        track.lamps.push({ s, side, lat, height: TUNNEL.height - hung.drop, kind: 'tunnel' });
+        track.lamps.push({ s, side, lat, height: TUNNEL.height - hung.drop, kind: 'tunnel', gain: tunnelGain(hung, s - t.s0, t.s1 - s) });
       }
     }
   }
   track.sectors = layout.sectors.map(([id, u]) => plan.at(id, u));
+}
+
+/**
+ * How brightly a tunnel lamp `fromEntry` m inside the entrance and `toExit` m before the exit is lit, against the
+ * interior's (layout.tunnelLamps: entrance, transition and exit zones).
+ */
+export function tunnelGain(hung, fromEntry, toExit) {
+  const [entry, high] = hung.entrance ?? [0, 1];
+  const fade = Math.min(1, Math.max(0, (fromEntry - entry) / Math.max(1, hung.transition ?? 1)));
+  const zone = high + (1 - high) * fade * fade * (3 - 2 * fade);
+  return Math.max(zone, hung.exit && toExit < hung.exit[0] ? hung.exit[1] : 1);
 }
 
 /** True where s is in a tunnel or on a bridge (where nothing stands beside the pavement but the walls). */
@@ -790,7 +801,7 @@ export class Track {
     this.tunnels = [];
     /** @type {Array<{ s0: number, s1: number, drop: number }>} the deck, abutment to abutment; `drop`: the ravine under its middle */
     this.bridges = [];
-    /** @type {Array<{ s: number, side: number, lat: number, height: number, kind: 'street' | 'lap' | 'tunnel' }>} side +1 left, -1 right */
+    /** @type {Array<{ s: number, side: number, lat: number, height: number, kind: 'street' | 'lap' | 'tunnel', gain?: number }>} side +1 left, -1 right; gain: a tunnel lamp's brightness against the interior's */
     this.lamps = [];
     /** Sector lines (m from the start/finish line); the third line is the start/finish line itself. */
     this.sectors = [];

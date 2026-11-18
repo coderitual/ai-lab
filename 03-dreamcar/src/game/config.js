@@ -64,7 +64,7 @@ export const HUD = {
   banner: 4,
   /** Driving the wrong way this long before the warning shows (s). */
   wrongWay: 1.2,
-  /** On the first run on a touch screen the zones (steer, brake, drift) are named until this much of the race clock (s). */
+  /** On the first run on a touch screen the controls (steer, brake, drift, gas) are named until this much of the race clock (s). */
   zonesFor: 3,
   /** The first-time hint shows until the car has covered this much road in a run (m). */
   hintDistance: 25,
@@ -126,8 +126,12 @@ export const HANDS = {
   },
   /** A stick: the power added to its curve (finer near the centre), its smoothing (s), and `counter` as for keys. */
   pad: { expo: [0, 0.5], lag: [0.02, 0.09], counter: 0.6 },
-  /** A thumb on the glass: the same. */
-  thumb: { expo: [0, 0.4], lag: [0.03, 0.1], counter: 0.5 },
+  /**
+   * A thumb on the touch slider: the same. The slider reads the thumb's distance from its fixed centre linearly;
+   * the whole curve is here: a little finer than linear at a standstill, much finer at speed, so that a few px of
+   * thumb is a small correction on the straight and the end of the travel is still full lock.
+   */
+  thumb: { expo: [0.15, 0.45], lag: [0.03, 0.1], counter: 0.5 },
 };
 
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */
@@ -440,10 +444,17 @@ export const FX = {
  * on medium a face every other frame at speed (the cube is new every 12 frames, 0.2 s at 60 Hz) and two every
  * third frame standing still kept the frame near its budget (docs/spec.md, "Budgets").
  */
+/**
+ * (tunnel lane) In the tunnel (the car's sky below `tunnelSky`) the faces see no further than `tunnelFar` m (the box
+ * hides the rest; what lies beyond is culled, which pays for it) and `tunnelFaces` are redrawn at speed: the lines of
+ * luminaires slide over the paint, and a cube that is a fifth of a second old shows them where the car was 13 m ago.
+ */
 export const PROBE = {
-  low: { size: 64, faces: 1, every: 2, stillSize: 128, stillFaces: 1, stillEvery: 2 },
-  medium: { size: 128, faces: 1, every: 2, stillSize: 256, stillFaces: 2, stillEvery: 3 },
-  high: { size: 256, faces: 2, every: 1, stillSize: 512, stillFaces: 3, stillEvery: 1 },
+  low: { size: 64, faces: 1, every: 2, stillSize: 128, stillFaces: 1, stillEvery: 2, tunnelFaces: 1 },
+  medium: { size: 128, faces: 1, every: 2, stillSize: 256, stillFaces: 2, stillEvery: 3, tunnelFaces: 2 },
+  high: { size: 256, faces: 2, every: 1, stillSize: 512, stillFaces: 3, stillEvery: 1, tunnelFaces: 3 },
+  tunnelSky: 0.02,
+  tunnelFar: 160,
   stillBelow: 1.5,
   movingAbove: 4,
 };

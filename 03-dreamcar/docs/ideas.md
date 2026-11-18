@@ -74,7 +74,20 @@ comparison stills and strike what is done.
 - **Trackside boards have no lamps of their own**; at night they are dark.
 - **The car's paint is dark** where nothing bright is near it.
 - **The tunnel's exit** at night and by day (the bloom of the portal) has not
-  been judged.
+  been judged against a reference: the video shows the exit only as a small
+  white rectangle from far inside.
+- **The tunnel against the owner's video** (design.md, "The tunnel"): the road
+  in the box is the circuit's dark asphalt, not the video's pale grey; the
+  walls are smoother and the ceiling plainer (no beams, no marks); the cutting
+  has no lamp posts; the gantry's signals are arrows only; the screens are
+  shading on flat panels, not slats. At night the first second inside is
+  white while the exposure closes (EXPOSURE.close); a slower close at night
+  only would read better.
+- **The car in the tunnel**: the probe stands at the middle of the car, so the
+  lines of fittings mirrored in the flanks sit a little wide; a ceiling-plane
+  correction in the car's materials (as `carGround` does for the road) would
+  put them right. The flake layer's rough read of the probe shows the fittings
+  as soft blotches on the rear bumper's corners.
 
 ### The car
 
@@ -115,6 +128,15 @@ from straight behind, the silver going warm in a low sun.
 - **More circuits.** The Track takes any closed layout of straights and arcs;
   the world builds from it. A second layout, or the same circuit reversed,
   is mostly data and a new set of medal times from the autopilot.
+- **Tilt steering on phones.** A third Steering option: the phone's roll
+  (DeviceOrientation; iOS asks permission on a gesture) read against the
+  angle it was held at when the run started, with a dead zone and the same
+  `HANDS.thumb` curve, and a recentre button. Needs a real phone to tune; the
+  slider and the pedals stay as they are.
+- **The touch controls on a real phone.** The slider's travel (56 + 0.05 ×
+  width, 48 to 92 px), the pedals' sizes and `HANDS.thumb.expo` were set in
+  headless Chromium and by the scripted thumb in `tools/unit`; an afternoon
+  with an iPhone and a mid-range Android, both ways up, should set them.
 - **A photo mode.** The staging camera (`__dreamcar.photo`) already exists;
   it needs a pause-sheet entry, a free orbit with touch and stick, and a
   high-tier render at a larger size.

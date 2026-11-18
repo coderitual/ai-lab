@@ -140,6 +140,20 @@ keys, a hand catches the rear when it slides beyond the rear tyres' peak
 slip (counter-steer 0.75 rad per rad). A stick or a thumb is trusted and only
 given the same lock.
 
+On a touch screen the thumb is read against a fixed slider
+(`src/engine/Input.js`): the steering is the thumb's distance from the
+slider's centre over its half travel, worked out in the pointer handlers and
+stored, so the fixed step only reads a number. The slider itself is linear;
+the curve that makes small corrections easy at speed is the hands'
+(`HANDS.thumb.expo`, the same place as a stick's). Every control owns the
+pointer id that took it (`setPointerCapture`, then a map of pointer id to
+pedal), so two or three fingers never steal from each other, and anything
+that can lose a finger's lift (pointercancel, lostpointercapture, blur, a
+hidden tab, orientationchange) lets every control go. The layout is worked
+out once per view size by `layoutOf` and drawn by the HUD from the same
+numbers. With the arrows the input reports keys (`analog: false`), so
+`PlayerDriver` winds the wheel exactly as for A and D.
+
 ## The autopilot's speed plan
 
 `AutoDriver` in `src/game/drivers.js`, what `?ap` runs and what the tests lap
@@ -500,8 +514,8 @@ is on and its share of the pool are one texel each of a small texture
 holds.
 
 Drawn as few meshes as there are materials: every pole, arm and housing is
-baked into one geometry (`lamp-fittings`, the tunnel's into
-`tunnel-lamp-fittings`), the street lamps' and floodlights' emitters into one
+baked into one geometry (`lamp-fittings`; the tunnel's fittings are
+tunnel.js's), the street lamps' and floodlights' emitters into one
 mesh whose vertex colours carry each kind's colour and radiance, and their
 glow into one mesh (they switch together); world/index.js cuts each into the
 400 m pieces. A piece of lamps costs a draw call per material, not per part.
@@ -514,6 +528,78 @@ cars' lamp positions and directions (`beams`, uniforms), sending back towards
 the eye what the beam lays on it times a coefficient that falls steeply with
 the angle between the lamp and the eye; the reflection probe's faces see none
 of it. No light is added and no draw call.
+
+## The tunnel
+
+`src/assets/world/tunnel.js`; the reference is docs/design.md, "The tunnel".
+A box swept along the road from one cross-section (`section`: kerb face at the
+Track's solid edge, walkway, wall, chamfer, flat ceiling; corners doubled so
+the normals stay sharp), a row every 2 m (4 m on low: its faces are flat and
+the bend is 1000 m). Each vertex carries where it is in the box (`aLocal`: s
+from the portal, lat, h) and its section's normal, and the box's shader paints
+from those alone: cast panels 5 m long with fine joints that fade out before
+they alias (`fwidth`), the dado's joint, grime at the foot, the ceiling's
+slabs and its soot, the walkway and its pale kerb face.
+
+**Its light.** The Track hangs a lamp every 12 m on each side
+(`tunnelLamps`), and each lamp carries a `gain`: the entrance zone's lamps are
+2.4 times as bright, the exit zone's 1.4. Those are the lamps lamps.js hands
+its fixed pool of real spot lights to near the car (so the car and the road
+are lit for real; the gain scales a light's intensity) and the lamps the box
+bakes: its shader finds the six rows nearest a fragment from s alone (they
+are evenly spaced) and sums what each would lay there with the spot light's
+own formula (`SPOT_GLSL`), times one minus its share of the pool and its gain
+(a texel each in lamps.js `shares`: red on, green share, blue gain / 4), plus a
+bounce term. The lamps hang over the shoulders, 0.6 m in from the kerb faces,
+leaning across the road: the far wall is lit evenly down to the walkway, the
+near wall low and dark high, which is how the video's walls look; hung at the
+wall, each lamp laid a hot scallop on the wall beside it. The fittings
+themselves are emitters (one mesh of vertex colours with every other thing
+in the tunnel that glows: guidance lights, door frames, signs, signals,
+arrows), far brighter than what they light (`head`, 60 times the lamps'
+colour), so they bloom and the reflection probe sees them; they are not
+lights. No light was added to the scene.
+
+**What the road mirrors** (road.js `TUNNEL_SHEEN`). The tunnel's road is
+dry, so there is no planar mirror there; the asphalt follows its own mirrored
+ray up to the plane of the fittings, finds how far across it passes from
+either line and how densely the line is lit where it meets it (the zones), and
+adds that as a soft streak, blurred more the further the ray travels, at the
+strength of its sky sheen (`roadSkySheen`, falling with the angle). The tail
+lamps are the wet road's `wetGlint` lobe made broad and short. The walls'
+light falling back onto the road (`bounce`, what the sky's fill is outside)
+is added, and both that and the lamps' direct light are shaded under each car
+by a soft rounded box round its plan (`shade`): the sun's shadow map does not
+reach in, the pool's spot lights cast none, and without it the car floated on
+its contact shadow alone.
+
+**The car in it.** What makes the paint and the glass is the probe: inside
+the box its faces see only 160 m (`PROBE.tunnelFar`: what lies beyond is
+culled) and on medium two faces are redrawn every other frame instead of one
+(`tunnelFaces`), so the cube is a tenth of a second old at speed and the lines
+of fittings slide over the roof, the shoulders and the glass with the car.
+The probe stands at the middle of the car and knows directions only: a line 5
+to 6 m overhead is mirrored almost where it should be on the roof and the
+glass, and a little wide on the flanks. A correction for the ceiling's plane in
+the car's materials, as `carGround` corrects for the road's, would put them
+exactly; it has not been made.
+
+**The portals and the cuttings.** The faces are a rectangle with the mouth
+cut out (ShapeGeometry), a reveal, a lintel standing out, a coping. The
+entrance (towards the woods) is weathered, with warm lamps under its lintel, a
+chevron board and a banner (one of the circuit's made-up boards, signs.js
+`paintBoard`, on its own canvas); the exit is pale, with a railing on its
+parapet. Out of the exit, upright retaining walls as high as the terrain's
+cliff there (the `cutting` preset makes it 5 m) carry the acoustic screens:
+one quad from post to post, as high as the lower of its two ends, so the
+steps are square; their slats and rails are a shader on world position
+(`screenShader`), not geometry. Into the entrance, sloped revetments over the
+last 75 m, upright at the face. Both stand where rock.js would put its rock
+faces (`concreteCut` tells it where not to), in front of the terrain's own
+cliff (never more than 0.7 m behind the solid edge: the cliff's foot is at
+0.8 m). Everything of one material is one mesh per tunnel; world/index.js cuts
+it into 400 m pieces. On low: no housings, no pipe or tray, a plainer gantry
+and railing, the banner as a colour.
 
 ## Determinism
 
