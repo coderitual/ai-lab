@@ -31,9 +31,11 @@ const DEG = Math.PI / 180;
  */
 export const WAVES = [
   // a long soft swell from the open sea
-  { dir: -28, len: 150, amp: 0.85, steep: 0.9 },
-  { dir: -6, len: 98, amp: 0.55, steep: 1.0 },
-  { dir: -50, len: 63, amp: 0.36, steep: 1.0 },
+  // (round 2) lower than round 1's 0.85, 0.55 and 0.36 m, and further apart in direction: from the coast road high
+  // above, the swell read as ruled lines; it is a texture in the frame (E1)
+  { dir: -28, len: 150, amp: 0.6, steep: 0.9 },
+  { dir: 4, len: 98, amp: 0.38, steep: 1.0 },
+  { dir: -61, len: 63, amp: 0.26, steep: 1.0 },
   // a light breeze's chop over it
   { dir: 18, len: 34, amp: 0.15, steep: 1.1 },
   { dir: -72, len: 21, amp: 0.085, steep: 1.1 },
@@ -51,7 +53,7 @@ export const WAVES = [
  * direction (alternating sides), so that from high above the swell reads as sets and lulls, not as ruled lines, and the
  * chop as patches of rough and calm water. The same factor moves the mesh, shades the normals and answers sampleWaves.
  */
-export const GROUPS = { amp: 0.5, len: 7.5, turn: 65 };
+export const GROUPS = { amp: 0.65, len: 7.5, turn: 65 };
 /** How many of WAVES are the swell (foam behind crests looks back over these). */
 export const SWELLS = 3;
 /** Rough crest-to-trough range of the open sea (m), for shading by height. */

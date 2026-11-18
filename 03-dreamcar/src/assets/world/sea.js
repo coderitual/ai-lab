@@ -56,7 +56,8 @@ const TIER = {
  * repeat and its slopes; rough: the calm surface's roughness; reach: share of the far plane the disc reaches.
  */
 export const SEA_LOOK = {
-  deep: [0.0016, 0.0062, 0.0135],
+  // (round 2, frame E1: from the coast road high above, a deep saturated blue; round 1's was near black)
+  deep: [0.0028, 0.013, 0.036],
   shallow: [0.012, 0.034, 0.031],
   scatter: [0.0, 0.0045, 0.0036],
   foam: [0.62, 0.65, 0.66],
@@ -64,6 +65,15 @@ export const SEA_LOOK = {
   rippleSlope: 0.6,
   rough: 0.05,
   reach: 0.97,
+  /**
+   * (round 2) per time of day, by name: `sky`, how much of the mirrored sky the water gives back (seen from the
+   * coast road high above, round 1's full mirror made the day's sea a pale grey-blue and the golden hour's a pale
+   * beige: frame E1's is a deep saturated blue), and `deep`, the open water's body. A time not named keeps 1 and `deep`.
+   */
+  byTime: {
+    day: { sky: 0.78, deep: [0.004, 0.02, 0.058] },
+    dusk: { sky: 0.42, deep: [0.0016, 0.0105, 0.0115] },
+  },
   /** at night: lamps' streaks, across and along (radians, about), and their share of the head's radiance */
   lamp: { across: 0.012, along: 0.22, gain: 0.06 },
 };
@@ -191,6 +201,8 @@ export function createSea({ caps, tier, atmosphere, sea, far, glints = null }) {
     uSeaSunDir: { value: new THREE.Vector3(0, 1, 0) },
     uSeaSun: { value: new THREE.Vector3() },
     uSeaSky: { value: 1 },
+    uSeaGain: { value: 1 },
+    uSeaDeep: { value: new THREE.Vector3().fromArray(SEA_LOOK.deep) },
     uRipple: { value: ripples },
     uFoamTex: { value: foamTex },
     uSeaGlintPos: glints ? glints.pos : { value: [] },
@@ -238,6 +250,9 @@ export function createSea({ caps, tier, atmosphere, sea, far, glints = null }) {
       // the scene's environment map is the sky's light on things, set apart from the sky as drawn (env.intensity);
       // a mirror shows the sky as drawn
       uniforms.uSeaSky.value = 1 / Math.max(0.05, t.env.intensity);
+      const own = SEA_LOOK.byTime[t.name] ?? {};
+      uniforms.uSeaGain.value = own.sky ?? 1;
+      uniforms.uSeaDeep.value.fromArray(own.deep ?? SEA_LOOK.deep);
     },
     update(simTime) {
       time = simTime;
@@ -285,6 +300,8 @@ uniform float uSeaFar;
 uniform vec3 uSeaSunDir;
 uniform vec3 uSeaSun;      // the sun's (or the moon's) colour times its intensity
 uniform float uSeaSky;     // what turns the environment map's light on things back into the sky as drawn
+uniform float uSeaGain;    // how much of the mirrored sky the water gives back at this time of day (SEA_LOOK.byTime)
+uniform vec3 uSeaDeep;     // the open water's body at this time of day
 uniform sampler2D uRipple;
 uniform sampler2D uFoamTex;
 #if SEA_LAMPS > 0
@@ -364,7 +381,7 @@ seaFoam = mix( seaFoam, mix( 0.35, 0.75, sWash ) * sMask, smoothstep( 150.0, 900
 
 // ---- the body: the light that comes back up out of the water, greener and lighter over the shallows
 float sClear = exp( - sDepth * 0.28 );
-vec3 sBody = mix( ${v3(SEA_LOOK.deep)}, ${v3(SEA_LOOK.shallow)}, sClear );
+vec3 sBody = mix( uSeaDeep, ${v3(SEA_LOOK.shallow)}, sClear );
 // a wave's top is thinner: lighter, and lit through when looking towards the sun
 float sTop = smoothstep( -0.2, 0.9, ( vSeaWorld.y - uSeaCentre.y ) / ( ${SEA_HEIGHT.toFixed(3)} * 0.5 * sAmp ) );
 sBody *= 0.85 + 0.35 * sTop;
@@ -389,6 +406,7 @@ reflectedLight.directDiffuse += seaScatter;
   float hLow = ( 1.0 - smoothstep( 0.04, 0.3, hR.y ) ) * smoothstep( 0.1, 0.35, seaRough );
   reflectedLight.indirectSpecular *= uSeaSky;
   reflectedLight.indirectSpecular = mix( reflectedLight.indirectSpecular, hazeColor( normalize( vec3( hR.x, max( hR.y, 0.02 ), hR.z ) ) ) * hF * ( 1.0 - seaFoam ), hLow );
+  reflectedLight.indirectSpecular *= uSeaGain;
 }
 #if SEA_LAMPS > 0
 {

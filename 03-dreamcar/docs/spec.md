@@ -42,7 +42,7 @@ run of `tools/handling.mjs`.
 | `sweep` | Shore bend | 250 to 657 | right R 220 through 80°, banked 9°; 100 m straight climbing to 5 % | 196 to 225 |
 | `esses` | Forest esses | 657 to 1409 | right R 260 55° (bank 8°), left R 330 40° (7°), right R 240 65° (9°); 4 to 5.5 % | 204 to 240 |
 | `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens) | 216 to 255 |
-| `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers: left R 300 through 110°, banked 10°, ground 42 m under the middle | 229 to 257 |
+| `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers: left R 300 through 110°, banked 10°, ground 96 m under the middle (under the sea: the piers stand in the water) | 229 to 257 |
 | `carousel` | The carousel | 2582 to 2915 | 150 m climb at 6 %, then right R 55 through 190°, banked 8° | 90 to 229 |
 | `crest` | The crest | 2915 to 3115 | 200 m straight over the top | 108 to 161 |
 | `plunge` | The plunge | 3115 to 3394 | right R 400 through 40°, banked 5°, 8 % down into the compression | 161 to 215 |
@@ -62,12 +62,12 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 
 | | |
 | --- | --- |
-| barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; walls in the tunnel and parapets on the bridges, 1.5 m beyond the pavement; on the sea side of the coast road (the climb, the carousel, the crest and the plunge: `coastDown`, `coastRun`, `coastTop`) the rail stands on white posts with ochre gravel beyond it and no trees (the corridor as the presets they replaced) |
+| barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; walls in the tunnel and parapets on the bridges, 1.5 m beyond the pavement; on the sea side of the coast road (the climb, the carousel, the crest and the plunge: `coastDown`, `coastRun`, `coastTop`) the rail stands on white posts, a lip of dry grass and the cliff beyond it, no trees either side; round the carousel and over the crest the verge inside the rail is ochre gravel (surface `GRAVEL`, grip 0.6), no tyre wall; edges and slopes as the presets they replaced; the coast road's kerbs bare concrete, its centre line double yellow (the sky road to the plunge, road.js `PIECE_MARKS`); no floodlights round the carousel and over the crest |
 | the sea | outside the loop at bearings from the course's middle outside -115 to 50 degrees (0: the straight's heading), from 55 to 170 m beyond the solid edge; the bay beside the straight; level -1.8 m; seabed to 45 m; 7 sea stacks; no far shore (terrain.js `SEA`) |
-| structures | the tunnel's bore 349 m, ceiling 6.4 m over the road (`TUNNEL`); two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
+| structures | the tunnel's bore 349 m, ceiling 6.4 m over the road (`TUNNEL`); two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
 
 | barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; the walkways' kerb faces in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
-| structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
+| structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
 | tyre walls | 8 runs, on the outside of the fast bends |
 | trackside boards | 11 runs, both walls of the straight included |
@@ -75,7 +75,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | marshal posts | 12 |
 | start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |
 | street lamps | 23, 9 m high, every 30.4 m on alternating sides along the whole straight |
-| floodlights | 69, 12 m high, every 55 m round the rest of the lap (`lapLamps`): on the inside of bends tighter than 1500 m, alternating elsewhere; none in the tunnel or within 25 m of its portals, none on `ledge1` (frame D3's place); 2.5 m behind the edge where it is a rail (47 of them; a lamp due at a rock face goes to the other side if a rail is there), at the edge in rock cuttings (4) and at parapets (18) |
+| floodlights | 62, 12 m high, every 55 m round the rest of the lap (`lapLamps`): on the inside of bends tighter than 1500 m, alternating elsewhere; none in the tunnel or within 25 m of its portals, none on `ledge1` (frame D3's place) nor on `carousel` and `crest` (frame E1's, round 2); 2.5 m behind the edge where it is a rail (40 of them; a lamp due at a rock face goes to the other side if a rail is there), at the edge in rock cuttings (4) and at parapets (18) |
 | tunnel lamps | 29 rows of two, every 12 m, 0.6 m in from the kerb faces and 0.3 m under the ceiling; gain 2.4 over the first 60 m, easing to 1 by 130 m, 1.4 over the last 36 m (`tunnelLamps`); fittings drawn along both haunches at 95 places each (two bars every 2 m over the first 60 m, one every 3 m to 130 m and over the last 36 m, every 6 m between: 250 bars) |
 | sector lines | s = 1881.8 m (37 %, just out of the tunnel) and 3420.0 m (67 %, the start of the ledge); the third is the line |
 | grid | 12 boxes behind the line (`track.grid`) |
@@ -303,8 +303,8 @@ Read once by `src/engine/params.js`.
 | `?manual` | the loop does not run: frames come from the page handle |
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
-| `?photo=back,right,up,yaw,pitch,fov[,hud]` | the staging camera |
-| `?photo=d1`, `d3`, `d4` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=back,right,up,yaw,pitch,fov[,roll][,hud]` | the staging camera (`roll`: degrees the picture leans clockwise) |
+| `?photo=d1`, `d3`, `d4`, `e1` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -341,13 +341,14 @@ Defined once: the waves in `src/engine/waves.js`, where the water is in
 | | |
 | --- | --- |
 | level | -1.8 m (`LAYOUT.lakeLevel`), 1.8 m under the start line |
-| coast | outside the loop at bearings from the course's middle outside -115 to 50 degrees (wandering 14 degrees), 55 to 170 m beyond the solid edge; the land's last fall a cliff rising 1.15 per metre; the seabed shelving 0.3 per metre to 45 m; the bay is the old lake's ellipse, 2.2 times as long to the west; open water within 90 to 205 m of the sea side of the sky road, the climb, the carousel, the crest and the plunge |
+| coast | outside the loop at bearings from the course's middle outside -115 to 24 degrees (wandering 14 degrees), 55 to 170 m beyond the solid edge; the land's last fall a cliff rising 1.15 per metre; the seabed shelving 0.3 per metre to 45 m; the bay is the old lake's ellipse, 2.2 times as long to the west |
+| the coast road's cliff | on a coast side (eased over 30 m): a lip 1.5 to 4 m wide beyond the solid edge, a cliff 1.6 to 2.6 m down per metre out to a talus 7 m under the water, the seabed beyond (terrain.js `COAST`); open water 10 m beyond the left edge of the sky road (under the deck), 60 to 70 m beyond it on the climb, the carousel, the crest and the plunge; the land side's rock cut 6 m high; inside the carousel a hill up to 22 m over the road beyond the cut, a ridge 230 m long from the hairpin's centre, 40 m to either side, set 0.8 of the way towards the climb |
 | sea stacks | 7, 9 to 17 m across, 12 to 34 m high, in the open sea, at least 160 m apart |
 | sea map | 512 x 512 texels over 4.8 km (9.4 m a texel): depth, the land's distance from the water (to 500 m), the water's from the land (to 160 m), the sea's share |
-| waves | 11 trochoids, longest first: a swell of 150, 98 and 63 m (0.85, 0.55, 0.36 m), chop of 34 to 7.9 m, short waves of 5.1 to 1.7 m (normals only); crest to trough about 2.7 m; from the north-west; deep-water speeds |
+| waves | 11 trochoids, longest first: a swell of 150, 98 and 63 m (0.6, 0.38, 0.26 m), chop of 34 to 7.9 m, short waves of 5.1 to 1.7 m (normals only); each in sets and lulls, its height times 1 ± 0.65 over a pattern 7.5 wavelengths long (at least 160 m) turned 65° off it (`GROUPS`); crest to trough about 1.9 m; from the north-west; deep-water speeds |
 | mesh | a disc of rings round each view's eye to 0.97 of the far plane (4850 m): low 32 segments, 4 rings, 160 triangles, flat; medium 96 segments, 19.9 k triangles, moved by the swell; high 160 segments |
 | waves in the normals | low 7, medium 9, high 11; each dropped beyond sqrt(570 h L) m (h the eye's height over the water) and its slopes added to the roughness |
-| colours | body albedo deep [0.0016, 0.0062, 0.0135], over the shallows [0.012, 0.034, 0.031]; foam 0.62 to 0.66; F0 0.02; roughness 0.05 calm |
+| colours | body albedo deep [0.0028, 0.013, 0.036] (by day [0.004, 0.02, 0.058], at golden hour [0.0016, 0.0105, 0.0115]; the mirrored sky given back 0.78 by day, 0.42 at golden hour, 1 at night: `SEA_LOOK.byTime`), over the shallows [0.012, 0.034, 0.031]; foam 0.62 to 0.66; F0 0.02; roughness 0.05 calm |
 | surf | bands over the last 14 to 26 m of water, running in with the swell |
 | at night | the 6 lamps the wet road glints with, drawn into the water as streaks |
 | draw calls | one in every pass that sees it (the scene, the probe's faces); not in the shadow map or the wet road's mirror |

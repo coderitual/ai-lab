@@ -217,7 +217,11 @@ vec4 gMid = texture2D( uLarge, vGroundPos.xz / 93.0 + vec2( 0.37, 0.61 ) );
 float gSlope = 1.0 - gN.y;
 // (env lane) aMask.y = 2 marks a cut rock face (rock.js): rock whatever its facets' slopes
 float gCut = step( 1.5, vMask.y );
-float gRock = gCut + ( 1.0 - gCut ) * smoothstep( 0.2, 0.34, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
+// (sea lane, round 2) near the sea a slope stays dry grass and scrub up to a steeper pitch before it is bare rock: the
+// headlands' sides read as grass over a cut, not as a quarry (frame E1)
+float gNearSea = 0.0;
+if ( uSeaBox.w > -1000.0 ) gNearSea = 1.0 - smoothstep( 160.0, 460.0, seaLandOff( seaMapAt( vGroundPos.xz ) ) );
+float gRock = gCut + ( 1.0 - gCut ) * smoothstep( 0.2 + 0.16 * gNearSea, 0.34 + 0.2 * gNearSea, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
 float gScree = max( min( vMask.y, 1.0 ), smoothstep( 0.68, 0.8, gMid.a ) * smoothstep( 0.12, 0.25, gSlope ) * 0.7 ) * ( 1.0 - gRock );
 // (env lane) scrub: dark clumps of box and juniper on the moderate slopes, between meadow and rock
 float gScrub = smoothstep( 0.06, 0.16, gSlope + ( gMid.b - 0.5 ) * 0.12 ) * smoothstep( 0.35, 0.6, gDet.r * 0.5 + gMid.g * 0.7 ) * ( 1.0 - gRock );
@@ -263,7 +267,7 @@ float gGullyX = texture2D( uLarge, vec2( ( vGroundPos.x - vGroundPos.z ) / 31.0,
 float gGully = smoothstep( 0.35, 0.65, gGullyX + 0.25 * ( gDetRock.g - 0.5 ) );
 vec3 gOchre = mix( vec3( 0.2, 0.105, 0.05 ), vec3( 0.3, 0.175, 0.085 ), 0.6 * gBedTone * 0.35 + 0.65 * gGully ) * ( 0.72 + 0.4 * gDetRock.g ) * ( 1.0 - 0.3 * gStreak );
 gRockCol = mix( gRockCol, mix( gOchre * ( 0.75 + 0.25 * gLarge.g ), gOchre, gCut ), gCoast );
-gScreeCol = mix( gScreeCol, vec3( 0.29, 0.17, 0.095 ) * ( 0.75 + 0.45 * gDet.b ), gCoast );
+gScreeCol = mix( gScreeCol, vec3( 0.46, 0.255, 0.14 ) * ( 0.82 + 0.36 * gDet.b ), gCoast );
 // the coast's grass is dry: olive and straw, sun-bleached (frame E1)
 gGrass = mix( gGrass, mix( vec3( 0.06, 0.062, 0.026 ), vec3( 0.105, 0.088, 0.045 ), smoothstep( 0.3, 0.75, gMid.b + 0.3 * ( gDet.r - 0.5 ) ) ) * ( 0.8 + 0.4 * gDet.r ), 0.85 * gCoast );
 vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;

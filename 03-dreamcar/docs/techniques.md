@@ -408,8 +408,15 @@ to the highlight's (`lost`, alpha^2 = alpha0^2 + 2 sigma^2), and so is the
 ripple map's when it fades with the footprint of the pixel. Close to, the
 sun breaks into glitter on the facets; far out the same light is a smooth,
 wide path: no shimmer, no aliased sparks, with nothing to tune by distance.
-The swell is long and soft (150, 98, 63 m; seen from 30 to 80 m up its lines
-are what reads), the chop and the short waves are a light breeze's.
+The swell is long and soft (150, 98, 63 m), the chop and the short waves are
+a light breeze's. (Round 2, frame E1) **Wave groups**: a sum of a few long
+trochoids seen from 100 m up reads as ruled lines. Each wave's amplitude is
+multiplied by its own slow factor, 1 + 0.65 cos(g . p + phase), with g about
+7.5 wavelengths long and turned 65 degrees off the wave (`GROUPS`): sets and
+lulls in the swell, rough and calm patches in the chop. The factor is applied
+in the mesh's displacement, the normals, the crest test for foam and in
+`sampleWaves` alike (the sea is still defined once); its own slope is left
+out of the normal (it is a hundredth of the wave's).
 
 **The shading** is a MeshStandardMaterial with the surface written into it
 (shading.js `extend`): the sun or moon, the sky's environment map, the fill,
@@ -431,6 +438,30 @@ into `hazeColor` of its own direction, which is what the sky dome shows just
 under the horizon, so the disc's edge never shows. Not 01's: the wake, the
 mirror (a planar reflection would be a scene pass: the sea reflects the
 environment map only), caustics and the sandy bed.
+
+**The coast road's cliff** (round 2, `COAST` in terrain.js). The near
+profile beyond a sea side's solid edge (`nearAt`) is replaced, by the side's
+coast weight eased over 30 m along the road, with `coastCliff`: a lip, then
+`top - (top - foot) * smoothstep(t)` down a run of `drop / steep` metres,
+then the seabed. Two things would undo it. The 16 m land-shape field is
+smoothed three times, which turns a cliff into a 50 m slope: so after the
+smoothing each cell off a sea side is pulled down to the same cliff
+(`coastCell`), and those cells seed the sea's flood. And the band and the
+grid blend the near profile into that field from 10 m out, adding the land's
+small hills and `keepDry`'s lift: on a sea side the near profile is kept to
+the edge of the road's reach (the last 40 m blend), the hills are left off,
+and nothing is lifted (only the sea stacks stand out of it). The spur inside
+the carousel (`COAST.knoll`) is a ridge from the hairpin's centre (the
+Track's point at the piece's middle, `r` to its inside) down the tongue
+between its legs, added after the two legs' grounds are blended, so both
+legs see the same hill, and only beyond the cut's top.
+
+**Per-piece road markings** (round 2, road.js `PIECE_MARKS`). A scheme per
+piece id, each scheme one channel of a per-metre RGBA texture (`uMarks`,
+sampled at s / length like the edge texture), eased over 6 m at its ends.
+'coast' (channel r) is a double yellow centre line: two 0.12 m lines 0.12 m
+apart, painted with the edge lines' wear and weight but a yellow paint
+colour. Channels g, b and a are free for other schemes.
 
 **Per tier**: low a flat disc (32 segments, four rings, 160 triangles) and
 the 7 longest waves in the normals; medium 96 segments moved by the swell,

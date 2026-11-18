@@ -215,12 +215,13 @@ export const LAYOUT = {
    * (night lane) The rest of the lap is lit too, more sparsely: a circuit's floodlights on tall poles at the solid
    * edge, `spacing` metres apart, everywhere outside the tunnels and the straight's own lamps (lamps keep `clear`
    * metres from a portal): on the inside of every bend tighter than `inside` metres, alternating sides elsewhere.
-   * None stand on the pieces in `skip`: the ledge's first bend is frame D3's place, which has no poles.
+   * None stand on the pieces in `skip`: the ledge's first bend is frame D3's place, which has no poles; (sea lane,
+   * round 2) the carousel and the crest are frame E1's, which has none either.
    * (finish lane) Where the edge is a rail or the trees, a pole stands `setback` metres behind it, so that it is never
    * between the chase camera and the car, and `height` m high; one due at a rock face goes to the other side if that is
    * a rail or the trees; at a rock face, a wall or a parapet it stands at the edge.
    */
-  lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1'] },
+  lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1', 'carousel', 'crest'] },
   /**
    * (tunnel lane) The tunnel's lamp rows: the light of the lines of fittings along the haunches (tunnel.js draws the
    * fittings), `drop` under the ceiling and `inset` in from the kerb's face (over the shoulder: from there the light

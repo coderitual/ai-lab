@@ -85,7 +85,7 @@ test('nowhere does the water reach the course: every sample is dry out to 2 m be
   return `${low.toFixed(1)} m over the water at the lowest; decks ${deck.toFixed(0)} m and more`;
 });
 
-test('after the tunnel the sea is in view: open water within 250 m of the sea side of the sky road, the climb, the crest and the plunge', () => {
+test('after the tunnel the sea is right below: open water within 90 m of the sea side of the sky road, the climb, the carousel, the crest and the plunge (the cliff, round 2)', () => {
   const p = new Vector3();
   const far = [];
   for (const [id, f] of [['viaduct', 0.5], ['climb', 0.5], ['carousel', 0.5], ['crest', 0.5], ['plunge', 0.3]]) {
@@ -95,7 +95,7 @@ test('after the tunnel the sea is in view: open water within 250 m of the sea si
       track.pointAt(s, d + track.edgeAt(s, 1), p);
       if (sea.at(p.x, p.z) > 0.9 && terrain.heightAt(p.x, p.z) < sea.level - 1) found = d;
     }
-    expect(found <= 250, `${id}: open water ${found} m beyond the left edge`);
+    expect(found <= 90, `${id}: open water ${found} m beyond the left edge`);
     far.push(`${id} ${found} m`);
   }
   return far.join(', ');

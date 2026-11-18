@@ -98,15 +98,18 @@ const SEA = {
  * over which a side becomes coast. On the land side, the cut face is `cut` m high (the coast's ochre and rust rock),
  * and inside the carousel's hairpin (`knoll.piece`, the bend frame E1 looks at) the headland rises `knoll.rise` m
  * over the road beyond the cut, along a ridge `knoll.along` m long from the bend's centre down the tongue between its
- * legs, `knoll.across` m to either side of it.
+ * legs, `knoll.across` m to either side of it, moved `knoll.shift` of the way towards the hairpin's entry leg (the
+ * climb): the day's sun (16 degrees up, due east) comes from that side, and a hill close to the crest would lay its
+ * shadow over the whole of the bend's exit, where frame E1 has the road and the apron in the sun.
+ * (round 2: the cut was 11 m; a face that high, facing west, shaded the hairpin's road from the low eastern sun)
  */
 const COAST = {
   lip: [1.5, 4],
   steep: [1.6, 2.6],
   below: 7,
   ease: 30,
-  cut: 11,
-  knoll: { piece: 'carousel', rise: 22, along: 230, across: 46 },
+  cut: 6,
+  knoll: { piece: 'carousel', rise: 22, along: 230, across: 40, shift: 0.8 },
 };
 
 /**
@@ -300,10 +303,12 @@ const FOOT = 0.8;
         const apex = track.pointAt(s0 + len / 2, 0, new THREE.Vector3());
         const ax = (c.x - apex.x) / Math.abs(seg.r);
         const az = (c.z - apex.z) / Math.abs(seg.r);
-        const { rise, along, across } = COAST.knoll;
+        const entry = track.pointAt(s0, 0, new THREE.Vector3());
+        const { rise, along, across, shift } = COAST.knoll;
+        const v0 = shift * ((entry.x - c.x) * az - (entry.z - c.z) * ax);
         return (x, z) => {
           const u = (x - c.x) * ax + (z - c.z) * az;
-          const v = (x - c.x) * az - (z - c.z) * ax;
+          const v = (x - c.x) * az - (z - c.z) * ax - v0;
           const back = Math.max(0, -u);
           const off = Math.hypot(v, back);
           // highest a little down the tongue from the bend's centre, falling away along it and to its sides

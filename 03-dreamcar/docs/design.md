@@ -325,15 +325,15 @@ its car's origin in the car's own level frame, turned `yaw` degrees left of
 the car's heading and `pitch` degrees up, with a lens of `fov` degrees top to
 bottom (as given, whatever the picture's shape); the HUD is hidden unless
 `hud: true` is given; `photo(null)` ends it. The same in the address:
-`?photo=back,right,up,yaw,pitch,fov` (add `,hud` to keep the HUD), so that
+`?photo=back,right,up,yaw,pitch,fov[,roll]` (`roll`: degrees the picture leans clockwise; add `,hud` to keep the HUD), so that
 `node tools/shot.cjs --url "…?manual&auto&ap&t=20&photo=4.5,2.2,0.9,22,1,46"`
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
 day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 78.8 s),
 `?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green) and
-`?photo=e1` (the coast road after the sky road, day, t 56 s: looking back down the climb at the car, with
-the viaduct and the sea beyond it); a name
+`?photo=e1` (frame E1, strict spec for the coast stretch: day, t 64.9 s, the car coming out of the carousel,
+the camera on the crest looking back at it; a `roll` of 7 degrees tilts the horizon as the frame's does); a name
 brings its own moment of the autopilot's run and its time of day unless the
 address gives `t` or `time`, and also works on the handle
 (`__dreamcar.photo('d1')`). The camera moves with the car, so the engine's
@@ -458,8 +458,11 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   in low warm light, with rust in their shade and dark trunks below; a gantry
   over the road carrying columns of round start lamps; boards, a tyre wall, a
   low concrete wall; the asphalt in shade, the car's tail lamps lit.
+- **E1** (sea lane; strict spec for the coast stretch, preset `e1`): a road
+  winding in an S round a cut hill on a headland high above an open sea; the
+  whole frame is described under "The sea".
 
-Day answers to D1, D3 and A; golden hour to D4 and D2; the wet night to two
+Day answers to D1, D3, E1 and A; golden hour to D4 and D2; the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
 light, the materials, the vegetation, the composition and the sense of speed:
@@ -480,6 +483,40 @@ side, ochre gravel run-off and a steel rail on white posts on the sea side;
 a viaduct on tall piers standing in front of the water; sun-bleached warm
 light. Only its light, colour, materials and composition are taken.
 
+**E1 is strict spec for the coast stretch** (the owner, round 2: "This is
+strict spec"; and "give a sea view after the tunnel"): a still from the
+comparison camera `e1` must read as the same picture except for the car.
+Nothing of the game's content is copied (no names, logos, board lettering,
+track shape). The frame, read carefully: the camera looks back along a road
+that winds in an S round a hill on a headland high above the sea; open sea
+fills the right half and the upper middle to a straight hazy horizon about
+60 % up, tilted a few degrees, with clear pale-blue sky deepening upwards and
+no land behind the water; on the left a steep hill cut for the road, a
+rust and ochre face 10 to 15 m high with erosion gullies, dark at its foot,
+dry olive grass and scrub above; dark asphalt with a double yellow centre
+line and white edge lines, a low concrete kerb strip on the inside of the
+bend; on the outside a broad apron of ochre gravel, then a steel rail on
+white posts, a lip of dry grass and then the sea far below; red and white
+boards at the next bend; a pale viaduct on tall slender piers standing in
+the sea; a low warm sun from the left behind the camera, the hill's shadow
+over the left of the road.
+
+**Where E1 is on our course** (`?photo=e1`): the carousel, the slow right
+hairpin round a spur at the head of the headland, is the bend nearest the
+frame's S; the camera stands on the crest just past its exit, looking back
+north at the car coming out of it on the inside lane. The hill on the left
+is the spur inside the hairpin (`COAST.knoll`), cut for the road; the
+apron, the rail and the sea are on the right; the boards stand round the
+hairpin's outside. What our course cannot give: the sky road is behind this
+camera (it runs from the climb's foot back south-east to the tunnel), so the
+frame's viaduct is not in our picture; its piers stand in the sea where the
+driver sees them, from the tunnel's cutting, the sky road and the climb. And
+our day sun is fixed: 16 degrees up, due east (down the start straight); from
+E1's camera, looking a little east of north, it stands about 80 degrees to
+the left and very slightly ahead, so the cut face (facing west) is in its own
+shade and the spur's shadow lies across the near road, where the frame's sun
+comes from behind the camera's left and lights the face.
+
 - **Where the coast runs** (`SEA` in terrain.js). The course stands on a
   headland. Seen from the middle of the course, everything outside the loop
   at a bearing outside the mainland's (-115° to 50°, 0° being the start
@@ -488,23 +525,47 @@ light. Only its light, colour, materials and composition are taken.
   side. The mainland with the massif and the far ridges stays east, behind
   the start straight, so frame D1 is untouched. The lake beside the straight
   is a bay of the same sea, as it was to the east and opening to the open
-  water in the south-west. From the road the land falls to the water 55 to
-  170 m beyond the solid edge, the last of it as a cliff (rise 1.15 per
-  metre) of ochre rock with a dark wet band at its foot; the seabed shelves
-  away at 0.3 per metre to 45 m. Seven sea stacks stand 30 to 120 m off the
-  open coast. No far shore: the far ridges stand aside where the sea is
-  (far.js), so the sky road and the crest look over water, haze and sky.
+  water in the south-west. (Round 2: the mainland's sector ends at 24°, not
+  50°, so that from the climb no far shore stands across the inlet; D1's view
+  lies between -70° and -2°.) Away from the coast road the land falls to the
+  water 55 to 170 m beyond the solid edge, the last of it as a cliff (rise
+  1.15 per metre) of ochre rock with a dark wet band at its foot; the seabed
+  shelves away at 0.3 per metre to 45 m. Seven sea stacks stand 30 to 120 m
+  off the open coast. No far shore: the far ridges stand aside where the sea
+  is (far.js), so the sky road and the crest look over water, haze and sky.
+- **The coast road's cliff** (round 2, `COAST` in terrain.js). On the sea
+  side of the coast road the land does not slope away to a shore far off:
+  beyond the rail a lip of dry grass 1.5 to 4 m wide, then a cliff straight
+  down into the sea (1.6 to 2.6 m down per metre out, rounded at its top, a
+  talus at its foot 7 m under the water), so that open water lies some 40
+  to 60 m beyond the solid edge and 85 to 110 m below the road. The land
+  side is cut 11 m deep (the coast's rust face), and inside the carousel the
+  spur rises as a hill up to about 22 m over the road beyond the cut, along
+  a ridge 230 m down the tongue between the climb and the crest. Nothing
+  grows tall either side of the coast road: dry olive grass and scrub.
+- **The sky road over the sea** (round 2): the deck crosses an inlet; the
+  ground under its middle is 96 m down (`drop`), under the water, so its
+  piers stand in the sea.
 - **The coast road** (`coastDown`, `coastRun`, `coastTop` in trackLayout.js:
   the climb, the carousel, the crest and the plunge): on the sea side the
-  steel rail stands on white posts, with ochre gravel beyond it and nothing
-  growing that would hide the water; on the land side the cut rock of the
-  climb and the carousel is the coast's warm ochre and rust, grass on top.
-  The corridor is exactly the presets' it replaced: the course and what the
-  cars hit did not change. Within a few hundred metres of the sea all rock
+  steel rail stands on white posts and nothing grows that would hide the
+  water; round the carousel and over the crest the verge inside the rail is
+  a broad apron of ochre gravel (round 2: `verge: 'gravel'`, the grip and
+  sound of gravel; no tyre wall on a coast side's run-off), elsewhere grass;
+  on the land side the cut rock of the climb and the carousel is the coast's
+  rust and ochre in faint beds scored by gullies, dry grass on top. The
+  corridor's edges and slopes are exactly the presets' it replaced. The road
+  from the sky road to the plunge has a double yellow centre line
+  (`PIECE_MARKS` in road.js) and its kerbs are bare concrete (kerbs.js); no
+  floodlight poles stand round the carousel and over the crest
+  (`lapLamps.skip`). Within a few hundred metres of the sea all rock
   is that warm stone and all loose stone ochre grit (groundMaterial.js reads
   the sea map); inland it stays the grey limestone.
 - **The water** is demo 01's sea (engine/waves.js, sea.js): a long soft
-  swell (150, 98 and 63 m long, 0.85 m and less) under a light breeze's chop,
+  swell (150, 98 and 63 m long, 0.6 m and less; round 2: lower and spread
+  wider in direction, and every wave rising and falling in sets and lulls of
+  its own, `GROUPS`, so that from high above it is a texture, not ruled
+  lines) under a light breeze's chop,
   from the open sea in the north-west; the swell dies down over the shallows
   and breaks along the shore in bands of surf that run in with it; a few
   streaks of foam behind crests. Its colour is what it mirrors and what comes
@@ -514,7 +575,9 @@ light. Only its light, colour, materials and composition are taken.
   shallows. **Day**: deep blue with the sky in it; the sun stands behind
   the coast road's views, so its glitter path lies towards the land. **Golden
   hour**: the low sun over the bay and the south-west, a path of gold glitter
-  on dark teal water. **Night**: black water, the moon's glitter, and the
+  on dark teal water (round 2: the water gives back less of the bright
+  golden sky, 0.42, and its body is a dark teal; by day 0.78 and a deeper,
+  more saturated blue, `SEA_LOOK.byTime`). **Night**: black water, the moon's glitter, and the
   nearest lamps of the lap drawn into it as long streaks (the same lamps the
   wet road glints with).
 - **Tiers**: low draws a flat disc of 160 triangles with the swell in the
