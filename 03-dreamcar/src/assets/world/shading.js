@@ -16,7 +16,7 @@ import * as THREE from 'three';
 
 /** Shared by every baked material: which of the two baked channels is the light now showing (day, night). */
 /** The least share of the sky's light that baked ground keeps, whatever hides the sky (see the shader below). */
-export const BAKE_SKY_FLOOR = 0.4;
+export const BAKE_SKY_FLOOR = 0.7;
 
 export const BAKE_UNIFORMS = { uBakeSel: { value: new THREE.Vector3(1, 0, 0) } };
 
