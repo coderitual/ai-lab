@@ -40,11 +40,16 @@ export function createContactShadow(positions, count, tier) {
       const x = ((c + 0.5) / w - 0.5) * SIZE.x;
       const across = half[r] > 0 ? Math.abs(x) - half[r] : Math.hypot(Math.max(0, Math.abs(x) - 0.6), along);
       const outside = Math.max(0, across);
-      let a = Math.exp(-outside / 0.09) * (0.55 + 0.4 * Math.min(1, Math.max(0, -across / 0.35)));
-      for (const wheel of WHEELS) a += 0.4 * Math.exp(-(((x - wheel.x) / 0.13) ** 2) - (((z - wheel.z) / 0.28) ** 2));
+      // (the owner's phone: "a soft dark blob with no contact": the edge is now tighter, the middle darker, and
+      // each tyre stands on a near-black patch the size of its footprint)
+      let a = Math.exp(-outside / 0.06) * (0.68 + 0.3 * Math.min(1, Math.max(0, -across / 0.3)));
+      for (const wheel of WHEELS) {
+        a += 0.35 * Math.exp(-(((x - wheel.x) / 0.14) ** 2) - (((z - wheel.z) / 0.3) ** 2));
+        a += 0.6 * Math.exp(-(((x - wheel.x) / 0.1) ** 4) - (((z - wheel.z) / 0.11) ** 4));
+      }
       // laid flat, the plane's texture rows run from the nose (row 0) to the tail
       const o = ((h - 1 - r) * w + c) * 4;
-      data[o + 3] = Math.round(255 * Math.min(0.95, a));
+      data[o + 3] = Math.round(255 * Math.min(0.97, a));
     }
   }
   const texture = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);

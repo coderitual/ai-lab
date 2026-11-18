@@ -99,8 +99,15 @@ band was 35 mm, and the screen was opaque).
 layer of metal flake under a clear coat.
 
 - **Base** (`PAINTS`: colour, metalness, roughness, flop, flake). Silver, this
-  car's high-tech silver: linear 0.56, metalness 0.9, roughness 0.4, falling
-  to 42 % edge-on (flop). The broad metal sheen and the darker faces turned
+  car's high-tech silver: linear 0.60 / 0.62 / 0.66 (cool), metalness 0.92,
+  roughness 0.27, falling to 34 % edge-on (flop). At roughness 0.4 the metal
+  layer read as a grey satin veil next to the press and daylight photographs;
+  at 0.27 it mirrors the sky as a soft blue over bonnet and roof. The metal
+  layer's read of the probe is held to five times the probe's average round
+  that direction, so a small fierce thing in it (the sun's glare on the road
+  behind the car, a lamp) makes a highlight, not a burnt-out panel (the
+  owner's phone showed the whole tail white by day); the clear coat keeps the
+  crisp highlight. The broad metal sheen and the darker faces turned
   away from the light are what make it metallic paint and not white plastic.
 - **Clear coat**, roughness 0.03, 1.6 times a plain lacquer's reflectance
   (`COAT_GAIN`): the crisp mirror image over the sheen. Both layers mirror the
@@ -171,20 +178,22 @@ Two guards on every probe read (`REFLECTIONS` in `materials.js`):
   road's asphalt shader where the road is seen exactly edge on from the probe;
   see below), the mips spread it, and the paint sampled it: black here, a
   screen-filling white bloom on other GPUs.
-- `carGround`: a reflected ray that meets the road within 20 m is turned into
-  the direction from the probe (the middle of the car's box) to that point: a
-  parallax correction for the road's plane, which the middle of the car
-  otherwise sees at the wrong size and place.
+- `carGround` (written, switched off: `REFLECTIONS(..., ground)` defaults to
+  false): a parallax correction for the road's plane. On a 64 to 256 cube it
+  magnified the road's few texels into dark blotches on the bumper.
 
 ### The glass
 
 The glass and the lenses are the skin again, drawn after the paint at the
 same depth with premultiplied alpha, so the reflection (the probe, at
 roughness 0.02) is not dimmed by the transparency. Windscreen and front door
-glass pass about three quarters of the light, the rear doors, quarter lights
+glass pass about half the light (55 % and 50 %: the photographs show dark
+glass), the rear doors, quarter lights
 and rear screen 15 % (privacy glass, as on this car), the roof 6 %. Each pane
 has its black band under the edge (25 mm on the windscreen, 28 on the rear
-screen); the rear screen carries its fourteen heating lines. Behind it are
+screen); the rear screen carries its fourteen heating lines, drawn only where they
+stand eight pixels or more apart (closer, at a phone's reduced resolution,
+they beat into a banded moire over the screen). Behind it are
 the cabin (`details.js`: seats with head restraints and bolsters, the rear
 bench, dash and cowl, console, door cards, steering wheel, interior mirror,
 parcel shelf, all black and lit by what sun comes through; under the roof
@@ -279,8 +288,9 @@ its dish.
 ### The contact shadow
 
 `shadow.js` bakes a small picture from the body's plan outline: densest under
-the sills and between the wheels, a darker pad under each tyre, fading over a
-hand's width outside the body. It is not a child of the car: the game adds
+the sills and between the wheels (0.68 to 0.97), a near-black patch the size
+of each tyre's footprint inside a softer pad, fading over 6 cm outside the
+body (it was a soft blob with no contact on the owner's phone). It is not a child of the car: the game adds
 `car.shadow` to the scene and `car.poseShadow(point, normal, yaw, strength)`
 lays it flat on the road while the body rolls and pitches above it.
 
