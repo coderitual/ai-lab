@@ -230,7 +230,26 @@ treeMaterial.js, impostors.js, forest.js; numbers in design.md, "The forest".
   coverage-preserving mips and a hard swap. No hashed or dithered
   transparency anywhere: under the motion blur it smears into noise.
 - **Shadows** are impostor cards turned to the sun, on a layer only the sun's
-  shadow camera sees: two triangles a tree.
+  shadow camera sees: two triangles a tree. A tree casts if its SHADOW comes
+  near the car, not the tree itself (forest lane): the level segment from its
+  foot to where the shadow of its top lands (its height times 3.5 under the
+  day's 16 degree sun, at most 160 m) is tested against the circle round the
+  car. Under a low sun the crowns that dapple the road ahead stand 50 to
+  90 m off towards the sun; tested by where they stood, they were left out
+  and the road lay in plain light or plain shade. The leaf gaps in the
+  baked pictures' alpha are what make the patches; the trunks of the trees
+  near the road make the long stripes.
+- **Schemes** (forest lane, `schemes.js`): a piece of the plan may name a
+  look (`scheme`, trackLayout.js SCHEMES). Everything that reads it asks
+  one table per Track sample: which scheme, its weight (1 on its pieces,
+  easing to 0 over its `blend` metres either side) and whether the sample
+  is on its own pieces. The weight decides gradually (a tree, a tuft, a
+  boulder is placed with that probability; the asphalt's tone and the
+  concrete strip fade with it); the lines are drawn only on the pieces
+  themselves, so they begin and end at a piece's end. Each part plants or
+  places what the scheme asks from its own random stream (`fork('scheme')`)
+  after everything else is placed, so that the rest of the lap is exactly as
+  it was.
 - **Where trees stand** is asked of `track.woodAt(s, side)` from 2 m behind
   the barrier, plus the mass of the forest away from the road where the
   terrain says; a keep-out callback keeps the start area and the town free.
@@ -297,6 +316,22 @@ tyres). The filter (three.js's five-tap PCF) is 1.0 / 1.2 / 1.6 texels wide
 on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car also lays its own contact shadow (the CAR lane's
 `car/shadow.js`), which no map is fine enough to draw.
 
+## Boulders
+
+`boulders.js` (forest lane): a unit icosahedron squashed into an ellipsoid
+and lumped by smooth noise of the direction (the same at every copy of a
+corner, so the non-indexed facets stay closed), then FRACTURED: three to five
+planes, everything beyond a plane pressed back onto it, which leaves the flat
+faces and sharp arrises of granite split along its joints. Painted per
+vertex: the granite flecked, lichen in pale patches, moss where a face looks
+at the sky (the grass's own green), the foot dark where it stands in the
+earth. Two shapes (a weathered `round` one and a split `block`), each one
+instanced mesh, scaled, turned and tilted per boulder. groundCover.js places
+each with its middle at least its plan radius (the shape's own widest reach
+in plan at the largest scale, plus 15 cm for the tilt) beyond the solid
+edge, so no car can touch one; the low tier draws them as its plain rocks in
+the granite's tone.
+
 ## The asphalt
 
 `road.js`, `roadTextures.js`, `corridor.js`, `roadHistory.js`.
@@ -322,7 +357,14 @@ on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car als
   joints on the decks, tyre marks before the carousel: single things placed
   by rule along the Track and drawn exactly.
 - **Paint:** a solid white line inside each edge, the start line and the
-  grid's boxes, a few millimetres proud, worn where tyres cross it.
+  grid's boxes, a few millimetres proud, worn where tyres cross it. Where a
+  piece's scheme asks (forest lane, `uScheme`: one texel a metre, read
+  nearest so that a line begins exactly at its piece's end) a double yellow
+  centre line, two 12 cm lines 16 cm apart; an older surface (the binder
+  worn off the stones, paler, rougher, less rubber, more sealed cracks); and
+  a flush precast concrete strip 0.32 m wide with a joint every metre along
+  the margin's outer side. All of it is paint and tone on the profile: the
+  course is unchanged.
 - **Wetness** (one shared uniform, the time of day's `wetness` or `?wet=`):
   water fills the gaps between stones first (the height channel says which),
   puddles stand in the wheel tracks and low spots, the road under the

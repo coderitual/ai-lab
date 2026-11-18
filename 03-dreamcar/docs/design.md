@@ -109,10 +109,13 @@ the bends and the braking zones (corridor.js), runs of surfacing of different
 ages with joints, the paver's seams 2 m either side of the middle, a few
 patches and sealed cracks, tyre marks before the carousel (roadHistory.js);
 its markings are a solid white line inside each edge (0.28 m), the start line
-and twelve grid boxes from `track.grid`, nothing else. A second, anisotropic
+and twelve grid boxes from `track.grid`, nothing else, but on the two forest
+stretches of frames E2 and E5 (below, "The forest"), where a piece's
+`scheme` adds a double yellow centre line and an older, paler surface. A second, anisotropic
 specular lobe stretched along the line of sight lays the low sun's glare on it
 as a long streak (`ASPHALT_SHEEN`). The kerbs (kerbs.js) are red and white
-painted concrete, one colour per tooth, on `track.kerbs`, exactly on
+painted concrete (blue and white in E5's bend, bare pale concrete in E2's
+wood: the scheme's paints), one colour per tooth, on `track.kerbs`, exactly on
 `track.profile()` (on low, rows at every second tooth top). Beyond the margin
 the terrain's band carries the verge: mown stripes 1.6 m wide, a ragged strip
 of worn earth along the kerbs, longer grass at the barrier, with tufts of
@@ -423,7 +426,10 @@ with a short `advance` after loading.
 ## The reference frames
 
 The owner chose five frames as the spec for the look ("treat those
-screenshots as spec, not suggestion"). They are kept out of the repository
+screenshots as spec, not suggestion"), and later two more for the forest,
+E2 and E5 ("another spec references"; "certain parts of the track can
+still be as they are, but I want it to have some parts that look like on
+the screenshots"). They are kept out of the repository
 and described here in words. Every change to the light, the materials or the
 grade is judged by staging our still beside the frame it answers to, at the
 same framing, and listing what still differs (ideas.md keeps the lists).
@@ -457,7 +463,25 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   over the road carrying columns of round start lamps; boards, a tyre wall, a
   low concrete wall; the asphalt in shade, the car's tail lamps lit.
 
-Day answers to D1, D3 and A; golden hour to D4 and D2; the wet night to two
+- **E2** (the owner's "another spec reference"), from a console racing game,
+  by day: a straight road through a wood of tall conifers with long bare
+  trunks and high crowns standing close on both sides, deep shade under
+  them; the low sun coming through from the side lays crisp patches of light
+  and long trunk shadows across pale grey, slightly worn asphalt; a double
+  yellow centre line and white edge lines; a low concrete kerb at the road's
+  edge, then a bright verge of long grass with ferns and yellow flowers;
+  mossy boulders among the trunks; a forested hillside at the vanishing
+  point under a bright sky with clouds.
+- **E5**, the same game, a mountain bend: big pale granite boulders and
+  outcrops right at the roadside, some as large as a van, shrubs between
+  them; mixed pines and firs, a tall stone pine with a bare trunk on the
+  inside; open sunny glades; grass islands with purple and yellow flowers; a
+  blue and white painted kerb at the apex; the double yellow line following
+  the bend; a yellow diamond warning sign (ours is a plain bend arrow of our
+  own drawing); more road beyond through the trees.
+
+Day answers to D1, D3 and A, and its two forest stretches to E2 and E5;
+golden hour to D4 and D2; the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
 light, the materials, the vegetation, the composition and the sense of speed:

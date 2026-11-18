@@ -33,7 +33,15 @@ export const CANOPY = {
   reach: 15,
   /** The least share of the sky that is left. */
   floor: 0.3,
+  /**
+   * (forest lane) The woods of the pieces' schemes (trackLayout.js SCHEMES, `wood`), blended in by the scheme's
+   * weight (schemes.js): frame e2's pines are tall and stand close (deep shade between the sun's patches), frame e5's
+   * stand in open groups round sunny glades.
+   */
+  schemes: { pinewood: { height: 27, density: 0.95 }, stonepine: { height: 17, density: 0.6 } },
 };
+
+import { schemeTable } from './schemes.js';
 
 const tables = new WeakMap();
 
@@ -49,32 +57,46 @@ function tableOf(track) {
     const wooded = new Uint8Array(n);
     const nearRaw = new Float32Array(n);
     const heightRaw = new Float32Array(n);
+    const densityRaw = new Float32Array(n);
+    const st = track.layout ? schemeTable(track) : null;
     for (let i = 0; i < n; i++) {
       const wood = track.woodAt ? track.woodAt(i * ds, side) : null;
       if (!wood) continue;
       wooded[i] = 1;
       nearRaw[i] = track.edgeAt(i * ds, side) + CANOPY.clear - CANOPY.overhang;
-      heightRaw[i] = (CANOPY.height[wood] ?? CANOPY.height.mixed) + Math.max(0, slopes ? slopes[i] : 0) * (CANOPY.overhang + CANOPY.depth);
+      let height = CANOPY.height[wood] ?? CANOPY.height.mixed;
+      let density = CANOPY.DENSITY;
+      const own = st && st.index[i] >= 0 ? CANOPY.schemes[st.defs[st.index[i]].wood] : null;
+      if (own) {
+        height += (own.height - height) * st.w[i];
+        density += (own.density - density) * st.w[i];
+      }
+      heightRaw[i] = height + Math.max(0, slopes ? slopes[i] : 0) * (CANOPY.overhang + CANOPY.depth);
+      densityRaw[i] = density;
     }
     const share = new Float32Array(n);
     const near = new Float32Array(n);
     const height = new Float32Array(n);
+    const density = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       let count = 0;
       let sumNear = 0;
       let sumHeight = 0;
+      let sumDensity = 0;
       for (let j = -span; j <= span; j++) {
         const k = (i + j + n) % n;
         if (!wooded[k]) continue;
         count++;
         sumNear += nearRaw[k];
         sumHeight += heightRaw[k];
+        sumDensity += densityRaw[k];
       }
       share[i] = count / (2 * span + 1);
       near[i] = count ? sumNear / count : 0;
       height[i] = count ? sumHeight / count : 0;
+      density[i] = count ? sumDensity / count : CANOPY.DENSITY;
     }
-    return { share, near, height };
+    return { share, near, height, density };
   });
   tables.set(track, t);
   return t;
@@ -95,7 +117,7 @@ export function canopyOpen(track, s, lat) {
     if (w.share[i] <= 0) continue;
     const d = Math.max(0.5, w.near[i] - side * lat);
     const cos = d / Math.hypot(d, w.height[i]);
-    lost += w.share[i] * CANOPY.DENSITY * CANOPY.LOW_SKY * (1 - cos) * 0.5;
+    lost += w.share[i] * w.density[i] * CANOPY.LOW_SKY * (1 - cos) * 0.5;
   }
   return Math.max(CANOPY.floor, 1 - lost);
 }

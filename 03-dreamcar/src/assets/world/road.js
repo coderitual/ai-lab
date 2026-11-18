@@ -35,7 +35,10 @@
 //    the tyre marks before the slow corner: single things placed by rule,
 //    drawn exactly;
 //  - paint: a solid white line inside each edge of the pavement, the start
-//    line and the grid's boxes, nothing else; a few millimetres proud (it
+//    line and the grid's boxes; on the pieces whose scheme (trackLayout.js
+//    SCHEMES, schemes.js) asks for it a double yellow centre line too, the
+//    asphalt there older, paler and more cracked, and a flush concrete strip
+//    along the margin's outer side (forest lane); a few millimetres proud (it
 //    catches the light along its edges), worn where tyres cross it, cut away
 //    where the road was patched, full of glass beads that send a car's head
 //    lamps back;
@@ -66,9 +69,12 @@ import { BORE_UNIFORMS, WET_UNIFORMS, extend, withBake } from './shading.js';
 import { GLINTS } from './lamps.js';
 import { canopyOpen } from './canopy.js';
 import { PIECE } from './terrain.js';
+import { schemeTable } from './schemes.js';
 
 /** The edge line: its width (m), its outer edge on the pavement's edge. */
 const EDGE_LINE = 0.28;
+/** (forest lane) The double yellow centre line of a scheme's pieces: each line's width (m), and its paint (linear). */
+const CENTRE_LINE = { width: 0.12, yellow: [0.52, 0.33, 0.035] };
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /**
@@ -236,6 +242,24 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
   edgeTexture.wrapS = THREE.RepeatWrapping;
   edgeTexture.needsUpdate = true;
 
+  // (forest lane) the pieces' schemes, per metre: r the lines (1 on the scheme's own pieces: they start and end at its
+  // ends), g how much older and paler the asphalt is, b how many more cracks, a the concrete strip's width (m); the
+  // last three blended into the neighbours (schemes.js)
+  const st = schemeTable(track);
+  const schemeBytes = new Uint8Array(n * 4);
+  let gap = 0.16;
+  for (let i = 0; i < n; i++) {
+    const k = st.index[i];
+    if (k < 0) continue;
+    const def = st.defs[k];
+    if (def.gap) gap = def.gap;
+    schemeBytes.set([st.on[i] && def.lines === 'double-yellow' ? 255 : 0, byte(st.w[i] * (def.asphalt ?? 0)), byte(st.w[i] * (def.cracks ?? 0)), byte(st.w[i] * (def.strip ?? 0))], i * 4);
+  }
+  const schemeTexture = new THREE.DataTexture(schemeBytes, n, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
+  schemeTexture.magFilter = schemeTexture.minFilter = THREE.NearestFilter;
+  schemeTexture.wrapS = THREE.RepeatWrapping;
+  schemeTexture.needsUpdate = true;
+
   const textures = roadTextures({ caps, tier });
 
   // the grid's boxes, in track coordinates (s counted back from the line is negative)
@@ -253,6 +277,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     uAggN: { value: textures.relief },
     uBig: { value: textures.big },
     uEdge: { value: edgeTexture },
+    uScheme: { value: schemeTexture },
     uFeat: { value: history.texture },
     uLength: { value: track.length },
     uGrid: { value: slots },
@@ -278,6 +303,8 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     ROAD_TIER: shade.tier,
     AGG_TILE: textures.tile.toFixed(3),
     ROAD_SLOTS: history.slots,
+    CENTRE_HALF_GAP: (gap / 2).toFixed(3),
+    ROAD_SHOULDER: track.shoulder.toFixed(3),
     ...(mirror && shade.tier > 0 ? { ROAD_MIRROR: 1 } : {}),
   };
   extend(material, 'asphalt', (shader) => {
@@ -623,6 +650,7 @@ uniform sampler2D uAgg;
 uniform sampler2D uAggN;
 uniform sampler2D uBig;
 uniform sampler2D uEdge;
+uniform sampler2D uScheme;
 uniform highp sampler2D uFeat;
 uniform float uLength;
 uniform vec4 uGrid[${GRID_SLOTS}];
@@ -678,6 +706,8 @@ roadFade = 1.0 - smoothstep( 18.0, 110.0, rDist );
 // 1 where single stones are told apart, 0 where a pixel holds many
 float rNear = 1.0 - smoothstep( 0.012, 0.05, max( length( rDx ), length( rDy ) ) );
 float rOnRoad = smoothstep( uHalf + aaL, uHalf - aaL, rA );
+// (forest lane) the piece's scheme: lines, older asphalt, more cracks, the concrete strip (schemes.js)
+vec4 rScheme = texture2D( uScheme, vec2( ( floor( rS / uLength * float( textureSize( uScheme, 0 ).x ) ) + 0.5 ) / float( textureSize( uScheme, 0 ).x ), 0.5 ) );
 
 // ================= the large fields and the stones
 vec4 rBig = texture2D( uBig, rUv / ${BIG_TILE.toFixed(1)} );
@@ -825,6 +855,8 @@ float rAge = ftHead.z >= 0.0 ? mix( ftHead.x, ftHead.y, smoothstep( -aaS, aaS, r
 float rSeamTar = ftHead.z >= 0.0 ? roadCover( rJointX, 0.02, aaS ) : 0.0;
 rAge = clamp( rAge + ( rBig2.r - 0.5 ) * 0.22, 0.0, 1.0 );
 rAge = mix( rAge, ftTone * 0.5, ftFresh );
+// (forest lane) an old road's surface: weathered, its binder worn off the stones (frame e2's pale grey)
+rAge = mix( rAge, max( rAge, 0.92 ), rScheme.g );
 float rWorn = mix( 0.3, 1.0, rAge );
 // new: binder over everything, black. Old: the binder weathered grey and worn off the stones' tops.
 // (night lane, frame D3: the sunlit road is a warm light grey; the stones are a warm limestone under the binder)
@@ -834,12 +866,15 @@ rCol *= ( 0.86 + 0.28 * rBig.r ) * ( 0.92 + 0.16 * rBig2.r ) * ( 0.92 + 0.16 * r
 rCol *= 1.0 - 0.2 * rTracks * rWorn;
 rCol *= 1.0 + 0.1 * rCrown * rWorn;
 rCol *= 1.0 - 0.12 * rDrip * rWorn;
-rCol = mix( rCol, vec3( 0.03, 0.03, 0.032 ) * ( 0.8 + 0.4 * rAgg.r ), 0.78 * rRubber );
+rCol = mix( rCol, vec3( 0.03, 0.03, 0.032 ) * ( 0.8 + 0.4 * rAgg.r ), 0.78 * rRubber * ( 1.0 - 0.6 * rScheme.g ) );
+// (forest lane) paler: pale stone showing through, dust in the pores
+rCol = mix( rCol, rCol * 1.55 + vec3( 0.026, 0.025, 0.023 ) * ( 0.8 + 0.4 * rMottle ), rScheme.g );
 // roughness as alpha squared (what averages truly over a pixel): each stone its own polish, the binder dull
 float rAlpha2 = rAgg.b * ${ROUGH_GAIN.toFixed(2)} * mix( 1.35, 0.9, rAge );
 rAlpha2 *= 1.0 - 0.5 * min( rTracks, 1.0 ) * rWorn;
 rAlpha2 *= 0.8 + 0.4 * rBig.b;
 rAlpha2 = mix( rAlpha2, 0.07, 0.6 * rRubber );
+rAlpha2 *= 1.0 + 0.4 * rScheme.g;
 roadTiltGain = 1.0 - 0.35 * min( rTracks, 1.0 ) * rWorn;
 
 // ================= paint: an edge line inside each edge, the start line, the grid
@@ -852,16 +887,19 @@ for ( int i = 0; i < ${GRID_SLOTS}; i ++ ) {
   rMarks += roadCover( d - 2.7, 0.07, aaS ) * roadCover( l, 1.25, aaL );
   rMarks += roadCover( abs( l ) - 1.18, 0.07, aaL ) * roadCover( d - 2.05, 0.65, aaS );
 }
+// (forest lane) the scheme's double yellow centre line, two solid lines either side of the centre
+float rYellow = step( 0.5, rScheme.r ) * roadCover( rA - ( CENTRE_HALF_GAP + ${(CENTRE_LINE.width / 2).toFixed(3)} ), ${(CENTRE_LINE.width / 2).toFixed(3)}, aaL );
+rMarks += rYellow;
 // worn: thin where the tyres run, gone in places, broken by the stones up close, newer where the road is
 float rWear = 0.55 + 0.25 * rBig.b + 0.2 * rMottle - 0.3 * rRubber + 0.2 * ( rAgg.g - 0.5 ) * rNear + 0.2 * ( 1.0 - rAge );
 roadPaint = clamp( rMarks, 0.0, 1.0 ) * rOnRoad * smoothstep( 0.14, 0.38, rWear ) * ( 1.0 - ftErase );
-rCol = mix( rCol, vec3( 0.68, 0.68, 0.655 ) * ( 0.88 + 0.16 * rAgg.r ) * ( 0.88 + 0.12 * rBig.r ), roadPaint );
+rCol = mix( rCol, mix( vec3( 0.68, 0.68, 0.655 ), vec3( ${CENTRE_LINE.yellow.map((v) => v.toFixed(3)).join(', ')} ), clamp( rYellow, 0.0, 1.0 ) ) * ( 0.88 + 0.16 * rAgg.r ) * ( 0.88 + 0.12 * rBig.r ), roadPaint );
 rAlpha2 = mix( rAlpha2, 0.085, roadPaint );
 roadTiltGain *= 1.0 - 0.65 * roadPaint;
 
 // ================= what lies on top of the paint: tar, stains, iron
 // cracks that broke the old road into blocks, and the seam between the lanes
-float rBlocks = roadCover( rBig.g * 5.3, 0.011, aaM ) * smoothstep( 0.55, 0.75, rBig2.b ) * smoothstep( 0.5, 0.8, rAge ) * ( 1.0 - ftFresh );
+float rBlocks = roadCover( rBig.g * 5.3, 0.011, aaM ) * smoothstep( 0.55 - 0.4 * rScheme.b, 0.75 - 0.4 * rScheme.b, rBig2.b ) * smoothstep( 0.5, 0.8, rAge ) * ( 1.0 - ftFresh );
 float rSeam = 0.45 * roadCover( abs( rLat ) - ${SEAM_LAT.toFixed(2)} - 0.015 * sin( rS * 0.3 ), 0.012, aaL ) * smoothstep( 0.35, 0.6, rBig2.g + rAge * 0.3 );
 float rTar = clamp( max( max( ftTar, rSeamTar ), max( rBlocks, rSeam ) ), 0.0, 1.0 ) * rOnRoad;
 rCol = mix( rCol, vec3( 0.021, 0.021, 0.023 ), 0.93 * rTar );
@@ -902,6 +940,17 @@ if ( rOut > -0.6 ) {
   rCol = mix( rCol, mix( vec3( 0.16, 0.085, 0.025 ), vec3( 0.05, 0.03, 0.015 ), gAgg.r ), rLeaves );
   rAlpha2 = mix( rAlpha2, 0.2, rLeaves );
   roadTiltGain *= 1.0 - 0.8 * rLeaves;
+  // (forest lane) the scheme's flush concrete strip along the margin's outer side: precast pieces a metre long
+  float stripW = rScheme.a;
+  if ( stripW > 0.01 ) {
+    float stripIn = rOut - ( ROAD_SHOULDER - stripW );
+    float strip = smoothstep( -aaL, aaL, stripIn ) * loose;
+    float joint = roadCover( fract( rS ) - 0.5, 0.008, aaS ) + roadCover( stripIn, 0.012, aaL );
+    vec3 concrete = vec3( 0.36, 0.35, 0.32 ) * ( 0.82 + 0.3 * gAgg.r ) * ( 0.85 + 0.3 * rBig2.r );
+    rCol = mix( rCol, mix( concrete, vec3( 0.05, 0.048, 0.045 ), clamp( joint, 0.0, 1.0 ) * 0.8 ), strip * smoothstep( 0.0, 0.3, stripW / 0.32 ) );
+    rAlpha2 = mix( rAlpha2, 0.5, strip );
+    roadGravel *= 1.0 - strip;
+  }
 }
 
 // ================= water
