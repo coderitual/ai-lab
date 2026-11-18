@@ -17,7 +17,7 @@ import { plantMaterial } from './treeMaterial.js';
 import { planeNoise } from './shading.js';
 import { GRASS } from './groundMaterial.js';
 import { boulderGeometry } from './boulders.js';
-import { createBendSigns } from './bendSigns.js';
+import { createBendSigns, createCurbs } from './schemeFurniture.js';
 import { schemeAt, schemeTable } from './schemes.js';
 
 const SURFACE_GRASS = 2;
@@ -425,6 +425,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       const v = r.range(0.75, 1.15);
       const warm = r.range(-0.04, 0.04);
       const item = make(point.x, y - size * 0.18, point.z, r.range(0, Math.PI * 2), [size * r.range(0.8, 1.4), size, size * r.range(0.8, 1.3)], [0.16 * v * (1 + warm), 0.155 * v, 0.14 * v * (1 - warm)], size * 1.5, r.range(-0.3, 0.3));
+      // (forest lane) not where the rock edge is drawn as a scheme's kerbstone (its knoll has its own boulders)
+      if (kind === EDGE.ROCK && schemeAt(track, s)?.def.curb) continue;
       rockItems.push(item);
     }
   }
@@ -492,8 +494,9 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
             const edge = track.edgeAt(s, side);
             const i = Math.round(s / track.ds) % track.count;
             // (only beside the woods: not where a rock face, a wall or a structure begins)
-            if (kinds[i] !== EDGE.RAIL && kinds[i] !== EDGE.TREES) continue;
-            const behind = kinds[i] === EDGE.RAIL || kinds[i] === EDGE.TREES ? 6 : 0;
+            const curbed = kinds[i] === EDGE.ROCK && !!def.curb && sch.on;
+            if (kinds[i] !== EDGE.RAIL && kinds[i] !== EDGE.TREES && !curbed) continue;
+            const behind = 6;
             const roll = sr.next();
             if (roll < 0.45 * w) {
               // long grass, taller towards the wood
@@ -545,7 +548,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
             if (!sch || sch.def !== def || sr.next() >= sch.w) continue;
             if (inRanges(s, track.tunnels, 20) || inRanges(s, track.bridges, 4)) continue;
             const ki = kinds[Math.round(s / track.ds) % track.count];
-            if (ki !== EDGE.RAIL && ki !== EDGE.TREES) continue;
+            if (ki !== EDGE.RAIL && ki !== EDGE.TREES && !(ki === EDGE.ROCK && def.curb && sch.on)) continue;
             const edge = track.edgeAt(s, side);
             const outcrop = granite && sr.next() < 0.22;
             if (outcrop) {
@@ -622,6 +625,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
   const signMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, flat: true, twoSided: true });
   const signs = createBendSigns({ track, terrain, material: signMaterial });
   group.add(signs.group);
+  const curbs = createCurbs({ track, terrain, material: signMaterial });
+  group.add(curbs.group);
 
   const frustum = new THREE.Frustum();
   const projView = new THREE.Matrix4();
@@ -643,6 +648,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       boulderMaterial.dispose();
       signMaterial.dispose();
       signs.dispose();
+      curbs.dispose();
       texture.dispose();
     },
   };

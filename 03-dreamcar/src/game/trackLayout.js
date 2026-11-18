@@ -74,6 +74,11 @@ export const SIDES = {
   // a hillside steeper than the sun put the whole bend in its shade. On a gentle one the sun comes in UNDER the
   // bank's crowns and through them, and lies on the road in patches (frame D3's dappled light).
   bank: { kind: 'wall', edge: [3.5, 5], slope: 0.07, far: 0.12, verge: 'grass', wood: 'broadleaf' },
+  // (forest lane) frame e5's grass island: inside the carousel, where the spur was cut as rock, a low knoll of grass,
+  // flowers, granite boulders and pines behind a low concrete edge; no rail. To the cars it is the rock edge it was
+  // (kind, distance and verge as `rock`: the course drives exactly as before); the world draws no cut face or cliff
+  // where the piece's scheme says `curb`, but a low concrete kerbstone at the edge and the knoll behind it.
+  island: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 0.22, verge: 'grass', wood: 'conifer' },
   // the road cut into the hill: a narrow verge, then the rock face
   rock: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null },
   // (tunnel lane) the cutting out of the tunnel: a lower cut (the terrain's cliff is 2 + 5 far m: 5 m), faced in
@@ -100,12 +105,14 @@ export const SIDES = {
  *   verge    'meadow' (long grass, ferns, yellow flowers) or 'islands' (grass islands with purple and yellow flowers)
  *   boulders 'mossy' (boulders among the trunks) or 'granite' (pale granite boulders and outcrops at the roadside)
  *   sign     a bend-warning sign this many metres before the piece, on its outside (0: none)
- * The two schemes answer the owner's frames e2 (a forest road in low side sun) and e5 (a mountain bend among granite
- * boulders), design.md "The reference frames".
+ *   curb     a solid edge of kind 'rock' on its pieces is drawn as a low concrete kerbstone this high (m) with the
+ *            ground behind it as the hillside's, not as a cut face
+ * The two schemes answer the owner's frames e2 (a forest road in low side sun: the rise and the first ess) and e5 (a
+ * mountain bend round an island of granite boulders: the carousel), design.md "The reference frames".
  */
 export const SCHEMES = {
   pinewood: { lines: 'double-yellow', gap: 0.16, asphalt: 0.7, cracks: 0.6, strip: 0.32, kerb: [[0.4, 0.39, 0.37], [0.52, 0.51, 0.49]], wood: 'pinewood', verge: 'meadow', boulders: 'mossy', sign: 0, blend: 90 },
-  granite: { lines: 'double-yellow', gap: 0.16, asphalt: 0.5, cracks: 0.4, strip: 0.32, kerb: [[0.02, 0.09, 0.42], [0.62, 0.61, 0.58]], wood: 'stonepine', verge: 'islands', boulders: 'granite', sign: 90, blend: 70 },
+  granite: { lines: 'double-yellow', gap: 0.16, asphalt: 0.5, cracks: 0.4, strip: 0.32, kerb: [[0.02, 0.09, 0.42], [0.62, 0.61, 0.58]], wood: 'stonepine', verge: 'islands', boulders: 'granite', sign: 90, curb: 0.32, blend: 70 },
 };
 
 /** The named stretches, in driving order. */
@@ -161,8 +168,7 @@ const SEGMENTS = [
   // Forest esses: long bends climbing through the wood, the last one turning the road along the hillside.
   { id: 'ess1', sec: 'esses', r: -260, deg: 55, ease: 100, bank: 8, g: 5.5, L: 'midRun', R: 'midUp', runoff: 'L', scheme: 'pinewood' },
   { id: 'ess2', sec: 'esses', r: 330, deg: 40, ease: 120, bank: 7, g: 5, L: 'highUp', R: 'highRun', runoff: 'R' },
-  // (forest lane) the last ess, the tightest, is frame e5's mountain bend among granite boulders
-  { id: 'ess3', sec: 'esses', r: -240, deg: 65, ease: 120, bank: 9, g: 4, L: 'highRun', R: 'highUp', runoff: 'L', scheme: 'granite' },
+  { id: 'ess3', sec: 'esses', r: -240, deg: 65, ease: 120, bank: 9, g: 4, L: 'highRun', R: 'highUp', runoff: 'L' },
 
   // The tunnel: a rock cutting, then the bore through the spur, bending gently right.
   { id: 'cutting', sec: 'tunnel', len: 70, ease: 70, g: 3.5, L: 'rock', R: 'rock' },
@@ -174,7 +180,8 @@ const SEGMENTS = [
 
   // The carousel: a climb along the far side, then a right round the spur, the slow corner of the lap.
   { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 6, L: 'highDown', R: 'rock' },
-  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'highRun', R: 'rock', runoff: 'L' },
+  // (forest lane) frame e5's bend: the road folds back round a grass island of granite and pines (it was a rock face)
+  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'highRun', R: 'island', runoff: 'L', scheme: 'granite' },
 
   // The crest: up over the top in the open, the lake far below.
   { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'open', R: 'open' },

@@ -115,7 +115,7 @@ export const VARIANTS = [
     tile: TILE.FIR,
     hangTile: -1,
     bark: BARK.LARCH,
-    P: { H: 24, trunkR: 0.3, bend: 0.25, crownBase: 0.62, whorls: 9, per: [3, 5], R: 3.0, power: 0.45, elevBase: 0.12, elevTop: 0.75, sag: 0.18, upturn: 0.3, frond: 1.25, curtain: 0, dead: 14, gaps: 0.3, lop: 0.42 },
+    P: { H: 24, trunkR: 0.32, bend: 0.25, crownBase: 0.58, whorls: 15, per: [4, 6], R: 3.5, power: 0.5, elevBase: 0.1, elevTop: 0.7, sag: 0.2, upturn: 0.32, frond: 1.35, curtain: 0, dead: 14, gaps: 0.22, lop: 0.38 },
   },
   {
     // (forest lane) frame e5's stone pine on the inside of the bend: a tall bare stem and a broad, flat-topped umbrella
@@ -126,7 +126,7 @@ export const VARIANTS = [
     tile: TILE.FIR,
     hangTile: -1,
     bark: BARK.LARCH,
-    P: { H: 20, trunkR: 0.36, bend: 0.4, crownBase: 0.66, whorls: 8, per: [4, 6], R: 5.2, power: 0.18, elevBase: 0.28, elevTop: 0.5, sag: 0.22, upturn: 0.3, frond: 1.4, curtain: 0, dead: 10, gaps: 0.18, lop: 0.3 },
+    P: { H: 20, trunkR: 0.38, bend: 0.45, crownBase: 0.66, whorls: 12, per: [5, 7], R: 5.6, power: 0.12, elevBase: 0.32, elevTop: 0.18, sag: 0.25, upturn: 0.22, frond: 1.6, curtain: 0, dead: 10, gaps: 0.12, lop: 0.28 },
   },
   {
     name: 'birch-a',

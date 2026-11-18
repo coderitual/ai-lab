@@ -1,4 +1,9 @@
-// (forest lane) A bend-warning sign of our own drawing: a yellow diamond with a
+// (forest lane) What stands at the roadside of the pieces' schemes
+// (trackLayout.js SCHEMES), coloured per vertex in the plants' flat material
+// (aTint carries the paint): the bend-warning signs and the low concrete
+// kerbstones along an edge the scheme draws as a `curb`.
+//
+// A bend-warning sign of our own drawing: a yellow diamond with a
 // black rim and a black arrow bent the way the road goes, on a grey post. One
 // stands `sign` metres before each run of pieces whose scheme names one
 // (trackLayout.js SCHEMES), on the outside of the bend, beyond the corridor's
@@ -124,6 +129,94 @@ export function createBendSigns({ track, terrain, material }) {
   return {
     group,
     count,
+    dispose() {
+      for (const m of group.children) m.geometry.dispose();
+    },
+  };
+}
+
+/** The kerbstone: precast concrete, a little weathered; its blocks (m). */
+const CURB = { width: 0.3, block: 1, colour: [0.4, 0.39, 0.36] };
+/** The Track's edge kind ROCK (game/track.js EDGE; assets/ does not import game/). */
+const EDGE_ROCK = 1;
+
+/**
+ * Low concrete kerbstones standing at the solid edge (face exactly at it, beyond the corridor) wherever a piece's
+ * scheme names a `curb` height and the edge is of kind rock: one mesh for all of them.
+ * @param {object} o
+ * @param {object} o.track
+ * @param {object} o.terrain heightOnTrack, bakeAt
+ * @param {THREE.Material} o.material a flat, two-sided plants' material
+ */
+export function createCurbs({ track, terrain, material }) {
+  const st = schemeTable(track);
+  const pos = [];
+  const tint = [];
+  const bakeArr = [];
+  const index = [];
+  const pt = new THREE.Vector3();
+  const prof = { y: 0, surface: 0 };
+  const bake = [0, 0, 0];
+  let metres = 0;
+  for (const run of st.runs) {
+    const top = run.def.curb ?? 0;
+    if (!top) continue;
+    for (const side of [1, -1]) {
+      const kinds = side > 0 ? track.kindL : track.kindR;
+      const len = track.wrap(run.s1 - run.s0);
+      let prev = -1;
+      for (let d = 0; d <= len + 1e-6; d += 1) {
+        const s = track.wrap(run.s0 + Math.min(d, len));
+        const i = Math.round(s / track.ds) % track.count;
+        if (kinds[i] !== EDGE_ROCK) {
+          prev = -1;
+          continue;
+        }
+        const edge = track.edgeAt(s, side);
+        const y0 = track.profile(s, side * edge, prof).y;
+        const yB = Math.max(y0, terrain.heightOnTrack(s, side * (edge + CURB.width)));
+        const tone = 0.9 + 0.2 * (((Math.floor(d / CURB.block) * 7919) % 13) / 13);
+        const col = CURB.colour.map((c) => c * tone);
+        track.pointAt(s, side * edge, pt);
+        terrain.bakeAt(pt.x, pt.z, bake, 0);
+        const base = pos.length / 3;
+        for (const [out, y] of [
+          [0, y0 - 0.25],
+          [0, y0 + top],
+          [CURB.width, y0 + top],
+          [CURB.width, yB - 0.25],
+        ]) {
+          track.pointAt(s, side * (edge + out), pt);
+          pos.push(pt.x, y, pt.z);
+          tint.push(...col, 1);
+          bakeArr.push(Math.min(1, bake[0] + 0.05), Math.min(1, bake[1] + 0.05), bake[2], 1);
+        }
+        if (prev >= 0) for (let k = 0; k < 3; k++) index.push(prev + k, base + k, base + k + 1, prev + k, base + k + 1, prev + k + 1);
+        prev = base;
+        metres++;
+      }
+    }
+  }
+  const group = new THREE.Group();
+  group.name = 'scheme-curbs';
+  if (index.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('aTint', new THREE.Float32BufferAttribute(tint, 4));
+    g.setAttribute('aShade', new THREE.Float32BufferAttribute(new Array(pos.length / 3).fill([1, 0]).flat(), 2));
+    g.setAttribute('aBake', new THREE.Float32BufferAttribute(bakeArr, 4));
+    g.setIndex(index);
+    g.computeVertexNormals();
+    g.computeBoundingSphere();
+    const mesh = new THREE.Mesh(g, material);
+    mesh.name = 'scheme-curb';
+    mesh.receiveShadow = true;
+    mesh.matrixAutoUpdate = false;
+    group.add(mesh);
+  }
+  return {
+    group,
+    metres,
     dispose() {
       for (const m of group.children) m.geometry.dispose();
     },
