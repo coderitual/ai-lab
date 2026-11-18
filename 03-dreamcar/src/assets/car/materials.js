@@ -23,7 +23,7 @@
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE, GLSL_PROBE, targetDefines } from '../../engine/glsl.js';
 import { RANGE } from './atlas.js';
-import { ARCHES, INTAKE_CENTRE, INTAKE_SIDE } from './features.js';
+import { ARCHES, GRILLE_STARS, INTAKE_CENTRE, INTAKE_SIDE } from './features.js';
 import { DIMS, STATIONS } from './spec.js';
 
 /** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
@@ -437,35 +437,38 @@ vec3 carForm(vec3 p, vec3 n) {
  * crawls at a distance.
  */
 void carGrille(vec3 p, float w) {
-  vec3 col = vec3(0.006, 0.006, 0.007);
-  float met = 0.0; float rough = 0.08;
+  // (the field is a lattice of black bars over open holes, not a sheet of lacquer: as a gloss sheet it mirrored the
+  // sky and the grille read grey from the chase camera; the photographs show it black with bright stars)
+  vec3 col = vec3(0.005, 0.005, 0.006);
+  float met = 0.0; float rough = 0.32;
   float foot = length(fwidth(p.xy));
-  float detail = 1.0 - smoothstep(0.0012, 0.003, foot);
+  float detail = 1.0 - smoothstep(0.0015, 0.004, foot);
   // diamond relief
-  vec2 dm = vec2(p.x / 0.017, p.y / 0.011);
+  vec2 dm = vec2(p.x / 0.02, p.y / 0.015);
   vec2 dd = abs(fract(dm) - 0.5);
   cTilt += detail * 0.25 * vec3(sign(fract(dm.x) - 0.5) * step(dd.y, dd.x), sign(fract(dm.y) - 0.5) * step(dd.x, dd.y), 0.0);
-  float r = floor((p.y - 0.464) / 0.022);
-  float cy = 0.475 + r * 0.022;
-  float off = mod(r, 2.0) * 0.017;
-  float cx = floor((p.x - off) / 0.034 + 0.5) * 0.034 + off;
+  // the lattice of stars (as details.js lays them: GRILLE_STARS)
+  float r = floor((p.y - ${f4(GRILLE_STARS.y0 - GRILLE_STARS.dy / 2)}) / ${f4(GRILLE_STARS.dy)});
+  float cy = ${f4(GRILLE_STARS.y0)} + r * ${f4(GRILLE_STARS.dy)};
+  float off = mod(r, 2.0) * ${f4(GRILLE_STARS.dx / 2)};
+  float cx = floor((p.x - off) / ${f4(GRILLE_STARS.dx)} + 0.5) * ${f4(GRILLE_STARS.dx)} + off;
   vec2 q = vec2(p.x - cx, p.y - cy);
-  // a three-pointed star 12 mm across: the nearest of three arms, each thinning to its tip
+  // a three-pointed star: the nearest of three arms, each thinning to its tip
   float d = 1.0;
   for (int i = 0; i < 3; i++) {
     float a = 1.5708 + float(i) * 2.0944;
     vec2 dir = vec2(cos(a), sin(a));
-    float t = clamp(dot(q, dir), 0.0, 0.006);
-    d = min(d, length(q - dir * t) - 0.0016 * (1.0 - t / 0.0065));
+    float t = clamp(dot(q, dir), 0.0, ${f4(GRILLE_STARS.arm)});
+    d = min(d, length(q - dir * t) - ${f4(GRILLE_STARS.arm * 0.27)} * (1.0 - t / ${f4(GRILLE_STARS.arm * 1.08)}));
   }
   float keep = step(0.108, length(p.xy - vec2(0.0, 0.573))) * step(0.012, abs(p.y - 0.578) - 0.007 * (1.0 - step(0.49, p.x)));
-  float pin = mix(0.04, clamp(0.5 - d / max(fwidth(d), 1e-5), 0.0, 1.0), detail) * keep * float(GRILLE_PINS);
+  float pin = mix(0.08, clamp(0.5 - d / max(fwidth(d), 1e-5), 0.0, 1.0), detail) * keep * float(GRILLE_PINS);
   col = mix(col, vec3(0.83, 0.84, 0.86), pin); met = mix(met, 1.0, pin); rough = mix(rough, 0.12, pin);
   // the smooth gloss black disc under the big star
   cTilt *= 1.0 - pin;
   cTilt *= step(0.095, length(p.xy - vec2(0.0, 0.573)));
   cTilt.x *= sign(vCarPos.x);
-  CAR_REGION(w, col, met, rough, 1.0);
+  CAR_REGION(w, col, met, rough, mix(0.3, 1.0, pin));
 }
 
 /** Distance from p to the segment a-b. */
@@ -518,7 +521,9 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   // under the boot lid's lip (the shoulder's rail at the tail), 9 mm of undercut: a soft shade below the edge
   if (p.z < -2.2) {
     float under = (SHOULDER_V - vSkinUv.y) * EXTENT_V;
-    cAO *= 1.0 - 0.5 * smoothstep(0.0, 0.006, under) * (1.0 - smoothstep(0.01, 0.06, under)) * smoothstep(0.62, 0.4, p.x);
+    // (it was half the light over 6 cm, and read as a dark band across the lid in the photograph straight on the
+    // tail, where the face under the lip is as bright as the rest)
+    cAO *= 1.0 - 0.25 * smoothstep(0.0, 0.004, under) * (1.0 - smoothstep(0.006, 0.025, under)) * smoothstep(0.62, 0.4, p.x);
   }
   // the grille's bright frame
   CAR_REGION(carCover(B.r - 0.008) * step(1.9, p.z) * step(0.4, p.y), vec3(0.83, 0.84, 0.86), 1.0, 0.08, 0.0);

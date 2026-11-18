@@ -207,8 +207,14 @@ export const TAIL_UPPER = 11;
 export const GRILLE_HALF = [[0, 0.71, 2.2675], [0.15, 0.708, 2.262], [0.3, 0.7, 2.246], [0.4, 0.686, 2.231], [0.47, 0.66, 2.207],
   [0.515, 0.615, 2.189], [0.535, 0.56, 2.178], [0.525, 0.515, 2.178], [0.49, 0.487, 2.186], [0.42, 0.472, 2.207],
   [0.3, 0.465, 2.226], [0.15, 0.462, 2.242], [0, 0.462, 2.247]];
+/**
+ * The grille's small stars (5.1): a staggered lattice, rows `dy` apart from y0 up, `dx` apart along a row (every
+ * other row shifted by half), each star's arms `arm` long. The photographs show about thirteen stars across a half,
+ * each nearly 25 mm across: the sheet's 12 mm stars at 34 x 22 mm read as a sparse sprinkle of dots.
+ */
+export const GRILLE_STARS = { y0: 0.478, dy: 0.03, dx: 0.04, arm: 0.0115 };
 /** The side intake's opening (5.3), left, in front view [x, y]: upper inner, lower inner, lower outer, upper outer. */
-export const INTAKE_SIDE = [[0.43, 0.455], [0.47, 0.37], [0.8, 0.305], [0.79, 0.465]];
+export const INTAKE_SIDE = [[0.43, 0.455], [0.47, 0.365], [0.8, 0.282], [0.79, 0.468]];
 /**
  * The lower intake across the apron (5.3), left half in front view [x, y], from the middle of its upper edge.
  * Redrawn with INTAKE_SIDE from the daylight photograph straight on the nose (camera fitted, outlines projected
@@ -216,7 +222,7 @@ export const INTAKE_SIDE = [[0.43, 0.455], [0.47, 0.37], [0.8, 0.305], [0.79, 0.
  * their lower edge rising inwards, and the painted blade between them and this black band sweeps under the plate
  * (the first outlines had the side intakes as tall trapezoids reaching down to the lip).
  */
-export const INTAKE_CENTRE = [[0, 0.305], [0.55, 0.305], [0.68, 0.265], [0.68, 0.225], [0, 0.225]];
+export const INTAKE_CENTRE = [[0, 0.272], [0.5, 0.278], [0.66, 0.255], [0.68, 0.222], [0, 0.222]];
 
 /** Every outline. Pure arithmetic: the dev tools run it in Node too. */
 export function buildFeatures() {
