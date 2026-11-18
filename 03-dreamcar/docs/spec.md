@@ -381,6 +381,24 @@ the massif 92 k; the car 85 k with its wheels), the shadow map 140 to 190 k
 wrapped in the page, labelled by the pass being drawn (techniques.md, "What
 each pass draws").
 
+**Draw calls after the finish lane** (2026-11-18, the same four moments at
+393x852 and device scale 1, one whole frame each, `stats().drawCalls` of
+the last of six frames, so a frame that draws a probe face; counted with the
+page's `renderer.renderBufferDirect` wrapped, as above):
+
+| moment | low, day, before | low, day, after | medium, night, before | medium, night, after | medium, day, after |
+| --- | --- | --- | --- | --- | --- |
+| grid (t = 0) | 213 | 133 | 409 | 291 | 200 |
+| esses (t = 33) | 220 | 140 | 392 | 267 | 187 |
+| sky road (t = 45) | 194 | 138 | 305 | 228 | 173 |
+| ledge bend (t = 79) | 257 | 149 | 418 | 273 | 192 |
+
+Both inside their budgets (low 150, medium 300) at these moments; other
+places on the lap were not counted. Triangles hardly moved (low 293 to
+358 k, medium by night 0.97 to 1.30 M): still over the triangle budgets.
+About a quarter of every pass's calls is the car (25 in the scene and in the
+mirror, 14 in the shadow map), which this lane did not touch.
+
 None of these was measured on a real GPU or phone.
 
 ## Sound

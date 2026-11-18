@@ -170,6 +170,20 @@ machine without a GPU, and only what is listed here.
   (spec.md). `node tools/unit.mjs` passed. Not looked at on `high`, at golden
   hour, in split screen or in motion; the playtest and the soundtest were not
   run.
+- **The finish lane's changes** (one green for all grass, the lens ghosts
+  kept on the sun's side, floodlights set back and raised, the draw-call
+  merges and draw distances, the kerbs' and rails' retro-reflection): stills
+  on software WebGL before and after, by eye, at `medium` 1280x720 by day
+  (t = 6, 14, 40 of the autopilot run), at dusk (t = 6) and by night
+  (t = 20, 50, 56), at 393x700 by night (t = 3, 45, 60) and at 393x852
+  scale 2 on `low` by day (t = 20, 79); draw calls counted at four moments
+  (spec.md); every picture of `tools/screenshots.cjs` regenerated and looked
+  at (no staged camera needed moving; the phone picture is now on
+  `medium`); `node tools/unit.mjs` passed (4 files). The kerbs' sparkle was
+  not caught in any still (no kerb lay in the beam ahead of the car in the
+  ones made); the rails' reflectors were. Not looked at on `high`, in split
+  screen at night or in motion; the playtest and the soundtest were not
+  run. The page raised no console error in any of these loads.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
@@ -190,11 +204,13 @@ Read this before believing anything above about a device.
   frame of the full world takes tens of seconds to draw. No frame rate on
   any real GPU has been measured. The adaptive render scale has been seen to
   step, never on a real device.
-- **The budgets.** Counted, not timed: after the picture lane's work the low
-  tier is at 253 to 328 k triangles and 168 to 230 draw calls (budget 250 k
-  and 150), medium at 0.67 to 1.04 M by day and up to 1.31 M by night
-  (budget 600 k). Both are still over. Whether a phone draws them at a
-  usable frame rate is unknown.
+- **The budgets.** Counted, not timed, at four moments of one autopilot
+  run (spec.md): after the finish lane the low tier draws 133 to 149 calls
+  by day (budget 150) and medium 228 to 291 by night (budget 300); triangles
+  are still over (low 293 to 358 k against 250 k, medium up to 1.3 M against
+  600 k). Other places on the lap, the high tier and split screen were not
+  counted. Whether a phone draws any of it at a usable frame rate is
+  unknown.
 - **Browsers.** Only headless Chromium. Safari (desktop and iOS: the owner's
   iPhone screenshots aside, which say nothing about its correctness) and
   Firefox are untested, including WebGL 2 on older iOS, half-float targets, the
