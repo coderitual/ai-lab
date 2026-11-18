@@ -66,7 +66,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | structures | the tunnel's bore 349 m, ceiling 6.4 m over the road (`TUNNEL`); two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
 | tyre walls | 8 runs, on the outside of the fast bends |
-| trackside boards | 11 runs, both walls of the straight included |
+| trackside boards | 10 runs: the outsides of the run-off bends, and two groups on the straight's lake-side wall (229 to 189 m and 82 to 44 m before the line); none on its land side |
 | distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel |
 | marshal posts | 12 |
 | start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |

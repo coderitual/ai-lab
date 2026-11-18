@@ -42,6 +42,7 @@ uniform sampler2D uCloudMap; // r: billows  g: fine detail  b: streaks  a: where
 uniform vec4 uCloud;        // cover, wisps, silver, unused
 uniform vec2 uCloudDrift;
 uniform vec4 uDisc;         // angular radius (rad), radiance, limb darkening, seas
+uniform vec4 uCloudGroup;   // (day lane) the group of heaps: its middle on the cloud sheet, 1 / radius^2, amount
 
 // A lookup in the cloud map at so many repeats per unit of the cloud sheet. The fragment stage hands over the
 // screen-space slope of the sheet's coordinates itself (cloudSlope, set once at the top of main): the lookups sit
@@ -77,8 +78,13 @@ float cumulus(vec2 p) {
   float billow = cloudTex(p * 0.48 + uCloudDrift * 2.0, 0.48).r;
   float detail = cloudTex(p * 1.8 + uCloudDrift * 4.0, 1.8).g;
   float shape = 0.52 * patches + 0.4 * billow + 0.08 * detail;
+  // (day lane) the group of heaps that stands where the frame has it (lighting.js clouds.group): the noise is pushed
+  // up round one place, so that its billows there are whole clouds, wherever the drift has carried the texture
+  vec2 g = p - uCloudGroup.xy;
+  shape += uCloudGroup.w * exp(-dot(g, g) * uCloudGroup.z) * (0.75 + 0.5 * billow);
   float edge = 0.8 - 0.5 * uCloud.x;
-  float body = smoothstep(edge, edge + 0.12, shape);
+  // (day lane) a crisper rim (was 0.12 wide): D1's heaps are cut sharp against the blue
+  float body = smoothstep(edge, edge + 0.07, shape);
   return body * body * (3.0 - 2.0 * body);
 }
 
@@ -363,6 +369,7 @@ export function createSky({ tier, rng, atmosphere }) {
     uCloud: { value: new THREE.Vector4() },
     uCloudDrift: { value: new THREE.Vector2() },
     uDisc: { value: new THREE.Vector4(0.01, 0, 0, 0) },
+    uCloudGroup: { value: new THREE.Vector4(0, 0, 1, 0) },
   };
   const domeUniforms = {
     ...shared,
@@ -437,6 +444,14 @@ export function createSky({ tier, rng, atmosphere }) {
       shared.uCloud.value.set(sky.clouds.cover, sky.clouds.wisps, sky.clouds.silver, 0);
       shared.uDisc.value.set(sky.disc.size * DEG, sky.disc.radiance, sky.disc.limb, sky.disc.seas);
       drift = sky.clouds.drift;
+      // the group's middle on the cloud sheet (cloudPlane in the shader)
+      const group = sky.clouds.group;
+      if (group) {
+        const g = group.dir;
+        const l = Math.hypot(g[0], g[1], g[2]);
+        const k = 1 / (Math.max(g[1] / l, 0) + 0.1);
+        shared.uCloudGroup.value.set((g[0] / l) * k, (g[2] / l) * k, 1 / (group.size * group.size), group.amount);
+      } else shared.uCloudGroup.value.set(0, 0, 1, 0);
 
       const u = domeUniforms;
       u.uZenith.value.fromArray(sky.zenith);

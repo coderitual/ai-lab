@@ -125,7 +125,8 @@ lamps (retro.js), as the road's lines do. Barriers: two
 stacked W-beams on posts (one beam where trackside panels stand behind it;
 set back behind tyre walls; a reflector painted on the upper beam over every
 fourth post, which blazes in the head lamps at night), low concrete walls 0.93 m high on the straight
-(walls.js, precast blocks painted white and teal), cut faces of bedded
+(walls.js, precast blocks: on the lake side of the straight a warm grey and a
+burnt orange by turns, white along the pits, a deep bottle green elsewhere), cut faces of bedded
 limestone where the edge is rock. Viaduct piers are slender eight-sided
 shafts under flared capitals; the short bridge spans a V-shaped gully across
 it with a stream's notch. Gradients up to 8 per cent; banking by rule
@@ -171,9 +172,11 @@ count, the upper two green for four seconds after lights out. On the land side
 behind the wall a catch fence, a pit lane and a two-storey pit building
 (garages, a glazed floor lit at dusk and at night, a roof terrace under a
 canopy carrying the name); on the lake side a covered stand. Along the lake
-side of the straight one run of tall hoardings (3.8 m panels, tops near 5 m),
-broken only by the stand and the gantry's tower; the land side stays open
-(grass, the barrier, the pits). Past the pit exit a short tyre wall with low
+side of the straight two groups of tall hoardings (3.8 m panels, tops near 5 m):
+five by the run-up's camera (frame D1) and four more 45 to 80 m before the
+line; between them the low wall is open, with hazel along it and loose rows
+of round green broadleaves 8 to 15 m tall behind it (forest.js). The land side
+stays open (grass, the barrier, the pits). Past the pit exit a short tyre wall with low
 boards on a low wall behind it. At the far end of the straight a footbridge
 carrying boards, a marshal's tower, and on the outside of the first bend a
 small stand and distance boards 200, 150 and 100. Low boards along the bends,
@@ -320,7 +323,7 @@ bottom (as given, whatever the picture's shape); the HUD is hidden unless
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
-day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 78.8 s) and
+day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 76.6 s) and
 `?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green); a name
 brings its own moment of the autopilot's run and its time of day unless the
 address gives `t` or `time`, and also works on the handle
@@ -340,8 +343,10 @@ with a short `advance` after loading.
   straight down the road (lighting.js `PLACES`, turned to the Track's heading
   by `placeLights`): the chase view drives into it, its glare lies along the
   asphalt, shadows fall straight back and a little left. A deep blue sky, pale
-  and bright at the horizon, with small lit cumulus (grey-blue bases, silver
-  rims near the sun); a compact sun with a soft aureole; dry asphalt. The
+  and bright at the horizon (zenith 0.15, 0.33, 0.86; horizon 0.5, 0.65,
+  0.92), with lit cumulus: a group of big heaps with crisp white tops and
+  soft grey bases over the massif's shoulder, left of its main peak, and a few
+  small ones elsewhere (grey-blue bases, silver rims near the sun); a compact sun with a soft aureole; dry asphalt. The
   drawn sky is as bright as the frames' (pale blue, paling to the horizon);
   its light on the scene is set apart (`env.intensity` 0.6, fill 0.13), so
   that the shade stays open but deep: sunlit level ground about 2.1 from the

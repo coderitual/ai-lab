@@ -83,7 +83,9 @@ const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
  * road the streak leaves dark asphalt on both sides. `grain`: how much of each stone's own tilt the lobe follows
  * (the rest sees the road's plane: one streak under the sun, broken up by the stones, not scattered into sparks).
  */
-const SHEEN = { along: 0.12, across: 0.18, gain: 0.25, grain: 0.5, keep: 0.25 };
+// (day lane) narrower across (0.15, was 0.18) and a little stronger (0.28, was 0.25): D1's glare is a narrower,
+// brighter path to the sun over darker asphalt
+const SHEEN = { along: 0.12, across: 0.15, gain: 0.28, grain: 0.5, keep: 0.25 };
 /**
  * The sky in the road (ASPHALT_SKY): seen at a glancing angle asphalt mirrors the low sky ahead as a soft broad
  * sheen (frames D3 and D4: it is what fills the shade). `gain` of the sky's own radiance at the horizon of the
@@ -94,7 +96,9 @@ const SHEEN = { along: 0.12, across: 0.18, gain: 0.25, grain: 0.5, keep: 0.25 };
  * cool at golden hour, never the sky's blue or rose); never more than `cap` (the sun's aureole is in that map: its
  * glare is the sun's own lobe's business).
  */
-const SKY_SHEEN = { gain: 0.5, power: 4, blur: 0.36, lift: 0.12, grey: 0.9, cap: 1.2 };
+// (day lane: gain 0.42, was 0.5: the middle distance of D1's road, 30 to 60 m out, was 25 to 35 levels paler than
+// the frame's)
+const SKY_SHEEN = { gain: 0.42, power: 4, blur: 0.36, lift: 0.12, grey: 0.9, cap: 1.2 };
 /** Head lamp brightness (THROW in assets/car/index.js: candela-like units at the beam's peak, per lamp). */
 const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;
@@ -750,8 +754,9 @@ rAge = mix( rAge, ftTone * 0.5, ftFresh );
 float rWorn = mix( 0.3, 1.0, rAge );
 // new: binder over everything, black. Old: the binder weathered grey and worn off the stones' tops.
 // (night lane, frame D3: the sunlit road is a warm light grey; the stones are a warm limestone under the binder)
-vec3 rCol = mix( vec3( 0.03, 0.029, 0.028 ), vec3( 0.084, 0.078, 0.069 ), rAge );
-rCol *= 1.0 + ( rAgg.r - 0.5 ) * mix( 0.45, 1.5, rAge );
+// (day lane) the old surfacing a shade darker (0.084 was a pale sheet in D1) and its stones more contrasty
+vec3 rCol = mix( vec3( 0.03, 0.029, 0.028 ), vec3( 0.077, 0.072, 0.064 ), rAge );
+rCol *= 1.0 + ( rAgg.r - 0.5 ) * mix( 0.5, 1.75, rAge );
 rCol *= ( 0.86 + 0.28 * rBig.r ) * ( 0.92 + 0.16 * rBig2.r ) * ( 0.92 + 0.16 * rMottle );
 rCol *= 1.0 - 0.2 * rTracks * rWorn;
 rCol *= 1.0 + 0.1 * rCrown * rWorn;
