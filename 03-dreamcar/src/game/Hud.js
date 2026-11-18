@@ -24,7 +24,7 @@
 // Words come from text.js.
 
 import './hud.css';
-import { STICK_RANGE } from '../engine/Input.js';
+import { STICK_RANGE, TOUCH } from '../engine/Input.js';
 import { formatMs } from './Race.js';
 import { TEXT } from './text.js';
 import { CAR } from './vehicle/params.js';
@@ -249,15 +249,33 @@ export class ViewHud {
 
     // the drift readout (designed, not yet wired: the HANDLING lane's slide angle and score feed setDrift): over
     // the road above the car, only while the car slides beyond about 15 degrees, fading out after
-    this.drift = cell('div', 'drift', el);
+    this.drift = cell('div', 'slide', el);
     this.driftAngle = cell('span', 'angle', this.drift.el, '0°');
     this.driftScore = cell('span', 'score', this.drift.el, '0');
     this._driftOn = false;
 
-    // under the right thumb (touch only): a place for thumb buttons such as a handbrake or drift button; empty and
-    // hidden until something is put in it (addThumbButton)
-    this.thumbs = cell('div', 'thumbs', el);
-    this.thumbs.show(false);
+    // under the right thumb (touch only): the DRIFT button and, with the throttle on manual, GAS. They are drawn
+    // here; Input finds them by the same numbers (TOUCH), so a finger on them never reaches the page's buttons
+    this.pads = cell('div', 'pads', el);
+    const pad = (name, b, label) => {
+      const c = cell('div', `pad ${name}`, this.pads.el, label);
+      const st = c.el.style;
+      st.width = st.height = `${2 * b.r}px`;
+      st.right = `calc(var(--sr) + ${b.right - b.r}px)`;
+      st.bottom = `calc(var(--sb) + ${b.bottom - b.r}px)`;
+      return c;
+    };
+    this.padDrift = pad('drift', TOUCH.drift, TEXT.pads.drift);
+    this.padGas = pad('gas', TOUCH.gas, TEXT.pads.gas);
+    this.padGas.show(false);
+
+    // the first run on a touch screen: the three zones named for a few seconds, ghosted
+    this.zoneHint = cell('div', 'zonehint', el);
+    const zs = this.zoneHint.el.style;
+    zs.setProperty('--steer', `${TOUCH.steerShare * 100}%`);
+    make('span', 'steer', this.zoneHint.el, TEXT.pads.steer);
+    make('span', 'brake', this.zoneHint.el, TEXT.pads.brake);
+    this.zoneHint.show(false);
 
     // the buttons: camera, lights, reset, pause, small and together (at a desk only pause shows)
     this.touchCol = cell('div', 'touchcol', el);
@@ -294,7 +312,12 @@ export class ViewHud {
     // and stay in the corners, clear of the car in the middle; an upright picture gets a little more
     const u = tall ? w / 62 : (Math.min(w, (h * 16) / 9) / 100) * 0.72;
     s.setProperty('--u', `${Math.max(3.6, Math.min(u, 10)).toFixed(2)}px`);
-    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330);
+    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330).flag('low', h < TOUCH.lowBelow);
+    // a low view (a stacked half on a phone): DRIFT stands beside GAS at the bottom, as Input finds it
+    const b = h < TOUCH.lowBelow ? TOUCH.driftLow : TOUCH.drift;
+    const ds = this.padDrift.el.style;
+    ds.right = `calc(var(--sr) + ${b.right - b.r}px)`;
+    ds.bottom = `calc(var(--sb) + ${b.bottom - b.r}px)`;
   }
 
   setVisible(on) {
@@ -455,21 +478,16 @@ export class ViewHud {
     this.driftScore.text(Math.round(score));
   }
 
-  /**
-   * A button under the right thumb (touch): a large round target. `onDown` / `onUp` for a held control (a
-   * handbrake), so it reports presses rather than clicks. Returns the element.
-   */
-  addThumbButton(name, label, onDown, onUp) {
-    const b = make('button', `thumb ${name}`, this.thumbs.el, label);
-    b.type = 'button';
-    b.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onDown();
-    });
-    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(type, () => onUp && onUp());
-    this.thumbs.show(true);
-    return b;
+  /** The touch pads: whether GAS shows (the throttle on manual), and which are held. */
+  setPads(manual, held) {
+    this.padGas.show(manual);
+    this.padDrift.flag('held', held.drift);
+    this.padGas.flag('held', held.gas);
+  }
+
+  /** The first-run naming of the touch zones. */
+  setZoneHint(on) {
+    this.zoneHint.show(on);
   }
 
   setWarn(wrongWay) {
@@ -644,6 +662,9 @@ export class Hud {
     this.qualityNote = cell('div', 'optnote', o);
     this.optSound = choiceRow(o, TEXT.sound, ['on', 'off'], [TEXT.on, TEXT.off], (v) => this.act(v === 'on' ? 'sound:on' : 'sound:off'));
     this.optTime = choiceRow(o, TEXT.timeOfDay, [], [], () => {});
+    // the driving help (one button per ASSISTS level, made in setState) and, on touch, the throttle
+    this.optAssists = choiceRow(o, TEXT.drivingHelp, [], [], () => {});
+    this.optThrottle = choiceRow(o, TEXT.throttle, ['auto', 'manual'], [TEXT.auto, TEXT.manual], (v) => this.act(`throttle:${v}`));
     this.optUnits = choiceRow(o, TEXT.units, ['kmh', 'mph'], [TEXT.kmh, TEXT.mph], (v) => this.act(`units:${v}`));
     this.optMap = choiceRow(o, TEXT.map, ['on', 'off'], [TEXT.shown, TEXT.hidden], (v) => this.act(`map:${v}`));
     this.closeButton = button(make('div', 'buttons', o), TEXT.done, () => this.closeOptions(), 'primary');
@@ -663,6 +684,18 @@ export class Hud {
     this._s = null;
     this._mode = 'solo';
     this._results = '';
+  }
+
+  /** The safe area's right and bottom insets in CSS px (where the touch pads stand inside), measured once. */
+  insets() {
+    if (!this._insets) {
+      const probe = make('div', '', this.root);
+      probe.style.cssText = 'position:absolute;visibility:hidden;padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+      const cs = getComputedStyle(probe);
+      this._insets = { right: parseFloat(cs.paddingRight) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };
+      probe.remove();
+    }
+    return this._insets;
   }
 
   /** DOM writes so far (all views and panels): the HUD's cost, for tests. */
@@ -752,7 +785,7 @@ export class Hud {
    */
   setState(s) {
     const times = s.times || [s.time];
-    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${this.optionsOpen}`;
+    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.assists}|${s.throttle}|${this.optionsOpen}`;
     this._s = s;
     if (key === this._state) return;
     const [wasPhase, wasPaused] = this._state.split('|');
@@ -787,6 +820,15 @@ export class Hud {
     const pick = (row, value) => {
       for (const [v, b] of row.cells) b.flag('on', v === value).attr('aria-pressed', v === value);
     };
+    for (const id of s.assistLevels || []) {
+      if (this.optAssists.cells.has(id)) continue;
+      const b = button(this.optAssists.group, TEXT.assistName(id), () => this.act(`assists:${id}`), 'toggle');
+      b.dataset.value = id;
+      this.optAssists.cells.set(id, new Cell(b));
+    }
+    pick(this.optAssists, s.assists);
+    pick(this.optThrottle, s.throttle);
+    this.optThrottle.row.hidden = !touch;
     pick(this.optQuality, s.quality);
     pick(this.optSound, s.muted ? 'off' : 'on');
     pick(this.optUnits, s.units);
@@ -855,12 +897,13 @@ export class Hud {
         const head = split
           ? `<div class="who${d.position === 1 && d.finished ? ' win' : ''}">${TEXT.driver(i)} · ${d.finished ? TEXT.place(d.position) : TEXT.dnf}</div>`
           : '';
+        const slide = d.slide >= 1 ? `<div class="slideline">${TEXT.bestSlide} <b>${Math.round(d.slide)}</b></div>` : '';
         const medal = d.medal
           ? `<span class="award ${d.medal}"><i></i>${TEXT.medalWon(TEXT.medal[d.medal])}</span>`
           : `<span class="award none">${TEXT.noMedal}</span>`;
         return (
           `<div class="col">${head}<table>${laps}<tr class="total"><td>${TEXT.total}</td>` +
-          `<td class="t">${d.finished ? formatMs(d.total) : '—'}</td><td></td></tr></table><div class="medalline">${medal}</div></div>`
+          `<td class="t">${d.finished ? formatMs(d.total) : '—'}</td><td></td></tr></table><div class="medalline">${medal}</div>${slide}</div>`
         );
       })
       .join('');

@@ -54,6 +54,8 @@ const BAND_OUT_BY_TIER = { low: [4, 12, 27], medium: [2, 5, 9, 14, 20, 27], high
 /** The far land: its cell and how far it reaches from the middle of the course (m). */
 const FAR_CELL_BY_TIER = { low: 140, medium: 100, high: 100 };
 const FAR_REACH = 4800;
+/** Beyond the barrier of an open side (no wood by the Track's word, the ground falling away) no forest stands this far out (m). */
+const OPEN_VIEW = 110;
 /** Where the start straight is seen from (x from, x to along z = 0) and the slope (tan 6 deg) the hills keep under. */
 const STRAIGHT_VIEW = { x0: -450, x1: 250, slope: 0.1 };
 
@@ -409,7 +411,12 @@ const FOOT = 0.8;
         const edgeB = track.edgeAt(sB, sideB);
         const dB = Math.max(0, Math.abs(latB) - edgeB);
         const hB = nearAt(sB, latB, edgeB, dB);
-        near += (hB - near) * smoothstep(0, 1, d / (d + dB + 1e-3));
+        // Where one of the two is on a deck its ground is a ravine's floor far below: each then keeps its own
+        // hillside for the first third of the way and they meet in a scarp between (so the bank the Track asks for
+        // behind a wall is there, and the valley under the deck has a side), instead of one long ramp
+        const scarp = (zoneOf(s) === 2) !== (zoneOf(sB) === 2);
+        const share = d / (d + dB + 1e-3);
+        near += (hB - near) * (scarp ? smoothstep(0.34, 0.66, share) : smoothstep(0, 1, share));
         reach = smoothstep(80, 200, g);
       }
     }
@@ -440,7 +447,13 @@ const FOOT = 0.8;
     }
     // (the forest stage: more of the valley sides wooded, so no slope reads as a bare dune)
     const patch = smoothstep(0.3, 0.45, noise.fbm(x / 230 + 11, z / 230, 4));
-    f = Math.max(f, patch * (1 - smoothstep(330, 420, y)) * (s === null || d > 12 ? 1 : 0));
+    // an open side (the Track grows nothing there and the ground falls away: a view) stays a meadow for OPEN_VIEW
+    // metres below the road, so the valley and the road further on show over the wall (frame D3)
+    let clear = s === null || d > 12 ? 1 : 0;
+    if (s !== null && track.woodAt && !track.woodAt(s, lat > 0 ? 1 : -1) && read(lat > 0 ? track.farSlopeL : track.farSlopeR, s) < -0.1) {
+      clear *= smoothstep(OPEN_VIEW, OPEN_VIEW * 1.4, d);
+    }
+    f = Math.max(f, patch * (1 - smoothstep(330, 420, y)) * clear);
     return f * (1 - smoothstep(0.55, 0.8, slope));
   }
 
@@ -829,7 +842,14 @@ const FOOT = 0.8;
         bake[v * 4 + 3] = marchSun(x, z, h0, dirs[2], 4000);
         const hx = (heights[j * m + Math.min(m - 1, i + 1)] - heights[j * m + Math.max(0, i - 1)]) / (2 * FAR_CELL);
         const hz = (heights[Math.min(m - 1, j + 1) * m + i] - heights[Math.max(0, j - 1) * m + i]) / (2 * FAR_CELL);
-        mask[v * 2] = forestOf(x, z, heights[v], 1 - 1 / Math.hypot(hx, 1, hz), null, 0, 0);
+        // the far land is wooded but for its steep faces and what lies above the tree line: the near wood's own
+        // patches grown together (seen through the haze under the massif, open land read as a pale band)
+        const steep = 1 - 1 / Math.hypot(hx, 1, hz);
+        const wooded =
+          heights[v] < lakeLevel + 0.6
+            ? 0
+            : smoothstep(0.1, 0.26, noise.fbm(x / 230 + 11, z / 230, 4)) * (1 - smoothstep(330, 420, heights[v])) * (1 - smoothstep(0.55, 0.8, steep));
+        mask[v * 2] = Math.max(forestOf(x, z, heights[v], steep, null, 0, 0), wooded);
       }
     }
     const index = [];

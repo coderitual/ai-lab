@@ -11,6 +11,14 @@
 // in from each portal: the bore's vertices carry an openness that scales the
 // sun and the sky's light (the same `aBake` the terrain carries).
 //
+// The bore is lined: pale glazed panels up the walls to LINING (they throw the
+// lamps' light back onto the road and show its rhythm at speed), a teal waist
+// stripe, a grimy base, bare concrete above and a sooted vault; and under each
+// lamp of the rows a luminous panel faces the driver, far brighter than what
+// it lights, so that the lamps go by as streaks. What the walls send to each
+// other (a pale bore is evenly lit, not a row of pools in the dark) is one
+// more baked term, BOUNCE.
+//
 // Everything is built in the road's frame: `s` along it, `lat` to the left,
 // `h` up from the centre line's height. The cross-section is upright, not
 // banked.
@@ -19,15 +27,29 @@ import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE } from '../../engine/glsl.js';
 import { levelFrame, row, stripGeometry, upright } from './furniture.js';
 import { LAMP_KINDS, SPOT_GLSL } from './lamps.js';
-import { extend, withBake } from './shading.js';
+import { BORE_UNIFORMS, extend, withBake } from './shading.js';
 
 /** The bore: walls up to SPRING above the road, then a vault to CROWN at the middle. */
 const SPRING = 4.3;
 /** The crown: TUNNEL.height in game/trackLayout.js (the cameras keep under it). */
 const CROWN = 6.4;
 const KERB = { width: 0.3, height: 0.12 };
-/** The painted band along the foot of each wall (m above the road). */
-const BAND = 1.4;
+/** The lining of pale panels up each wall (m above the road), their width along the road, and the waist stripe in it. */
+const LINING = 3.3;
+const PANEL = 1.25;
+const WAIST = [1.08, 1.3];
+/** The bore's own light bounced about, as a share of what one lamp lays on the wall beside it. */
+const BOUNCE = 0.2;
+/**
+ * Daylight in the mouth: seen from deep inside, the opening is a white glare (the eye, and the frame's exposure, are
+ * set for the lamps: frame A's tunnel and every photograph of one). A veil across each opening adds `veil` times the
+ * haze's brightness (so it is the time of day's own: nothing at night), in full for an eye more than `far` m inside
+ * the bore and clearing to nothing over the last `near` m; `grey` of the haze's colour is lost in it.
+ */
+const MOUTH = { veil: 1.3, near: 12, far: 70, grey: 0.7 };
+/** The luminous panel under each lamp: metres along the road, across and thick; how far it leans to face the road
+ * (rad); how far in from the wall and under the lamp's head it hangs (m); its radiance against the lamp's colour. */
+const LUMINAIRE = { along: 1.5, across: 0.42, thick: 0.08, lean: 0.75, inset: 0.32, drop: 0.3, radiance: 9 };
 /** The portal: how far the face reaches beyond the walls and above the road, and the collar round the opening. */
 const FACE_WIDE = 9;
 const COLLAR = { width: 0.7, depth: 0.6 };
@@ -49,7 +71,7 @@ function halfSection(W) {
     [W - KERB.width, KERB.height, 0, 1],
     [W, KERB.height, 0, 1],
     [W, KERB.height, -1, 0],
-    [W, BAND, -1, 0],
+    [W, LINING, -1, 0],
     [W, SPRING, -1, 0],
   ];
   const n = 10;
@@ -84,6 +106,9 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
   group.name = 'tunnels';
   const frame = {};
   const disposables = [];
+  /** The veils of daylight in the mouths: their material, a point of the sheet and the way out. */
+  const veils = [];
+  const eye = new THREE.Vector3();
   // the walls stand at the Track's solid edge in the bore (TUNNEL.wallOffset beyond the pavement)
   const W = track.tunnels.length ? track.edgeAt((track.tunnels[0].s0 + track.tunnels[0].s1) / 2, 1) : track.halfWidth + WALL_OFFSET;
   const spec = LAMP_KINDS.tunnel;
@@ -142,6 +167,9 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
       atmosphere.patch(withBake(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.82, metalness: 0 }))),
       { lamps, first, rows, spacing: (t.s1 - t.s0) / rows, lampLat, lampH, leftFirst, spec },
     );
+    // what the road in the bore mirrors: the lining as a lamp lights it from its own height, on average about a third
+    // of that along the wall (0.58 is the lining's paint)
+    BORE_UNIFORMS.uBoreGlow.value.fromArray(spec.color).multiplyScalar(((0.58 / Math.PI) * 0.35 * spec.intensity) / (lampH * lampH));
     const boreMesh = new THREE.Mesh(bore, boreMaterial);
     boreMesh.name = `tunnel-bore-${which}`;
     boreMesh.castShadow = true;
@@ -166,10 +194,31 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
       niches.push(upright(at(side * (W - 0.01), 0.2), facing, 1.3, 1.9, 0.02));
     }
     const green = atmosphere.patch(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.25, 2.6, 0.9) }));
-    const recess = atmosphere.patch(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.1, 0.09, 0.07) }));
+    const recess = atmosphere.patch(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.022, 0.02, 0.017) }));
     const unit = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
     group.add(row(unit, green, signs, { shadow: false, name: 'tunnel-signs' }), row(unit, recess, niches, { shadow: false, name: 'tunnel-niches' }));
     disposables.push(green, recess, unit);
+
+    // the luminous panels: one under each lamp of the rows, hung a little in from the wall and leant to face the road
+    if (tunnelLamps.length) {
+      const panel = new THREE.BoxGeometry(LUMINAIRE.across, LUMINAIRE.thick, LUMINAIRE.along);
+      const glow = atmosphere.patch(new THREE.MeshBasicMaterial({ color: new THREE.Color(...spec.color).multiplyScalar(LUMINAIRE.radiance) }));
+      const turn = new THREE.Quaternion();
+      const lean = new THREE.Quaternion();
+      const at = new THREE.Vector3();
+      const one = new THREE.Vector3(1, 1, 1);
+      const matrices = tunnelLamps.map((l) => {
+        levelFrame(track, l.s, frame);
+        // (the head already hangs `inset` in from the wall by the Track's own number; this is a little further in and lower)
+        at.copy(l.head).addScaledVector(frame.flat, -l.side * LUMINAIRE.inset);
+        at.y -= LUMINAIRE.drop;
+        turn.setFromAxisAngle(new THREE.Vector3(0, 1, 0), l.yaw);
+        lean.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -l.side * LUMINAIRE.lean);
+        return new THREE.Matrix4().compose(at, turn.clone().multiply(lean), one);
+      });
+      group.add(row(panel, glow, matrices, { shadow: false, name: 'tunnel-luminaires' }));
+      disposables.push(panel, glow);
+    }
 
     // ---- the portals
     const concrete = atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0x8d8a83, roughness: 0.88, side: THREE.DoubleSide }));
@@ -179,6 +228,24 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
       [t.s0, -1],
       [t.s1, 1],
     ]) {
+      // the veil of daylight across the opening (MOUTH): a sheet just outside the collar, additive, set per view
+      {
+        levelFrame(track, s, frame);
+        const ahead = frame.ahead.clone().multiplyScalar(out);
+        const at = frame.pos.clone().addScaledVector(ahead, COLLAR.depth + 0.15);
+        const corner = (lat, h) => [at.x + frame.flat.x * lat, at.y + h, at.z + frame.flat.z * lat];
+        const sheet = new THREE.BufferGeometry();
+        sheet.setAttribute('position', new THREE.Float32BufferAttribute([...corner(-W, 0), ...corner(W, 0), ...corner(W, CROWN), ...corner(-W, CROWN)], 3));
+        sheet.setIndex([0, 1, 2, 0, 2, 3]);
+        const light = new THREE.MeshBasicMaterial({ color: 0x000000, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
+        const veil = new THREE.Mesh(sheet, light);
+        veil.name = 'tunnel-mouth-light';
+        veil.renderOrder = 2;
+        veil.frustumCulled = false;
+        group.add(veil);
+        veils.push({ light, at, outward: ahead });
+        disposables.push(sheet, light);
+      }
       const portal = buildPortal(track, terrain, s, out, W);
       const mesh = new THREE.Mesh(portal, concrete);
       mesh.name = 'tunnel-portal';
@@ -198,6 +265,22 @@ export function createTunnels({ track, terrain, atmosphere, lamps }) {
 
   return {
     group,
+    /** Before each view: how much of the mouths' glare this eye sees (see MOUTH). @param {THREE.Camera} camera */
+    prepareView(camera) {
+      const haze = atmosphere.uniforms.uHazeColor.value;
+      const grey = 0.2126 * haze.x + 0.7152 * haze.y + 0.0722 * haze.z;
+      eye.setFromMatrixPosition(camera.matrixWorld);
+      for (const v of veils) {
+        const inside = -(eye.x - v.at.x) * v.outward.x - (eye.z - v.at.z) * v.outward.z;
+        const k = Math.min(1, Math.max(0, (inside - MOUTH.near) / (MOUTH.far - MOUTH.near)));
+        const show = MOUTH.veil * k * k * (3 - 2 * k);
+        v.light.color.setRGB(
+          show * (haze.x + (grey - haze.x) * MOUTH.grey),
+          show * (haze.y + (grey - haze.y) * MOUTH.grey),
+          show * (haze.z + (grey - haze.z) * MOUTH.grey),
+        );
+      }
+    },
     dispose() {
       for (const d of disposables) d.dispose();
     },
@@ -235,6 +318,7 @@ ${GLSL_NOISE}
 ${SPOT_GLSL}
 varying vec3 vLocal;
 varying vec2 vLocalN;
+float boreGloss;         // 1 on the glazed lining
 uniform float uReal[${count}];
 uniform float uOn[${count}];
 uniform vec4 uBore;      // rows, spacing, lamp lat, lamp height
@@ -268,30 +352,44 @@ vec3 boreLampLight(vec3 P, vec3 N) {
   float s = vLocal.x;
   float h = vLocal.z;
   float wall = step(0.5, abs(vLocalN.x));
-  // concrete: panels 10 m long with dark joints, streaks running down from the vault, damp near the foot
+  // concrete: pours 10 m long with dark joints, streaks running down from the vault, damp near the foot
   float joint = smoothstep(0.03, 0.0, abs(fract(s / 10.0 + 0.5) - 0.5) * 10.0 - 0.02);
   float streak = valueNoise(vec2(s * 1.7, h * 0.12 + valueNoise(vec2(s * 0.3, 1.0)) * 2.0));
   float blot = valueNoise(vec2(s * 0.35, h * 0.6 + vLocal.y * 0.4));
   vec3 concrete = vec3(0.30, 0.295, 0.28) * (0.78 + 0.35 * streak) * (0.85 + 0.25 * blot);
   // the vault is sooted by the exhaust that collects under it
   concrete *= mix(1.0, 0.45, smoothstep(${SPRING.toFixed(1)}, ${CROWN.toFixed(1)}, h));
-  // the painted band, a pale cream that throws the lamps' light back onto the road, and grimy at its foot
-  vec3 paint = vec3(0.62, 0.59, 0.52) * (0.9 + 0.12 * blot) * mix(0.55, 1.0, smoothstep(0.1, 0.8, h));
-  float band = wall * step(h, ${BAND.toFixed(2)});
+  // the lining: pale glazed panels, each a shade of its own, a fine joint between them and one along the middle;
+  // a waist stripe in the circuit's teal; road grime up from the foot
+  float lining = wall * step(h, ${LINING.toFixed(2)});
+  float aa = fwidth(s) + 1.0e-3;
+  float panel = floor(s / ${PANEL.toFixed(2)});
+  float seam = 1.0 - smoothstep(0.008, 0.008 + aa, abs(fract(s / ${PANEL.toFixed(2)} + 0.5) - 0.5) * ${PANEL.toFixed(2)});
+  seam = max(seam, 1.0 - smoothstep(0.008, 0.008 + fwidth(h) + 1.0e-3, abs(h - ${((LINING + WAIST[1]) / 2).toFixed(2)})));
+  seam *= 1.0 - smoothstep(0.02, 0.12, aa);
+  vec3 paint = vec3(0.6, 0.585, 0.54) * (0.93 + 0.1 * hash11(panel * 7.13 + sign(vLocal.y) * 3.0)) * (0.92 + 0.1 * blot);
+  float waist = step(${WAIST[0].toFixed(2)}, h) * step(h, ${WAIST[1].toFixed(2)});
+  paint = mix(paint, vec3(0.035, 0.3, 0.32), waist);
+  paint *= mix(0.4, 1.0, smoothstep(0.12, 0.75, h + 0.25 * (streak - 0.5)));
+  paint *= 1.0 - 0.55 * seam;
   vec3 kerb = vec3(0.36, 0.35, 0.33) * (0.85 + 0.2 * streak);
-  vec3 c = mix(concrete, paint, band);
+  vec3 c = mix(concrete, paint, lining);
   c = mix(c, kerb, step(h, ${(KERB.height + 0.01).toFixed(2)}));
-  c *= 1.0 - 0.6 * joint * wall;
-  // a thin dark line where band and concrete meet
-  c *= 1.0 - 0.5 * wall * smoothstep(0.03, 0.0, abs(h - ${BAND.toFixed(2)}));
+  c *= 1.0 - 0.6 * joint * wall * (1.0 - lining);
+  // a thin dark line where lining and concrete meet
+  c *= 1.0 - 0.5 * wall * smoothstep(0.03, 0.0, abs(h - ${LINING.toFixed(2)}));
+  boreGloss = lining * (1.0 - waist * 0.3);
   diffuseColor.rgb *= c;
 }`,
       )
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-totalEmissiveRadiance += diffuseColor.rgb * RECIPROCAL_PI * boreLampLight(vLocal, vec3(0.0, vLocalN.x, vLocalN.y));`,
-      );
+// the lamps' light, lamp by lamp, and what the bore's own pale walls send round (BOUNCE of a lamp's light on the
+// wall beside it: intensity over the square of the lamp's height above the road)
+totalEmissiveRadiance += diffuseColor.rgb * RECIPROCAL_PI * (boreLampLight(vLocal, vec3(0.0, vLocalN.x, vLocalN.y)) + uBoreColor * (${BOUNCE.toFixed(2)} * uBoreLamp.x / (uBore.w * uBore.w)) * uOn[uBoreFirst]);`,
+      )
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.38, boreGloss);');
   });
 }
 

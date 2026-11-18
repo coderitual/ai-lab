@@ -192,8 +192,26 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   high; kept under `dreamcar.quality`, applied by reloading the page; `?q=` in
   the address wins; auto is what the capability probe chose), sound, time of
   day, speed in km/h or mph (`dreamcar.units`), the map shown or hidden
-  (`dreamcar.map`). Keys reach every button by Tab and Enter, a pad by its
-  d-pad and A; every touch target is at least 44 px.
+  (`dreamcar.map`), the driving help (Full, Sport, Off; `dreamcar.assists`,
+  applied to every car at once), and on touch screens the throttle (auto or
+  manual; `dreamcar.throttle`). Keys reach every button by Tab and Enter, a
+  pad by its d-pad and A; touch targets are at least 44 px (the driving
+  buttons 64 px and more).
+- **Controls, each device as if it were the only one.** Keys: W A S D or the
+  arrows, Space the handbrake. Pad: triggers, left stick, A or RB the
+  handbrake. Touch (a phone on its side, one thumb each side): the left 55 %
+  of the view steers with a floating stick (sideways only, 96 px for full
+  lock); anywhere on the right brakes; a round DRIFT button under the right
+  thumb is the handbrake; the car drives itself while the left thumb steers
+  (or with the GAS button, with the throttle on manual). The zones are named
+  on the first touch run. In split screen each half has all of it.
+- **A slide is seen and counted.** While the car slides beyond 12° its angle
+  and a running score show just above the speed, fading a second after; the
+  best slide of the run is on the results. The chase camera keeps nearer the
+  way the car is going while it slides, so the car is seen yawed and the road
+  ahead stays in view, and opens its lens a little. The rear tyres mark the
+  road and trail a thin smoke in a held slide on dry asphalt, and throw more
+  spray on a wet one (`FX.slide…`).
 - **Start.** On the one race clock: the camera dives from 16 m up, 34 m behind
   and 9 m to the side onto the car's tail while the gantry's five lamps come
   on, and is settled in the chase view as the last one lights; the hold, then

@@ -87,8 +87,12 @@ export class Effects {
       // the road, its paved margin and the kerbs: rubber marks and smoke; grass and gravel: dust and stones
       const paved = w.surface === SURFACE.ASPHALT || w.surface === SURFACE.SHOULDER || w.surface === SURFACE.KERB;
 
+      // a held slide (the car's own measure, vehicle.slideAngle): the slide assists keep each tyre near its peak, so
+      // its skid alone stays under the thresholds; the rear wheels of a car sliding past `slideFrom` degrees mark and
+      // smoke by the slide's angle as well
+      const rearSlide = j >= 2 ? clamp01((Math.abs(v.slideAngle || 0) * (180 / Math.PI) - FX.slideFrom) / FX.slideFull) * (speed > 3 ? 1 : 0) : 0;
       // ---- the mark: from the slide, eased in and out, on paved ground only
-      const want = down && paved ? clamp01((w.skid - FX.markFrom) / FX.markFull) : 0;
+      const want = down && paved ? Math.max(clamp01((w.skid - FX.markFrom) / FX.markFull), rearSlide) : 0;
       this._level[i] += (want - this._level[i]) * Math.min(1, dt * FX.markEase);
       const level = this._level[i];
       if (level > 0.03 && down) {
@@ -120,7 +124,10 @@ export class Effects {
         const across = Math.tan(Math.max(-1.4, Math.min(1.4, w.slipAngle))) * ref;
         const scrub = Math.hypot(w._slip ?? w.slipRatio * ref, across);
         const held = 1 - FX.smokeHeld * Math.max(v.assists.tc, v.assists.abs, v.assists.esc);
-        const s = clamp01((w.skid - FX.smokeFrom) / (1 - FX.smokeFrom)) * clamp01((scrub - FX.smokeScrub) / FX.smokeScrubFull) * held;
+        const s = Math.max(
+          clamp01((w.skid - FX.smokeFrom) / (1 - FX.smokeFrom)) * clamp01((scrub - FX.smokeScrub) / FX.smokeScrubFull) * held,
+          rearSlide * FX.slideSmoke,
+        );
         this._owed[o] += s * FX.smokeRate * t.rate * dt;
         while (this._owed[o] >= 1) {
           this._owed[o] -= 1;
@@ -161,7 +168,7 @@ export class Effects {
       if (wetRoad && paved && speed > FX.sprayFrom) {
         // spray: a low, fine mist behind the tyre (never a wall), growing with speed; the rear wheels throw most
         const rear = j >= 2 ? 1 : 0.45;
-        const k = clamp01((speed - FX.sprayFrom) / 25) * clamp01((wet - FX.wetFrom) / 0.4) * rear;
+        const k = clamp01((speed - FX.sprayFrom) / 25) * clamp01((wet - FX.wetFrom) / 0.4) * rear * (1 + FX.slideSpray * rearSlide);
         this._owed[o + 3] += FX.sprayRate * t.rate * k * dt;
         while (this._owed[o + 3] >= 1) {
           this._owed[o + 3] -= 1;

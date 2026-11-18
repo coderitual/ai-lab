@@ -112,6 +112,8 @@ const SECTION_NAMES = {
  * @property {boolean} [bridge] on piers; `drop`: how far the ground lies under the middle of the deck (m)
  * @property {number} [drop]
  * @property {'L' | 'R'} [runoff] the side whose verge is the run-off of a fast bend (tyre wall, boards)
+ * @property {boolean} [kerb] false: no kerb on the inside of this bend (a white line, the paved margin and the verge
+ *   instead); the outside kerb at its exit stays
  */
 
 /** @type {Segment[]} */
@@ -149,8 +151,9 @@ const SEGMENTS = [
   { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'highDown', R: 'highUp' },
 
   // The ledge: fast downhill sweepers along the hillside. The first, a left, has the valley open on its inside over
-  // a low wall and a wooded bank on its outside; the second, a right, runs under rock with a rail and the drop outside.
-  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 10, g: -7.5, gk: [[0.3, -7.5]], L: 'balcony', R: 'bank', runoff: 'R' },
+  // a low wall and a wooded bank on its outside (and no kerb on its inside: a white line, the paved margin and
+  // rough grass, as in frame D3); the second, a right, runs under rock with a rail and the drop outside.
+  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 10, g: -7.5, gk: [[0.3, -7.5]], L: 'balcony', R: 'bank', runoff: 'R', kerb: false },
   { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: -7.5, L: 'midRun', R: 'rock', runoff: 'L' },
 
   // Gully bridge: straight across a gully on piers.

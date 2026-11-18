@@ -682,7 +682,10 @@ test('kerbs: inside every bend from entry to exit, outside at the exits of the f
   for (const { seg, s0, s1 } of Object.values(pieces)) {
     if (!seg.r || Math.abs(seg.r) > LAYOUT.kerbs.inside || seg.bridge || seg.tunnel) continue;
     const side = seg.r > 0 ? 1 : -1;
-    for (const u of [0.1, 0.5, 0.9]) expect(track.kerbAt(s0 + (s1 - s0) * u, side) > 0.99, `no kerb inside ${seg.id} at ${u}`);
+    if (seg.kerb === false) {
+      // a piece that asks for no inside kerb has none through its middle (a neighbour's exit kerb may reach its start)
+      for (const u of [0.5, 0.9]) expect(track.kerbAt(s0 + (s1 - s0) * u, side) < 0.01, `a kerb inside ${seg.id} at ${u}, which asks for none`);
+    } else for (const u of [0.1, 0.5, 0.9]) expect(track.kerbAt(s0 + (s1 - s0) * u, side) > 0.99, `no kerb inside ${seg.id} at ${u}`);
     if (Math.abs(seg.r) <= LAYOUT.kerbs.outside) expect(track.kerbAt(s1 - 5, -side) > 0.99, `no kerb outside the exit of ${seg.id}`);
   }
   const k = track.kerbs.find((it) => track.wrap(it.s1 - it.s0) > 60);
