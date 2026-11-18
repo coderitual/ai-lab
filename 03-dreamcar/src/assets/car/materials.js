@@ -260,7 +260,7 @@ vec3 carBoreBox(vec3 rWorld) {
 }
 /** Under the roof the probe's lamps and fittings are the analytic lines' (carBoreLines): what it sees is held to a few times the lining's radiance. */
 vec3 carBoreHold(vec3 seen) {
-  float cap = 6.0 * max(max(uBoreGlow.r, max(uBoreGlow.g, uBoreGlow.b)), 1e-4);
+  float cap = 4.0 * max(max(uBoreGlow.r, max(uBoreGlow.g, uBoreGlow.b)), 1e-4);
   float peak = max(seen.r, max(seen.g, seen.b));
   float keep = peak > cap ? cap * (1.0 + 0.25 * log(peak / cap)) / peak : 1.0;
   return seen * mix(1.0, keep, carBoreAt.w);
@@ -355,7 +355,13 @@ vec3 carSoftProbe(vec3 r, float rough, float foot) {
  * The flake layer's share of the tunnel's lines (carBoreLines at the layer's own spread): a soft bright sheen round
  * the clear coat's crisp lines, not a second mirror image.
  */
-const BORE_SHEEN = 0.35;
+const BORE_SHEEN = 0.2;
+/**
+ * And the clear coat's (and the glass's) share, against a plain lacquer's reflectance: a little more, so that on a
+ * pale silver under pale walls the lines read as the brightest thing on the body, as they do on a polished car
+ * under strip lights (at 1 they were faint, at the shoulders only a thin grey).
+ */
+const BORE_COAT = 2.5;
 
 const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false, bore = false) => /* glsl */ `
 #include <lights_fragment_maps>
@@ -371,7 +377,7 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false,
     clearcoatRadiance = mix(clearcoatRadiance * carSky, carSane(probeSample(carProbe, r, max(material.clearcoatRoughness, ${FOOTPRINT})), clearcoatRadiance * carSky), carProbeOn);
     ${bore ? 'clearcoatRadiance = carBoreHold(clearcoatRadiance);' : ''}
     ${soft ? 'clearcoatRadiance = mix(vec3(dot(clearcoatRadiance, vec3(0.2126, 0.7152, 0.0722))), clearcoatRadiance, 0.3);' : ''}
-    ${bore ? 'clearcoatRadiance += carBoreLines(vCarPos, carToCar(rBore), 2.0 * material.clearcoatRoughness * material.clearcoatRoughness);' : ''}
+    ${bore ? `clearcoatRadiance += ${BORE_COAT.toFixed(2)} * carBoreLines(vCarPos, carToCar(rBore), 2.0 * material.clearcoatRoughness * material.clearcoatRoughness);` : ''}
   }
   #else
   clearcoatRadiance *= carSky;
@@ -396,7 +402,7 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false,
     if (peak > cap) seen *= (cap + 0.1 * (peak - cap)) / peak;
     ${bore ? 'seen = carBoreHold(seen);' : ''}
     radiance = mix(radiance * carSky, seen, carProbeOn);
-    ${bore ? `radiance += ${(soft ? BORE_SHEEN : 1).toFixed(2)} * carBoreLines(vCarPos, carToCar(rBore), 2.0 * material.roughness * material.roughness);` : ''}
+    ${bore ? `radiance += ${(soft ? BORE_SHEEN : BORE_COAT).toFixed(2)} * carBoreLines(vCarPos, carToCar(rBore), 2.0 * material.roughness * material.roughness);` : ''}
   }`
       : `
   radiance *= carSky;`

@@ -280,14 +280,15 @@ So under the tunnel's roof the lines are drawn exactly (`GLSL_BORE` in
   step at speed. The entrance's pairs are two bars 0.34 m apart. From outside
   the box a ray counts only through the mouth, so the lines appear as the
   car nears the portal and nothing pops. The clear coat (and the glass, the
-  lenses, the gloss trims) take them at full radiance through their own
-  Fresnel: thin and crisp on the roof, the boot lid and the bonnet, drawn out
+  lenses, the gloss trims) take them at `BORE_COAT` (2.5) times their
+  radiance through their own Fresnel (at 1, a plain lacquer's, they were
+  faint grey threads on the pale silver): thin and crisp on the roof, the boot lid and the bonnet, drawn out
   along the shoulders and flanks. The flake layer takes them at
-  `BORE_SHEEN` (0.35) through its roughness: a soft sheen round the crisp
+  `BORE_SHEEN` (0.2) through its roughness: a soft sheen round the crisp
   line, not a second image.
 - **The probe under the roof** (`carBoreHold`): its fittings would double
   the lines as blotches, so what it shows is held, in proportion to how far
-  the car is under the roof, to six times the lining's radiance
+  the car is under the roof, to four times the lining's radiance
   (`uBoreGlow`), rolling off slowly above it; what is left is the walls, the
   ceiling, the walkway and the dado, the green lights. And it is
   box-projected (`carBoreBox`): a reflected ray meeting a wall or the

@@ -511,11 +511,16 @@ the box its faces see only 160 m (`PROBE.tunnelFar`: what lies beyond is
 culled) and on medium two faces are redrawn every other frame instead of one
 (`tunnelFaces`), so the cube is a tenth of a second old at speed and the lines
 of fittings slide over the roof, the shoulders and the glass with the car.
-The probe stands at the middle of the car and knows directions only: a line 5
-to 6 m overhead is mirrored almost where it should be on the roof and the
-glass, and a little wide on the flanks. A correction for the ceiling's plane in
-the car's materials, as `carGround` corrects for the road's, would put them
-exactly; it has not been made.
+The probe stands at the middle of the car, knows directions only and sees
+the fittings as broad stand-ins a fifth of a second old: in the paint they
+came out as blotches and broken flecks. So the car draws the two lines of
+luminaires itself (car.md, "In the tunnel"): each reflected ray is followed
+from the body's own point to the lines' plane, with the rows of bars and their
+places read from the tunnel (`BORE_UNIFORMS`, `LUMINAIRE`) and the car's place
+in the road's frame handed over by the game each frame (`setBore`); the probe's
+read is held to a few times the lining's radiance under the roof, so the
+fittings in it do not double them, and box-projected onto the walls and the
+ceiling.
 
 **The portals and the cuttings.** The faces are a rectangle with the mouth
 cut out (ShapeGeometry), a reveal, a lintel standing out, a coping. The
