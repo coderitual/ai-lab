@@ -210,7 +210,9 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       const h = ring.lo + (ring.hi - ring.lo) * Math.min(1, Math.max(0, 0.15 + 1.1 * ridge * (0.5 + broad)));
       // (sky lane) the near rings stand aside where the massif is: they would be in front of it but drawn behind
       // (all of them, round two: the farthest showed over the massif's low right-hand ridge as pale hills)
-      const aside = smoothstep(0.3, 0.6, inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a)));
+      // (sea lane) and where the sea runs to the horizon: no far shore (terrain.sea's bearings)
+      const open = terrain.sea ? terrain.sea.sector(mid.x + Math.cos(a) * ring.r, mid.z + Math.sin(a) * ring.r) : 0;
+      const aside = Math.max(smoothstep(0.3, 0.6, inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a))), smoothstep(0.05, 0.5, open));
       heights.push(h * (1 - aside) - 300 * aside);
     }
     for (let i = 0; i <= cols; i++) {
@@ -352,7 +354,11 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         }
         // the ends of the field fade into the land, so it never ends in a wall
         const edge = smoothstep(0, 0.06, u) * smoothstep(1, 0.94, u) * smoothstep(1, 0.92, v);
-        y = -60 + (y + 60) * edge;
+        // (sea lane, round 2) where the column's bearing from the course's middle is wholly the sea's (its far end on
+        // the land side, 60 to 75 degrees off the straight: outside frame D1, which sees -13 to 63) it sinks under the
+        // horizon: from the coast road (frame E1) it stood across the open sea as a far shore
+        const sink = terrain.sea ? smoothstep(0.85, 1, terrain.sea.sector(start.pos.x + Math.cos(a) * MASSIF.crest, start.pos.z + Math.sin(a) * MASSIF.crest)) : 0;
+        y = -60 + (y + 60) * edge * (1 - sink);
         const p = at(i, j);
         pos[p * 3] = x;
         pos[p * 3 + 1] = y;
@@ -499,6 +505,8 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       track.locate(x, z, -1, spot);
       if (Math.abs(spot.lat) < 260) continue;
       if (h > 60) continue;
+      // (sea lane) not over the open sea, where from the coast road a sheet read as a blot on the water
+      if (terrain.sea && terrain.sea.at(x, z) > 0.3) continue;
       if (sheets.some((s) => Math.hypot(s.x - x, s.z - z) < 500)) continue;
       sheets.push({ x, z, y: Math.max(terrain.lake.level, h) + mistRng.range(14, 30), radius: mistRng.range(380, 650) });
     }

@@ -340,12 +340,19 @@ export const CAMERA = {
  * from the start of a run at RULES.autopilotPace; `time`, the time of day), used when the address does not give
  * them. D1: the run-up to the line, low behind and right of the car, yawed left; D3: the ledge's first bend, low
  * behind and left, looking down it; D4: the grid at golden hour just after the lights go out (the lamps show green), low on the lake side behind
- * the car, looking forward and right at the land side with the gantry's lamps in the picture.
+ * the car, looking forward and right at the land side with the gantry's lamps in the picture. E1 (sea lane, round 2:
+ * the owner's coast road frame, strict spec): the car coming out of the carousel, the camera on the crest 10 m ahead of
+ * it and a little up, looking back north at it with the horizon tilted 7 degrees (`roll`): the cut spur on the left,
+ * the hairpin, the gravel apron, the rail on white posts and the boards on the right, the open sea beyond. Waves (sea
+ * lane, round 2): the low crossing on the long right, behind and right of the car, looking ahead and out over the
+ * lagoon beside the causeway (not yet staged: the first pose tried, low on the bay side, saw the road and the massif).
  */
 export const PHOTOS = {
   d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
   d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
+  e1: { back: -10, right: 2.5, up: 3.8, yaw: 162, pitch: -10, fov: 38, roll: 7, t: 64.9, time: 'day' },
+  waves: { back: 7, right: 3, up: 2.2, yaw: -30, pitch: -4, fov: 55, t: 94.4, time: 'day' },
 };
 
 /**

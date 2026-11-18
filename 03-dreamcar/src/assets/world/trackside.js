@@ -33,6 +33,8 @@ const WALL = { top: 0.93, board: 0.42 };
 const D3_REACH = 300;
 const D3_OUTSIDE = [0, 10, 6];
 const D3_INSIDE = [0, 6, 5, 10];
+/** (sea lane, round 2) On the coast road's sea side (frame E1) the boards are red and white: VARNO, PELLORA, TERNA. */
+const COAST_BOARDS = [0, 6, 10, 6];
 /** The tall run is phased at this many metres before the line (frame D1's camera). */
 const D1_ANCHOR = 175;
 /** A tyre stack: radius, height (four tyres), spacing along the wall. */
@@ -133,7 +135,8 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
     const T = big ? TALL : SMALL;
     const n = Math.floor(len / (T.w + T.gap));
     const pitch = len / n;
-    const palette = inD3(run) ? (run.inside ? D3_INSIDE : D3_OUTSIDE) : null;
+    const coast = (run.side > 0 ? track.coastL : track.coastR)?.[Math.round(track.wrap(run.s0 + len / 2) / track.ds) % track.count] === 1;
+    const palette = inD3(run) ? (run.inside ? D3_INSIDE : D3_OUTSIDE) : coast ? COAST_BOARDS : null;
     // the tall run's panel index at the anchor
     const k0 = big ? Math.round(track.wrap(tallAnchor - run.s0) / pitch - 0.5) : 0;
     for (let k = 0; k < n; k++) {

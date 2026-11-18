@@ -124,6 +124,17 @@ machine without a GPU, and only what is listed here.
   keyboard driver (scripted drivers, in Node). Run for this document:
   passed.
 - **The rules** (`tools/unit.mjs`, race): 82 checks, passed.
+- **The sea** (`tools/unit.mjs`, sea; sea lane, 2026-11-18, round 2): the
+  coast presets keep the edges and slopes of the presets they replaced (the
+  carousel's and the crest's verge is now gravel); no water within 2 m
+  beyond any solid edge off the decks (1.5 m over the water at the lowest),
+  and every deck at least 39 m over it; open water within 90 m of the sea
+  side of the sky road (10 m: under its deck), the climb, the carousel,
+  the crest and the plunge (60 to 70 m: the cliff); the bay off the start
+  line; the sea map; the waves deterministic. Round 2's look was judged in
+  stills of `e1` at the medium tier (day, golden hour, night) beside the
+  owner's frame E1, and in the chase camera every 2 s from the tunnel's exit
+  to the end of the plunge on the low tier (1280x720 and 393x700).
 - **The feel** (`tools/unit.mjs`, drift): 8 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
@@ -300,5 +311,17 @@ Read this before believing anything above about a device.
   the board and ghost storage after many laps, and the time-of-day fade
   repeated many times are untested.
 - **Wet grip.** The wet road at night is a look; the tyres do not notice it.
+- **The sea** (sea lane): the waves' motion was only seen in stills (no
+  frame sequence was watched for shimmer or swimming of the disc that
+  follows the eye); the high tier's sea, split screen over the sea, the
+  surf from close by (no camera stood on a shore) were not looked at; the
+  sea's cost on a real GPU is unknown. The coast road after round 2 was
+  judged at the medium tier in `e1` only and at the low tier in the chase
+  camera only (the high tier there, and the bonnet and far cameras, were not
+  looked at). The low crossing and its big swell were seen in one medium
+  still each by day, golden hour and night and in the chase camera at
+  393x700 on the low tier; `?photo=waves`'s pose was not staged; frame D1
+  was checked after the far massif's change at a later moment of the run
+  than its preset (its skyline unchanged).
 - **Accessibility** beyond keyboard reachability of the buttons (screen
   readers, colour blindness, reduced motion) has not been considered.

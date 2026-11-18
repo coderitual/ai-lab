@@ -73,7 +73,7 @@ Track: out to the solid edge it is the Track's own cross-section; beyond it,
 the hillside the Track asks for, with a cliff where the edge is rock (a rock
 face stands in front of it, `rock.js`); further out it blends over 10 to
 100 m into a field made on a 16 m grid from the road itself (rising inside
-the loop, falling towards the lake and the valleys, a ridge over the tunnel,
+the loop, falling towards the sea, the bay and the valleys, a ridge over the tunnel,
 a ravine under the sky road), with ridged noise on top; far away, mountains.
 
 It is drawn in three pieces that meet without cracks: a **band** that follows
@@ -394,6 +394,114 @@ vignette, a filmic tone curve, saturation, split toning, lift, sRGB, grain and
 dither. On low the blur is done inside the final pass and FXAA replaces the
 multisampling. Every pattern (blur jitter, AO rotation, dither) is a function
 of the pixel, grain of the run's own clock.
+
+## The sea (from demo 01)
+
+`src/engine/waves.js`, `src/assets/world/sea.js`, the coast in
+`src/assets/world/terrain.js`. Demo 01's sea brought into this frame: 03
+does not import from 01 (each demo builds alone); the port is 03's own, and
+inside 03 the sea is defined once: the waves in waves.js, where the water is
+in terrain.js (`terrain.sea`), how it looks in sea.js.
+
+**Where it is.** The terrain's height function makes the coast: outside the
+loop, at a bearing from the course's middle outside the mainland's
+(`SEA.mainland`), the land falls from the road's own height to the water
+55 to 170 m beyond the solid edge, steeply at the last (a cliff), and the
+seabed shelves away beyond (`coastAt`). Far from the road the valley itself
+sinks to the seabed in those bearings. The lake's ellipse, drawn out to the
+west, makes the bay. Which low ground is sea is decided by a flood from the
+open water over the 16 m field: whatever it does not reach is a hollow,
+which `keepDry` holds just above the water, because the water is one level
+plane drawn everywhere (the land covers it where it stands higher). Cells of
+the grid and the far land wholly 2 m under the water are not drawn (fewer
+triangles than the lake's world had, on every tier). At start-up the
+terrain also writes the **sea map** (512 x 512 over 4.8 km): the depth, and
+two chamfer distance fields (the land's distance from the water, the
+water's from the land). The water reads it for the shallows and the surf,
+the ground for its coastal colours. Seven sea stacks are bumps in the same
+height function, placed by `rng.fork('stacks')` in the open sea 30 to 120 m
+off the shore.
+
+**The surface** is 01's: a sum of trochoidal (Gerstner) waves with deep-water
+dispersion, the vertex stage moving a camera-centred radial grid (01's, rings
+spaced to keep the cells square) and the fragment stage summing the analytic
+slopes for the normal. Each wave is dropped from the mesh where the mesh has
+fewer than about five vertices per wavelength, and from the normals where it
+is smaller than a pixel (01's rule: at sqrt(570 h L) m for an eye h m over a
+wave L m long). New here: the slope variance a wave stops drawing is added
+to the highlight's (`lost`, alpha^2 = alpha0^2 + 2 sigma^2), and so is the
+ripple map's when it fades with the footprint of the pixel. Close to, the
+sun breaks into glitter on the facets; far out the same light is a smooth,
+wide path: no shimmer, no aliased sparks, with nothing to tune by distance.
+The swell is long and soft (150, 98, 63 m), the chop and the short waves are
+a light breeze's. (Round 2, frame E1) **Wave groups**: a sum of a few long
+trochoids seen from 100 m up reads as ruled lines. Each wave's amplitude is
+multiplied by its own slow factor, 1 + 0.65 cos(g . p + phase), with g about
+7.5 wavelengths long and turned 65 degrees off the wave (`GROUPS`): sets and
+lulls in the swell, rough and calm patches in the chop. The factor is applied
+in the mesh's displacement, the normals, the crest test for foam and in
+`sampleWaves` alike (the sea is still defined once); its own slope is left
+out of the normal (it is a hundredth of the wave's).
+
+**The shading** is a MeshStandardMaterial with the surface written into it
+(shading.js `extend`): the sun or moon, the sky's environment map, the fill,
+the shadow map and the haze reach the water as they reach the land, and the
+time of day's light is all the colour it has. 01's analytic sky becomes the
+environment map; 01's rule that a facet tipped past the horizon shows the sky
+just over it, not the ground under it, is kept (the normal is bent). The body
+is an albedo (what comes back up out of the water: deep blue, greener over
+the shallows by the sea map's depth), lighter at the tops of the waves, with
+01's light through the wave's top towards the sun as a small added term.
+Foam is 01's: the swell's Jacobian now and a moment ago leaves streaks behind
+crests; the surf is bands that run in with the swell over the last 14 to
+26 m of water (the sea map's distance to land), warped by the lace texture;
+far away the lace becomes a share of white. At night the six lamps the wet
+road glints with (lamps.js picks them per view) are drawn into the water as
+streaks, a lobe about the mirrored view narrow across the plane of
+incidence and long in it, widened by the roughness. Far out the water fades
+into `hazeColor` of its own direction, which is what the sky dome shows just
+under the horizon, so the disc's edge never shows. Not 01's: the wake, the
+mirror (a planar reflection would be a scene pass: the sea reflects the
+environment map only), caustics and the sandy bed.
+
+**The coast road's cliff** (round 2, `COAST` in terrain.js). The near
+profile beyond a sea side's solid edge (`nearAt`) is replaced, by the side's
+coast weight eased over 30 m along the road, with `coastCliff`: a lip, then
+`top - (top - foot) * smoothstep(t)` down a run of `drop / steep` metres,
+then the seabed. Two things would undo it. The 16 m land-shape field is
+smoothed three times, which turns a cliff into a 50 m slope: so after the
+smoothing each cell off a sea side is pulled down to the same cliff
+(`coastCell`), and those cells seed the sea's flood. And the band and the
+grid blend the near profile into that field from 10 m out, adding the land's
+small hills and `keepDry`'s lift: on a sea side the near profile is kept to
+the edge of the road's reach (the last 40 m blend), the hills are left off,
+and nothing is lifted (only the sea stacks stand out of it). The spur inside
+the carousel (`COAST.knoll`) is a ridge from the hairpin's centre (the
+Track's point at the piece's middle, `r` to its inside) down the tongue
+between its legs, added after the two legs' grounds are blended, so both
+legs see the same hill, and only beyond the cut's top.
+
+**The low crossing and the big waves** (round 2). The causeway is the same
+cliff function with other numbers (a 2.5 m lip, a bank 0.6 down per metre),
+applied to both sides of a stretch of `back` (`seaSide`: on the inside it
+fades out beyond the lagoon's width, so the land comes back), and on the
+lagoon side the seabed stops at 9 m. The big swell is a factor on the swell's
+amplitudes only, a smoothstep bump round one place (`BOOST`, set by
+`waves.setBoost` from `terrain.sea.surf`): in the shader it multiplies the
+same `waveGroup` factor that the sets and lulls use, so the mesh, the normals,
+the Jacobian foam and `sampleWaves` all see one surface.
+
+**Per-piece road markings** (round 2, road.js `PIECE_MARKS`). A scheme per
+piece id, each scheme one channel of a per-metre RGBA texture (`uMarks`,
+sampled at s / length like the edge texture), eased over 6 m at its ends.
+'coast' (channel r) is a double yellow centre line: two 0.12 m lines 0.12 m
+apart, painted with the edge lines' wear and weight but a yellow paint
+colour. Channels g, b and a are free for other schemes.
+
+**Per tier**: low a flat disc (32 segments, four rings, 160 triangles) and
+the 7 longest waves in the normals; medium 96 segments moved by the swell,
+9 waves; high 160 segments, all 11. The clock is the run's (`world.update`),
+the eye's height sets the waves' reach in `prepareView`.
 
 ## What each pass draws (the budget)
 

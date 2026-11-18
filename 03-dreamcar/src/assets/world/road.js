@@ -69,6 +69,16 @@ import { PIECE } from './terrain.js';
 
 /** The edge line: its width (m), its outer edge on the pavement's edge. */
 const EDGE_LINE = 0.28;
+/**
+ * (sea lane, round 2) Per-piece road markings beyond the white edge lines, by piece id (trackLayout.js): a scheme
+ * names what each piece adds. 'coast': a double yellow centre line (two lines `yellow.width` m wide, `yellow.gap` m
+ * apart), the coast road after the tunnel as in frame E1. Each scheme is one channel of the marks texture (uMarks:
+ * r coast; g, b, a free for other schemes), eased over `MARK_EASE` m at the ends of its pieces.
+ */
+const PIECE_MARKS = { viaduct: 'coast', climb: 'coast', carousel: 'coast', crest: 'coast', plunge: 'coast' };
+const MARK_CHANNEL = { coast: 0 };
+const MARK_EASE = 6;
+const YELLOW = { width: 0.12, gap: 0.12, color: [0.62, 0.43, 0.08] };
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /**
@@ -236,6 +246,28 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
   edgeTexture.wrapS = THREE.RepeatWrapping;
   edgeTexture.needsUpdate = true;
 
+  // ---- (sea lane, round 2) the per-piece markings (PIECE_MARKS), per metre: one channel per scheme
+  const marks = new Uint8Array(n * 4);
+  {
+    let s0 = 0;
+    for (const seg of track.layout?.segments ?? []) {
+      const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
+      const channel = MARK_CHANNEL[PIECE_MARKS[seg.id]];
+      if (channel !== undefined) {
+        for (let d = -MARK_EASE; d <= len + MARK_EASE; d += ds) {
+          const i = Math.round(track.wrap(s0 + d) / ds) % n;
+          const v = Math.min(1, Math.max(0, Math.min(d + MARK_EASE, len + MARK_EASE - d) / MARK_EASE));
+          marks[i * 4 + channel] = Math.max(marks[i * 4 + channel], byte(v));
+        }
+      }
+      s0 += len;
+    }
+  }
+  const marksTexture = new THREE.DataTexture(marks, n, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
+  marksTexture.magFilter = marksTexture.minFilter = THREE.LinearFilter;
+  marksTexture.wrapS = THREE.RepeatWrapping;
+  marksTexture.needsUpdate = true;
+
   const textures = roadTextures({ caps, tier });
 
   // the grid's boxes, in track coordinates (s counted back from the line is negative)
@@ -253,6 +285,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     uAggN: { value: textures.relief },
     uBig: { value: textures.big },
     uEdge: { value: edgeTexture },
+    uMarks: { value: marksTexture },
     uFeat: { value: history.texture },
     uLength: { value: track.length },
     uGrid: { value: slots },
@@ -357,6 +390,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     dispose() {
       for (const g of geometries) g.dispose();
       edgeTexture.dispose();
+      marksTexture.dispose();
       history.dispose();
       material.dispose();
     },
@@ -623,6 +657,7 @@ uniform sampler2D uAgg;
 uniform sampler2D uAggN;
 uniform sampler2D uBig;
 uniform sampler2D uEdge;
+uniform sampler2D uMarks;
 uniform highp sampler2D uFeat;
 uniform float uLength;
 uniform vec4 uGrid[${GRID_SLOTS}];
@@ -854,8 +889,12 @@ for ( int i = 0; i < ${GRID_SLOTS}; i ++ ) {
 }
 // worn: thin where the tyres run, gone in places, broken by the stones up close, newer where the road is
 float rWear = 0.55 + 0.25 * rBig.b + 0.2 * rMottle - 0.3 * rRubber + 0.2 * ( rAgg.g - 0.5 ) * rNear + 0.2 * ( 1.0 - rAge );
+// (sea lane, round 2) the per-piece markings (PIECE_MARKS): the coast road's double yellow centre line
+float rYellow = textureLod( uMarks, vec2( rS / uLength, 0.5 ), 0.0 ).r * roadCover( rA - ${(YELLOW.gap / 2 + YELLOW.width / 2).toFixed(3)}, ${(YELLOW.width / 2).toFixed(3)}, aaL );
+rMarks += rYellow;
 roadPaint = clamp( rMarks, 0.0, 1.0 ) * rOnRoad * smoothstep( 0.14, 0.38, rWear ) * ( 1.0 - ftErase );
-rCol = mix( rCol, vec3( 0.68, 0.68, 0.655 ) * ( 0.88 + 0.16 * rAgg.r ) * ( 0.88 + 0.12 * rBig.r ), roadPaint );
+vec3 rPaintCol = mix( vec3( 0.68, 0.68, 0.655 ), vec3( ${YELLOW.color.map((c) => c.toFixed(3)).join(', ')} ), clamp( rYellow, 0.0, 1.0 ) );
+rCol = mix( rCol, rPaintCol * ( 0.88 + 0.16 * rAgg.r ) * ( 0.88 + 0.12 * rBig.r ), roadPaint );
 rAlpha2 = mix( rAlpha2, 0.085, roadPaint );
 roadTiltGain *= 1.0 - 0.65 * roadPaint;
 
