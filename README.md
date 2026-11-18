@@ -11,6 +11,10 @@ folder and is published to GitHub Pages under the same name.
 
 All demos: https://coderitual.github.io/ai-lab/
 
+Work that is not released yet is published as a preview beside them, under
+https://coderitual.github.io/ai-lab/preview/ (the branch named in
+`.github/preview-ref`; `preview/version.txt` says which commit it is).
+
 | #  | Demo | Play |
 | -- | ---- | ---- |
 | 01 | [Breakwater GP](01-breakwater-gp/) — an original powerboat slalom race on simulated waves, built with three.js. Solo, two-player split screen, or up to four players online with no server | https://coderitual.github.io/ai-lab/01-breakwater-gp/ |

@@ -1,6 +1,15 @@
 # Builds every numbered demo (01-…, 02-…) and publishes them to GitHub Pages,
 # each under its own sub-path: https://<owner>.github.io/<repo>/01-…/
 #
+# A preview of work that is not released yet can be published beside them, under
+# https://<owner>.github.io/<repo>/preview/01-…/ : a manual run with `preview_ref`
+# set to a branch builds that branch's demos into /preview/. With the input empty
+# the branch named in the first line of .github/preview-ref is taken (so that every
+# publish carries the current preview), or else a branch named `preview`; with
+# none of the three there is no preview. The released site at the root is always
+# built from the ref the run was started on. /preview/version.txt says which
+# commit the preview is.
+#
 # One-time setup: repository Settings → Pages → Build and deployment →
 # Source: "GitHub Actions".
 name: Deploy demos to GitHub Pages
@@ -8,6 +17,11 @@ name: Deploy demos to GitHub Pages
 on:
   push:
   workflow_dispatch:
+    inputs:
+      preview_ref:
+        description: 'Branch (or tag, or commit) to publish as a preview under /preview/, beside the released site. Empty: the branch in .github/preview-ref, or one named "preview", else no preview.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -39,6 +53,32 @@ jobs:
         run: node scripts/build-site.mjs
         env:
           SITE_URL: ${{ steps.pages.outputs.base_url }}
+      # The preview, if one was asked for: another checkout beside the first, built by its own copy of the script
+      # (so a branch may change how the site is built), and copied into the site under /preview/.
+      - name: Look for a preview
+        id: preview
+        env:
+          ASKED: ${{ github.event.inputs.preview_ref }}
+        run: |
+          ref="$ASKED"
+          if [ -z "$ref" ] && [ -f .github/preview-ref ]; then ref="$(head -n 1 .github/preview-ref | tr -d '[:space:]')"; fi
+          if [ -z "$ref" ] && git ls-remote --exit-code --heads origin preview >/dev/null 2>&1; then ref=preview; fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - name: Check out the preview
+        if: steps.preview.outputs.ref != ''
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.preview.outputs.ref }}
+          path: _preview
+      - name: Build the preview
+        if: steps.preview.outputs.ref != ''
+        run: |
+          node _preview/scripts/build-site.mjs
+          mkdir -p _site/preview
+          cp -R _preview/_site/. _site/preview/
+          git -C _preview log -1 --format='%H %cI %s' > _site/preview/version.txt
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}/preview
       - name: Upload the site
         uses: actions/upload-pages-artifact@v5
         with:
