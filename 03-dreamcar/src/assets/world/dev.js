@@ -4,6 +4,7 @@
 //   placeOnRoad()    an object's place and attitude at track coordinates
 //   roadCamera()     a camera standing on the road, or looking straight down at it
 //   createLightTest()  a grey card, a white card, a chrome ball and a matt ball
+//   createTreeLab()  the light of the world without the world: single trees in seconds
 //
 // The light test is how the numbers of lighting.js are checked: the grey card
 // is 18 % and lies flat, so in open sun at the day's exposure it should come
@@ -12,6 +13,14 @@
 // sun's highlight, the matt ball where the light comes from.
 
 import * as THREE from 'three';
+import { createAtmosphere } from './atmosphere.js';
+import { createEnvironment } from './environment.js';
+import { CASTER_LAYER, createTreeKit } from './forest.js';
+import { TIMES, placeLights } from './lighting.js';
+import { selectBake } from './shading.js';
+import { createSky } from './sky.js';
+import { createSun } from './sun.js';
+import { TIERS } from '../../engine/caps.js';
 
 const DEG = Math.PI / 180;
 const frame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
@@ -137,4 +146,83 @@ export function createLightTest({ mode, towardsLight }) {
       for (const thing of new Set(made)) thing.dispose();
     },
   };
+}
+
+/**
+ * (trees lane) The tree lab: the sky, the sun and its shadow, the haze and the environment map of the real world
+ * round a bare field, and the forest's tree kit, with nothing else built: `viewer.html?asset=tree&lab=1` starts in a
+ * few seconds where the whole world needs a minute or two. It answers to the part of the World's interface the
+ * viewer uses. The straight is taken to run towards +X, as on the map.
+ * @param {object} options
+ * @param {THREE.WebGLRenderer} options.renderer @param {import('../../engine/caps.js').Caps} options.caps
+ * @param {import('../../engine/caps.js').Tier} options.tier @param {import('../../engine/rng.js').Rng} options.rng
+ * @param {import('../../engine/params.js').Params} options.params
+ */
+export function createTreeLab({ renderer, caps, tier, rng, params }) {
+  const scene = new THREE.Scene();
+  placeLights(90);
+  const atmosphere = createAtmosphere(caps);
+  const sky = createSky({ tier, rng: rng.fork('sky'), atmosphere });
+  const environment = createEnvironment({ renderer, caps, sky, atmosphere });
+  const sun = createSun({ renderer, tier, shadows: params.shadows });
+  scene.onBeforeRender = (_renderer, _scene, camera) => sun.beforeRender(camera);
+  const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
+  const kit = createTreeKit({ renderer, tier, coverage, rng: rng.fork('forest'), atmosphere });
+  sun.light.shadow.camera.layers.enable(CASTER_LAYER);
+  // a field of mown grass, and far behind the tree a dark wall (what a crown is seen against in the wood)
+  const field = new THREE.Mesh(
+    new THREE.CircleGeometry(600, 48).rotateX(-Math.PI / 2),
+    atmosphere.patch(new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(0.1, 0.13, 0.05), roughness: 1 })),
+  );
+  field.receiveShadow = true;
+  const group = new THREE.Group();
+  scene.add(field, group, sky.dome, sky.stars, ...sun.objects);
+  scene.fog = atmosphere.fog;
+  const world = {
+    scene,
+    time: null,
+    probeHidden: [sky.stars],
+    atmosphere,
+    /** As World.forest, as far as single trees go. */
+    forest: { specimen: kit.specimen, group, atlas: kit.atlas, uniforms: kit.uniforms, kit, stats: { ms: kit.ms, bytes: kit.bytes, triangles: kit.models.map((m) => m.triangles) } },
+    stats: { ms: kit.ms },
+    setTime(name) {
+      const time = TIMES[name] ?? TIMES.day;
+      world.time = time;
+      atmosphere.setTime(time);
+      sky.setTime(time);
+      selectBake(time.name);
+      const above = time.ambient.sky.map((v) => v * time.ambient.intensity);
+      const below = time.ambient.ground.map((v) => v * time.ambient.intensity);
+      sun.setTime(time, above, below);
+      scene.environment = environment.get(time.name);
+      scene.environmentIntensity = time.env.intensity;
+      kit.uniforms.uWind.value.z = time.name === 'night' ? 0.5 : 1;
+      kit.uniforms.uWet.value = params.wet ?? time.wetness ?? 0;
+      return time;
+    },
+    update(dt, simTime) {
+      sky.update(dt, simTime);
+      kit.uniforms.uTime.value = simTime;
+    },
+    prepareView(camera, focus) {
+      sun.prepareView(camera, focus);
+      atmosphere.prepareView(camera);
+    },
+    restore() {
+      environment.forget();
+      environment.build();
+      world.setTime(world.time.name);
+    },
+    dispose() {
+      environment.dispose();
+      sun.dispose();
+      sky.dispose();
+      kit.dispose();
+    },
+  };
+  environment.build();
+  world.setTime(params.time);
+  world.update(0, 0);
+  return world;
 }

@@ -5,40 +5,55 @@
 // foot) with whorls of branches whose length follows the species' crown
 // profile; each branch leaves the trunk at an angle that goes from hanging low
 // in the crown to rising at its top, sags with its length and lifts its tip;
-// under the crown stand the dead stubs of branches the shade has killed. A
-// broadleaf is a trunk that divides: limbs fork and send side shoots, each
-// child shorter and thinner than its parent, turning towards the light and
-// wandering, and none leaves the ellipsoid that is the crown's outline; the
-// last limbs carry the leaves.
+// under the crown stand the dead stubs of branches the shade has killed.
+//
+// A broadleaf's crown is a heap of LOBES: a dozen or two balls of foliage
+// arranged in rings round the crown's outline, each bulging out of it (the
+// billowing sub-crowns of a maple, the separate masses of an open-grown tree).
+// The trunk divides at the fork into a few main limbs, each of which carries
+// the lobes of its side of the tree; a limb runs to the middle of every lobe
+// and twigs run on from there. The leaves are some hundreds of LEAF CARDS on
+// the lobes' shells, more on their outside than underneath, none where one
+// lobe is buried in another: each card a flat spray of some dozens of leaves
+// with the sky between them (a sprig of the foliage atlas), facing more or
+// less out of its lobe and tilted every way. A few big cards of leaf mass fill
+// the inside, and are what shows, dark, between the leaves of the outside.
+//
+// THE CROWN'S OWN SHADE is worked out here, not in the shader: from every
+// card (and every ring of a limb) rays go out all round through the lobes, and
+// how far each travels inside foliage says how much light comes from there.
+// Their sum is the card's BENT NORMAL, the direction most of its light comes
+// from, and how OPEN it is to the sky. The material lights a leaf from the
+// cone of open sky round its bent normal (treeMaterial.js).
 //
 // MESHES, from the same skeleton so that one can stand in for the other:
-//   full     the trunk and every limb as a tube of bark; on a conifer's branch
-//            a row of side fronds, a frond at the tip and (spruce) curtains of
-//            twigs hanging under it; on a broadleaf's last limbs a handful of
-//            leaf-cluster cards each, turned every way so the crown has leaves
-//            towards any eye. A few thousand triangles.
-//   reduced  the trunk and the main limbs with fewer sides, one bent card for
-//            a conifer's whole bough, one or two large cards for all the
-//            leaves of a last limb. A few hundred triangles. Also what casts
-//            the shadow and what the wet road mirrors.
+//   full     the trunk and every limb and twig as a tube of bark; every leaf
+//            card (a conifer: a row of side fronds on each branch, a frond at
+//            the tip and, spruce, curtains of twigs hanging under it). Three to
+//            six thousand triangles.
+//   reduced  the trunk and the limbs with fewer sides, no twigs; every third
+//            leaf card, larger (a conifer: one bent card for a whole bough).
+//            A thousand triangles or fewer.
 //
 // WHAT A VERTEX CARRIES besides its place:
-//   normal   bark: the tube's own. Foliage: NOT the card's: the direction out
-//            of the crown at that point (from the trunk's axis and up, or from
-//            the middle of a broadleaf's crown), so the crown is lit as one
-//            soft body and not as a pile of flat cards.
+//   normal   bark: the tube's own. Foliage: NOT the card's: its bent normal
+//            (a conifer: the direction out of the crown at that point), so the
+//            crown is lit as one body and not as a pile of flat cards. The
+//            card's own facing is found in the fragment shader.
 //   uv       foliage: into the foliage atlas. Bark: u across one bark tile
 //            (once round the limb), v along it in repeats.
-//   aShade   x how much light gets in (dark inside the crown and low down,
-//            light at the tips); y what it is: 0 foliage (takes the tree's
-//            tint), 0.5 dead twig (atlas, own colour), 1 bark; z where on the
-//            old-to-new (or green-to-red) scale its colour lies; w how much
+//   aShade   x how open to the light it is (dark inside the crown and low
+//            down, light on its outside); y what it is: 0 foliage (takes the
+//            tree's tint), 0.5 dead twig (atlas, own colour), 1 bark; z
+//            foliage: where on the old-to-new (or green-to-red) scale its
+//            colour lies; bark: how pale it is (0.5: as painted); w how much
 //            light comes through it from behind.
 //   aWind    x how far it moves when its branch swings (m at full gust), y the
-//            branch's phase, z how much it flutters (leaf and frond tips).
+//            branch's phase, z how much it flutters (leaf and frond tips), w 1 on
+//            a leaf card that is not drawn when it is seen edge-on.
 
 import * as THREE from 'three';
-import { barkSpan, tileRect } from './forestTextures.js';
+import { barkSpan, subRect, tileRect } from './forestTextures.js';
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -95,7 +110,7 @@ class Builder {
     this.n.push(n[0], n[1], n[2]);
     this.uv.push(u, v);
     this.shade.push(shade[0], shade[1], shade[2], shade[3]);
-    this.wind.push(wind[0] / SWAY_MAX, wind[1], wind[2], 0);
+    this.wind.push(wind[0] / SWAY_MAX, wind[1], wind[2], wind[3] ?? 0);
     return this.p.length / 3 - 1;
   }
 
@@ -139,7 +154,8 @@ class Builder {
  * A tube of bark along a polyline.
  * @param {Builder} b @param {number[][]} pts @param {number[]} radii
  * @param {object} o sides; bark: tile; barkSize: texels of a tile; run: metres of limb per repeat of the bark;
- *   ao(i): light at point i; sway(i): [m, phase]; lobe(i, angle): radius multiplier (the flare of the foot)
+ *   ao(i): light at point i; sway(i): [m, phase]; lobe(i, angle): radius multiplier (the flare of the foot); tone: how
+ *   pale the bark is (0.5: as painted)
  */
 function tube(b, pts, radii, o) {
   const [u0, u1] = barkSpan(o.bark, o.barkSize);
@@ -158,7 +174,7 @@ function tube(b, pts, radii, o) {
       const a = (k / o.sides) * Math.PI * 2;
       const d = add(scale(side, Math.cos(a)), scale(other, Math.sin(a)));
       const r = radii[i] * (o.lobe ? o.lobe(i, a) : 1);
-      ring.push(b.vertex(mad(pts[i], d, r), d, lerp(u0, u1, k / o.sides), run / o.run, [o.ao(i), 1, 0.5, 0], [sway, phase, 0]));
+      ring.push(b.vertex(mad(pts[i], d, r), d, lerp(u0, u1, k / o.sides), run / o.run, [o.ao(i), 1, o.tone ?? 0.5, 0], [sway, phase, 0]));
     }
     rings.push(ring);
   }
@@ -452,211 +468,321 @@ function coniferMesh(variant, sk, rng, full, barkSize, through) {
 
 // ------------------------------------------------------------------------------------------------ broadleaves
 
-/** The skeleton of a broadleaf: its limbs (the trunk is the first), and the leaf clusters the last ones carry. */
+/** Directions spread evenly all round: where a leaf looks for its light. */
+const AROUND = (() => {
+  const N = 20;
+  const out = new Float64Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (2 * (i + 0.5)) / N;
+    const r = Math.sqrt(1 - y * y);
+    out.set([Math.cos(i * 2.39996323) * r, y, Math.sin(i * 2.39996323) * r], i * 3);
+  }
+  return out;
+})();
+/** Share of the light lost per metre of crown crossed. */
+const CROWN_DENSITY = 0.5;
+/** The mean share of the rays that reach a leaf on the open outside of a crown: `open` is 1 there. */
+const OPEN_OUTSIDE = 0.42;
+
+/**
+ * How the light reaches a point of a crown made of `lobes`: rays all round, each dimmed by the length it travels
+ * inside a lobe (overlapping lobes counted once), less coming up from the ground than down from the sky.
+ * @returns {(p: number[], out: { bent: number[], open: number }) => void} `bent`: the unit direction most of the
+ *   light comes from; `open`: 0 (deep inside) to 1 (on the open outside)
+ */
+function exposureIn(lobes) {
+  const count = lobes.length;
+  const from = new Float64Array(count);
+  const to = new Float64Array(count);
+  const ox = new Float64Array(count);
+  const oy = new Float64Array(count);
+  const oz = new Float64Array(count);
+  const cc = new Float64Array(count);
+  return (p, out) => {
+    for (let i = 0; i < count; i++) {
+      const l = lobes[i];
+      ox[i] = p[0] - l.c[0];
+      oy[i] = p[1] - l.c[1];
+      oz[i] = p[2] - l.c[2];
+      cc[i] = ox[i] * ox[i] + oy[i] * oy[i] + oz[i] * oz[i] - l.solid * l.solid;
+    }
+    let sx = 0;
+    let sy = 0;
+    let sz = 0;
+    let sum = 0;
+    for (let d = 0; d < AROUND.length; d += 3) {
+      const dx = AROUND[d];
+      const dy = AROUND[d + 1];
+      const dz = AROUND[d + 2];
+      // the stretches of this ray that lie inside a lobe, in order of where they begin
+      let n = 0;
+      for (let i = 0; i < count; i++) {
+        const half = ox[i] * dx + oy[i] * dy + oz[i] * dz;
+        const disc = half * half - cc[i];
+        if (disc <= 0) continue;
+        const root = Math.sqrt(disc);
+        if (root - half <= 0) continue;
+        const t0 = Math.max(0, -half - root);
+        let k = n++;
+        for (; k > 0 && from[k - 1] > t0; k--) {
+          from[k] = from[k - 1];
+          to[k] = to[k - 1];
+        }
+        from[k] = t0;
+        to[k] = root - half;
+      }
+      let inside = 0;
+      let reached = 0;
+      for (let k = 0; k < n; k++) {
+        if (to[k] <= reached) continue;
+        inside += to[k] - Math.max(reached, from[k]);
+        reached = to[k];
+      }
+      const light = Math.exp(-CROWN_DENSITY * inside) * (dy < -0.1 ? 0.5 : 1);
+      sx += dx * light;
+      sy += dy * light;
+      sz += dz * light;
+      sum += light;
+    }
+    const len = Math.hypot(sx, sy, sz);
+    out.bent = len > 1e-4 ? [sx / len, sy / len, sz / len] : [0, 1, 0];
+    out.open = clamp01((sum * 3) / AROUND.length / OPEN_OUTSIDE);
+  };
+}
+
+/** A point of the curve from `a` to `b` that is pulled towards `ctrl`. */
+const bend = (a, ctrl, b, t) => {
+  const u = 1 - t;
+  return [u * u * a[0] + 2 * u * t * ctrl[0] + t * t * b[0], u * u * a[1] + 2 * u * t * ctrl[1] + t * t * b[1], u * u * a[2] + 2 * u * t * ctrl[2] + t * t * b[2]];
+};
+
+/**
+ * The skeleton of a broadleaf: the lobes of its crown, its limbs (the trunk is the first) and its leaf cards, each
+ * with its light worked out (see the header).
+ */
 function broadleafSkeleton(P, rng) {
   const H = P.H;
   const c = [0, H * P.crown.cy, 0];
   const rx = P.crown.rx;
   const ry = H * P.crown.ry;
-  /** < 1 inside the crown's outline. */
-  const inside = (p) => ((p[0] - c[0]) / rx) ** 2 + ((p[1] - c[1]) / ry) ** 2 + ((p[2] - c[2]) / rx) ** 2;
+  const unit = () => {
+    const y = rng.range(-1, 1);
+    const a = rng.range(0, Math.PI * 2);
+    const r = Math.sqrt(1 - y * y);
+    return [Math.cos(a) * r, y, Math.sin(a) * r];
+  };
+
+  // THE LOBES, ring by ring from the top of the crown down
+  const lobes = [];
+  const turn0 = rng.range(0, Math.PI * 2);
+  P.lobes.rings.forEach(([count, polar, place], ring) => {
+    const start = turn0 + ring * 0.9 + rng.range(-0.3, 0.3);
+    for (let k = 0; k < count; k++) {
+      const az = start + ((k + rng.range(-0.22, 0.22)) / count) * Math.PI * 2;
+      const pol = Math.max(0, polar + rng.range(-0.12, 0.12));
+      const far = place * rng.range(0.93, 1.07);
+      const R = rx * rng.range(P.lobes.r[0], P.lobes.r[1]);
+      lobes.push({
+        c: [c[0] + Math.sin(pol) * Math.cos(az) * rx * far, c[1] + Math.cos(pol) * ry * far, c[2] + Math.sin(pol) * Math.sin(az) * rx * far],
+        R,
+        solid: R * 0.9,
+        core: false,
+        phase: rng.next(),
+        sway: 0,
+      });
+    }
+  });
+  const outer = lobes.slice();
+  // (the middle of the crown, where the limbs are: it takes light away and carries only leaf mass)
+  const core = P.lobes.core ? { c: [c[0], c[1] - 0.1 * ry, c[2]], R: rx * P.lobes.core, solid: rx * P.lobes.core * 0.9, core: true, phase: 0.5, sway: 0.02 } : null;
+  if (core) lobes.push(core);
+  const look = exposureIn(lobes);
+
+  // THE WOOD
   const limbs = [];
-  const FLEX = [0, 0.012, 0.026, 0.045, 0.06];
-  let shootTurn = rng.range(0, Math.PI * 2);
-
-  /**
-   * One limb and everything that grows from it.
-   * @param {number[]} start @param {number[]} dir @param {number} len @param {number} r0 radius at its start
-   * @param {number} level 0: the trunk @param {number} phase its sway phase @param {number} sway0 how far its
-   *   start already moves with its parents (m)
-   */
-  function limb(start, dir, len, r0, level, phase, sway0) {
-    const steps = level === 0 ? 4 : 3;
-    const pts = [start];
-    let d = dir;
-    let p = start;
-    let grown = 0;
-    for (let j = 0; j < steps; j++) {
-      const w = P.gnarl * (level === 0 ? 0.3 : 1);
-      // it wanders, and turns towards the light (or, with a negative `up`, hangs)
-      d = norm([d[0] + rng.range(-w, w), d[1] + rng.range(-w, w) * 0.5 + P.up[level] / steps, d[2] + rng.range(-w, w)]);
-      let step = len / steps;
-      let q = mad(p, d, step);
-      if (level > 0 && inside(q) > 1) {
-        // it would leave the crown's outline: it stops at it
-        let lo = 0;
-        let hi = 1;
-        for (let k = 0; k < 5; k++) {
-          const mid = (lo + hi) / 2;
-          if (inside(mad(p, d, step * mid)) > 1) hi = mid;
-          else lo = mid;
-        }
-        step *= lo;
-        if (step < 0.15) break;
-        q = mad(p, d, step);
-        grown += step;
-        p = q;
-        pts.push(p);
-        break;
-      }
-      grown += step;
-      p = q;
-      pts.push(p);
-    }
-    if (pts.length < 2) return;
-    const last = level >= P.levels;
-    const rEnd = last ? 0.008 : r0 * (level === 0 ? 0.72 : 0.6);
-    const radii = pts.map((_, j) => lerp(r0, rEnd, j / (pts.length - 1)));
-    if (level === 0) radii[0] = r0 * 1.5; // the flare of the foot
-    const flex = FLEX[Math.min(level, FLEX.length - 1)];
-    const me = { pts, radii, level, phase, sway0, sway1: sway0 + flex * grown, len: grown, last, clusters: [] };
+  const limb = (pts, r0, r1, level, phase, sway0, flex) => {
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) len += length(sub(pts[i], pts[i - 1]));
+    const radii = pts.map((_, i) => lerp(r0, r1, Math.pow(i / (pts.length - 1), 0.8)));
+    const me = { pts, radii, level, phase, sway0, sway1: sway0 + flex * len };
     limbs.push(me);
-    const swayAt = (u) => lerp(me.sway0, me.sway1, u);
-
-    if (!last) {
-      const end = pts[pts.length - 1];
-      const endDir = norm(sub(end, pts[pts.length - 2]));
-      const e1 = square(endDir);
-      const e2 = cross(endDir, e1);
-      const n = P.forks[level];
-      const around = rng.range(0, Math.PI * 2);
-      const lead = rng.next() < P.leader[level];
-      for (let k = 0; k < n; k++) {
-        const isLead = lead && k === 0;
-        const spread = isLead ? rng.range(0.04, 0.2) : P.spread[level] * rng.range(0.75, 1.25);
-        const a = around + (k / n) * Math.PI * 2 + rng.range(-0.4, 0.4);
-        const cd = norm(add(scale(endDir, Math.cos(spread)), scale(add(scale(e1, Math.cos(a)), scale(e2, Math.sin(a))), Math.sin(spread))));
-        const cl = len * P.ratio[level] * rng.range(0.82, 1.18) * (isLead ? 1.15 : P.side);
-        // a parent's cross-section is shared out among its children; the one that carries on keeps the most
-        const cr = rEnd * (isLead ? 0.92 : lead ? 0.5 : Math.pow(1 / n, 0.42));
-        limb(end, cd, cl, cr, level + 1, level === 0 ? rng.next() : phase + rng.range(-0.08, 0.08), swayAt(1));
-      }
-      // side shoots part-way along: a leader's whorl-less branches, and what keeps the inside of a crown from being bare
-      const shoots = P.shoots?.[level] ?? 0;
-      for (let k = 0; k < shoots; k++) {
-        const u = 0.25 + (0.65 * (k + rng.range(0.2, 0.8))) / shoots;
-        const at = along(pts, u);
-        const tan = tangentAt(pts, u);
-        const s1 = square(tan);
-        const s2 = cross(tan, s1);
-        shootTurn += 2.39996;
-        const spread = P.spread[level] * rng.range(0.85, 1.25);
-        const cd = norm(add(scale(tan, Math.cos(spread)), scale(add(scale(s1, Math.cos(shootTurn)), scale(s2, Math.sin(shootTurn))), Math.sin(spread))));
-        limb(at, cd, len * P.ratio[level] * P.side * (1 - 0.35 * u) * rng.range(0.85, 1.2), lerp(r0, rEnd, u) * 0.45, level + 1, level === 0 ? rng.next() : phase + rng.range(-0.08, 0.08), swayAt(u));
+    return me;
+  };
+  /** A limb's centre line from `a` to `b`, leaving `a` more steeply than it arrives, wandering by `gnarl`. */
+  const reach = (a, b, steps, rise, gnarl) => {
+    const d = sub(b, a);
+    const l = length(d);
+    const ctrl = [a[0] + d[0] * (0.5 - 0.3 * rise), a[1] + d[1] * 0.5 + l * 0.3 * rise, a[2] + d[2] * (0.5 - 0.3 * rise)];
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const p = bend(a, ctrl, b, i / steps);
+      const w = i > 0 && i < steps ? gnarl * l : 0;
+      pts.push([p[0] + rng.range(-w, w), p[1] + rng.range(-w, w) * 0.5, p[2] + rng.range(-w, w)]);
+    }
+    return pts;
+  };
+  const leanTo = rng.range(0, Math.PI * 2);
+  const fork = [Math.cos(leanTo) * P.bend, H * P.fork, Math.sin(leanTo) * P.bend];
+  const trunk = limb(reach([0, -0.4, 0], fork, 4, -0.4, 0.012), P.trunkR * 1.05, P.trunkR * 0.84, 0, 0, 0, 0.004);
+  trunk.radii[0] = P.trunkR * 1.5; // the flare of the foot
+  // the lobes are shared out among the main limbs by the side of the tree they stand on; those over the middle hang
+  // on the leader, where the tree has one
+  const groups = Array.from({ length: P.mains + 1 }, () => []);
+  const turnG = rng.range(0, Math.PI * 2);
+  for (const l of outer) {
+    const dx = l.c[0] - fork[0];
+    const dz = l.c[2] - fork[2];
+    const central = P.leader && Math.hypot(dx, dz) < 0.3 * rx;
+    const share = ((Math.atan2(dz, dx) - turnG) / (Math.PI * 2) + 2) % 1;
+    groups[central ? P.mains : Math.floor(share * P.mains) % P.mains].push(l);
+  }
+  const used = groups.filter((g) => g.length).length;
+  groups.forEach((group, g) => {
+    if (!group.length) return;
+    const mid = scale(group.reduce((sum, l) => add(sum, l.c), [0, 0, 0]), 1 / group.length);
+    const leader = g === P.mains;
+    // where this limb divides: on the way to the middle of its lobes, lower than they are
+    const far = P.divide ?? 0.5;
+    const joint = leader ? [fork[0] + (mid[0] - fork[0]) * 0.6, lerp(fork[1], mid[1], 0.55), fork[2] + (mid[2] - fork[2]) * 0.6] : [lerp(fork[0], mid[0], far), lerp(fork[1], mid[1], far * 0.92), lerp(fork[2], mid[2], far)];
+    const phase = rng.next();
+    const r0 = P.trunkR * 0.84 * Math.pow(1 / used, 0.4) * (leader ? 1.15 : 1);
+    const main = limb(reach(fork, joint, 4, leader ? 0 : (P.rise ?? 0.5), P.gnarl ?? 0.05), r0, r0 * 0.66, 1, phase, trunk.sway1, 0.012);
+    for (const l of group) {
+      const r1 = Math.max(0.035, r0 * 0.66 * Math.pow(1 / group.length, 0.42));
+      const arm = limb(reach(joint, l.c, 3, 0.35, P.gnarl ?? 0.05), r1, 0.022, 2, phase + rng.range(-0.06, 0.06), main.sway1, 0.028);
+      l.sway = arm.sway1;
+      l.phase = arm.phase;
+      for (let k = 0; k < P.twigs; k++) {
+        const u = unit();
+        if (u[1] < -0.2) u[1] = -u[1];
+        const from = along(arm.pts, rng.range(0.7, 1));
+        limb(reach(from, mad(l.c, u, l.R * rng.range(0.7, 0.92)), 2, 0.2, 0.06), 0.02, 0.006, 3, arm.phase, lerp(arm.sway0, arm.sway1, 0.85), 0.045);
       }
     }
+  });
 
-    // leaves: on the last limbs, and a few on the outer part of the ones before
-    if (level >= P.levels - 1 && level > 0) {
-      const count = last ? P.clusters : Math.round(P.clusters / 3);
-      for (let k = 0; k < count; k++) {
-        const u = last ? 0.3 + 0.7 * Math.pow((k + rng.next()) / count, 0.8) : rng.range(0.45, 1);
-        // a leaf mass, not a row: clusters stand round the limb in a clump of their own (P.clump m), more of them
-        // towards its end
-        const r = (P.clump ?? 0) * Math.sqrt(rng.next()) * (0.5 + 0.5 * u);
-        const off = norm([rng.range(-1, 1), rng.range(-0.6, 1), rng.range(-1, 1)]);
-        const at = mad(along(pts, u), off, r);
-        // where in its own clump it sits: each clump is a small dome, lit on top, darker underneath
-        const dome = (P.clump ?? 0) > 0 ? off[1] * (r / P.clump) : 0;
-        const tan = tangentAt(pts, u);
-        const out = norm(sub(at, c));
-        // a cluster leans away from its limb, out of the crown and a little up
-        const dir0 = turn(tan, square(tan), rng.range(0.3, 1.2));
-        const dir = norm(add(add(turn(dir0, tan, rng.range(0, Math.PI * 2)), scale(out, 0.55)), [0, 0.15, 0]));
-        me.clusters.push({ at, dir, dome, clumpN: off, size: rng.range(P.leaf[0], P.leaf[1]), roll: rng.range(-1.2, 1.2), hue: rng.next(), sway: swayAt(u), spin: rng.range(0, Math.PI) });
+  // THE LEAVES
+  const cards = [];
+  const light = { bent: [0, 1, 0], open: 1 };
+  const floor = c[1] - ry * (P.floor ?? 0.95);
+  const area = outer.reduce((sum, l) => sum + l.R * l.R, 0);
+  for (const lobe of outer) {
+    const want = Math.round((P.cards * lobe.R * lobe.R) / area);
+    let made = 0;
+    for (let tries = 0; made < want && tries < want * 4; tries++) {
+      // on the lobe's shell, more of them towards its outside, fewer underneath
+      const u = unit();
+      if (u[1] < -0.2 && rng.next() > P.under) u[1] = -u[1];
+      const r = (1 - 0.45 * rng.next() ** 2) * rng.range(0.95, 1.06);
+      const p = mad(lobe.c, u, lobe.R * r);
+      if (p[1] < floor) continue;
+      // not where it would be buried in another lobe, and seldom where hardly any light comes
+      let buried = false;
+      for (const o of lobes) {
+        if (o === lobe) continue;
+        const reach = o.R * (o.core ? 0.8 : 0.72);
+        if ((p[0] - o.c[0]) ** 2 + (p[1] - o.c[1]) ** 2 + (p[2] - o.c[2]) ** 2 < reach * reach) {
+          buried = true;
+          break;
+        }
       }
+      if (buried && rng.next() < 0.9) continue;
+      look(p, light);
+      if (light.open < 0.16 && rng.next() < 0.75) continue;
+      // facing out of the lobe, tilted every way (and a little towards the sky, as leaves are held)
+      const tilt = unit();
+      const n = norm([u[0] * 0.75 + tilt[0], u[1] * 0.75 + tilt[1] + (P.flat ?? 0.2), u[2] * 0.75 + tilt[2]]);
+      cards.push({ p, n, out: u, size: rng.range(P.leaf[0], P.leaf[1]), lobe, hue: rng.next(), sub: rng.int(4), flip: rng.next() < 0.5, mass: false, bent: light.bent, open: light.open });
+      made++;
     }
   }
+  // the inside: a few big cards of leaf mass in each lobe and in the middle of the crown. They are what shows between
+  // the leaves of the outside, and they keep the sky from showing through the middle of the tree.
+  for (const lobe of lobes) {
+    const count = lobe.core ? P.fill * 3 : P.fill;
+    for (let k = 0; k < count; k++) {
+      const u = unit();
+      if (u[1] < -0.3) u[1] = -u[1];
+      const p = mad(lobe.c, u, lobe.R * rng.range(0.25, 0.5));
+      if (p[1] < floor) continue;
+      look(p, light);
+      const tilt = unit();
+      cards.push({ p, n: norm(mad(u, tilt, 0.5)), out: u, size: lobe.R * rng.range(0.8, 1.05), lobe, hue: rng.next(), sub: 0, flip: rng.next() < 0.5, mass: true, bent: light.bent, open: light.open });
+    }
+  }
+  return { H, c, rx, ry, lobes, limbs, cards, look, footPhase: rng.range(0, Math.PI * 2) };
+}
 
-  // the trunk leans and wanders a little on its way to the first fork
-  const lean = rng.range(0, Math.PI * 2);
-  const tilt = (P.bend / (H * P.fork + 0.4)) * 0.5;
-  limb([0, -0.4, 0], norm([Math.cos(lean) * tilt, 1, Math.sin(lean) * tilt]), H * P.fork + 0.4, P.trunkR, 0, 0, 0);
-  return { H, c, rx, ry, limbs, footPhase: rng.range(0, Math.PI * 2) };
+/**
+ * One leaf card: a square of `size` about `k.p` in the plane square to `k.n`, picturing the atlas rectangle `rect`
+ * with its stem end towards the inside of the lobe (or, `hang`: hanging from its top edge). `dim`: how much of its
+ * light it keeps (the inside's leaf mass is dimmer than its place alone makes it).
+ */
+function leafCard(b, k, size, rect, hang, through, dim = 1) {
+  let ua;
+  let va;
+  if (hang) {
+    const n = norm([k.n[0], k.n[1] * 0.15, k.n[2]]);
+    ua = norm(cross([0, 1, 0], n));
+    va = cross(ua, n);
+    if (va[1] > 0) va = scale(va, -1);
+  } else {
+    ua = sub(k.out, scale(k.n, dot(k.out, k.n)));
+    ua = length(ua) < 0.2 ? square(k.n) : norm(ua);
+    va = cross(k.n, ua);
+  }
+  const [u0, v0, u1, v1] = rect;
+  const half = size / 2;
+  const sway = k.lobe.sway;
+  const ids = [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ].map(([x, y]) => {
+    const p = add(mad(k.p, ua, x * half * (hang ? 0.85 : 1)), scale(va, y * half));
+    const tip = hang ? (y + 1) / 2 : (x + 1) / 2;
+    const v = hang ? (y < 0 ? v0 : v1) : (y < 0) !== k.flip ? v0 : v1;
+    return b.vertex(p, k.bent, x < 0 ? u0 : u1, v, [k.open * dim, 0, k.hue, through], [sway + 0.03 * tip, k.lobe.phase, 0.35 + 0.65 * tip, 1]);
+  });
+  b.quad(ids[0], ids[1], ids[2], ids[3]);
 }
 
 /** @see coniferMesh */
 function broadleafMesh(variant, sk, rng, full, barkSize, through) {
   const P = variant.P;
   const b = new Builder();
-  const { c, rx, ry } = sk;
-  /** 0 at the crown's middle, 1 on its outline. */
-  const depth = (p) => Math.sqrt(((p[0] - c[0]) / rx) ** 2 + ((p[1] - c[1]) / ry) ** 2 + ((p[2] - c[2]) / rx) ** 2);
-  const normalAt = (p) => norm([(p[0] - c[0]) / (rx * rx), (p[1] - c[1]) / (ry * ry) + 0.035, (p[2] - c[2]) / (rx * rx)]);
-  /** Dark in the middle of the crown and on its underside, light on its outside and top. */
-  const aoAt = (p) => (0.18 + 0.82 * Math.pow(smooth(0.35, 1.02, depth(p)), 1.4)) * (0.55 + 0.45 * smooth(-0.8, 0.45, (p[1] - c[1]) / ry));
-  const sides = full ? [8, 6, 4, 3, 3] : [6, 4, 3, 3, 3];
-
+  const light = { bent: [0, 1, 0], open: 1 };
+  const sides = full ? [8, 6, 4, 3] : [5, 4, 3, 3];
   for (const limb of sk.limbs) {
-    const { pts, radii, level } = limb;
-    const u = (i) => i / (pts.length - 1);
-    // the reduced tree keeps the trunk, the main limbs and whatever of the rest is thick enough to be seen
-    const wood = full || level <= 1 || (level === 2 && radii[0] > 0.03);
-    if (wood) {
-      const lobe = level === 0 ? (i, a) => 1 + (i === 0 ? 0.16 : 0) * Math.cos(4 * a + sk.footPhase) : null;
-      tube(b, full || pts.length < 4 ? pts : [pts[0], pts[2], pts[pts.length - 1]], full || pts.length < 4 ? radii : [radii[0], radii[2], radii[radii.length - 1]], {
-        sides: sides[level],
-        bark: variant.bark,
-        barkSize,
-        run: Math.max(0.35, 2 * Math.PI * radii[0]),
-        // limbs inside the crown are in its shade: they read dark against the leaves
-        ao: (i) => (level === 0 ? lerp(0.95, 0.7, u(i)) : 0.4 + 0.3 * smooth(0.5, 1, depth(pts[Math.min(pts.length - 1, i)]))),
-        sway: (i) => [lerp(limb.sway0, limb.sway1, u(i)), limb.phase],
-        lobe,
-      });
-    }
-    if (!limb.clusters.length) continue;
-    const r = rng.fork(`l${limbs_id(limb, sk)}`);
-
-    if (!full) {
-      // all the leaves of this limb as two large crossed cards (one where the limb is only a side branch)
-      const mid = along(pts, 0.6);
-      const dir = norm(add(tangentAt(pts, 0.7), scale(norm(sub(mid, c)), 0.4)));
-      const size = limb.clusters.reduce((s, k) => s + k.size, 0) / limb.clusters.length;
-      const big = size * (limb.last ? 1.75 : 1.4) + (P.clump ?? 0) * 0.6;
-      const hue = limb.clusters.reduce((s, k) => s + k.hue, 0) / limb.clusters.length;
-      const base = mad(mid, dir, -big * 0.35);
-      const cards = limb.last ? 4 : 1;
-      for (let k = 0; k < cards; k++) {
-        if (P.hang) {
-          const h = norm(turn([dir[0], 0, dir[2]], [0, 1, 0], k * 1.05 + r.range(-0.3, 0.3)));
-          const a = mad(mid, h, -big * 0.5);
-          const e = mad(mid, h, big * 0.5);
-          curtain(b, { a, c: e, drop: big * 0.55, tile: variant.tile, normalAt, ao: [aoAt(a), aoAt(mad(a, [0, -1, 0], big))], hue: [hue, hue], through, sway: [limb.sway0, limb.sway1], phase: limb.phase, flutter: 1 });
-        } else {
-          const across = turn(square(dir), dir, k * 1.05 + r.range(-0.4, 0.4));
-          const end = mad(base, dir, big);
-          ribbon(b, { pts: [base, end], across, width: big * 0.95, tile: variant.massTile ?? variant.tile, fold: 0, normalAt, ao: [aoAt(base), aoAt(end)], hue: [hue, hue], through, sway: [limb.sway0, limb.sway1], phase: limb.phase, flutter: 1 });
-        }
-      }
-      continue;
-    }
-
-    for (const k of limb.clusters) {
-      if (P.hang) {
-        // a spray of hanging twigs: its top edge level, across the direction it grew in
-        const h = norm(turn([k.dir[0], 0, k.dir[2]], [0, 1, 0], k.spin));
-        const half = k.size * 0.36;
-        const a = mad(k.at, h, -half);
-        const e = mad(k.at, h, half);
-        const foot = mad(k.at, [0, -1, 0], k.size);
-        curtain(b, { a, c: e, drop: k.size, lean: norm([h[2] * 0.12, -1, -h[0] * 0.12]), tile: variant.tile, normalAt, ao: [aoAt(k.at), aoAt(foot) * 0.9], hue: [k.hue, k.hue], through, sway: [k.sway, k.sway + 0.03], phase: limb.phase, flutter: 1 });
-      } else {
-        const across = turn(square(k.dir), k.dir, k.roll);
-        const line = frondLine(k.at, k.dir, k.size, 2, 0.35);
-        const end = line[line.length - 1];
-        // the crown's normal, bent towards the clump's own: the crown billows, sub-crown by sub-crown
-        const domeNormal = (p) => norm(add(scale(normalAt(p), 0.65), scale(k.clumpN, 0.35)));
-        const domeAo = 0.72 + 0.28 * clamp01(0.5 + 0.9 * k.dome);
-        ribbon(b, { pts: line, across, width: k.size * 0.95, tile: variant.tile, fold: 0, normalAt: domeNormal, ao: [aoAt(k.at) * domeAo, aoAt(end) * domeAo], hue: [k.hue, k.hue], through, sway: [k.sway, k.sway + 0.04], phase: limb.phase, flutter: 1 });
-      }
-    }
+    // the reduced tree keeps the trunk and the limbs: no twigs
+    if (!full && limb.level > 2) continue;
+    const last = limb.pts.length - 1;
+    const keep = full || last < 3 ? limb.pts.map((_, i) => i) : [0, Math.round(last / 2), last];
+    const pts = keep.map((i) => limb.pts[i]);
+    tube(b, pts, keep.map((i) => limb.radii[i]), {
+      sides: sides[limb.level],
+      bark: variant.bark,
+      barkSize,
+      run: Math.max(0.35, 2 * Math.PI * limb.radii[0]),
+      tone: P.barkTone ?? 0.5,
+      // limbs inside the crown are in its shade: they read dark against the leaves
+      ao: (i) => {
+        sk.look(pts[i], light);
+        return 0.3 + 0.7 * light.open;
+      },
+      sway: (i) => [lerp(limb.sway0, limb.sway1, keep[i] / last), limb.phase],
+      lobe: limb.level === 0 ? (i, a) => 1 + (i === 0 ? 0.16 : 0) * Math.cos(4 * a + sk.footPhase) : null,
+    });
   }
+  const subs = variant.subs ?? [0, 1, 2, 3];
+  sk.cards.forEach((k, i) => {
+    if (k.mass) leafCard(b, k, k.size, tileRect(variant.massTile), false, through * 0.6, 0.6);
+    // the reduced tree: every third card, larger
+    else if (full || i % 3 === 0) leafCard(b, k, k.size * (full ? 1 : 1.7), variant.hang ? tileRect(variant.tile) : subRect(variant.tile, subs[k.sub % subs.length]), !!variant.hang, through);
+  });
   return b;
 }
-
-/** A limb's place in its skeleton: names the random stream its leaves are laid out with. */
-const limbs_id = (limb, sk) => sk.limbs.indexOf(limb);
 
 // ------------------------------------------------------------------------------------------------
 

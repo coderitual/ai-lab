@@ -5,14 +5,18 @@
 // every species is one material. A tile is a picture of what one card of a
 // tree carries: a spruce bough seen from above, the curtain of twigs that
 // hangs under it, a fir spray, a larch spray, a hanging spray of birch leaves,
-// a cluster of maple leaves, one of lime leaves, a bare twig; then, for the
-// reduced trees' large cards, a mass of many small maple leaves and one of
-// lime leaves (so a big card still shows leaves of a leaf's size), and, for
-// the wood's floor, a patch of fallen leaves and one of grass and moss. The pictures
-// are painted in their own colours at a middling brightness; a tree's tint
-// (treeSpecies.js) multiplies them down to what its foliage sends back.
+// a bare twig; then the broadleaves' SPRIGS: a tile divided in four, each
+// quarter one small twig with a couple of dozen leaves and the gaps between
+// them (four of maple; two of lime and two of a small-leaved tree), which is
+// what one small leaf card of a crown shows; two tiles of dense leaf MASS for
+// the few big cards that fill a crown's inside; and, for the wood's floor, a
+// patch of fallen leaves and one of grass and moss. The conifers' pictures
+// are painted in their own colours at a middling brightness; the broadleaves'
+// nearly grey, each leaf with its own light and a hint of its own hue: a
+// tree's tint (treeSpecies.js) multiplies them to what its foliage sends back,
+// so one picture serves a green tree and a turned one.
 //   FAN tiles (all but the two below and the floor's two): the stem comes in at the middle of the
-//     left edge and runs to the right (+u).
+//     left edge and runs to the right (+u). A sprig is a FAN in its quarter.
 //   HANG tiles (SPRUCE_HANG, BIRCH): what hangs is attached along the top
 //     edge and hangs down (+v).
 //
@@ -47,6 +51,16 @@ export function tileRect(tile) {
   const col = tile % TILE_COLS;
   const row = Math.floor(tile / TILE_COLS);
   return [col / TILE_COLS, row / TILE_ROWS, (col + 1) / TILE_COLS, (row + 1) / TILE_ROWS];
+}
+
+/** [u0, v0, u1, v1] of quarter `k` (0..3) of a tile: one sprig of a sprig tile. */
+export function subRect(tile, k) {
+  const [u0, v0, u1, v1] = tileRect(tile);
+  const w = (u1 - u0) / 2;
+  const h = (v1 - v0) / 2;
+  const x = u0 + (k % 2) * w;
+  const y = v0 + (k >> 1) * h;
+  return [x, y, x + w, y + h];
 }
 
 /** Bark tiles, left to right. */
@@ -452,13 +466,6 @@ const MAPLE_COLOURS = [
   [16, 86, 46],
   [6, 78, 40],
 ];
-const LIME_COLOURS = [
-  [64, 70, 48],
-  [54, 88, 54],
-  [46, 92, 52],
-  [36, 84, 46],
-  [26, 70, 38],
-];
 const BIRCH_COLOURS = [
   [70, 62, 48],
   [58, 86, 56],
@@ -466,44 +473,94 @@ const BIRCH_COLOURS = [
   [42, 86, 48],
 ];
 
-/** A cluster of leaves on a forking twig that comes in from the left. */
-function paintCluster(ctx, rng, px, { colours, shape, size, leaves, wood }) {
-  // the twigs: a main one and a few side shoots
-  const twigs = [[0.03, 0.5, 0.78, 0.5 + rng.range(-0.06, 0.06)]];
-  for (let k = 0; k < 5; k++) {
-    const t = rng.range(0.15, 0.75);
-    const a = rng.sign() * rng.range(0.45, 1.0);
-    const l = rng.range(0.16, 0.36);
-    const x = 0.03 + 0.75 * t;
-    twigs.push([x, 0.5, x + Math.cos(a) * l, 0.5 + Math.sin(a) * l]);
+/** The byte of a canvas colour for a linear value 0..1 (the atlas is an sRGB texture). */
+const srgbByte = (v) => Math.round(255 * Math.pow(Math.max(0, Math.min(1, v)), 1 / 2.2));
+/**
+ * A nearly grey leaf colour: `light` its linear brightness, `warm` -1..1 where it lies between the yellow or blue
+ * (-) and the red (+) end of whatever its tree's tint will make of it.
+ */
+const leafGrey = (light, warm) => `rgb(${srgbByte(light * (1 + 0.06 * warm))},${srgbByte(light * (1 - 0.1 * warm))},${srgbByte(light * 0.92)})`;
+
+/**
+ * A sprig: a spray of leaves seen flat, as one leaf card of a broadleaf crown shows it. Leaves stand in twos and
+ * threes at nodes spread evenly over the picture inside a ragged outline, with gaps about a leaf wide between the
+ * groups (the sky, or the darker leaves behind, show through them); twigs run to the nodes from a main twig that
+ * comes in at the middle of the left edge; the leaves underneath are in the others' shade. Painted nearly grey (see
+ * leafGrey).
+ * @param {CanvasRenderingContext2D} ctx @param {import('../../engine/rng.js').Rng} rng @param {number} px one texel
+ * @param {object} o shape: the leaf's outline; size: [lo, hi] a leaf's length (share of the picture); gap: the
+ *   distance between nodes in leaf lengths; per: [lo, hi] leaves at a node
+ */
+function paintSprig(ctx, rng, px, { shape, size, gap, per }) {
+  const step = ((size[0] + size[1]) / 2) * gap;
+  // the nodes: a jittered triangular lattice, kept inside an outline of a few lobes
+  const lobes = 3 + rng.int(3);
+  const phase = rng.range(0, Math.PI * 2);
+  const nodes = [];
+  for (let row = 0, y = 0.07; y < 0.94; y += step * 0.87, row++) {
+    for (let x = 0.07 + (row % 2) * step * 0.5; x < 0.94; x += step) {
+      const nx = x + rng.range(-0.28, 0.28) * step;
+      const ny = y + rng.range(-0.28, 0.28) * step;
+      const a = Math.atan2(ny - 0.5, nx - 0.5);
+      if (Math.hypot(nx - 0.5, ny - 0.5) > 0.47 * (0.84 + 0.16 * Math.sin(lobes * a + phase))) continue;
+      nodes.push([nx, ny]);
+    }
   }
-  ctx.strokeStyle = wood;
-  twigs.forEach(([x0, y0, x1, y1], k) => {
-    ctx.lineWidth = (k === 0 ? 4 : 2.4) * px;
-    ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(x1, y1);
-    ctx.stroke();
-  });
-  // the leaves: the lower ones first and darker (they are in the others' shade); each cluster leans towards one end
-  // of its palette, with strays
-  const lean = rng.range(0.25, 0.75);
-  for (let k = 0; k < leaves; k++) {
-    const [x0, y0, x1, y1] = twigs[rng.int(twigs.length)];
-    const t = Math.pow(rng.next(), 0.6);
-    const along = Math.atan2(y1 - y0, x1 - x0);
-    const a = along + rng.sign() * rng.range(0.25, 1.25);
-    const s = size * rng.range(0.7, 1.15);
-    // (the stalk carries the leaf off the twig)
-    const stalk = s * rng.range(0.15, 0.5);
-    const x = Math.min(0.9, Math.max(0.1, x0 + (x1 - x0) * t + Math.cos(a) * stalk));
-    const y = Math.min(0.9, Math.max(0.1, y0 + (y1 - y0) * t + Math.sin(a) * stalk));
-    const depth = k / leaves;
-    const [h, sat, l] = autumn(colours, lean + rng.range(-0.3, 0.3) + (rng.next() < 0.12 ? rng.range(-0.5, 0.5) : 0), rng);
-    // (each leaf its own light: a crown seen from a distance is a fine texture of them)
-    const light = l * (0.42 + 0.66 * depth) * rng.range(0.78, 1.18);
-    leaf(ctx, x, y, a, s, hsl(h, sat, light), hsl(h - 4, sat, light * 0.72), hsl(h + 6, sat * 0.8, Math.min(92, light * 1.28)), shape, px);
+  // the twigs: a main one along the middle, and one from it to every node
+  const main = [0.01, 0.5, 0.8, 0.5 + rng.range(-0.06, 0.06)];
+  ctx.strokeStyle = leafGrey(0.24, 0);
+  ctx.lineWidth = 3.2 * px;
+  ctx.beginPath();
+  ctx.moveTo(main[0], main[1]);
+  ctx.lineTo(main[2], main[3]);
+  ctx.stroke();
+  ctx.lineWidth = 1.8 * px;
+  ctx.beginPath();
+  for (const [nx, ny] of nodes) {
+    // (it leaves the main twig a little before the node, as a side twig does)
+    const t = Math.max(0.03, Math.min(1, (nx - main[0]) / (main[2] - main[0]) - 0.6 * Math.abs(ny - 0.5)));
+    ctx.moveTo(main[0] + (main[2] - main[0]) * t, main[1] + (main[3] - main[1]) * t);
+    ctx.lineTo(nx, ny);
   }
+  ctx.stroke();
+  // the leaves, fanned at each node away from where the twig comes from
+  const leaves = [];
+  for (const [nx, ny] of nodes) {
+    const away = Math.atan2(ny - 0.5, nx - 0.12);
+    const n = per[0] + rng.int(per[1] - per[0] + 1);
+    const turn = rng.range(-0.5, 0.5);
+    for (let k = 0; k < n; k++) leaves.push([nx, ny, away + turn + (n > 1 ? (k / (n - 1) - 0.5) * 2.2 : 0) + rng.range(-0.3, 0.3), rng.next()]);
+  }
+  // drawn from the back to the front: the first ones lie under the others, in their shade
+  leaves.sort((a, b) => a[3] - b[3]);
+  const LO = 0.04;
+  const HI = 0.96;
+  for (const [nx, ny, a, depth] of leaves) {
+    const s = rng.range(size[0], size[1]);
+    let x = nx + Math.cos(a) * s * 0.1;
+    let y = ny + Math.sin(a) * s * 0.1;
+    // (the whole leaf stays in the picture: its middle is kept half a leaf from the edge)
+    const mx = x + Math.cos(a) * s * 0.5;
+    const my = y + Math.sin(a) * s * 0.5;
+    const half = s * 0.52;
+    x += Math.max(0, LO + half - mx) - Math.max(0, mx - (HI - half));
+    y += Math.max(0, LO + half - my) - Math.max(0, my - (HI - half));
+    const light = (0.56 + 0.38 * Math.pow(depth, 0.7)) * rng.range(0.9, 1.08);
+    const warm = rng.range(-1, 1);
+    leaf(ctx, x, y, a, s, leafGrey(light, warm), leafGrey(light * 0.78, warm), leafGrey(Math.min(1, light * 1.12), warm), shape, px);
+  }
+}
+
+/** A small pointed, toothed egg of a leaf (hornbeam, alder, elm: the small-leaved trees). */
+function smallShape(ctx) {
+  ctx.moveTo(0, 0.03);
+  ctx.bezierCurveTo(0.4, 0.06, 0.4, 0.62, 0, 1);
+  ctx.bezierCurveTo(-0.4, 0.62, -0.4, 0.06, 0, 0.03);
+  return [
+    [0, 0.94],
+    [0.22, 0.5],
+    [-0.22, 0.5],
+  ];
 }
 
 /** Hanging twigs with small leaves on short stalks (birch). */
@@ -541,14 +598,14 @@ function paintBirch(ctx, rng, px) {
 }
 
 /**
- * A leaf mass (the reduced trees' cards): many small leaves heaped in a ragged clump of a few lobes, the lower and
- * inner ones darker, a few twigs showing through: so that a big card still shows leaves of a leaf's size.
+ * A leaf mass: many small leaves heaped in a ragged clump of a few lobes, the lower and inner ones darker, a few
+ * twigs showing through. What the few big cards that fill the inside of a crown show. Painted nearly grey.
  */
-function paintMass(ctx, rng, px, { colours, shape, size, leaves, wood }) {
+function paintMass(ctx, rng, px, { shape, size, leaves }) {
   const lobes = [];
-  for (let k = 0; k < 6; k++) lobes.push([rng.range(0.3, 0.7) + (k - 2.5) * 0.06, rng.range(0.3, 0.7), rng.range(0.16, 0.26)]);
-  ctx.strokeStyle = wood;
-  for (let k = 0; k < 7; k++) {
+  for (let k = 0; k < 6; k++) lobes.push([rng.range(0.3, 0.7) + (k - 2.5) * 0.06, rng.range(0.3, 0.7), rng.range(0.17, 0.27)]);
+  ctx.strokeStyle = leafGrey(0.22, 0);
+  for (let k = 0; k < 6; k++) {
     const [x, y] = lobes[k % lobes.length];
     ctx.lineWidth = rng.range(2, 3.5) * px;
     ctx.beginPath();
@@ -556,19 +613,17 @@ function paintMass(ctx, rng, px, { colours, shape, size, leaves, wood }) {
     ctx.quadraticCurveTo(0.3, 0.5 + rng.range(-0.15, 0.15), x, y);
     ctx.stroke();
   }
-  const lean = rng.range(0.25, 0.75);
   for (let k = 0; k < leaves; k++) {
     const [lx, ly, lr] = lobes[rng.int(lobes.length)];
     const a = rng.range(0, Math.PI * 2);
     const r = Math.sqrt(rng.next()) * lr;
-    const x = Math.min(0.94, Math.max(0.06, lx + Math.cos(a) * r));
-    const y = Math.min(0.94, Math.max(0.06, ly + Math.sin(a) * r));
+    const x = Math.min(0.93, Math.max(0.07, lx + Math.cos(a) * r));
+    const y = Math.min(0.93, Math.max(0.07, ly + Math.sin(a) * r));
     // drawn from the back to the front: the first ones are the inside of the mass, in its own shade
     const depth = k / leaves;
-    const rim = r / lr;
-    const [h, sat, l] = autumn(colours, lean + rng.range(-0.3, 0.3), rng);
-    const light = l * (0.5 + 0.38 * depth + 0.2 * rim) * (0.85 + 0.3 * (1 - y));
-    leaf(ctx, x, y, rng.range(0, Math.PI * 2), size * rng.range(0.7, 1.2), hsl(h, sat, light), hsl(h - 4, sat, light * 0.72), hsl(h + 6, sat * 0.8, Math.min(92, light * 1.25)), shape, px);
+    const light = (0.34 + 0.4 * depth + 0.16 * (r / lr)) * rng.range(0.85, 1.12);
+    const warm = rng.range(-1, 1);
+    leaf(ctx, x, y, rng.range(0, Math.PI * 2), size * rng.range(0.75, 1.2), leafGrey(light, warm), leafGrey(light * 0.72, warm), leafGrey(Math.min(1, light * 1.2), warm), shape, px);
   }
 }
 
@@ -665,32 +720,46 @@ export function createFoliageAtlas(tile, rng, anisotropy = 4) {
       }),
     [TILE.LARCH]: (r) => paintLarch(ctx, r, px),
     [TILE.BIRCH]: (r) => paintBirch(ctx, r, px),
-    [TILE.MAPLE]: (r) => paintCluster(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.085, leaves: 270, wood: 'rgb(60,44,36)' }),
-    [TILE.LIME]: (r) => paintCluster(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.065, leaves: 440, wood: 'rgb(56,46,40)' }),
     [TILE.TWIG]: (r) => paintTwig(ctx, r, px),
-    [TILE.MAPLE_MASS]: (r) => paintMass(ctx, r, px, { colours: MAPLE_COLOURS, shape: mapleShape, size: 0.05, leaves: 1000, wood: 'rgb(60,44,36)' }),
-    [TILE.LIME_MASS]: (r) => paintMass(ctx, r, px, { colours: LIME_COLOURS, shape: limeShape, size: 0.042, leaves: 1200, wood: 'rgb(56,46,40)' }),
+    [TILE.MAPLE_MASS]: (r) => paintMass(ctx, r, px, { shape: mapleShape, size: 0.07, leaves: 420 }),
+    [TILE.LIME_MASS]: (r) => paintMass(ctx, r, px, { shape: limeShape, size: 0.058, leaves: 520 }),
     [TILE.LITTER]: (r) => paintLitter(ctx, r, px),
     [TILE.FLOOR]: (r) => paintFloor(ctx, r, px),
   };
+  // the sprig tiles: four pictures each (a quarter's strokes are those of a tile half the size)
+  const MAPLE_SPRIG = { shape: mapleShape, size: [0.16, 0.2], gap: 1.22, per: [2, 3] };
+  const LIME_SPRIG = { shape: limeShape, size: [0.13, 0.16], gap: 1.32, per: [2, 3] };
+  const SMALL_SPRIG = { shape: smallShape, size: [0.095, 0.12], gap: 1.3, per: [2, 4] };
+  const sprigs = {
+    [TILE.MAPLE]: [MAPLE_SPRIG, MAPLE_SPRIG, MAPLE_SPRIG, MAPLE_SPRIG],
+    [TILE.LIME]: [LIME_SPRIG, LIME_SPRIG, SMALL_SPRIG, SMALL_SPRIG],
+  };
   const regions = [];
-  for (const [key, paint] of Object.entries(painters)) {
-    const k = Number(key);
-    const col = k % TILE_COLS;
-    const row = Math.floor(k / TILE_COLS);
+  const paintIn = (x, y, size, paint) => {
     ctx.save();
-    ctx.setTransform(tile, 0, 0, tile, col * tile, row * tile);
+    ctx.setTransform(size, 0, 0, size, x, y);
     ctx.beginPath();
     ctx.rect(GUTTER, GUTTER, 1 - 2 * GUTTER, 1 - 2 * GUTTER);
     ctx.clip();
-    paint(rng.fork(`tile${k}`));
+    paint();
     ctx.restore();
-    regions.push([col * tile, row * tile, (col + 1) * tile, (row + 1) * tile]);
+    regions.push([x, y, x + size, y + size]);
+  };
+  for (const [key, paint] of Object.entries(painters)) {
+    const k = Number(key);
+    paintIn((k % TILE_COLS) * tile, Math.floor(k / TILE_COLS) * tile, tile, () => paint(rng.fork(`tile${k}`)));
+  }
+  for (const [key, four] of Object.entries(sprigs)) {
+    const k = Number(key);
+    const half = tile / 2;
+    four.forEach((o, q) => {
+      paintIn((k % TILE_COLS) * tile + (q % 2) * half, Math.floor(k / TILE_COLS) * tile + (q >> 1) * half, half, () => paintSprig(ctx, rng.fork(`sprig${k}-${q}`), px * 2, o));
+    });
   }
   const pixels = ctx.getImageData(0, 0, width, height).data;
-  // The broadleaves' tiles keep only their light and a hint of their hue: the tree's tint (treeSpecies.js) gives
-  // them their colour, green or turned, so one picture serves a green lime and a red maple.
-  for (const k of [TILE.BIRCH, TILE.MAPLE, TILE.LIME, TILE.MAPLE_MASS, TILE.LIME_MASS, TILE.LITTER, TILE.FLOOR]) {
+  // The birch's tile and the floor's two are painted in colour and keep only their light and a hint of their hue (the
+  // sprigs and the masses are painted that way to begin with): the tree's tint gives them their colour.
+  for (const k of [TILE.BIRCH, TILE.LITTER, TILE.FLOOR]) {
     const x0 = (k % TILE_COLS) * tile;
     const y0 = Math.floor(k / TILE_COLS) * tile;
     for (let y = y0; y < y0 + tile; y++) {
