@@ -115,6 +115,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
     const paintMaterial = keep(createPaintMaterial(shared, caps, paint, {
       shoulderV: v.atlas[RAIL.shoulder],
       extentV: lay.extent[1],
+      texel: Math.max(lay.extent[0] / atlas.width, lay.extent[1] / atlas.height),
       // the grille's small stars are geometry (details.js) except on the low tier, where the paint draws them
       pins: tier === 'low',
     }));

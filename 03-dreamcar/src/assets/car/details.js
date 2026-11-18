@@ -13,7 +13,7 @@
 //    material turns into light (materials.js, LAMP_FN).
 
 import * as THREE from 'three';
-import { GRILLE_HALF, INTAKE_SIDE } from './features.js';
+import { GRILLE_HALF, GRILLE_STARS, INTAKE_CENTRE, INTAKE_SIDE } from './features.js';
 import { buildLampUnits } from './lampUnits.js';
 import { LAMP_FN } from './materials.js';
 import { MIRROR, Tris, V, bar, createSkinCaster, frame, roundRect, surfaceHit } from './parts.js';
@@ -86,7 +86,10 @@ function pipeTrim(bright, black, matrix, wall) {
     const face = V(0, 0, 1).transformDirection(matrix);
     bright.quad(m(outer[i], 0.004), m(outer[j], 0.004), m(inner[j], 0.004), m(inner[i], 0.004), face);
     const ro = V(outer[i].x, outer[i].y, 0).normalize().transformDirection(matrix);
-    bright.quad(m(outer[i], 0.004), m(outer[j], 0.004), m(outer[j], -wall), m(outer[i], -wall), ro);
+    // (only its first 8 mm bright: further back it is the black diffuser's surround it is set in; all bright, it
+    // read as a chrome box standing off the bumper, where the photographs show a flush frame)
+    bright.quad(m(outer[i], 0.004), m(outer[j], 0.004), m(outer[j], -0.008), m(outer[i], -0.008), ro);
+    black.quad(m(outer[i], -0.008), m(outer[j], -0.008), m(outer[j], -wall), m(outer[i], -wall), ro);
     const ri = ro.clone().negate();
     bright.quad(m(inner[i], 0.004), m(inner[j], 0.004), m(inner[j], -0.012), m(inner[i], -0.012), ri);
     black.quad(m(inner[i], -0.012), m(inner[j], -0.012), m(inner[j], -wall - 0.05), m(inner[i], -wall - 0.05), ri);
@@ -105,8 +108,9 @@ function mirror(gloss, matte, glass, segments) {
   // the daylight photographs (front, and the two from ahead and to the right) show a taller, deeper shell than
   // the sheet's 0.135 x 0.11: 0.16 high and 0.13 deep; its width stays the published one (2.033 over the mirrors)
   const c = V(0.923, 1.05, 0.41);
-  const half = V(0.093, 0.08, 0.065);
-  const e = 0.45; // squareness: below 1 squares the sphere off
+  // rounder than a box (the press pictures: a smooth rounded shell, its outer end a soft curve)
+  const half = V(0.095, 0.075, 0.065);
+  const e = 0.68; // squareness: below 1 squares the sphere off
   for (let i = 0; i < P.count; i++) {
     let x = P.getX(i);
     let y = P.getY(i);
@@ -197,13 +201,13 @@ function cabin(dark, emit) {
   screen(0.18, 0.27, 0, 0.84, 0.36, -0.52);
 }
 
-/** One of the grille's small stars (5.1): three arms 12 mm across rising to a point 3 mm proud, six facets. */
+/** One of the grille's small stars (5.1): three arms (GRILLE_STARS.arm) rising to a point 4 mm proud, six facets. */
 function pin(t, matrix, out) {
-  const apex = V(0, 0, 0.003).applyMatrix4(matrix);
+  const apex = V(0, 0, 0.004).applyMatrix4(matrix);
   const pts = [];
   for (let i = 0; i < 6; i++) {
     const a = Math.PI / 2 + (i * Math.PI) / 3;
-    const r = i % 2 ? 0.0019 : 0.0062;
+    const r = i % 2 ? 0.31 * GRILLE_STARS.arm : 1.03 * GRILLE_STARS.arm;
     pts.push(V(Math.cos(a) * r, Math.sin(a) * r, 0).applyMatrix4(matrix));
   }
   for (let i = 0; i < 6; i++) t.tri(apex, pts[i], pts[(i + 1) % 6], out);
@@ -255,11 +259,12 @@ export function buildDetails(samples, { tier, plate, skin, lay }) {
     const outline = [...GRILLE_HALF, ...GRILLE_HALF.slice(1, -1).reverse().map(([x, y]) => [-x, y])];
     const lean = V(0, -0.087, 1).normalize();
     const left = new Tris();
-    for (let r = 0; r < 11; r++) {
-      const y = 0.475 + r * 0.022;
-      for (let k = 0; k <= 16; k++) {
-        const x = k * 0.034 + (r % 2) * 0.017;
-        const m = 0.009;
+    const { y0, dy, dx, arm } = GRILLE_STARS;
+    for (let r = 0; y0 + r * dy < 0.72; r++) {
+      const y = y0 + r * dy;
+      for (let k = 0; k * dx < 0.56; k++) {
+        const x = k * dx + (r % 2) * (dx / 2);
+        const m = arm * 0.9;
         if (![[m, 0], [-m, 0], [0, m], [0, -m]].every(([dx, dy]) => insidePolygon(outline, x + dx, y + dy))) continue;
         // none on the big star's disc, none against the louvre
         if (Math.hypot(x, y - 0.573) < 0.108 || (Math.abs(y - 0.578) < 0.019 && x > 0.1 && x < 0.5)) continue;
@@ -285,10 +290,10 @@ export function buildDetails(samples, { tier, plate, skin, lay }) {
     };
     const [ui, li] = INTAKE_SIDE;
     const innerX = (y) => ui[0] + ((li[0] - ui[0]) * (ui[1] - y)) / (ui[1] - li[1]);
-    for (const y of [0.3, 0.368]) slat(y, innerX(y) - 0.015, 0.79, 0.028, left.matte);
-    slat(0.29, 0.0, 0.415, 0.022, left.matte);
+    for (const y of [0.385, 0.425]) slat(y, innerX(y) - 0.015, 0.79, 0.028, left.matte);
+    slat(0.248, 0.0, INTAKE_CENTRE[2][0] - 0.01, 0.022, left.matte);
     // the air curtain: an upright gloss black blade against the outer edge, standing clear of the slot behind it
-    const blade = [0.236, 0.3, 0.36, 0.424].map((y) => V(0.775, y, skinZ(0.775, y) - 0.012));
+    const blade = [0.295, 0.35, 0.405, 0.458].map((y) => V(0.775, y, skinZ(0.775, y) - 0.012));
     bar(left.gloss, blade, V(0.35, 0, 1).normalize(), 0.0125, 0.03, 0);
     matte.addMirrored(left.matte);
     gloss.addMirrored(left.gloss);
@@ -371,7 +376,7 @@ export function buildDetails(samples, { tier, plate, skin, lay }) {
   }
 
   // ---- rear: the tail-pipe trims, the diffuser's six fins (6.4)
-  const trimNormal = V(0.385, 0, -0.923).normalize();
+  const trimNormal = V(0.25, 0, -0.968).normalize();
   // the frame's face stands just proud of the bumper everywhere along its edge (the bumper turns under here, so
   // a face placed at the skin's centre point would sink into it at the top)
   const centre = V(0.57, 0.31, hit(V(0.57, 0.31, -3.5), V(0, 0, 1)).point.z);
@@ -393,7 +398,16 @@ export function buildDetails(samples, { tier, plate, skin, lay }) {
         matte.quad(V(X, 0.375, z0), V(X, 0.315, z0), V(X, 0.315, z0 - 0.016), V(X, 0.355, z0 - 0.016), V(Math.sign(dx), 0, 0));
       }
       const [x0, x1] = [s * x - 0.006, s * x + 0.006];
-      matte.quad(V(x0, 0.375, z0), V(x1, 0.375, z0), V(x1, 0.355, z0 - 0.016), V(x0, 0.355, z0 - 0.016), V(0, 1, -1));
+      // (its sloping top lit as if facing the sky made each fin a white tick under the tunnel's lamps and the sun:
+      // the fins stand in the valance's shade, so the top takes the light of the face behind it)
+      {
+        const q = [V(x0, 0.375, z0), V(x1, 0.375, z0), V(x1, 0.355, z0 - 0.016), V(x0, 0.355, z0 - 0.016)];
+        const shade = V(0, 0.15, -1).normalize();
+        const up = new THREE.Vector3().subVectors(q[1], q[0]).cross(new THREE.Vector3().subVectors(q[2], q[0])).y > 0;
+        const [a, b, c, d] = up ? q : [q[0], q[3], q[2], q[1]];
+        matte.smooth([a, b, c], [shade, shade, shade]);
+        matte.smooth([a, c, d], [shade, shade, shade]);
+      }
       matte.quad(V(x0, 0.355, z0 - 0.016), V(x1, 0.355, z0 - 0.016), V(x1, 0.315, z0 - 0.016), V(x0, 0.315, z0 - 0.016), V(0, 0, -1));
       matte.quad(V(x0, 0.315, z0), V(x1, 0.315, z0), V(x1, 0.315, z0 - 0.016), V(x0, 0.315, z0 - 0.016), V(0, -1, 0));
     }

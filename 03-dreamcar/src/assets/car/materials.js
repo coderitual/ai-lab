@@ -23,7 +23,7 @@
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE, GLSL_PROBE, targetDefines } from '../../engine/glsl.js';
 import { RANGE } from './atlas.js';
-import { ARCHES, INTAKE_SIDE } from './features.js';
+import { ARCHES, GRILLE_STARS, INTAKE_CENTRE, INTAKE_SIDE } from './features.js';
 import { DIMS, STATIONS } from './spec.js';
 
 /** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
@@ -283,7 +283,7 @@ export function mirrorProbe(shader, uniforms, { coat = false, seen = 1 } = {}) {
 }
 
 /** The paint, and everything else opaque on the skin. */
-export function createPaintMaterial(shared, caps, paintName = 'silver', { shoulderV = 0.5, extentV = 5, pins = true } = {}) {
+export function createPaintMaterial(shared, caps, paintName = 'silver', { shoulderV = 0.5, extentV = 5, texel = 0.005, pins = true } = {}) {
   const paint = PAINTS[paintName] || PAINTS.silver;
   const material = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 1, roughness: 0.4, clearcoat: 1, clearcoatRoughness: 0.03 });
   const own = {
@@ -298,8 +298,11 @@ export function createPaintMaterial(shared, caps, paintName = 'silver', { should
 // where the shoulder's rail lies in the atlas (v), and the metres of skin the atlas spans that way
 #define SHOULDER_V ${shoulderV.toFixed(5)}
 #define EXTENT_V ${extentV.toFixed(4)}
+// the atlas's texel on the car, at its coarsest (m)
+#define ATLAS_TEXEL ${texel.toFixed(5)}
 #define GRILLE_PINS ${pins ? 1 : 0}
 ${['UI', 'LI', 'LO', 'UO'].map((name, i) => `#define INTAKE_${name} vec2(${f4(INTAKE_SIDE[i][0])}, ${f4(INTAKE_SIDE[i][1])})`).join('\n')}
+${INTAKE_CENTRE.slice(0, 4).map(([x, y], i) => `#define INTAKE_C${i} vec2(${f4(x)}, ${f4(y)})`).join('\n')}
 uniform vec3 paintColor;
 uniform float paintMetal;
 uniform float paintRough;
@@ -388,12 +391,13 @@ void carFlake(float amount) {
 vec3 carForm(vec3 p, vec3 n) {
   vec3 tilt = vec3(0.0);
   float side = sign(vCarPos.x);
-  // power domes: crests at x 0.27 at the cowl converging to 0.20 at z 1.9, 9 mm high, the outer flank sharper
-  if (n.y > 0.5 && p.z > 0.72 && p.z < 2.0) {
-    float crest = mix(0.27, 0.20, clamp((p.z - 0.8) / 1.1, 0.0, 1.0));
-    float s = p.x < crest ? 0.055 : 0.028;
+  // power domes: crests at x 0.27 at the cowl converging to 0.20 at z 1.9, 14 mm high, the outer flank sharper,
+  // running out just behind the bonnet's front edge (the press pictures show them the whole length of the bonnet)
+  if (n.y > 0.45 && p.z > 0.72 && p.z < 2.1) {
+    float crest = mix(0.27, 0.19, clamp((p.z - 0.8) / 1.2, 0.0, 1.0));
+    float s = p.x < crest ? 0.06 : 0.03;
     float t = (p.x - crest) / s;
-    float a = 0.009 * smoothstep(0.74, 0.9, p.z) * (1.0 - smoothstep(1.6, 1.95, p.z));
+    float a = 0.014 * smoothstep(0.74, 0.92, p.z) * (1.0 - smoothstep(1.8, 2.08, p.z));
     float slope = a * exp(-t * t) * (-2.0 * t / s);
     tilt.x -= side * slope;
   }
@@ -433,35 +437,38 @@ vec3 carForm(vec3 p, vec3 n) {
  * crawls at a distance.
  */
 void carGrille(vec3 p, float w) {
-  vec3 col = vec3(0.006, 0.006, 0.007);
-  float met = 0.0; float rough = 0.08;
+  // (the field is a lattice of black bars over open holes, not a sheet of lacquer: as a gloss sheet it mirrored the
+  // sky and the grille read grey from the chase camera; the photographs show it black with bright stars)
+  vec3 col = vec3(0.005, 0.005, 0.006);
+  float met = 0.0; float rough = 0.32;
   float foot = length(fwidth(p.xy));
-  float detail = 1.0 - smoothstep(0.0012, 0.003, foot);
+  float detail = 1.0 - smoothstep(0.0015, 0.004, foot);
   // diamond relief
-  vec2 dm = vec2(p.x / 0.017, p.y / 0.011);
+  vec2 dm = vec2(p.x / 0.02, p.y / 0.015);
   vec2 dd = abs(fract(dm) - 0.5);
   cTilt += detail * 0.25 * vec3(sign(fract(dm.x) - 0.5) * step(dd.y, dd.x), sign(fract(dm.y) - 0.5) * step(dd.x, dd.y), 0.0);
-  float r = floor((p.y - 0.464) / 0.022);
-  float cy = 0.475 + r * 0.022;
-  float off = mod(r, 2.0) * 0.017;
-  float cx = floor((p.x - off) / 0.034 + 0.5) * 0.034 + off;
+  // the lattice of stars (as details.js lays them: GRILLE_STARS)
+  float r = floor((p.y - ${f4(GRILLE_STARS.y0 - GRILLE_STARS.dy / 2)}) / ${f4(GRILLE_STARS.dy)});
+  float cy = ${f4(GRILLE_STARS.y0)} + r * ${f4(GRILLE_STARS.dy)};
+  float off = mod(r, 2.0) * ${f4(GRILLE_STARS.dx / 2)};
+  float cx = floor((p.x - off) / ${f4(GRILLE_STARS.dx)} + 0.5) * ${f4(GRILLE_STARS.dx)} + off;
   vec2 q = vec2(p.x - cx, p.y - cy);
-  // a three-pointed star 12 mm across: the nearest of three arms, each thinning to its tip
+  // a three-pointed star: the nearest of three arms, each thinning to its tip
   float d = 1.0;
   for (int i = 0; i < 3; i++) {
     float a = 1.5708 + float(i) * 2.0944;
     vec2 dir = vec2(cos(a), sin(a));
-    float t = clamp(dot(q, dir), 0.0, 0.006);
-    d = min(d, length(q - dir * t) - 0.0016 * (1.0 - t / 0.0065));
+    float t = clamp(dot(q, dir), 0.0, ${f4(GRILLE_STARS.arm)});
+    d = min(d, length(q - dir * t) - ${f4(GRILLE_STARS.arm * 0.27)} * (1.0 - t / ${f4(GRILLE_STARS.arm * 1.08)}));
   }
   float keep = step(0.108, length(p.xy - vec2(0.0, 0.573))) * step(0.012, abs(p.y - 0.578) - 0.007 * (1.0 - step(0.49, p.x)));
-  float pin = mix(0.04, clamp(0.5 - d / max(fwidth(d), 1e-5), 0.0, 1.0), detail) * keep * float(GRILLE_PINS);
+  float pin = mix(0.08, clamp(0.5 - d / max(fwidth(d), 1e-5), 0.0, 1.0), detail) * keep * float(GRILLE_PINS);
   col = mix(col, vec3(0.83, 0.84, 0.86), pin); met = mix(met, 1.0, pin); rough = mix(rough, 0.12, pin);
   // the smooth gloss black disc under the big star
   cTilt *= 1.0 - pin;
   cTilt *= step(0.095, length(p.xy - vec2(0.0, 0.573)));
   cTilt.x *= sign(vCarPos.x);
-  CAR_REGION(w, col, met, rough, 1.0);
+  CAR_REGION(w, col, met, rough, mix(0.3, 1.0, pin));
 }
 
 /** Distance from p to the segment a-b. */
@@ -514,7 +521,9 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   // under the boot lid's lip (the shoulder's rail at the tail), 9 mm of undercut: a soft shade below the edge
   if (p.z < -2.2) {
     float under = (SHOULDER_V - vSkinUv.y) * EXTENT_V;
-    cAO *= 1.0 - 0.5 * smoothstep(0.0, 0.006, under) * (1.0 - smoothstep(0.01, 0.06, under)) * smoothstep(0.62, 0.4, p.x);
+    // (it was half the light over 6 cm, and read as a dark band across the lid in the photograph straight on the
+    // tail, where the face under the lip is as bright as the rest)
+    cAO *= 1.0 - 0.25 * smoothstep(0.0, 0.004, under) * (1.0 - smoothstep(0.006, 0.025, under)) * smoothstep(0.62, 0.4, p.x);
   }
   // the grille's bright frame
   CAR_REGION(carCover(B.r - 0.008) * step(1.9, p.z) * step(0.4, p.y), vec3(0.83, 0.84, 0.86), 1.0, 0.08, 0.0);
@@ -570,7 +579,7 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   // (its distance to their edges is worked out here: the atlas's is too coarse to be a relief)
   if (p.z > 1.85 && p.y < 0.47 && p.y > 0.17 && B.r > 0.0) {
     float w = min(min(carLine(p.xy, INTAKE_UI, INTAKE_LI), carLine(p.xy, INTAKE_LI, INTAKE_LO)), carLine(p.xy, INTAKE_LO, INTAKE_UO));
-    w = min(w, min(carLine(p.xy, vec2(0.26, 0.335), vec2(0.42, 0.28)), min(carLine(p.xy, vec2(0.42, 0.28), vec2(0.42, 0.245)), carLine(p.xy, vec2(0.42, 0.245), vec2(0.0, 0.245)))));
+    w = min(w, min(carLine(p.xy, INTAKE_C0, INTAKE_C1), min(carLine(p.xy, INTAKE_C1, INTAKE_C2), carLine(p.xy, INTAKE_C2, INTAKE_C3))));
     float t = clamp(w / 0.055, 0.0, 1.0);
     float hump = sin(3.14159 * t);
     // (run out smoothly towards the region's own edges: a cut-off height is a crease)
@@ -579,7 +588,9 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
     cAO *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 0.014, w));
   }
   // shut lines: a dark gap with a little shade either side; the fuel flap (right side only)
-  float shut = A.b;
+  // (the signed channel draws the line; the unsigned one, which interpolates at most about a texel too far,
+  // keeps away the zeros the signed one has where its sign flips off the lines)
+  float shut = max(abs(B.b), A.b - 0.8 * ATLAS_TEXEL);
   if (vCarPos.x < 0.0 && vCarNormal.x < -0.4) {
     float flap = carBox(vec2(-vCarPos.z, vCarPos.y), vec2(1.71, 0.875), vec2(0.145, 0.07), 0.04);
     shut = min(shut, abs(flap));
