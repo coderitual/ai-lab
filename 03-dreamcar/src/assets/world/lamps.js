@@ -28,7 +28,9 @@ import { footBox, levelFrame, row, upright } from './furniture.js';
  */
 export const LAMP_KINDS = {
   street: { intensity: 14, range: 26, angle: 1.25, penumbra: 0.65, tilt: 0.42, head: 90, color: [1.0, 0.86, 0.7], arm: 2.4 },
-  tunnel: { intensity: 26, range: 18, angle: 1.3, penumbra: 0.5, tilt: 0.6, head: 55, color: [1.0, 0.62, 0.3], arm: 0 },
+  // (render lane) a warm white, not sodium orange: under the orange lamps the bore, the road and the car were one
+  // murky brown; a little stronger, so that each lamp lays a pool on the road
+  tunnel: { intensity: 34, range: 18, angle: 1.3, penumbra: 0.5, tilt: 0.6, head: 55, color: [1.0, 0.85, 0.66], arm: 0 },
 };
 /** Pool size per tier. */
 const POOL = { low: 2, medium: 4, high: 6 };

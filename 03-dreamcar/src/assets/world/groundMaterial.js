@@ -228,11 +228,11 @@ if ( gVerge > 0.0 ) {
   float vd = vVerge.x;
   float vAa = 0.6 * ( abs( dFdx( vd ) ) + abs( dFdy( vd ) ) ) + 1.0e-3;
   // the mower's passes: bands about 1.6 m wide whose blades lean one way or the other (a shade apart, no more:
-  // frame D1's verge is evenly mown), a yellow-green that the low sun warms further
+  // frame D1's verge is evenly mown), (render lane) an autumn green, not a neon yellow-green
   float pass = abs( fract( vd / 3.2 ) * 2.0 - 1.0 );
   float stripe = clamp( ( pass - 0.5 ) / max( vAa / 1.6, 1.0e-3 ) + 0.5, 0.0, 1.0 );
   stripe = mix( stripe, 0.5, smoothstep( 0.3, 1.0, vAa / 1.6 ) );
-  vec3 mown = mix( vec3( 0.074, 0.115, 0.017 ), vec3( 0.088, 0.135, 0.02 ), stripe ) * ( 0.85 + 0.3 * gDet.r ) * ( 0.88 + 0.24 * gMid.r );
+  vec3 mown = mix( vec3( 0.056, 0.088, 0.03 ), vec3( 0.066, 0.1, 0.034 ), stripe ) * ( 0.85 + 0.3 * gDet.r ) * ( 0.88 + 0.24 * gMid.r );
   // a wide run-off is mown to the kerb but for a ragged strip of worn earth along it (D1); a narrow verge with a
   // wall close by is rough grass in tufts with bare earth between them, most of it by the road (D3)
   float vWidth = vd - vVerge.z;
@@ -278,7 +278,9 @@ gForest = max( gForest, gClump );
 vec3 gAlbedo = gGrass;
 // blades let through a bright yellow-green, the mown verge most (bare earth none)
 groundGrass = ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * ( 1.0 - gVergeEarth );
-groundThrough = mix( vec3( 0.18, 0.42, 0.05 ), vec3( 0.3, 0.4, 0.03 ), gVerge ) * ( 0.6 + 0.8 * gVerge ) * groundGrass * gFade;
+// (render lane) the light through the blades is a natural green, not the neon yellow-green it was: against the
+// low sun the verge still glows, but as autumn grass
+groundThrough = mix( vec3( 0.13, 0.26, 0.07 ), vec3( 0.15, 0.24, 0.07 ), gVerge ) * ( 0.6 + 0.6 * gVerge ) * groundGrass * gFade;
 gAlbedo = mix( gAlbedo, vec3( 0.03, 0.045, 0.02 ) * ( 0.7 + 0.6 * gDet.r ), gScrub * 0.85 );
 gAlbedo = mix( gAlbedo, gForestCol, gForest );
 // (seen from the road a clump is crowns, not forest floor)

@@ -191,6 +191,146 @@ export function createSigns({ tier, anisotropy = 1 }) {
 const NARROW = { I: 0.18, 1: 0.4 };
 
 /**
+ * (render lane) The boards' display face: heavy capitals built from filled shapes on the letter's own box (x
+ * across, y up from the baseline, in letter heights; W is the letter's width, t the stem's weight), not from a pen
+ * drawn along a skeleton. Every letter is exactly as tall as the others, the diagonals' ends are cut level with
+ * the baseline and the cap line, the points of A, V and W are flat, the counters are even. Our own letters, drawn
+ * here; characters it lacks (digits) fall back to the plate's stroke letters.
+ *   ['r', x0, y0, x1, y1]                 a rectangle
+ *   ['o', x0, y0, x1, y1, [tl, tr, br, bl]] a rounded ring: corner radii 1 = round, 0 = square, stem t thick
+ *   ['b', xa, ya, xb, yb, hw]             a band from (xa, ya) to (xb, yb), hw wide across (left edges given)
+ *   cut: the same shapes taken out of the letter
+ * `w` is the letter's width as a share of the face's standard width.
+ */
+const BLOCK = (() => {
+  const L = (w, make) => ({ w, make });
+  const diag = (t) => t * 1.22; // a diagonal's width across, so it looks as heavy as a stem
+  return {
+    A: L(1.12, (W, t) => {
+      const hw = diag(t) * 0.95;
+      const m = W / 2 - hw / 2;
+      return { fill: [['b', 0, 0, m, 1, hw], ['b', W - hw, 0, m, 1, hw], ['r', hw * 0.5, 0.13, W - hw * 0.5, 0.13 + t * 0.85]] };
+    }),
+    B: L(1, (W, t) => ({ fill: [['r', 0, 0, t, 1], ['o', 0, 0.5 - t / 2, W * 0.94, 1, [0, 1, 1, 0]], ['o', 0, 0, W, 0.5 + t / 2, [0, 1, 1, 0]]] })),
+    C: L(1, (W, t) => ({ fill: [['o', 0, 0, W, 1, [1, 1, 1, 1]]], cut: [['r', W * 0.55, 0.36, W, 0.64]] })),
+    D: L(1, (W, t) => ({ fill: [['o', 0, 0, W, 1, [0, 1, 1, 0]]] })),
+    E: L(0.88, (W, t) => ({ fill: [['r', 0, 0, t * 1.08, 1], ['r', 0, 1 - t, W, 1], ['r', 0, 0.5 - t / 2, W * 0.86, 0.5 + t / 2], ['r', 0, 0, W, t]] })),
+    F: L(0.86, (W, t) => ({ fill: [['r', 0, 0, t * 1.08, 1], ['r', 0, 1 - t, W, 1], ['r', 0, 0.5 - t / 2, W * 0.84, 0.5 + t / 2]] })),
+    G: L(1, (W, t) => ({ fill: [['o', 0, 0, W, 1, [1, 1, 1, 1]], ['r', W * 0.5, 0.52 - t, W, 0.52]], cut: [['r', W * 0.5, 0.52, W, 0.7]] })),
+    H: L(1, (W, t) => ({ fill: [['r', 0, 0, t * 1.08, 1], ['r', W - t * 1.08, 0, W, 1], ['r', 0, 0.5 - t / 2, W, 0.5 + t / 2]] })),
+    I: L(0.3, (W, t) => ({ fill: [['r', 0, 0, W, 1]] })),
+    K: L(1, (W, t) => {
+      const hw = diag(t);
+      return { fill: [['r', 0, 0, t * 1.08, 1], ['b', t * 0.5, 0.26, W - hw, 1, hw], ['b', W - hw, 0, W * 0.3, 0.6, hw]] };
+    }),
+    L: L(0.84, (W, t) => ({ fill: [['r', 0, 0, t * 1.08, 1], ['r', 0, 0, W, t]] })),
+    M: L(1.2, (W, t) => {
+      const s = t * 1.08;
+      const hw = diag(t) * 0.92;
+      return { fill: [['r', 0, 0, s, 1], ['r', W - s, 0, W, 1], ['b', 0, 1, W / 2 - hw / 2, 0.3, hw], ['b', W - hw, 1, W / 2 - hw / 2, 0.3, hw]] };
+    }),
+    N: L(1, (W, t) => {
+      const s = t * 1.08;
+      const hw = diag(t) * 1.1;
+      return { fill: [['r', 0, 0, s, 1], ['r', W - s, 0, W, 1], ['b', 0, 1, W - hw, 0, hw]] };
+    }),
+    O: L(1, (W, t) => ({ fill: [['o', 0, 0, W, 1, [1, 1, 1, 1]]] })),
+    P: L(0.96, (W, t) => ({ fill: [['r', 0, 0, t * 1.08, 1], ['o', 0, 0.4 - t / 2, W, 1, [0, 1, 1, 0]]] })),
+    Q: L(1, (W, t) => ({ fill: [['o', 0, 0, W, 1, [1, 1, 1, 1]], ['b', W * 0.5, 0.42, W - diag(t), 0, diag(t)]] })),
+    R: L(1, (W, t) => ({ fill: [['r', 0, 0, t * 1.08, 1], ['o', 0, 0.4 - t / 2, W, 1, [0, 1, 1, 0]], ['b', W - diag(t), 0, W * 0.3, 0.42, diag(t)]] })),
+    S: L(1, (W, t) => ({
+      fill: [['o', 0, 0.5 - t / 2, W * 0.96, 1, [1, 1, 1, 1]], ['o', 0, 0, W, 0.5 + t / 2, [1, 1, 1, 1]]],
+      cut: [['r', W * 0.55, 0.5 + t / 2, W, 1 - t - 0.05], ['r', 0, t + 0.05, W * 0.45, 0.5 - t / 2]],
+    })),
+    T: L(0.94, (W, t) => ({ fill: [['r', 0, 1 - t, W, 1], ['r', W / 2 - t * 0.54, 0, W / 2 + t * 0.54, 1]] })),
+    U: L(1, (W, t) => ({ fill: [['o', 0, 0, W, 1.4, [1, 1, 1, 1]]] })),
+    V: L(1.04, (W, t) => {
+      const hw = diag(t);
+      const m = W / 2 - hw / 2;
+      return { fill: [['b', 0, 1, m, 0, hw], ['b', W - hw, 1, m, 0, hw]] };
+    }),
+    W: L(1.36, (W, t) => {
+      const hw = diag(t) * 0.92;
+      const b1 = W * 0.27 - hw / 2;
+      const b2 = W * 0.73 - hw / 2;
+      const m = W / 2 - hw / 2;
+      return { fill: [['b', 0, 1, b1, 0, hw], ['b', m, 0.78, b1, 0, hw], ['b', m, 0.78, b2, 0, hw], ['b', W - hw, 1, b2, 0, hw]] };
+    }),
+    X: L(1, (W, t) => {
+      const hw = diag(t);
+      return { fill: [['b', 0, 0, W - hw, 1, hw], ['b', W - hw, 0, 0, 1, hw]] };
+    }),
+    Y: L(1, (W, t) => {
+      const hw = diag(t);
+      const m = W / 2 - hw / 2;
+      return { fill: [['b', 0, 1, m, 0.42, hw], ['b', W - hw, 1, m, 0.42, hw], ['r', W / 2 - t * 0.54, 0, W / 2 + t * 0.54, 0.5]] };
+    }),
+    Z: L(0.92, (W, t) => ({ fill: [['r', 0, 1 - t, W, 1], ['r', 0, 0, W, t], ['b', 0, 0, W - diag(t) * 1.1, 1, diag(t) * 1.1]] })),
+  };
+})();
+
+/** A rounded rectangle as a path, corners [tl, tr, br, bl] of radius r each (0: square), either way round. */
+function roundedRect(g, x0, y0, x1, y1, radii, r, reverse) {
+  const k = radii.map((c) => Math.min(c * r, (x1 - x0) / 2, (y1 - y0) / 2));
+  // in letter space y runs up: "top" is y1
+  const pts = [
+    [x0, y1, k[0]],
+    [x1, y1, k[1]],
+    [x1, y0, k[2]],
+    [x0, y0, k[3]],
+  ];
+  if (reverse) pts.reverse();
+  const n = pts.length;
+  const start = [(pts[0][0] + pts[n - 1][0]) / 2, (pts[0][1] + pts[n - 1][1]) / 2];
+  g.moveTo(start[0], start[1]);
+  for (let i = 0; i < n; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % n];
+    if (p[2] > 0) g.arcTo(p[0], p[1], q[0], q[1], p[2]);
+    else g.lineTo(p[0], p[1]);
+  }
+  g.closePath();
+}
+
+/** Adds one of the face's shapes to the current path. */
+function blockShape(g, s, t) {
+  const [kind, a, b, c, d, e] = s;
+  if (kind === 'r') g.rect(a, b, c - a, d - b);
+  else if (kind === 'b') {
+    g.moveTo(a, b);
+    g.lineTo(a + e, b);
+    g.lineTo(c + e, d);
+    g.lineTo(c, d);
+    g.closePath();
+  } else if (kind === 'o') {
+    const r = 0.34;
+    const tx = t * 1.08;
+    roundedRect(g, a, b, c, d, e, r, false);
+    roundedRect(g, a + tx, b + t, c - tx, d - t, e, Math.max(0.04, r - t * 0.85), true);
+  }
+}
+
+/**
+ * Draws a letter of the display face with its lower left corner at the origin (y down the canvas), `W` letter
+ * heights wide and `h` px high, with stems `pen` letter heights thick, in `color`.
+ */
+function drawBlock(g, block, W, h, pen, color) {
+  const t = Math.min(pen, 0.3);
+  const { fill, cut = [] } = block.make(W, t);
+  g.scale(h, -h);
+  g.beginPath();
+  g.rect(0, 0, W, 1);
+  for (const s of cut) blockShape(g, s, t);
+  g.clip('evenodd');
+  g.fillStyle = color;
+  for (const s of fill) {
+    g.beginPath();
+    blockShape(g, s, t);
+    g.fill('nonzero');
+  }
+}
+
+/**
  * Writes a word of capitals and digits with its baseline at y, starting at x, letters `h` high. `wide` stretches
  * the letters (1 = the plate's proportions), `slant` leans them (italic, as a share of the height).
  * @returns {number} the width written
@@ -204,12 +344,14 @@ function write(g, text, x, y, h, { pen = 0.17, wide = 1.15, gap = 0.2, slant = 0
       cx += cw * 0.6;
       continue;
     }
-    const w = NARROW[c] != null ? Math.max(p, NARROW[c] * h) : cw;
+    const block = BLOCK[c];
+    const w = block ? block.w * cw : NARROW[c] != null ? Math.max(p, NARROW[c] * h) : cw;
     if (!measure) {
       g.save();
       g.translate(x + cx, y);
       if (slant) g.transform(1, 0, -slant, 1, 0, 0);
-      drawGlyph(g, c, 0, 0, w, h, p);
+      if (block) drawBlock(g, block, w / h, h, pen, g.strokeStyle);
+      else drawGlyph(g, c, 0, 0, w, h, p);
       g.restore();
     }
     cx += w + gap * h;
@@ -327,7 +469,7 @@ function drawMark(g, kind, x, y, s, color, field) {
 // The cells
 
 /** The circuit's name: heavy, wide letters that fill the board. */
-const NAME_LETTERS = { pen: 0.33, wide: 1.55, slant: 0.1, gap: 0.16 };
+const NAME_LETTERS = { pen: 0.25, wide: 1.4, slant: 0.12, gap: 0.17 };
 
 function drawGantryBoard(g, [x, y, w, h]) {
   g.fillStyle = '#163a4c';
