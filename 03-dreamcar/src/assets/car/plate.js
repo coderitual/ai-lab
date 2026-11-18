@@ -64,7 +64,9 @@ const GLYPHS = {
 export function drawGlyph(g, char, x, y, w, h, pen) {
   const strokes = GLYPHS[char];
   if (!strokes) return;
-  const ux = (w - pen) / 4;
+  // never nothing: a character as narrow as the pen (I) would make a transform a canvas cannot invert, and a canvas
+  // draws nothing through one of those
+  const ux = Math.max((w - pen) / 4, 1e-3);
   const uy = (h - pen) / 7;
   for (const stroke of strokes) {
     const closed = stroke[0] === 'z';

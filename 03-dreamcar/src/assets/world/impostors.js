@@ -20,11 +20,11 @@
 //   SHAPE   at half the size: the BENT NORMAL of what is seen, in the tree's
 //           own frame (rgb), and in alpha what it is: 0.04 to 0.24 bark (by
 //           how much light gets to it), 0.3 to 1 a leaf (by how open the crown
-//           is there). It has no coverage of its own to be weighted by, so it
-//           has no holes: each picture is first drawn with every leaf card as
-//           a whole square, then again with the leaves cut out, so that a gap
-//           between leaves holds what the card round it holds, or what the
-//           leaf seen through it does.
+//           is there, as its square root). It has no coverage of its own to be
+//           weighted by, so it has no holes: each picture is first drawn with
+//           every leaf card as a whole square and every limb thickened, then
+//           again as it is, so that a gap between leaves holds what the card
+//           round it holds, or what the leaf seen through it does.
 // So the card is lit by the same code, the same sun, sky and lamps as the
 // tree, at every time of day, and takes the same per-tree tint.
 //
@@ -44,6 +44,7 @@ const STEP = 16;
 
 const VERTEX = /* glsl */ `
 attribute vec4 aShade;
+uniform float uFat;
 varying vec4 vShade;
 varying vec2 vUv;
 varying vec3 vN;
@@ -51,7 +52,8 @@ void main() {
   vShade = aShade;
   vUv = uv;
   vN = normal;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+  // (uFat: bark drawn this much thicker, see the shape atlas's first drawing)
+  gl_Position = projectionMatrix * modelViewMatrix * vec4( position + normal * ( uFat * step( 0.75, aShade.y ) ), 1.0 );
 }`;
 
 const FRAGMENT = /* glsl */ `
@@ -72,7 +74,9 @@ void main() {
     else c.rgb *= 1.0 + 0.08 * ( vShade.z - 0.5 ) * 2.0;
   }
   if ( uPass < 0.5 ) gl_FragColor = vec4( c.rgb, 1.0 );
-  else gl_FragColor = vec4( normalize( vN ) * 0.5 + 0.5, bark ? 0.04 + 0.2 * vShade.x : 0.3 + 0.7 * vShade.x );
+  // (a leaf's openness as its square root: where a picture's texel averages an open leaf with a dark one seen past
+  // it, the average then leans to the dark one, as the light of the two does)
+  else gl_FragColor = vec4( normalize( vN ) * 0.5 + 0.5, bark ? 0.04 + 0.2 * vShade.x : 0.3 + 0.7 * sqrt( vShade.x ) );
 }`;
 
 /**
@@ -150,7 +154,7 @@ export function bakeImpostors({ renderer, models, foliage, bark, cell, rings = 2
   const material = new THREE.ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
-    uniforms: { uFoliage: { value: foliage }, uBark: { value: bark }, uPass: { value: 0 }, uWhole: { value: 0 } },
+    uniforms: { uFoliage: { value: foliage }, uBark: { value: bark }, uPass: { value: 0 }, uWhole: { value: 0 }, uFat: { value: 0 } },
     side: THREE.DoubleSide,
   });
   const scene = new THREE.Scene();
@@ -207,11 +211,14 @@ export function bakeImpostors({ renderer, models, foliage, bark, cell, rings = 2
         rt.viewport.set((s.x + k * s.w) * scale, s.y * scale, s.w * scale, s.h * scale);
         renderer.setRenderTarget(rt);
         if (pass === 1) {
-          // whole cards first, then the leaves themselves over them
+          // whole cards and thickened limbs first (by some three texels: a trunk's edge is then mixed with bark, a
+          // leaf's with leaves), then the tree itself over them
           material.uniforms.uWhole.value = 1;
+          material.uniforms.uFat.value = (3 * (f.top - f.bottom)) / (s.h * scale);
           renderer.render(scene, camera);
           renderer.clearDepth();
           material.uniforms.uWhole.value = 0;
+          material.uniforms.uFat.value = 0;
         }
         renderer.render(scene, camera);
       }

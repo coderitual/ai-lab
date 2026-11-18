@@ -798,7 +798,8 @@ function broadleafMesh(variant, sk, rng, full, barkSize, through) {
  * @param {object[]} variants VARIANTS of treeSpecies.js @param {Record<string, { through: number }>} species
  * @param {import('../../engine/rng.js').Rng} rng
  * @param {object} o
- * @param {boolean} o.full false: only the reduced mesh is built (the low tier never draws the full one)
+ * @param {boolean|((variant: object) => boolean)} o.full false: only the reduced mesh is built (the low tier never
+ *   draws the full one); or which variants get a full one
  * @param {number} o.barkSize texels of one bark tile
  * @returns {TreeModel[]}
  */
@@ -810,7 +811,7 @@ export function growTrees(variants, species, rng, { full, barkSize }) {
     const sk = conifer ? coniferSkeleton(variant.P, r.fork('skeleton')) : broadleafSkeleton(variant.P, r.fork('skeleton'));
     const mesh = conifer ? coniferMesh : broadleafMesh;
     const reduced = mesh(variant, sk, r.fork('reduced'), false, barkSize, through);
-    const detailed = full ? mesh(variant, sk, r.fork('full'), true, barkSize, through) : null;
+    const detailed = (typeof full === 'function' ? full(variant) : full) ? mesh(variant, sk, r.fork('full'), true, barkSize, through) : null;
     const bounds = (detailed ?? reduced).bounds();
     return {
       full: detailed ? detailed.geometry() : null,
