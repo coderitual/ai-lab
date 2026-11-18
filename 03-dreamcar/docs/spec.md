@@ -71,6 +71,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | marshal posts | 12 |
 | start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |
 | street lamps | 23, 9 m high, every 30.4 m on alternating sides along the whole straight |
+| floodlights | 69, 10 m high, every 55 m round the rest of the lap (`lapLamps`): on the inside of bends tighter than 1500 m, alternating elsewhere; none in the tunnel or within 25 m of its portals, none on `ledge1` (frame D3's place) |
 | tunnel lamps | 29 rows of two, every 12 m |
 | sector lines | s = 1881.8 m (37 %, just out of the tunnel) and 3420.0 m (67 %, the start of the ledge); the third is the line |
 | grid | 12 boxes behind the line (`track.grid`) |
@@ -304,11 +305,12 @@ and the moon are placed against the start straight's heading by
 
 | | day | dusk (golden hour) | night |
 | --- | --- | --- | --- |
-| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | the moon 8° left, 17° up; 0.08 |
+| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | the moon 8° left, 17° up; 0.12 |
 | exposure (tunnel) | 0.68 (5.6) | 4.2 (6) | 22 (8) |
-| sky's light on the scene: environment / fill | 0.6 / 0.13 | 0.6 / 0.014 | 1 / 0.009 |
-| wetness | 0 | 0 | 0.65 |
-| street lamps / tunnel / windows | 0 / 1 / 0 | 1 / 1 / 0.7 | 1 / 1 / 1 |
+| sky's light on the scene: environment / fill | 0.6 / 0.13 | 0.6 / 0.014 | 1 / 0.013 |
+| sky at the zenith (radiance) | [0.22, 0.38, 0.78] | [0.02, 0.034, 0.068] | [0.0007, 0.0014, 0.0038] |
+| wetness | 0 | 0 | 0.8 |
+| street lamps and floodlights / tunnel / windows / cones in the air | 0 / 1 / 0 / 0 | 1 / 1 / 0.7 / 0 | 1 / 1 / 1 / 1 |
 | car lamps | running lights | low beam | low beam |
 | clouds cover | 0.45 | 0.45 | 0.3 |
 | bloom / glare / ghosts | 0.05 / 0.015 / 0.0003 | 0.09 / 0.03 / 0.0003 | 0.15 / 0 / 0 |
@@ -331,7 +333,7 @@ pass with their sizes. In short:
 | lens (flare source, ghosts, glare, star) | no | yes | yes |
 | ambient occlusion | no | 8 samples, half size | 14 samples |
 | car's probe at speed / standing | 64 / 128 per face, a face every 2nd frame (standing too) | 128 / 256; a face every 2nd frame, standing 2 every 3rd | 256 / 512, 2 faces a frame, standing 3 |
-| wet road mirror | none | 0.35 of the view's height, to 220 m | 0.5, to 320 m |
+| wet road mirror | none (the six nearest lamps' heads drawn into the water analytically) | 0.35 of the view's height, to 220 m, streaked copy 0.3 of its height | 0.5, to 320 m, streak 0.3 |
 | forest: full / reduced / impostor trees to | 0 / 60 / 650 m | 34 / 95 / 900 m | 50 / 130 / 1200 m |
 | effects: skid quads / soft particles / sparks | 800 / 192 / 48 | 1500 / 320 / 96 | 2000 / 400 / 128 |
 
