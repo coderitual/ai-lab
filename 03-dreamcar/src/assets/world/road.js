@@ -51,9 +51,10 @@
 //    for what tyres carry in.
 // With a `mirror` (engine/PlanarMirror.js, medium and high tiers) the water
 // shows the scene's real reflection: sharp where it stands, drawn out towards
-// the viewer and blurred where the film is broken. Without one the same
-// roughness and Fresnel take the sky from the environment map and the lamps'
-// own highlights.
+// the viewer into long streaks where the film is broken (the mirror's own
+// streaked copy). Without one the same roughness and Fresnel take the sky from
+// the environment map, and the heads of the nearest lamps (`glints`, filled by
+// lamps.js) are drawn as the same streaks analytically.
 
 import * as THREE from 'three';
 import { GLSL_HASH } from '../../engine/glsl.js';
@@ -62,6 +63,8 @@ import { corridorOf } from './corridor.js';
 import { FEATURE_CELL, GRID_SLOTS, SEAM_LAT, roadHistory } from './roadHistory.js';
 import { BIG_TILE, ROUGH_GAIN, VARIANCE_GAIN, roadTextures } from './roadTextures.js';
 import { BORE_UNIFORMS, WET_UNIFORMS, extend, withBake } from './shading.js';
+import { GLINTS } from './lamps.js';
+import { canopyOpen } from './canopy.js';
 
 /** The edge line: its width (m), its outer edge on the pavement's edge. */
 const EDGE_LINE = 0.28;
@@ -96,8 +99,23 @@ const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;
 /** Up to this many cars' head lamps answered by the paint. */
 const BEAMS = 2;
-/** Per tier: how much of the shader runs (0: one lookup of each texture, no streaks), and the mirror's taps. */
-const SHADER = { low: { tier: 0, taps: 0 }, medium: { tier: 1, taps: 5 }, high: { tier: 2, taps: 8 } };
+/** Per tier: how much of the shader runs (0: one lookup of each texture). */
+const SHADER = { low: { tier: 0 }, medium: { tier: 1 }, high: { tier: 2 } };
+/**
+ * A lamp's head seen in wet asphalt without a mirror (GLINTS of lamps.js): a lobe about the mirrored direction,
+ * `across` wide across the plane of incidence and `along` long in it (the streak; both as the length of the
+ * difference of unit vectors, about radians), at `gain` of the head's radiance, less on a merely damp surface.
+ */
+const GLINT = { across: 0.006, along: 0.12, gain: 0.12 };
+/**
+ * The cars' tail lamps in the wet road, on every tier: the same lobe as GLINT, wider and longer (a tail lamp is a
+ * broad source close to the road, its streak reaches from under the bumper towards the eye), `radiance` of the
+ * lamp's red as the lobe sees it at the tail light, `brake` times that with the brake lamps. The mirror shows the
+ * lamps themselves too small to streak: seen from under the road they are thin bars edge on.
+ */
+const TAIL_GLINT = { across: 0.05, along: 0.3, radiance: 1.6, brake: 3, gain: 0.6, color: [1.0, 0.03, 0.015] };
+/** The thin film on wet asphalt outside the puddles: how much of a puddle's mirror it shows (always streaked). */
+const FILM = { share: 0.55 };
 
 /**
  * @param {object} options
@@ -109,7 +127,8 @@ const SHADER = { low: { tier: 0, taps: 0 }, medium: { tier: 1, taps: 5 }, high: 
  * @param {number} options.rowStep one row every this many samples (the terrain band's own step)
  * @param {import('../../engine/rng.js').Rng} [options.rng]
  * @param {{ uniforms: object, texture: THREE.Texture }|null} [options.mirror] the wet road's planar reflection (its
- *   uniforms, with uMirrorPlane added: the plane as (normal, constant)), or null for speculars only
+ *   uniforms, with uMirrorPlane added: the plane as (normal, constant), and uMirrorStreak), or null for speculars
+ *   and lamp glints only
  */
 export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rng = createRng(3), mirror = null }) {
   const n = track.count;
@@ -169,6 +188,8 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
         frame.tan.toArray(along, v * 4);
         along[v * 4 + 3] = co.pond[i];
         (terrain.bake4At ?? terrain.bakeAt)(pt.x, pt.z, bake, v * 4);
+        // what the woods beside the road hide of the sky (canopy.js)
+        bake[v * 4 + 2] *= canopyOpen(track, sw, lats[k]);
         codeB[v * 4] = byte(0.5 + co.line[i] / 8);
         codeB[v * 4 + 1] = byte(co.rubber[i]);
         codeB[v * 4 + 2] = byte(co.tongue[i]);
@@ -227,6 +248,10 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     uBeamPos: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, -1e4, 0)) },
     uBeamDir: { value: Array.from({ length: BEAMS }, () => new THREE.Vector3(0, 0, 1)) },
     uBeamPower: { value: new Array(BEAMS).fill(0) },
+    uTailPos: { value: Array.from({ length: BEAMS * 2 }, () => new THREE.Vector3(0, -1e4, 0)) },
+    uTailPower: { value: new Array(BEAMS).fill(0) },
+    uGlintPos: { value: Array.from({ length: GLINTS }, () => new THREE.Vector4()) },
+    uGlintColor: { value: Array.from({ length: GLINTS }, () => new THREE.Vector3()) },
     ...WET_UNIFORMS,
     ...BORE_UNIFORMS,
     ...(mirror ? mirror.uniforms : {}),
@@ -241,7 +266,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     ROAD_TIER: shade.tier,
     AGG_TILE: textures.tile.toFixed(3),
     ROAD_SLOTS: history.slots,
-    ...(mirror && shade.taps ? { ROAD_MIRROR: 1, ROAD_TAPS: shade.taps } : {}),
+    ...(mirror && shade.tier > 0 ? { ROAD_MIRROR: 1 } : {}),
   };
   extend(material, 'asphalt', (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -262,7 +287,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
       .replace('#include <normal_fragment_maps>', ASPHALT_NORMAL)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${ASPHALT_BEADS}`)
       .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>\n${WET_SPECULAR}`)
-      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${ASPHALT_SKY}\n${WET_MIRROR}`);
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${ASPHALT_SKY}\n${WET_MIRROR}\n${WET_GLINTS}`);
   });
   withBake(material);
   // the low sun's glare: a second, anisotropic lobe on every direct light, after the bake has unrolled the loop
@@ -289,13 +314,15 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     group,
     material,
     uniforms,
+    /** The lamps' heads the wet road glints with where it has no mirror (lamps.js fills them each view). */
+    glints: { pos: uniforms.uGlintPos, color: uniforms.uGlintColor },
     /** What the road's history holds, and what its textures cost. */
     stats: { history: history.stats, textureBytes: textures.bytes, textureMs: textures.ms },
     /** 0..1 */
     setWetness(w) {
       WET_UNIFORMS.uWet.value = w;
     },
-    /** @param {Array<{ pos: THREE.Vector3, dir: THREE.Vector3, low: number, high: number }>} beams */
+    /** @param {import('./index.js').Beam[]} beams */
     setBeams(beams) {
       for (let i = 0; i < BEAMS; i++) {
         const b = beams?.[i];
@@ -304,7 +331,15 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
           uniforms.uBeamDir.value[i].copy(b.dir).normalize();
           // two lamps, seen from the road as one
           uniforms.uBeamPower.value[i] = 2 * (LAMP_LOW * b.low + LAMP_HIGH * b.high);
-        } else uniforms.uBeamPower.value[i] = 0;
+          if (b.tailL) {
+            uniforms.uTailPos.value[i * 2].copy(b.tailL);
+            uniforms.uTailPos.value[i * 2 + 1].copy(b.tailR);
+          }
+          uniforms.uTailPower.value[i] = TAIL_GLINT.radiance * ((b.tail ?? 0) + TAIL_GLINT.brake * (b.brake ?? 0));
+        } else {
+          uniforms.uBeamPower.value[i] = 0;
+          uniforms.uTailPower.value[i] = 0;
+        }
       }
     },
     dispose() {
@@ -334,17 +369,18 @@ export const EYE_FROM_PROJECTION =
   '( abs( abs( projectionMatrix[ 1 ][ 1 ] ) - 1.0 ) < 1.0e-3 && abs( abs( projectionMatrix[ 0 ][ 0 ] ) - 1.0 ) < 1.0e-3 ? 0.0 : 1.0 )';
 
 /**
- * GLSL (fragment, declarations): the planar mirror as wet ground reads it, shared with paving.js. A material that
- * uses it defines ROAD_MIRROR and ROAD_TAPS and carries the mirror's uniforms.
+ * GLSL (fragment, declarations): the planar mirror as wet ground reads it. A material that uses it defines
+ * ROAD_MIRROR and carries the mirror's uniforms; one without it gets the lamp glints' uniforms instead.
  *
  * A wet road draws each light out into a streak from the point that mirrors it towards the viewer: the nearer road
- * sees the light at a glancing angle off the far side of its bumps. So the picture is read at several places up
- * its height from where this point lands in it (never down), over a length that grows with the water's roughness,
- * each read from the mip level whose texels are as wide as the gap to the next: one soft streak, not a row of dots.
- * Standing water (roughness near zero) reads one sharp place.
+ * sees the light at a glancing angle off the far side of its bumps. The mirror draws that streak once for the whole
+ * picture (PlanarMirror's `streak`: each texel the weighted sum of what lies above it); here the sharp picture
+ * (standing water, roughness near zero, a little softer as it roughens) gives way to the streaked one as the film
+ * breaks up: two lookups a pixel, sharp across, long along.
  */
 export const WET_MIRROR_PARS = /* glsl */ `
 float roadWater;      // the share of this pixel under water, 0..1
+float roadFilm;       // how much of the rest still carries a thin film after rain (a rough, streaking mirror)
 float roadPuddle;     // 1 where water stands clear over the stones
 float roadWaterRough; // the water surface's own roughness
 #ifdef ROAD_MIRROR
@@ -353,27 +389,36 @@ uniform mat4 uMirrorMatrix;
 uniform float uMirrorOn;
 uniform vec2 uMirrorTexel;
 uniform vec4 uMirrorPlane;
+uniform sampler2D uMirrorStreak;
 // rgb: what the water at 'world' mirrors; a: how far to believe it (0 off the mirror's plane or beyond its picture)
 vec4 wetMirror( vec3 world, vec2 push, float rough ) {
   float trust = 1.0 - smoothstep( 0.4, 2.5, abs( dot( world, uMirrorPlane.xyz ) + uMirrorPlane.w ) );
   if ( uMirrorOn < 0.5 || trust <= 0.0 ) return vec4( 0.0 );
   vec4 mc = uMirrorMatrix * vec4( world, 1.0 );
   vec2 uv = mc.xy / mc.w + push;
-  float len = clamp( rough * rough * 1.7, 0.0, 0.2 );
-  float lod = log2( max( len / ( float( ROAD_TAPS ) * uMirrorTexel.y ), 1.0 ) );
-  float jitter = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) );
-  vec3 sum = vec3( 0.0 );
-  float total = 0.0;
-  for ( int i = 0; i < ROAD_TAPS; i ++ ) {
-    float t = ( float( i ) + jitter ) / float( ROAD_TAPS );
-    float w = 1.0 - 0.8 * t;
-    sum += textureLod( uMirrorTex, uv + vec2( 0.0, ( t - 0.1 ) * len ), lod ).rgb * w;
-    total += w;
-  }
+  vec3 sharp = textureLod( uMirrorTex, uv, clamp( rough * 8.0, 0.0, 1.5 ) ).rgb;
+  // (a texel below the point: the streak runs from the light's own image towards the eye, and starts at it)
+  vec3 streak = textureLod( uMirrorStreak, uv - vec2( 0.0, uMirrorTexel.y ), 0.0 ).rgb;
+  vec3 seen = mix( sharp, streak, smoothstep( 0.08, 0.3, rough ) );
   vec2 inside = smoothstep( vec2( 0.0 ), vec2( 0.03 ), uv ) * smoothstep( vec2( 0.0 ), vec2( 0.03 ), 1.0 - uv );
-  return vec4( sum / total, trust * inside.x * inside.y );
+  return vec4( seen, trust * inside.x * inside.y );
 }
+#else
+uniform vec4 uGlintPos[${GLINTS}];
+uniform vec3 uGlintColor[${GLINTS}];
 #endif
+uniform vec3 uTailPos[${BEAMS * 2}];
+uniform float uTailPower[${BEAMS}];
+// A light at 'lamp' seen in wet ground at P: a lobe about the mirrored view, 'across' wide across the plane of
+// incidence and 'along' long in it (the streak towards the eye)
+float wetGlint( vec3 P, vec3 N, vec3 V, vec3 lamp, float across, float along ) {
+  vec3 R = reflect( - V, N );
+  vec3 A = normalize( cross( N, V ) );
+  vec3 dev = normalize( lamp - P ) - R;
+  float x = dot( dev, A ) / across;
+  float y = dot( dev, cross( R, A ) ) / along;
+  return exp( - x * x - y * y );
+}
 `;
 
 /** GLSL (fragment, after lights_physical_fragment): water reflects less head on than stone does (n = 1.33). */
@@ -389,10 +434,12 @@ material.specularColorBlended = mix( material.specularColor, diffuseColor.rgb, m
  */
 export const WET_MIRROR = /* glsl */ `
 #ifdef ROAD_MIRROR
-if ( vRoadWorld.w > 0.5 && roadWater > 0.003 ) {
-  // pushed about by the surface's own tilt (stones standing out of the film): reflections break up
-  vec4 mirrored = wetMirror( vRoadWorld.xyz, ( normal.xy - nonPerturbedNormal.xy ) * vec2( 0.03, 0.08 ), roadWaterRough );
-  float mWet = roadWater * mirrored.a;
+if ( vRoadWorld.w > 0.5 && roadWater + roadFilm > 0.003 ) {
+  // pushed about by the surface's own tilt (stones standing out of the film): reflections break up. The film reads
+  // the streaked picture only, at about half a puddle's strength.
+  float mShare = roadWater / max( roadWater + ${FILM.share.toFixed(2)} * roadFilm, 1.0e-3 );
+  vec4 mirrored = wetMirror( vRoadWorld.xyz, ( normal.xy - nonPerturbedNormal.xy ) * vec2( 0.03, 0.08 ), mix( 0.42, roadWaterRough, mShare ) );
+  float mWet = max( roadWater, ${FILM.share.toFixed(2)} * roadFilm ) * mirrored.a;
   // the brightest things are held to a few times white: a lamp's head in a puddle glares, it does not burn a hole
   vec3 mCol = mirrored.rgb * ( 3.0 / ( 3.0 + max( mirrored.r, max( mirrored.g, mirrored.b ) ) ) );
   // water's Fresnel (n = 1.33) on the unbroken surface; a broken film faces the eye a little more than the road does
@@ -402,6 +449,44 @@ if ( vRoadWorld.w > 0.5 && roadWater > 0.003 ) {
   reflectedLight.directSpecular *= 1.0 - 0.85 * mWet;
 }
 #endif
+`;
+
+/**
+ * GLSL (fragment, after the lights): lights drawn into the wet road analytically, as long streaks about the mirrored
+ * direction of the view, narrow across the plane of incidence and drawn out in it (wetGlint), with water's Fresnel,
+ * shorter and fainter on a merely damp surface: the cars' tail lamps on every tier (TAIL_GLINT; only behind the car,
+ * which hides them from the road ahead of it), and where there is no mirror the heads of the nearest lamps (GLINT).
+ */
+const WET_GLINTS = /* glsl */ `
+if ( vRoadWorld.w > 0.5 && uWet > 0.02 ) {
+  vec3 gP = vRoadWorld.xyz;
+  vec3 gV = normalize( cameraPosition - gP );
+  vec3 gN = normalize( ( vec4( nonPerturbedNormal, 0.0 ) * viewMatrix ).xyz ); // view space to world
+  float gWet = max( roadWater, ${FILM.share.toFixed(2)} * roadFilm );
+  float gF = 0.02 + 0.98 * pow( 1.0 - clamp( dot( gN, gV ), 0.0, 1.0 ), 5.0 );
+  float gLong = mix( 0.5, 1.0, roadWater );
+  vec3 glint = vec3( 0.0 );
+#ifndef ROAD_MIRROR
+  for ( int i = 0; i < ${GLINTS}; i ++ ) {
+    if ( uGlintPos[ i ].w <= 0.0 ) continue;
+    glint += uGlintColor[ i ] * ( uGlintPos[ i ].w * wetGlint( gP, gN, gV, uGlintPos[ i ].xyz, ${GLINT.across.toFixed(3)}, gLong * ${GLINT.along.toFixed(3)} ) );
+  }
+  glint *= ${GLINT.gain.toFixed(2)} * 3.0 / ( 3.0 + max( glint.r, max( glint.g, glint.b ) ) );
+#endif
+  float tail = 0.0;
+  for ( int i = 0; i < ${BEAMS}; i ++ ) {
+    if ( uTailPower[ i ] <= 0.0 ) continue;
+    // a tail lamp shines backwards: the road ahead of the car (and under it) is in the car's own shadow
+    vec3 back = - uBeamDir[ i ];
+    for ( int k = 0; k < 2; k ++ ) {
+      vec3 lamp = uTailPos[ i * 2 + k ];
+      float behind = smoothstep( -0.1, 0.4, dot( normalize( gP - lamp ), back ) );
+      tail += uTailPower[ i ] * behind * wetGlint( gP, gN, gV, lamp, ${TAIL_GLINT.across.toFixed(3)}, gLong * ${TAIL_GLINT.along.toFixed(3)} );
+    }
+  }
+  tail *= ${TAIL_GLINT.gain.toFixed(2)} * 3.0 / ( 3.0 + tail );
+  reflectedLight.indirectSpecular += ( glint + tail * vec3( ${TAIL_GLINT.color.map((c) => c.toFixed(3)).join(', ')} ) ) * ( gF * gWet );
+}
 `;
 
 /**
@@ -663,7 +748,8 @@ rAge = clamp( rAge + ( rBig2.r - 0.5 ) * 0.22, 0.0, 1.0 );
 rAge = mix( rAge, ftTone * 0.5, ftFresh );
 float rWorn = mix( 0.3, 1.0, rAge );
 // new: binder over everything, black. Old: the binder weathered grey and worn off the stones' tops.
-vec3 rCol = mix( vec3( 0.028, 0.028, 0.03 ), vec3( 0.074, 0.072, 0.07 ), rAge );
+// (night lane, frame D3: the sunlit road is a warm light grey; the stones are a warm limestone under the binder)
+vec3 rCol = mix( vec3( 0.03, 0.029, 0.028 ), vec3( 0.084, 0.078, 0.069 ), rAge );
 rCol *= 1.0 + ( rAgg.r - 0.5 ) * mix( 0.45, 1.5, rAge );
 rCol *= ( 0.86 + 0.28 * rBig.r ) * ( 0.92 + 0.16 * rBig2.r ) * ( 0.92 + 0.16 * rMottle );
 rCol *= 1.0 - 0.2 * rTracks * rWorn;
@@ -768,6 +854,9 @@ rCol *= 1.0 - 0.12 * roadPuddle;
 rAlpha2 *= mix( 1.0, 0.75, rSoaked );
 // a broken film scatters what it mirrors, standing water does not
 roadWaterRough = mix( 0.42, 0.05, smoothstep( 0.35, 1.05, rFill ) );
+// (night lane) after rain the whole surface is wet, not only where water stands: the binder between the stones holds
+// a film that mirrors lights as long soft streaks (the mirror's streaked copy), weaker on paint and dust
+roadFilm = rRaining * smoothstep( 0.3, 0.7, rRain ) * ( 1.0 - roadWater ) * ( 1.0 - 0.5 * roadPaint ) * ( 1.0 - 0.7 * roadGravel ) * ( 1.0 - ftHole );
 roadTiltGain *= 1.0 - roadWater;
 
 diffuseColor.rgb *= rCol;

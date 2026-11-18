@@ -21,7 +21,9 @@
 
 import * as THREE from 'three';
 import { createCar } from '../assets/car/index.js';
+import { LAMPS as CAR_LAMPS } from '../assets/car/spec.js';
 import { createWorld } from '../assets/world/index.js';
+import { canopyOpen } from '../assets/world/canopy.js';
 import { TIMES } from '../assets/world/lighting.js';
 import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
@@ -107,6 +109,7 @@ const HELD = { steer: 0, throttle: 0, brake: 0, handbrake: 1 };
 
 const probeAt = new THREE.Vector3();
 const probeHidden = [];
+const mirrorHidden = [];
 const frameOut = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
 const putAt = new THREE.Vector3();
 const shadowPoint = new THREE.Vector3();
@@ -304,7 +307,7 @@ export class Game {
         roofTime: 0,
         offer: '',
         putBacks: 0,
-        beam: { pos: new THREE.Vector3(), dir: new THREE.Vector3(), low: 0, high: 0 },
+        beam: { pos: new THREE.Vector3(), dir: new THREE.Vector3(), low: 0, high: 0, tailL: new THREE.Vector3(), tailR: new THREE.Vector3(), tail: 0, brake: 0 },
         shadowHint: -1,
         // (ENGINE lane) The blur's box is the car without its lowest 10 cm: the road it stands on must not count
         // as part of it, and the tyres' contact patches do move with the road.
@@ -960,7 +963,8 @@ export class Game {
         car.poseShadow(shadowPoint, shadowNormal, vehicle.yaw, vehicle.upsideDown ? 0 : clamp01(1 - lift / 1.5));
       }
       car.setLights(racer.lamps);
-      car.setReflections({ cube: this.views[racer.index]?.probe?.texture ?? null, sky: vehicle.sky });
+      // the car's sky: none in the tunnel, less under the woods (the same canopy the road beside it sees)
+      car.setReflections({ cube: this.views[racer.index]?.probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat) });
 
       obj.updateMatrixWorld();
       sharp.prevMatrix.copy(sharp.matrix);
@@ -972,6 +976,11 @@ export class Game {
       b.pos.set(0, 0.65, 2.2).applyQuaternion(obj.quaternion).add(obj.position);
       b.low = racer.lamps.low;
       b.high = racer.lamps.high;
+      // and the tail lamps, which the wet road draws out into red streaks
+      b.tailL.set(CAR_LAMPS.tail.x, CAR_LAMPS.tail.y, CAR_LAMPS.tail.z).applyQuaternion(obj.quaternion).add(obj.position);
+      b.tailR.set(-CAR_LAMPS.tail.x, CAR_LAMPS.tail.y, CAR_LAMPS.tail.z).applyQuaternion(obj.quaternion).add(obj.position);
+      b.tail = racer.lamps.tail;
+      b.brake = racer.lamps.brake;
 
       // what lights the smoke and the spray: the head lamps' cone and a red glow round the tail lamps
       const fl = (this._fxLamps[racer.index] ||= { headPos: new THREE.Vector3(), headDir: new THREE.Vector3(), tailPos: new THREE.Vector3(), head: 0, tail: 0 });
@@ -1150,7 +1159,13 @@ export class Game {
     const n = this.views.length;
     this.views.forEach((view, i) => {
       const car = view.racer.car;
-      this.world.prepareView(view.camera, car.object.position, this.beams);
+      // the wet road's mirror leaves out what lies on the road: seen from under it, a car's contact shadow and its
+      // spray would hide the car's own reflection (its tail lamps' red streaks)
+      mirrorHidden.length = 0;
+      for (const r of this.racers) if (r.car.shadow) mirrorHidden.push(r.car.shadow);
+      if (this.ghostCar?.shadow) mirrorHidden.push(this.ghostCar.shadow);
+      mirrorHidden.push(...this.effects.objects);
+      this.world.prepareView(view.camera, car.object.position, this.beams, mirrorHidden);
       // (ENGINE lane) the car's probe, from the middle of the car, without the car itself; after prepareView, so
       // that the shadows it shows are this view's. In split screen the two take turns. Nearly still (the title's
       // orbit, the grid): the larger cube, redrawn whole over a few frames; at speed the smaller one, a face or two.

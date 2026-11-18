@@ -196,6 +196,13 @@ export const LAYOUT = {
   ],
   /** Street lamps stand along these pieces, alternating sides; tunnel lamps hang in rows along every tunnel. */
   streetLamps: { pieces: ['finish', 'pitIn', 'grid', 'gridRun'], spacing: 30, height: 9 },
+  /**
+   * (night lane) The rest of the lap is lit too, more sparsely: a circuit's floodlights on tall poles at the solid
+   * edge, `spacing` metres apart, everywhere outside the tunnels and the straight's own lamps (lamps keep `clear`
+   * metres from a portal): on the inside of every bend tighter than `inside` metres, alternating sides elsewhere.
+   * None stand on the pieces in `skip`: the ledge's first bend is frame D3's place, which has no poles.
+   */
+  lapLamps: { spacing: 55, height: 10, clear: 25, inside: 1500, skip: ['ledge1'] },
   tunnelLamps: { spacing: 12, drop: 0.55, inset: 0.45 },
   /** Kerbs: on the inside of every bend tighter than `inside` metres from entry to exit, and on the outside at the exit of every bend tighter than `outside`. */
   kerbs: { inside: 800, outside: 500, exit: 0.4, width: SHOULDER },

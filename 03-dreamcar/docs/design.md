@@ -374,18 +374,23 @@ with a short `advance` after loading.
   65 m with a sharp cut-off rising to the right, high beam about 150 m; LED
   daytime running lamps always on; tail lamps red with a hot core; brake lamps
   three times brighter; warm tunnel lamps; lit windows in the pit building and the
-  towns. Exposure about 4 stops above day (lighting.js: 18 against 1; at 5
-  stops the moonlit land read as dusk and anything facing a head lamp within
+  towns. Exposure about 5 stops above day (lighting.js: 22 against 0.68; at 32
+  the moonlit land read as dusk and anything facing a head lamp within
   30 m burnt white). Lens ghosts are off at night.
 - **Night is the night after rain.** The asphalt is wet (lighting.js
-  `wetness`: day 0, night 0.65; `?wet=` overrides): dark, glossy, with
+  `wetness`: day 0, night 0.8; `?wet=` overrides): dark, glossy, with
   broken puddles in the wheel tracks and low spots, dry under the tunnel's
   roof. On the medium and high tiers it mirrors what stands on it through a
   planar reflection drawn per view about the road's plane under the view's
   car (engine/PlanarMirror.js; a third of the view's height on medium, half
   on high; nothing on low, which keeps the speculars): the tail lamps, the
   car, the lamps, the tree line and the sky, each light
-  drawn out into a streak towards the viewer. The head lamps lay a cool pool
+  drawn out into a streak towards the viewer, on the thin film that covers the
+  whole road as well as in the puddles; the tail lamps lie on it as two long
+  red streaks (drawn by the asphalt on every tier; the low tier draws the
+  nearest lamps' streaks so too). Floodlights stand round the whole lap, each
+  with a visible cone of light in the damp air, and the sky is a deep blue
+  that the massif stands against. The head lamps lay a cool pool
   on the road ahead through the asphalt's own backscatter (road.js), while
   their beam keeps light off what is close and high.
 - A circuit has no studs and no guide posts (studs.js and posts.js place

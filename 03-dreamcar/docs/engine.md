@@ -33,7 +33,7 @@ road's mirror; the car's reflection probe is updated just before the call.
 
 | # | pass | size | format | tiers |
 | --- | --- | --- | --- | --- |
-| a | road mirror (`PlanarMirror`, from `world.prepareView`) | 0.35 (medium) / 0.5 (high) of the view's height | half-float + depth renderbuffer | medium, high, and only with `caps.hdr` |
+| a | road mirror (`PlanarMirror`, from `world.prepareView`), then its streaked copy (two passes of 8 taps) | 0.35 (medium) / 0.5 (high) of the view's height | half-float + depth renderbuffer; the copy and its middle step half-float | medium, high, and only with `caps.hdr` |
 | b | reflection probe faces (`ReflectionProbe.update`, from the game) | 64 / 128 / 256 per face at speed, 128 / 256 / 512 standing still | half-float cube, mipmapped | all (`PROBE` in game/config.js) |
 | 1 | **the scene**, one render call | the view x render scale | half-float, depth texture, MSAA 0 / 4 / 4 | all |
 | 2 | ambient occlusion term | half | RGBA8 | medium, high; only when `look.ao > 0` |
@@ -334,6 +334,26 @@ the near plane slanted into the mirror plane (oblique clipping) rather than a
 clip plane in every shader. Materials read it through `mirror.uniforms`
 (`uMirrorTex`, `uMirrorMatrix`: world position to the mirror's picture,
 `uMirrorOn`: 0 when the eye is under the plane or nothing was drawn).
+
+With `streak` (the share of the picture's height, 0.3 on medium and high) the
+mirror also draws its picture out upwards into `uMirrorStreak`: each texel the
+weighted sum of eight texels above it, then of eight more at eight times the
+stride (63 first strides in all, fitted to `streak`). That is what a rippled
+or rough wet surface shows of a light: a streak towards the viewer as wide as
+the light and many times longer. The road reads the sharp picture where water
+stands and the streaked one on the film: two lookups a pixel, where it used to
+read 5 (medium) or 8 (high) taps along the streak from the mip chain, which
+smeared a light as wide as it was long.
+
+What the mirror leaves out (world/index.js): the road and the ground, the
+lamps' glow on them, the rails, and whatever the game names in
+`prepareView(camera, focus, beams, hidden)`: the cars' contact shadows,
+smoke and spray, which, seen from under the road, hid the cars' own
+reflections. What only the mirror shows: a soft halo round each lamp's head
+(lamps.js `HALO`), because a head a few centimetres wide falls between its
+texels and the mirror's picture has no bloom of its own. The cars' tail lamps
+are seen from under the road as thin bars edge on; their red streaks are drawn
+by the asphalt itself (road.js `TAIL_GLINT`) on every tier.
 
 ## Split screen and the render scale
 

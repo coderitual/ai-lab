@@ -103,7 +103,9 @@
  *
  * @property {import('../../engine/FramePipeline.js').Look} look the grade of the finished picture
  *
- * @property {{ street: number, tunnel: number, windows: number }} lamps how far each kind of lamp is turned up, 0..1
+ * @property {{ street: number, tunnel: number, windows: number, haze?: number }} lamps how far each kind of lamp is
+ *   turned up, 0..1 (the floodlights round the lap go with the street lamps); `haze`: how much of their light the
+ *   air shows as a cone under each lamp on a pole (0: none; the damp night after rain: 1)
  * @property {number} wetness 0..1 how wet the road is (world.wetness defaults to it; ?wet= overrides): the night
  *   is the night after rain, the road a dark mirror with puddles in the wheel tracks and low spots
  * @property {'drl'|'low'} carLights what a car's automatic lamps do under the open sky (in the tunnel: always low)
@@ -263,15 +265,18 @@ export const TIMES = {
   // outline; everything else is lamps.
   night: {
     name: 'night',
-    sun: { dir: MOON, color: [0.6, 0.75, 1.0], intensity: 0.08 },
+    // (night lane) the moon x1.5 and the sky about x1.6 and bluer: the owner's night was black beyond the head lamps.
+    // The sky is now a deep blue that the massif stands against as a silhouette, and its light (the environment
+    // map) and the moon's make the forest and the mountain readable; the lamps still burn far above it.
+    sun: { dir: MOON, color: [0.6, 0.75, 1.0], intensity: 0.12 },
     sky: {
-      zenith: [0.00045, 0.00085, 0.0021],
-      horizon: [0.0016, 0.0025, 0.0046],
+      zenith: [0.0007, 0.0014, 0.0038],
+      horizon: [0.0024, 0.0038, 0.0072],
       falloff: 0.12,
       phase: 0.25,
       glow: { color: [0.62, 0.77, 1.0], wide: [0.002, 0.7], tight: [0.012, 0.95] },
       disc: { size: 0.9, radiance: 0.055, limb: 0.1, phase: 0.75, tilt: -25, seas: 0.5 },
-      ground: [0.0007, 0.0009, 0.0014],
+      ground: [0.0009, 0.0012, 0.0019],
       stars: 1.5e-6,
       milkyWay: 0.0005,
       airglow: [0.0003, 0.00055, 0.0004],
@@ -280,7 +285,7 @@ export const TIMES = {
     env: { intensity: 1 },
     // the night sky lays only about a tenth of the moon's light on the ground; this keeps the moon's shadows
     // from being holes
-    ambient: { sky: [0.45, 0.6, 1.0], ground: [0.3, 0.36, 0.5], intensity: 0.009 },
+    ambient: { sky: [0.45, 0.6, 1.0], ground: [0.3, 0.36, 0.5], intensity: 0.013 },
     // (look lane: the haze halved, the far ranges were pale grey behind black hills; reference B's are near black)
     fog: { color: [0.0008, 0.0011, 0.0019], sun: [0.0004, 0.0005, 0.0008], sunLobe: 4, density: 0.00042, heightFalloff: 0.011, air: 0.00006 },
     // four stops above day (look lane: was five; at 32 the moonlit land read as dusk and everything that faces a head
@@ -292,9 +297,10 @@ export const TIMES = {
     // the lit tunnel is two stops brighter than the moonlit road outside
     tunnelExposure: 8,
     look: { contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], lift: [0.0006, 0.0009, 0.0018], vignette: 0.32, chroma: 0.0012, grain: 1.2, bloom: 0.15, ghosts: 0, ao: 0.9, star: 0.015, halo: 0.15 },
-    lamps: { street: 1, tunnel: 1, windows: 1 },
-    // the night after rain (look reference B): wet asphalt, water standing in the ruts
-    wetness: 0.65,
+    lamps: { street: 1, tunnel: 1, windows: 1, haze: 1 },
+    // the night after rain (look reference B): wet asphalt, water standing in the ruts and the dips
+    // (night lane: was 0.65, water only in the deepest dips; the references' road is a dark mirror)
+    wetness: 0.8,
     carLights: 'low',
   },
 };

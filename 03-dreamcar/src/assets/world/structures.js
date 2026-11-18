@@ -25,8 +25,9 @@ import { createViaducts } from './viaduct.js';
  * @param {import('../../engine/caps.js').Tier} options.tier
  * @param {import('./atmosphere.js').Atmosphere} options.atmosphere
  * @param {import('../../engine/rng.js').Rng} options.rng
+ * @param {object} [options.glints] the wet road's lamp glints (road.js), filled by the lamps each view
  */
-export function createStructures({ track, terrain, caps, tier, atmosphere, rng }) {
+export function createStructures({ track, terrain, caps, tier, atmosphere, rng, glints = null }) {
   const group = new THREE.Group();
   group.name = 'structures';
   const ms = {};
@@ -37,7 +38,7 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng }
     clock = now;
   };
 
-  const lamps = createLamps({ track, caps, tier, atmosphere });
+  const lamps = createLamps({ track, caps, tier, atmosphere, glints });
   lap('lamps');
   const tunnels = createTunnels({ track, terrain, atmosphere, lamps });
   lap('tunnel');
@@ -60,8 +61,13 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng }
     // (picture lane) on the low tier a probe's face is 64 texels across 90 degrees: posts, rails and the glow under
     // the lamps are less than a texel in it, and each cost a draw call
     probeHidden: tier === 'low' ? [...dressing.probeHidden, rails.group, posts.group, ...lamps.glows] : dressing.probeHidden,
-    /** What the wet road's mirror leaves out (the lamps' glow lies on the road, which the mirror leaves out too). */
-    mirrorHidden: [...dressing.mirrorHidden, ...lamps.glows],
+    /** The lamps' halos, which only the road's mirror shows (lamps.js). */
+    halos: lamps.halos,
+    /**
+     * What the wet road's mirror leaves out (the lamps' glow lies on the road, which the mirror leaves out too; the
+     * rails, posts and beams, 30 to 40 thousand triangles, are dark lines low beside it that its streaks smear away).
+     */
+    mirrorHidden: [...dressing.mirrorHidden, ...lamps.glows, rails.group],
     stats: { ms, lamps: lamps.stats, rails: rails.stats, walls: walls.stats, posts: posts.stats, viaducts: viaducts.stats, dressing: dressing.stats },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {

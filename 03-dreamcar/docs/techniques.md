@@ -317,8 +317,28 @@ on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car als
   under the view's car, with an oblique near clip, into a reduced target to a
   short far plane, without redrawing shadow maps; the asphalt reads it
   projectively, pushed by the aggregate's normal, drawn out into a streak
-  towards the viewer by roughness, weighted by Fresnel and the wetness. On
-  low there is no mirror and the speculars remain.
+  towards the viewer by roughness, weighted by Fresnel and the wetness. After
+  rain the whole surface carries a thin film, not only the puddles: outside
+  the standing water the asphalt shows the mirror's streaked copy at 0.55 of
+  a puddle's strength (road.js `FILM`), so every lamp, board and window lies
+  on the road as a long vertical streak. On low there is no mirror: the
+  heads of the six lit lamps nearest the eye (lamps.js fills `road.glints`
+  each view) are drawn into the water analytically as the same streaks (a
+  lobe about the mirrored view, narrow across the plane of incidence, long in
+  it), and on every tier the cars' tail lamps are drawn so too (`TAIL_GLINT`,
+  only behind the car), which the mirror cannot show.
+- **The canopy** (`src/assets/world/canopy.js`): what the woods beside the road
+  hide of the sky, defined once from the Track's `woodAt` and multiplied into
+  the baked sky share (`aBake.z`) of the road, the kerbs and the verges, and
+  into the car's own sky by the game. A wood is a wall of crowns 16 m
+  (broadleaf), 18 (mixed) or 20 (conifer) high plus the hillside's rise under
+  it, its face 3.5 m nearer than the first trunks; a wall standing up to an
+  angle t hides (1 - cos t) / 2 of a cosine-weighted sky, the low sky it hides
+  counts 1.3 times (it is the bright part by day), the leaves stop 0.85 of it,
+  averaged 15 m either way along the road, never below 0.3. In a wood on both
+  sides the road keeps about 0.35 to 0.45 of the sky; on the ledge, with the
+  bank's wood on the right, 0.5 to 0.8; in the open 1. The sun that reaches
+  the road there stands out against real shade.
 
 ## The frame
 
@@ -355,11 +375,32 @@ mirror's, the probes') still work. Smaller cells cull more but cost draw
 calls, of which `low` has 150.
 
 Other passes leave out what cannot show in them: the mirror the lamps' glow
-(it lies on the road, which the mirror leaves out), the skid marks draw only
+(it lies on the road, which the mirror leaves out) and the rails (30 to 40
+thousand triangles of dark lines low beside the road, which its streaks smear
+away), the skid marks draw only
 the slots some wheel has used (none on a clean run), and the glow under the
 lamps is a coarse grid (5 columns, a row every 5 m: the light itself is
 worked out per pixel), one mesh per kind of lamp, hidden while that kind is
 off (the street lamps by day).
+
+## The lamps at night
+
+`src/assets/world/lamps.js`. 150 lamps: 23 street lamps on the straight
+(warm), 69 floodlights 10 m high every 55 m round the rest of the lap (a
+cooler white; on the inside of every bend tighter than 1500 m, alternating
+elsewhere; none in the tunnels or within 25 m of a portal, none on the ledge's
+first bend, frame D3's place), 58 in the tunnel. The scene still has the same
+fixed pool of real spot lights (2, 4 or 6 by tier); everything else a lamp
+does is drawn: its head (an emitter that blooms), its glow on the ground
+(worked out per pixel from the same spot light, darker on wet ground), its
+cone in the damp air (lighting.js `lamps.haze`: an open cone from the head to
+the ground, additive, as bright as the length of air a ray crosses in it,
+fading towards the ground and when the eye comes within 6 to 24 m of it), its
+halo in the road's mirror, and its streak in the wet road. How far each lamp
+is on and its share of the pool are one texel each of a small texture
+(`shares`), read by the glow, the cones, the halos and the tunnel's bore:
+150 lamps as two uniform arrays would be more uniforms than a phone's shader
+holds.
 
 ## Determinism
 

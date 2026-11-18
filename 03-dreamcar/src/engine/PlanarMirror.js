@@ -19,9 +19,35 @@
 // far plane (the sky, drawn at infinity by its own shader, still shows), the
 // shadow maps are not drawn again for it, and whatever the caller names is
 // hidden for the pass. Knows nothing about roads: the caller gives the plane.
+//
+// With `streak` the picture is also drawn out upwards into a second texture,
+// `streakTexture`: what a rough or rippled mirror (wet asphalt) shows of a
+// light is a long vertical streak towards the viewer, as wide as the light and
+// many times longer. Two passes of eight taps, the second eight times the
+// stride of the first, each texel the sum of what lies above it, weighted down
+// with distance: a smooth streak `streak` of the picture's height long, sharp
+// across, for two lookups in the material instead of a row of them per pixel.
 
 import * as THREE from 'three';
 import { createTarget, resizeTarget } from './caps.js';
+import { FullscreenPass, createPassMaterial } from './FullscreenPass.js';
+
+/** One stride of the streak: eight taps upwards from the pixel, the nearest counting most (uFall per tap). */
+const STREAK_PASS = /* glsl */ `
+uniform sampler2D uSource;
+uniform vec2 uStride;
+uniform float uFall;
+void main() {
+  vec3 sum = vec3(0.0);
+  float total = 0.0;
+  for (int i = 0; i < 8; i++) {
+    float w = exp(-uFall * float(i));
+    sum += fromTarget(textureLod(uSource, vUv + uStride * float(i), 0.0)).rgb * w;
+    total += w;
+  }
+  outColor = toTarget(vec4(sum / total, 1.0));
+}
+`;
 
 const _cam = new THREE.Vector3();
 const _view = new THREE.Vector3();
@@ -36,11 +62,12 @@ export class PlanarMirror {
   /**
    * @param {THREE.WebGLRenderer} renderer
    * @param {import('./caps.js').Caps} caps
-   * @param {{ scale?: number, far?: number, clipBias?: number }} [options] `scale`: the target's height against the
-   *   view's; `far`: the mirrored camera's far plane (m); `clipBias`: how far behind the plane the picture still
-   *   reaches (m), so that what stands on the surface meets its reflection without a gap
+   * @param {{ scale?: number, far?: number, clipBias?: number, streak?: number }} [options] `scale`: the target's
+   *   height against the view's; `far`: the mirrored camera's far plane (m); `clipBias`: how far behind the plane the
+   *   picture still reaches (m), so that what stands on the surface meets its reflection without a gap; `streak`:
+   *   the length of the drawn-out copy, a share of the picture's height (0: none)
    */
-  constructor(renderer, caps, { scale = 0.5, far = 300, clipBias = 0.03 } = {}) {
+  constructor(renderer, caps, { scale = 0.5, far = 300, clipBias = 0.03, streak = 0 } = {}) {
     this.renderer = renderer;
     this.scale = scale;
     this.far = far;
@@ -59,6 +86,18 @@ export class PlanarMirror {
       uMirrorOn: { value: 0 },
       uMirrorTexel: { value: new THREE.Vector2(1 / 4, 1 / 4) },
     };
+    this.streak = streak;
+    if (streak > 0) {
+      this._half = createTarget(caps);
+      this._streak = createTarget(caps);
+      /** The picture drawn out upwards (see the header); null without `streak`. */
+      this.streakTexture = this._streak.texture;
+      this.uniforms.uMirrorStreak = { value: this.streakTexture };
+      this._stride = new THREE.Vector2();
+      this._source = { value: null };
+      this._fall = { value: 0 };
+      this._pass = new FullscreenPass(createPassMaterial(caps, { fragmentShader: STREAK_PASS, uniforms: { uSource: this._source, uStride: { value: this._stride }, uFall: this._fall } }));
+    } else this.streakTexture = null;
     /** Milliseconds the last render() took on the CPU side (for the stats). */
     this.ms = 0;
   }
@@ -79,6 +118,10 @@ export class PlanarMirror {
     if (this.target.width !== w || this.target.height !== h) {
       resizeTarget(this.target, w, h);
       this.uniforms.uMirrorTexel.value.set(1 / w, 1 / h);
+      if (this.streak > 0) {
+        resizeTarget(this._half, w, h);
+        resizeTarget(this._streak, w, h);
+      }
     }
     _cam.setFromMatrixPosition(camera.matrixWorld);
     _view.subVectors(point, _cam);
@@ -132,6 +175,18 @@ export class PlanarMirror {
     renderer.setRenderTarget(this.target);
     renderer.render(scene, mirror);
     renderer.setRenderTarget(previous);
+    if (this.streak > 0) {
+      // the second stride is eight times the first, so the taps reach 7 + 7 x 8 = 63 first strides: fitted to `streak`
+      const step = Math.max(1, (this.streak * h) / 63) / h;
+      this._source.value = this.texture;
+      this._stride.set(0, step);
+      this._fall.value = 0.05;
+      this._pass.render(renderer, this._half);
+      this._source.value = this._half.texture;
+      this._stride.set(0, step * 8);
+      this._fall.value = 0.3;
+      this._pass.render(renderer, this._streak);
+    }
     renderer.shadowMap.autoUpdate = shadowAuto;
     renderer.shadowMap.needsUpdate = shadowNeeds;
     hidden.forEach((o, i) => (o.visible = shown[i]));
@@ -140,5 +195,8 @@ export class PlanarMirror {
 
   dispose() {
     this.target.dispose();
+    this._half?.dispose();
+    this._streak?.dispose();
+    this._pass?.dispose();
   }
 }
