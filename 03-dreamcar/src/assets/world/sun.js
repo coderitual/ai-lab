@@ -34,9 +34,11 @@ import * as THREE from 'three';
  * is filtered (texels). A texel is 2 * reach / size: 9, 5 and 3 cm.
  */
 export const SHADOW = {
-  low: { size: 1024, reach: 46, radius: 1.2 },
-  medium: { size: 2048, reach: 56, radius: 1.8 },
-  high: { size: 4096, reach: 66, radius: 2.5 },
+  // (render lane: the filter was 1.2 / 1.8 / 2.5 texels; with the map fitted to the sun's height a texel is finer
+  // along the ground, and a narrower filter keeps the car's shadow crisp instead of a soft blob)
+  low: { size: 1024, reach: 46, radius: 1.0 },
+  medium: { size: 2048, reach: 56, radius: 1.2 },
+  high: { size: 4096, reach: 66, radius: 1.6 },
 };
 
 /** How far in from the edge of its square a view's car is kept (m): shadows also fall on what is behind it. */

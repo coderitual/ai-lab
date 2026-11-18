@@ -31,7 +31,7 @@ SwiftShader on four busy cores. Times below are from that machine.
 
 | script | what it does | checks | time here |
 | --- | --- | --- | --- |
-| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (112 241 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). | 3 files | 1.5 to 2 min |
+| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (111 821 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). | 3 files | 1.5 to 2 min |
 | `node tools/handling.mjs` | The car measured the way a road test would; prints the table of spec.md. `--json`, `--no-laps`. | (a table, not checks) | 6 s |
 | `node tools/trackmap.mjs out.svg` | Draws the circuit from above with its height, gradient and speed envelope, and prints its numbers (sections, structures, kerbs, dressing, lamps, sectors, pieces). `--png out.png`, `--fit a,b` (close the loop after an edit). | | under 1 s |
 | `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the steering part, the brake part, DRIFT, the automatic throttle and its moment after, GAS on manual, the zones' naming, both split halves), slide (a handbrake turn through the keys, the readout, the driving help kept and applied), window, hud (now with the DRIFT and GAS buttons), options, start, photo, determinism, params, tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
@@ -140,6 +140,13 @@ machine without a GPU, and only what is listed here.
   stills beside the owner's reference frames (sky, environment, trees, start,
   car and look lanes) were looked at by eye on software WebGL at `medium`,
   and a few at `high`.
+- **The render lane's changes** (golden dusk, board lettering, the fitted
+  shadow map and narrower filter, the tighter AO, the verge's green, the
+  tunnel's fittings, the massif's strata and relief, the ledge's lower bank):
+  looked at by eye in stills on software WebGL at `medium`, 1280x720 for
+  d1, d3 and d4 and 393x852 at device scale 2 for the chase view on the sky
+  road and in the tunnel; `node tools/unit.mjs` passed (4 files). Not looked
+  at on `low` or `high`, at night, or in motion; the playtest was not run.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.

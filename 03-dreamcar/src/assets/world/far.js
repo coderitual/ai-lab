@@ -118,9 +118,9 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   float ledge = smoothstep(0.78, 0.97, fract(bedAt));
   float beds = ((bedTone - 0.5) * 0.42 - 0.3 * ledge) * (1.0 - smoothstep(6.0, 16.0, footprint));
   float streakN = fbm(vec2(dot(vRockWorld.xz, vec2(0.71, 0.7)) / 34.0, vRockWorld.y / 520.0), 3);
-  float streak = smoothstep(0.52, 0.75, streakN) * (1.0 - smoothstep(5.0, 14.0, footprint));
+  float streak = smoothstep(0.56, 0.8, streakN) * (1.0 - smoothstep(5.0, 14.0, footprint));
   float pine = smoothstep(0.55, 0.85, flatness) * smoothstep(0.56, 0.7, fbm(vRockWorld.xz / 45.0, 3)) * (1.0 - smoothstep(10.0, 30.0, footprint));
-  vec3 rockCol = diffuseColor.rgb * (1.0 + beds) * (1.0 - 0.38 * streak);
+  vec3 rockCol = diffuseColor.rgb * (1.0 + beds) * (1.0 - 0.28 * streak);
   rockCol = mix(rockCol, vec3(0.03, 0.045, 0.028), 0.75 * pine);
   // the gentle ground above the tree line is scree and turf, lighter, with the ledges catching the sky
   diffuseColor.rgb = mix(diffuseColor.rgb, rockCol, rockShare);

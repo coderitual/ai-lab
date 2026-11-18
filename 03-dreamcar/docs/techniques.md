@@ -271,7 +271,8 @@ need no room of their own: whatever shades a point of the ground lies on the
 same line to the sun, so it is in the map wherever the point is. The normal
 offset is 0.8 of the larger texel (it was 1.6, which under a 16 degree sun
 lifted the road 9 cm into the light and set the car's shadow 30 cm off its
-tyres). The car also lays its own contact shadow (the CAR lane's
+tyres). The filter (three.js's five-tap PCF) is 1.0 / 1.2 / 1.6 texels wide
+on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car also lays its own contact shadow (the CAR lane's
 `car/shadow.js`), which no map is fine enough to draw.
 
 ## The asphalt
