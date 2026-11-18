@@ -411,8 +411,8 @@ function layCorridor(track, plan) {
   const { count: n, ds, layout } = track;
   const segs = layout.segments;
   const sides = [
-    { key: 'L', edge: track.edgeL, kind: track.kindL, verge: track.vergeL, slope: track.slopeL, wood: track._woodL, phase: 0.6 },
-    { key: 'R', edge: track.edgeR, kind: track.kindR, verge: track.vergeR, slope: track.slopeR, wood: track._woodR, phase: 2.9 },
+    { key: 'L', edge: track.edgeL, kind: track.kindL, verge: track.vergeL, slope: track.slopeL, wood: track._woodL, coast: track.coastL, phase: 0.6 },
+    { key: 'R', edge: track.edgeR, kind: track.kindR, verge: track.vergeR, slope: track.slopeR, wood: track._woodR, coast: track.coastR, phase: 2.9 },
   ];
   const far = [new Float64Array(n), new Float64Array(n)];
   for (let side = 0; side < 2; side++) {
@@ -433,6 +433,7 @@ function layCorridor(track, plan) {
       out.kind[i] = KIND[preset.kind];
       out.verge[i] = VERGE[preset.verge];
       out.wood[i] = Math.max(0, WOODS.indexOf(preset.wood ?? null));
+      out.coast[i] = preset.coast ? 1 : 0;
     }
     // Narrow first (so the rounding that follows cannot push an edge out beyond what its preset allows, and the
     // tunnel's walls stay exactly where they are), then limit the rate, then round the corners.
@@ -771,6 +772,9 @@ export class Track {
     this.slopeR = new Float32Array(n);
     this.farSlopeL = new Float32Array(n);
     this.farSlopeR = new Float32Array(n);
+    /** (sea lane) 1 on the sea side of the coast road (a preset's `coast`): ochre gravel beyond the barrier, white posts. */
+    this.coastL = new Uint8Array(n);
+    this.coastR = new Uint8Array(n);
     /** How much sky is overhead: 1 in the open, 0 in the tunnel, easing over about 25 m at the portals. */
     this.sky = new Float32Array(n);
     // Heading on the map (unit, level): what the cubics between samples are built from.

@@ -65,6 +65,29 @@ const FAR_REACH = 4800;
 const OPEN_VIEW = 110;
 /** Where the start straight is seen from (x from, x to along z = 0) and the slope (tan 6 deg) the hills keep under. */
 const STRAIGHT_VIEW = { x0: -450, x1: 250, slope: 0.1 };
+/**
+ * (sea lane) THE SEA, whose surface is the Track's lake level. Outside the loop, at a bearing from the course's middle
+ * (degrees, atan2(z, x): 0 is +X, 90 is +Z) outside `mainland`, the land falls from the road to the water `shore`
+ * metres beyond the solid edge (it wanders between the two) and the sea runs to the horizon: north of the tunnel's
+ * spur, round the sky road and the headland of the carousel and the crest, down the west side. The mainland, with
+ * the massif and the far ridges behind the start straight, stays east of it (frame D1 is untouched). The lake beside
+ * the straight is a bay of the same sea, reaching `bayWest` times as far west as east, where it opens to it.
+ * `cliff`: rise per metre of the land above the water's edge; `shelf`: fall per metre of the seabed beyond it, down to
+ * `deep`; `soft`: degrees over which the coast turns from sea to mainland (and as much again of wander); `stacks`: how
+ * many sea stacks stand off the coast.
+ * `map`: the sea map's texels a side and its half width (m) round the middle (see seaMap below).
+ */
+const SEA = {
+  mainland: [-115, 50],
+  soft: 14,
+  shore: [55, 170],
+  cliff: 1.15,
+  shelf: 0.3,
+  deep: 45,
+  bayWest: 2.2,
+  stacks: 7,
+  map: { size: 512, half: 2400 },
+};
 
 /**
  * @typedef {object} Terrain
@@ -80,9 +103,22 @@ const STRAIGHT_VIEW = { x0: -450, x1: 250, slope: 0.1 };
  *   rock edge: how far beyond the solid edge its top is (m), how high it rises, and how much of a rock edge it is
  * @property {(s: number, lat: number) => number} heightOnTrack the same height at track coordinates
  * @property {THREE.MeshStandardMaterial} material the ground's material (the band, the grid, the far land)
- * @property {{ level: number, extent: { x0: number, x1: number, z0: number, z1: number } }} lake where the water lies
+ * @property {{ level: number, extent: { x0: number, x1: number, z0: number, z1: number } }} lake the bay beside the
+ *   straight (the lake it was): its surface and the box of its old ellipse (far.js puts the town's lights round it)
+ * @property {SeaShape} sea where the sea is (sea.js draws it; far.js keeps the far ridges off it)
  * @property {object} stats vertices, triangles, milliseconds
  * @property {() => void} dispose
+ *
+ * @typedef {object} SeaShape
+ * @property {number} level the water's surface (y)
+ * @property {(x: number, z: number) => number} at 0..1 how much a point of the map is sea (1) rather than land or a
+ *   pond (0); beyond the course, whether its bearing is the sea's
+ * @property {(x: number, z: number) => number} sector 0..1 the sea's share of a point's bearing from the course's
+ *   middle (for what lies beyond the land: the far ridges)
+ * @property {{ size: number, x0: number, z0: number, extent: number, data: Uint8Array }} map the sea map, RGBA per
+ *   texel over a square `extent` m a side from (x0, z0), x along a row: r the water's depth (sqrt of depth / 64 m),
+ *   g how far the land is from the water (0 at its edge, 1 at 500 m and more), b how far the water is from the land
+ *   (0 at the shore, 1 at 160 m and more), a the sea's share (at)
  */
 
 /**
@@ -176,8 +212,31 @@ const FOOT = 0.8;
   const mid = { x: (track.bounds.minX + track.bounds.maxX) / 2, z: (track.bounds.minZ + track.bounds.maxZ) / 2 };
   // the lake lies along the straight's shore (the straight runs along z = 0, the water on its -z side)
   const LAKE = { x: 60, z: -330, rx: 650, rz: 300 };
-  const lakeE = (x, z) => ((x - LAKE.x) / LAKE.rx) ** 2 + ((z - LAKE.z) / LAKE.rz) ** 2;
-  function valley(x, z) {
+  // (sea lane) the lake is a bay of the sea: its ellipse as it was to the east, drawn out westwards to the open water
+  const lakeE = (x, z) => ((x - LAKE.x) / (x < LAKE.x ? LAKE.rx * SEA.bayWest : LAKE.rx)) ** 2 + ((z - LAKE.z) / LAKE.rz) ** 2;
+  const RAD = 180 / Math.PI;
+  /** 0..1 the sea's share of a point's bearing from the course's middle (SEA.mainland), with a wander of its own. */
+  function seaSector(x, z) {
+    const a = Math.atan2(z - mid.z, x - mid.x) * RAD;
+    const r = Math.hypot(x - mid.x, z - mid.z);
+    const into = Math.min(a - SEA.mainland[0], SEA.mainland[1] - a) + 2 * SEA.soft * (noise.fbm(r / 700 + 21, a / 35 + 4, 3) - 0.5);
+    return smoothstep(SEA.soft, -SEA.soft, into);
+  }
+  /** Metres beyond the solid edge where the water begins. */
+  const shoreAt = (x, z) => SEA.shore[0] + (SEA.shore[1] - SEA.shore[0]) * smoothstep(0.3, 0.7, noise.fbm(x / 520 + 13, z / 520 - 7, 3));
+  /** The coast's profile at d m beyond the solid edge, from a road whose ground is at `base`. */
+  const coastAt = (x, z, base, d) => {
+    const shore = shoreAt(x, z);
+    const fall = d < shore ? SEA.cliff : SEA.shelf;
+    return Math.max(lakeLevel - SEA.deep, Math.min(base - 0.25 * d, lakeLevel + fall * (shore - d)));
+  };
+  /** The valley with the bay and the open sea far from the road. */
+  const valley = (x, z) => {
+    const h = valleyLand(x, z);
+    const s = seaSector(x, z);
+    return s > 0 ? h + (lakeLevel - SEA.deep - h) * s : h;
+  };
+  function valleyLand(x, z) {
     const e = lakeE(x, z);
     const inLake = smoothstep(1.06, 0.82, e);
     const floor = 3 + 20 * noise.fbm(x / 420, z / 420, 3) + 30 * smoothstep(1.2, 3, e) * noise.fbm(x / 300 + 7, z / 300, 3);
@@ -216,6 +275,8 @@ const FOOT = 0.8;
   const mz = Math.ceil((maxZ - minZ) / MACRO) + 1;
   const macro = new Float32Array(mx * mz);
   const macroD = new Float32Array(mx * mz);
+  /** (sea lane) 1 where a cell of the field could start the sea's flood (open water well beyond the road, or the bay). */
+  const seaSeed = new Uint8Array(mx * mz);
   const spot = { index: -1, s: 0, lat: 0 };
   // the loop as a polygon on the map, to tell inside (the massif) from outside (the valleys)
   const ring = [];
@@ -240,7 +301,7 @@ const FOOT = 0.8;
         const side = spot.lat >= 0 ? 1 : -1;
         const d = Math.max(0, Math.abs(spot.lat) - track.edgeAt(spot.s, side));
         const base = read(ref, spot.s);
-        const g = valley(x, z);
+        const g = valleyLand(x, z);
         let v;
         if (inside(x, z)) {
           // the massif: gently up from the road at first (meadows, the wood), then steeply
@@ -256,6 +317,11 @@ const FOOT = 0.8;
           v = Math.max(Math.min(base + rise + (away - rise) * open, cap), Math.min(base + fall * 45 * open, cap));
         } else {
           v = Math.max(base - 0.25 * d, g);
+          // (sea lane) towards the sea the land falls from the road to the water's edge, steeply at the last, and
+          // the seabed shelves away beyond it
+          const sea = seaSector(x, z);
+          if (sea > 0) v += (coastAt(x, z, base, d) - v) * sea;
+          if ((sea > 0.5 && d > shoreAt(x, z) + 30) || lakeE(x, z) < 0.8) seaSeed[j * mx + i] = 1;
         }
         macro[j * mx + i] = v;
         macroD[j * mx + i] = d;
@@ -293,8 +359,90 @@ const FOOT = 0.8;
     return (arr[k] * (1 - u) + arr[k + 1] * u) * (1 - v) + (arr[k + w] * (1 - u) + arr[k + w + 1] * u) * v;
   };
   const inMacro = (x, z) => x >= minX && x <= maxX && z >= minZ && z <= maxZ;
+  // (sea lane) Which of the field's low ground is the sea: a flood from the open water and the bay through every cell
+  // under the water's level. What it does not reach is a hollow in the land, which the water must not fill (the sea
+  // is one level plane drawn everywhere, and the land covers it): such ground is held just above the water.
+  const seaGrid = new Float32Array(mx * mz);
+  {
+    const queue = new Int32Array(mx * mz);
+    let head = 0;
+    let tail = 0;
+    for (let k = 0; k < mx * mz; k++) {
+      if (seaSeed[k] && macro[k] < lakeLevel) {
+        seaGrid[k] = 1;
+        queue[tail++] = k;
+      }
+    }
+    while (head < tail) {
+      const k = queue[head++];
+      const i = k % mx;
+      const j = (k - i) / mx;
+      for (const [a, b] of [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]]) {
+        if (a < 0 || b < 0 || a >= mx || b >= mz) continue;
+        const q = b * mx + a;
+        if (seaGrid[q] || macro[q] >= lakeLevel + 0.5) continue;
+        seaGrid[q] = 1;
+        queue[tail++] = q;
+      }
+    }
+    // one blur, so that the share falls from 1 to 0 across a cell or two at the shore
+    const tmp = new Float32Array(seaGrid);
+    for (let j = 1; j < mz - 1; j++) {
+      for (let i = 1; i < mx - 1; i++) {
+        let sum = 0;
+        for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) sum += tmp[(j + b) * mx + i + a];
+        seaGrid[j * mx + i] = sum / 9;
+      }
+    }
+  }
+  /** 0..1 how much of a point is sea (SeaShape.at). */
+  const seaAt = (x, z) => (inMacro(x, z) ? bilinear(seaGrid, mx, mz, minX, minZ, MACRO, x, z) : Math.max(seaSector(x, z), smoothstep(1.06, 0.82, lakeE(x, z))));
+  /** Ground under the water's level that is not the sea's is lifted to just above it. */
+  // (sea lane) A few sea stacks off the coast: columns of rock standing out of the water some 30 to 120 m from the
+  // shore (where the field is sea and land is a few cells away), apart from one another.
+  const stacks = [];
+  {
+    const stackRng = rng.fork('stacks');
+    const near = (k, reach) => {
+      const i = k % mx;
+      const j = (k - i) / mx;
+      for (let b = -reach; b <= reach; b++) {
+        for (let a = -reach; a <= reach; a++) {
+          const q = (j + b) * mx + i + a;
+          if (j + b >= 0 && j + b < mz && i + a >= 0 && i + a < mx && macro[q] > lakeLevel + 4) return true;
+        }
+      }
+      return false;
+    };
+    for (let tries = 0; tries < 4000 && stacks.length < SEA.stacks; tries++) {
+      const k = stackRng.int(mx * mz);
+      if (seaGrid[k] < 0.99 || macro[k] > lakeLevel - 4 || near(k, 2) || !near(k, 7)) continue;
+      const x = minX + (k % mx) * MACRO + stackRng.range(-6, 6);
+      const z = minZ + Math.floor(k / mx) * MACRO + stackRng.range(-6, 6);
+      // (in the open sea, not in the bay, which frames D1 and D4 look across)
+      if (lakeE(x, z) < 1.6 || seaSector(x, z) < 0.8 || stacks.some((t) => Math.hypot(t.x - x, t.z - z) < 160)) continue;
+      stacks.push({ x, z, r: stackRng.range(9, 17), h: stackRng.range(12, 34) });
+    }
+  }
+  /** The stacks' height at a point (-Infinity where there is none). */
+  const stackAt = (x, z) => {
+    let top = -Infinity;
+    for (const t of stacks) {
+      const q = Math.hypot(x - t.x, z - t.z) / (t.r * (0.85 + 0.3 * noise.fbm(x / 9 + t.x, z / 9, 2)));
+      if (q < 1.6) top = Math.max(top, lakeLevel - 6 + (t.h + 6) * (1 - smoothstep(0.75, 1.15, q)) * (0.85 + 0.25 * noise.fbm(x / 6, z / 6 + t.z, 2)));
+    }
+    return top;
+  };
+  const keepDry = (h, x, z) => {
+    h = Math.max(h, stackAt(x, z));
+    if (h >= lakeLevel + 1) return h;
+    const wet = seaAt(x, z);
+    return wet >= 0.5 ? h : h + (lakeLevel + 1 - h) * smoothstep(0.5, 0.2, wet);
+  };
+  /** The small hills on top of the land's shape, and fewer of them on the seabed, so it raises no islets by chance. */
+  const detailAt = (x, z) => detail(x, z) * (1 - 0.8 * seaAt(x, z));
   /** The land's shape with its hills: what the ground is far from any road. */
-  const land = (x, z) => (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detail(x, z);
+  const land = (x, z) => keepDry((inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z), x, z);
 
   const phases = { macro: Math.round(performance.now() - started) };
   // the far land's heights, on its own coarse grid (the bake marches over them too)
@@ -429,8 +577,8 @@ const FOOT = 0.8;
     }
     const w = smoothstep(10, 100, d) * reach;
     if (w <= 0) return near;
-    const far = (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detail(x, z) * smoothstep(15, 150, d);
-    return near + (far - near) * w;
+    const far = (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z) * smoothstep(15, 150, d);
+    return keepDry(near + (far - near) * w, x, z);
   }
   const near = (x, z) => (inMacro(x, z) ? bilinear(macroD, mx, mz, minX, minZ, MACRO, x, z) : 1e9) < NEAR_REACH;
   function heightAt(x, z) {
@@ -533,6 +681,7 @@ const FOOT = 0.8;
         for (let k = 1; k <= 4; k++) offs[2 + k] = offs[2] + (top - offs[2]) * (k / 4);
         for (let k = 0; k < BAND_OUT.length; k++) offs[7 + k] = top + BAND_OUT[k];
         const gravel = (side > 0 ? track.vergeL : track.vergeR)[i] === SURFACE_GRAVEL;
+        const coast = (side > 0 ? track.coastL : track.coastR)?.[i] === 1;
         const woodHere = track.woodAt ? !!track.woodAt(s, side) : false;
         let lastOwn = 0;
         for (let k = 0; k < cols; k++) {
@@ -566,6 +715,8 @@ const FOOT = 0.8;
           verge[v * 4 + 3] = woodHere ? 0.4 : 0;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
+          // (sea lane) beyond the barrier on the sea side of the coast road, a strip of gravel (ochre on the coast)
+          if (coast && k >= 1) mask[v * 2 + 1] = Math.max(mask[v * 2 + 1], 1 - smoothstep(6, 12, d));
         }
         ext[half][i] = edge + offs[lastOwn];
         if (bandStep > 1) for (let b = 1; b < bandStep && i + b < n; b++) ext[half][i + b] = ext[half][i];
@@ -756,6 +907,8 @@ const FOOT = 0.8;
     }
   }
   const gridGeometries = [];
+  /** (sea lane) Ground this far under the water's level is never seen: the waves' troughs do not reach it. */
+  const DROWNED = lakeLevel - 2;
   // cells per chunk side: (finish lane) about 400 m on medium as on low (it was 288 m: fifteen pieces of grid in a
   // view at night), 240 m on high
   const CH = tier === 'medium' ? 64 : 48;
@@ -804,8 +957,13 @@ const FOOT = 0.8;
           const c11 = covered[k00 + gw + 1];
           const v = b * w + a;
           const drop = (p, q, r) => (p && q && r) || p === 2 || q === 2 || r === 2;
-          if (!drop(c00, c01, c10)) index.push(v, v + w, v + 1);
-          if (!drop(c10, c01, c11)) index.push(v + 1, v + w, v + w + 1);
+          // (sea lane) and none wholly under the sea, which hides it
+          const h00 = gHeight[k00] < DROWNED;
+          const h10 = gHeight[k00 + 1] < DROWNED;
+          const h01 = gHeight[k00 + gw] < DROWNED;
+          const h11 = gHeight[k00 + gw + 1] < DROWNED;
+          if (!drop(c00, c01, c10) && !(h00 && h01 && h10)) index.push(v, v + w, v + 1);
+          if (!drop(c10, c01, c11) && !(h10 && h01 && h11)) index.push(v + 1, v + w, v + w + 1);
         }
       }
       if (!index.length) continue;
@@ -864,10 +1022,14 @@ const FOOT = 0.8;
       }
     }
     const index = [];
+    // (sea lane) leaving out the triangles wholly under the sea (by the land's own heights, not the lowered ones
+    // under the grid, which nothing sees either way)
+    const dry = (v) => heights[v] >= DROWNED - 1;
     for (let j = 0; j < m - 1; j++) {
       for (let i = 0; i < m - 1; i++) {
         const v = j * m + i;
-        index.push(v, v + m, v + 1, v + 1, v + m, v + m + 1);
+        if (dry(v) || dry(v + m) || dry(v + 1)) index.push(v, v + m, v + 1);
+        if (dry(v + 1) || dry(v + m) || dry(v + m + 1)) index.push(v + 1, v + m, v + m + 1);
       }
     }
     farGeometry = new THREE.BufferGeometry();
@@ -877,6 +1039,71 @@ const FOOT = 0.8;
     farGeometry.setIndex(index);
     farGeometry.computeVertexNormals();
   }
+
+  // ---- (sea lane) the sea map: what the water's shader and the ground's need to know about the coast, per texel
+  // (SeaShape.map): the depth, and how far land and water are from each other (two chamfer passes over the texels)
+  const seaMap = (() => {
+    const { size, half } = SEA.map;
+    const x0 = mid.x - half;
+    const z0 = mid.z - half;
+    const step = (2 * half) / size;
+    const data = new Uint8Array(size * size * 4);
+    const toWater = new Float32Array(size * size);
+    const toLand = new Float32Array(size * size);
+    const BIG = 1e9;
+    for (let j = 0; j < size; j++) {
+      for (let i = 0; i < size; i++) {
+        const x = x0 + (i + 0.5) * step;
+        const z = z0 + (j + 0.5) * step;
+        const k = j * size + i;
+        const wet = seaAt(x, z);
+        const depth = wet >= 0.5 ? Math.max(0, lakeLevel - coarseHeight(x, z)) : 0;
+        const water = depth > 0;
+        toWater[k] = water ? 0 : BIG;
+        toLand[k] = water ? BIG : 0;
+        data[k * 4] = Math.round(255 * Math.sqrt(Math.min(1, depth / 64)));
+        data[k * 4 + 3] = Math.round(255 * wet);
+      }
+    }
+    const chamfer = (f) => {
+      const a = step;
+      const b = step * Math.SQRT2;
+      for (let j = 0; j < size; j++) {
+        for (let i = 0; i < size; i++) {
+          const k = j * size + i;
+          let v = f[k];
+          if (i > 0) v = Math.min(v, f[k - 1] + a);
+          if (j > 0) {
+            v = Math.min(v, f[k - size] + a);
+            if (i > 0) v = Math.min(v, f[k - size - 1] + b);
+            if (i < size - 1) v = Math.min(v, f[k - size + 1] + b);
+          }
+          f[k] = v;
+        }
+      }
+      for (let j = size - 1; j >= 0; j--) {
+        for (let i = size - 1; i >= 0; i--) {
+          const k = j * size + i;
+          let v = f[k];
+          if (i < size - 1) v = Math.min(v, f[k + 1] + a);
+          if (j < size - 1) {
+            v = Math.min(v, f[k + size] + a);
+            if (i < size - 1) v = Math.min(v, f[k + size + 1] + b);
+            if (i > 0) v = Math.min(v, f[k + size - 1] + b);
+          }
+          f[k] = v;
+        }
+      }
+    };
+    chamfer(toWater);
+    chamfer(toLand);
+    for (let k = 0; k < size * size; k++) {
+      data[k * 4 + 1] = Math.round(255 * Math.min(1, toWater[k] / 500));
+      data[k * 4 + 2] = Math.round(255 * Math.min(1, toLand[k] / 160));
+    }
+    return { size, x0, z0, extent: 2 * half, data };
+  })();
+  phases.sea = Math.round(performance.now() - started);
 
   // ---- assembled
   const group = new THREE.Group();
@@ -908,6 +1135,7 @@ const FOOT = 0.8;
     group,
     material,
     lake: { level: lakeLevel, extent: { x0: LAKE.x - LAKE.rx * 1.1, x1: LAKE.x + LAKE.rx * 1.1, z0: LAKE.z - LAKE.rz * 1.1, z1: LAKE.z + LAKE.rz * 1.1 } },
+    sea: { level: lakeLevel, at: seaAt, sector: seaSector, map: seaMap, stacks },
     heightAt,
     heightOnTrack,
     normalAt(x, z, out = normal) {

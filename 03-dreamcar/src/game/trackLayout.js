@@ -44,7 +44,8 @@ export const VIADUCT = { parapetOffset: 1.5, drop: 32 };
  * wanders slowly inside the range); `slope`: rise per metre of the verge on the way there; `far`: rise per metre
  * of the hillside beyond it (where another stretch of the road is close, the builder works the real slope out
  * from the two roads instead); `verge`: what the verge is made of; `wood`: what grows beyond the barrier
- * ('broadleaf', 'conifer', 'mixed' or null).
+ * ('broadleaf', 'conifer', 'mixed' or null); `coast`: the sea side of the coast road (gravel beyond the barrier, white
+ * posts: scenery only).
  */
 export const SIDES = {
   // the lakeside straight: a low concrete wall each side; the water beyond the left one, the town beyond the right
@@ -80,6 +81,12 @@ export const SIDES = {
   wallUp: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: 0.7, verge: 'asphalt', wood: null },
   wallDown: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: -0.45, verge: 'asphalt', wood: null },
   parapet: { kind: 'parapet', edge: [VIADUCT.parapetOffset, VIADUCT.parapetOffset], slope: 0, far: -2.5, verge: 'asphalt', wood: null },
+  // (sea lane) the sea side of the coast road after the sky road (`coast`): a steel rail on white posts with ochre
+  // gravel beyond it and nothing growing that would hide the sea. The corridor is the preset's it replaces (edge,
+  // slope, verge, kind, far: highDown, highRun, open), so the course and what the cars hit are exactly as they were.
+  coastDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.35, verge: 'grass', wood: null, coast: true },
+  coastRun: { kind: 'rail', edge: [7, 10], slope: -0.02, far: -0.3, verge: 'grass', wood: null, coast: true },
+  coastTop: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'grass', wood: null, coast: true },
 };
 
 /** The named stretches, in driving order. */
@@ -144,14 +151,15 @@ const SEGMENTS = [
   { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapet', bridge: true, drop: 42 },
 
   // The carousel: a climb along the far side, then a right round the spur, the slow corner of the lap.
-  { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 6, L: 'highDown', R: 'rock' },
-  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'highRun', R: 'rock', runoff: 'L' },
+  // (sea lane) the coast road: from here to the foot of the plunge the sea lies below on the left, the land cut on the right
+  { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 6, L: 'coastDown', R: 'rock' },
+  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'coastRun', R: 'rock', runoff: 'L' },
 
-  // The crest: up over the top in the open, the lake far below.
-  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'open', R: 'open' },
+  // The crest: up over the top in the open, the sea far below.
+  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'coastTop', R: 'open' },
 
   // The plunge: 8 per cent down into a compression.
-  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'highDown', R: 'highUp' },
+  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'coastDown', R: 'highUp' },
 
   // The ledge: fast downhill sweepers along the hillside. The first, a left, has the valley open on its inside over
   // a low wall and a wooded bank on its outside (and no kerb on its inside: a white line, the paved margin and
@@ -209,7 +217,7 @@ export const LAYOUT = {
   tunnelLamps: { spacing: 12, drop: 0.55, inset: 0.45 },
   /** Kerbs: on the inside of every bend tighter than `inside` metres from entry to exit, and on the outside at the exit of every bend tighter than `outside`. */
   kerbs: { inside: 800, outside: 500, exit: 0.4, width: SHOULDER },
-  /** The lake's surface (the straight runs along its shore at y = 0). */
+  /** The sea's surface (the straight runs along the shore of its bay at y = 0; terrain.js says where the sea is). */
   lakeLevel: -1.8,
 };
 

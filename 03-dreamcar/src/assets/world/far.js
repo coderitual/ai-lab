@@ -210,7 +210,9 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       const h = ring.lo + (ring.hi - ring.lo) * Math.min(1, Math.max(0, 0.15 + 1.1 * ridge * (0.5 + broad)));
       // (sky lane) the near rings stand aside where the massif is: they would be in front of it but drawn behind
       // (all of them, round two: the farthest showed over the massif's low right-hand ridge as pale hills)
-      const aside = smoothstep(0.3, 0.6, inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a)));
+      // (sea lane) and where the sea runs to the horizon: no far shore (terrain.sea's bearings)
+      const open = terrain.sea ? terrain.sea.sector(mid.x + Math.cos(a) * ring.r, mid.z + Math.sin(a) * ring.r) : 0;
+      const aside = Math.max(smoothstep(0.3, 0.6, inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a))), smoothstep(0.05, 0.5, open));
       heights.push(h * (1 - aside) - 300 * aside);
     }
     for (let i = 0; i <= cols; i++) {
@@ -499,6 +501,8 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       track.locate(x, z, -1, spot);
       if (Math.abs(spot.lat) < 260) continue;
       if (h > 60) continue;
+      // (sea lane) not over the open sea, where from the coast road a sheet read as a blot on the water
+      if (terrain.sea && terrain.sea.at(x, z) > 0.3) continue;
       if (sheets.some((s) => Math.hypot(s.x - x, s.z - z) < 500)) continue;
       sheets.push({ x, z, y: Math.max(terrain.lake.level, h) + mistRng.range(14, 30), radius: mistRng.range(380, 650) });
     }

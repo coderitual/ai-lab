@@ -141,7 +141,7 @@ line, m; speeds are the autopilot's at full pace):
 | The tunnel | 1409 to 2006 | a rock cutting, the lit bore (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out; up to 255 km/h |
 | The sky road | 2006 to 2582 | on piers: a 576 m left of 300 m radius, banked 10 degrees, the valley 42 m under its middle; about 230 to 257 km/h |
 | The carousel | 2582 to 2915 | a 150 m climb, then 190 degrees right round a spur at 55 m radius, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
-| The crest | 2915 to 3115 | the top (108 m), in the open, the lake far below; the car goes light over it at about 160 km/h |
+| The crest | 2915 to 3115 | the top (108 m), in the open, the sea far below on the left; the car goes light over it at about 160 km/h |
 | The plunge | 3115 to 3394 | 8 per cent down a 400 m right into a compression; to 215 km/h |
 | The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m on the hillside, rock on one side; 216 to 257 km/h |
 | Gully bridge | 3778 to 4115 | 337 m straight on piers, 26 m over the gully, 8 per cent down; to 282 km/h |
@@ -454,6 +454,60 @@ light, the materials, the vegetation, the composition and the sense of speed:
 no names, logos, HUD artwork or layout, track shapes, liveries or lettering.
 The car itself is checked against four daylight photographs of the owner's
 car (car.md), which also stay out of the repository.
+
+## The sea
+
+(sea lane) After the tunnel the road comes out onto the coast. The owner:
+"after the tunnel there is a nice part of the track where we can have a
+sea; the sea and its shader are built in the repo, in the 01 project". His
+reference for the look (kept out of the repository, like the others; called
+E1 here): a road winding along a headland high above an open sea, deep blue
+water with a long soft swell, a bright band towards the horizon and haze
+into a clear sky; an ochre and rust cut slope with grass on top on the land
+side, ochre gravel run-off and a steel rail on white posts on the sea side;
+a viaduct on tall piers standing in front of the water; sun-bleached warm
+light. Only its light, colour, materials and composition are taken.
+
+- **Where the coast runs** (`SEA` in terrain.js). The course stands on a
+  headland. Seen from the middle of the course, everything outside the loop
+  at a bearing outside the mainland's (-115° to 50°, 0° being the start
+  straight's heading) is sea to the horizon: north of the tunnel's spur, round
+  the sky road and the headland of the carousel and the crest, down the west
+  side. The mainland with the massif and the far ridges stays east, behind
+  the start straight, so frame D1 is untouched. The lake beside the straight
+  is a bay of the same sea, as it was to the east and opening to the open
+  water in the south-west. From the road the land falls to the water 55 to
+  170 m beyond the solid edge, the last of it as a cliff (rise 1.15 per
+  metre) of ochre rock with a dark wet band at its foot; the seabed shelves
+  away at 0.3 per metre to 45 m. Seven sea stacks stand 30 to 120 m off the
+  open coast. No far shore: the far ridges stand aside where the sea is
+  (far.js), so the sky road and the crest look over water, haze and sky.
+- **The coast road** (`coastDown`, `coastRun`, `coastTop` in trackLayout.js:
+  the climb, the carousel, the crest and the plunge): on the sea side the
+  steel rail stands on white posts, with ochre gravel beyond it and nothing
+  growing that would hide the water; on the land side the cut rock of the
+  climb and the carousel is the coast's warm ochre and rust, grass on top.
+  The corridor is exactly the presets' it replaced: the course and what the
+  cars hit did not change. Within a few hundred metres of the sea all rock
+  is that warm stone and all loose stone ochre grit (groundMaterial.js reads
+  the sea map); inland it stays the grey limestone.
+- **The water** is demo 01's sea (engine/waves.js, sea.js): a long soft
+  swell (150, 98 and 63 m long, 0.85 m and less) under a light breeze's chop,
+  from the open sea in the north-west; the swell dies down over the shallows
+  and breaks along the shore in bands of surf that run in with it; a few
+  streaks of foam behind crests. Its colour is what it mirrors and what comes
+  back up out of it: the sky's environment map with water's Fresnel, so it
+  pales into a bright band towards the horizon and fades there into the
+  haze the sky shows under the horizon; a dark blue body, greener over the
+  shallows. **Day**: deep blue with the sky in it; the sun stands behind
+  the coast road's views, so its glitter path lies towards the land. **Golden
+  hour**: the low sun over the bay and the south-west, a path of gold glitter
+  on dark teal water. **Night**: black water, the moon's glitter, and the
+  nearest lamps of the lap drawn into it as long streaks (the same lamps the
+  wet road glints with).
+- **Tiers**: low draws a flat disc of 160 triangles with the swell in the
+  normals only; medium and high move the mesh with the swell. One draw call
+  in every pass that sees it; no pass of its own.
 
 ## Left out on purpose (for now)
 

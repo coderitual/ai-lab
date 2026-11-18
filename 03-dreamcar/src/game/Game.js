@@ -151,7 +151,7 @@ export class Game {
     // the times of day are whatever lighting.js has, in its order; the demo opens at DEFAULT_TIME (config.js: null, the first)
     params = { ...params, time: params.time && TIMES[params.time] ? params.time : DEFAULT_TIME && TIMES[DEFAULT_TIME] ? DEFAULT_TIME : Object.keys(TIMES)[0] };
     this.params = params;
-    this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params });
+    this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params, viewFar: VIEW.far });
     if (this.world.time.name !== params.time) this.world.setTime(params.time);
     this.effects = new Effects({
       scene: this.world.scene,
