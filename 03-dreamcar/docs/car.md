@@ -146,8 +146,10 @@ distance keeps the false zero away.
 layer of metal flake under a clear coat.
 
 - **Base** (`PAINTS`: colour, metalness, roughness, flop, flake). Silver, this
-  car's high-tech silver: linear 0.59 / 0.615 / 0.675 (cool), metalness 0.82,
-  roughness 0.42, falling to 40 % edge-on (flop). A metallic paint, not
+  car's high-tech silver: linear 0.59 / 0.615 / 0.675 (cool), metalness 0.86,
+  roughness 0.33, falling to 22 % edge-on (flop, as `pow(1 - n.v, 1.15)`;
+  round 8: at 0.82 / 0.42 / 40 % the body was one even pale grey at night and
+  in the tunnel, with nothing to say where a panel turned). A metallic paint, not
   polished metal: the flake layer shades softly from light to dark across a
   panel, light silver in the sun and mid grey turned away from it, and takes
   the sun as a colour of its own as well as a broad sheen. Round 4's 0.92 /
@@ -163,6 +165,20 @@ layer of metal flake under a clear coat.
   its colour, and the probe's average round that direction still caps a
   small fierce thing in it (the sun's glare on the road behind the car, a
   lamp) at five times, so that it makes a highlight, not a burnt-out panel.
+- **Lamps and the sun in the probe** (`GLSL_KEY`, `carKey`): the car takes
+  their light from the lights themselves (the sun, the floodlights' pool of
+  spots, its own lamps), so what the probe's few coarse texels of a lamp add
+  through a rough layer is a second copy of that light smeared over a panel.
+  At night it was most of what the paint showed: a pale grey glow over the
+  whole body, blotches that moved as the probe's faces were redrawn, a green
+  ring round the rims from the start lamps. Every read of the probe is held to
+  a number of white papers of the moment (`carKey` = `PAPER` 0.7 over the
+  picture's exposure, which `setReflections({ exposure })` hands over from the
+  view), rolling off slowly above it: 1.2 for a rough read (`KEY_ROUGH`), 16
+  for a crisp one (`KEY_CRISP`: the clear coat, the glass, gloss trim), so a
+  lamp stays a small bright highlight in the lacquer. The wheels do the same
+  (`mirrorProbe`). By day the cap is about the sky round the sun, so only the
+  sun's disc and its glare on the road are held.
 - **Clear coat**, roughness 0.03, a plain lacquer's reflectance (4 % face on,
   `COAT_GAIN` 1): the only crisp reflection, strong only at grazing angles.
   Its image is held to 30 % of its colour (45 % until round six, which still

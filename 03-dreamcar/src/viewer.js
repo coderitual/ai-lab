@@ -171,7 +171,7 @@ const ASSETS = {
     world.scene.add(car.shadow);
     car.poseShadow(stand.position, new THREE.Vector3(0, 1, 0), stand.rotation.y, 1);
     const probe = params.probe ? new ReflectionProbe(engine.renderer, number('probesize', TIERS[carTier].probeSize)) : null;
-    if (probe) car.setReflections({ cube: probe.texture, sky: 1 });
+    if (probe) car.setReflections({ cube: probe.texture, sky: 1, exposure: time.exposure });
     // mirror=1: the paint as a plain mirror, to read the body's surfaces in the reflections (with stripes=1)
     if (query.get('mirror') === '1') {
       car.object.traverse((o) => {
@@ -198,7 +198,7 @@ const ASSETS = {
       // (look lane) as in the game: its reflection probe (probe=0: none), so the paint mirrors the lamps, the town and
       // the wet road round it
       made.probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[tier].probeSize) : null;
-      if (made.probe) made.car.setReflections({ cube: made.probe.texture, sky: 1 });
+      if (made.probe) made.car.setReflections({ cube: made.probe.texture, sky: 1, exposure: time.exposure });
     }
     if (query.has('card')) {
       const towardsLight = new THREE.Vector3().fromArray(time.sun.dir).transformDirection(stand.matrixWorld.clone().invert());
@@ -417,7 +417,15 @@ function placeCamera() {
   camera.updateMatrixWorld();
   if (pinhole && !ortho) placePinhole();
 
+  // (the world's forest and other late parts arrive after the page starts: gather them again)
+  world.scene.traverse((object) => {
+    if ((object.isMesh || object.isPoints || object.isLine || object.isSprite) && !worldMeshes.includes(object) && !inStand(object) && object !== asset.car?.shadow && object.parent !== asset.car?.shadow) {
+      worldMeshes.push(object);
+      scenery.push(object);
+    }
+  });
   for (const object of scenery) object.visible = !ortho && !studio;
+  if (studio && world.forest) world.forest.group.visible = false;
   if (studio) studio.group.visible = !ortho;
   world.scene.background = ortho ? backdrop : null;
   frame.look = ortho ? flatLook : time.look;

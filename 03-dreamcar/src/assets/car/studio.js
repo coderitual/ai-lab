@@ -18,7 +18,8 @@ import * as THREE from 'three';
 export function createStudio({ stripes = false, exposure = 1 } = {}) {
   const group = new THREE.Group();
   group.name = 'studio';
-  const dome = new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, depthWrite: false });
+  // (it writes depth: the world's sky and its far forest are drawn after the scene's meshes, and would cover it)
+  const dome = new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false });
   dome.defines = { STUDIO_STRIPES: stripes ? 1 : 0 };
   dome.onBeforeCompile = (shader) => {
     shader.uniforms.studioGain = { value: 1 / exposure };
@@ -41,9 +42,12 @@ export function createStudio({ stripes = false, exposure = 1 } = {}) {
     c = mix(vec3(2.2), vec3(0.015), band);
     if (el < -1.0) c = vec3(0.05);
   #else
-    c = vec3(0.035, 0.036, 0.04);
-    // the band of light round the horizon, brightest low down
-    c += vec3(0.9, 0.92, 0.95) * smoothstep(-1.0, 1.0, el) * (1.0 - smoothstep(6.0, 22.0, el));
+    // a showroom: dark walls, a dim band round the horizon (the far wall's foot, lit), two long strip lights high
+    // on either side running the length of the car (the lines along its shoulders) and the soft box overhead
+    c = vec3(0.02, 0.021, 0.024);
+    c += vec3(0.32, 0.33, 0.35) * smoothstep(-1.0, 1.0, el) * (1.0 - smoothstep(3.0, 12.0, el));
+    float along = abs(d.z) / max(length(d.xz), 1e-4);
+    c += vec3(2.6, 2.6, 2.55) * smoothstep(0.6, 1.2, abs(el - 24.0) * -1.0 + 2.0) * (1.0 - smoothstep(0.55, 0.7, along));
     // the soft box overhead: 9 m long, 3 m wide, 6 m up, lying along the car
     if (d.y > 0.05) {
       vec2 at = d.xz * (6.0 / d.y);
@@ -59,8 +63,8 @@ export function createStudio({ stripes = false, exposure = 1 } = {}) {
   const sphere = new THREE.Mesh(new THREE.SphereGeometry(80, 48, 32), dome);
   sphere.renderOrder = -10;
   sphere.frustumCulled = false;
-  const floorMaterial = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 });
-  floorMaterial.color.setRGB(0.16, 0.16, 0.165, THREE.LinearSRGBColorSpace);
+  const floorMaterial = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0 });
+  floorMaterial.color.setRGB(0.07, 0.07, 0.075, THREE.LinearSRGBColorSpace);
   const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 64), floorMaterial);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -0.002;

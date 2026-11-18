@@ -1020,7 +1020,9 @@ export class Game {
       }
       car.setLights(racer.lamps);
       // the car's sky: none in the tunnel, less under the woods (the same canopy the road beside it sees)
-      car.setReflections({ cube: this.views[racer.index]?.probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat) });
+      // (and the picture's exposure, which says how bright white paper is where it is: materials.js GLSL_KEY)
+      const own = this.views[racer.index];
+      car.setReflections({ cube: own?.probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat), exposure: own?.frame.exposure || own?.exposure });
       if (car.setBore) this._poseBore(car, obj, vehicle);
 
       obj.updateMatrixWorld();
