@@ -443,18 +443,19 @@ ${IMP_READ}
   // between two pictures a silhouette is half there: that becomes half coverage, or a cut where there is none
   float cover = colour.a;
   #ifdef ALPHA_TO_COVERAGE
-    diffuseColor.a = clamp( ( cover - 0.25 ) / 0.4, 0.0, 1.0 );
+    diffuseColor.a = clamp( ( cover - 0.15 ) / 0.6, 0.0, 1.0 );
     if ( diffuseColor.a <= 0.0 ) discard;
   #else
     if ( cover < 0.42 ) discard;
   #endif
   colour.rgb /= cover;
-  // the shape atlas's alpha: 0.04 to 0.24 bark, 0.3 to 1 a leaf, by the light that gets there
+  // the shape atlas's alpha: 0.04 to 0.24 bark, 0.3 to 1 a leaf, by the light that gets there (a leaf's as a root)
   float leaf = smoothstep( 0.24, 0.3, shape.a );
   treeBump = shape.xyz * 2.0 - 1.0;
   treeBark = 1.0 - leaf;
   treeThrough = leaf > 0.5 ? vImpCell.w : - 1.0;
   treeOpen = clamp( ( shape.a - 0.3 ) / 0.7, 0.0, 1.0 );
+  treeOpen *= treeOpen;
   treeCards = 0.0;
   treeGloss = leaf * treeOpen * 0.6 * ( 0.25 + 0.75 * uWet ) + ( 1.0 - leaf ) * 0.7;
   diffuseColor.rgb *= colour.rgb * mix( vec3( 1.0 ), vTint.rgb, leaf );

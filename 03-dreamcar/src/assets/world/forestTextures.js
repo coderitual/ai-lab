@@ -263,6 +263,11 @@ function needleTwig(ctx, rng, x0, y0, x1, y1, bow, o) {
   }
   ctx.lineWidth = o.width;
   const n = Math.max(2, Math.round(length / o.step));
+  // (the needles of a twig are stroked in four tones, each tone at once: a stroke for every needle costs ten times
+  // the start-up time and shows no difference)
+  const TONES = 4;
+  const tones = Array.from({ length: TONES }, () => []);
+  const span = o.light[1] + o.tip - o.light[0];
   for (let k = 0; k <= n; k++) {
     const t = (k + rng.range(-0.4, 0.4)) / n;
     if (t < 0 || t > 1.02) continue;
@@ -270,14 +275,23 @@ function needleTwig(ctx, rng, x0, y0, x1, y1, bow, o) {
     for (const side of [-1, 1]) {
       const a = dir + side * rng.range(o.splay[0], o.splay[1]);
       const l = o.len * rng.range(0.7, 1.15) * (1 - 0.35 * t * t);
-      const light = (rng.range(o.light[0], o.light[1]) + o.tip * t * t * t) * (o.shade ?? 1) * (rng.next() < 0.07 ? 0.6 : 1);
-      ctx.strokeStyle = hsl(o.hue + rng.range(-8, 8) - 22 * t * t * (o.tip > 0 ? 1 : 0), o.sat + rng.range(-6, 6), light);
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
-      ctx.stroke();
+      const light = (rng.range(o.light[0], o.light[1]) + o.tip * t * t * t) * (rng.next() < 0.07 ? 0.6 : 1);
+      tones[Math.max(0, Math.min(TONES - 1, Math.floor(((light - o.light[0]) / span) * TONES)))].push(x, y, x + Math.cos(a) * l, y + Math.sin(a) * l);
     }
   }
+  const twigHue = o.hue + rng.range(-6, 6);
+  tones.forEach((lines, k) => {
+    if (!lines.length) return;
+    // (the lightest are the new growth at the tips: yellower)
+    const f = (k + 0.5) / TONES;
+    ctx.strokeStyle = hsl(twigHue - (o.tip > 0 ? 18 * f * f : 0), o.sat + rng.range(-5, 5), (o.light[0] + span * f) * (o.shade ?? 1));
+    ctx.beginPath();
+    for (let i = 0; i < lines.length; i += 4) {
+      ctx.moveTo(lines[i], lines[i + 1]);
+      ctx.lineTo(lines[i + 2], lines[i + 3]);
+    }
+    ctx.stroke();
+  });
 }
 
 /** A bough seen from above: a stem with side twigs swept forward, needles all along them. */
@@ -337,15 +351,16 @@ function paintLarch(ctx, rng, px) {
   const tuft = (x, y, size, shade) => {
     ctx.lineWidth = 1.5 * px;
     const n = 13;
+    // (a rosette is one tone, stroked at once)
+    ctx.strokeStyle = hsl(rng.range(38, 52), rng.range(72, 90), rng.range(46, 64) * shade);
+    ctx.beginPath();
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2 + rng.range(-0.3, 0.3);
       const l = size * rng.range(0.6, 1.1);
-      ctx.strokeStyle = hsl(rng.range(38, 52), rng.range(72, 90), rng.range(44, 66) * shade);
-      ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
-      ctx.stroke();
     }
+    ctx.stroke();
   };
   const twig = (x0, y0, x1, y1, shade) => {
     ctx.strokeStyle = wood;
@@ -381,7 +396,10 @@ function paintLarch(ctx, rng, px) {
   ctx.stroke();
 }
 
-/** One leaf at (x, y), pointing along `angle`, `size` long: `shape(ctx)` draws its outline for a leaf from (0, 0) to (0, 1). */
+/**
+ * One leaf at (x, y), pointing along `angle`, `size` long: `shape(ctx)` draws its outline for a leaf from (0, 0) to
+ * (0, 1). `edge` and `vein`: the colours of its rim and its veins, or null for a plain leaf.
+ */
 function leaf(ctx, x, y, angle, size, fill, edge, vein, shape, px) {
   ctx.save();
   ctx.translate(x, y);
@@ -391,6 +409,11 @@ function leaf(ctx, x, y, angle, size, fill, edge, vein, shape, px) {
   const veins = shape(ctx);
   ctx.fillStyle = fill;
   ctx.fill();
+  // (a leaf only a few texels long is its outline, filled: no rim, no veins)
+  if (!edge) {
+    ctx.restore();
+    return;
+  }
   ctx.lineWidth = (1.1 * px) / size;
   ctx.strokeStyle = edge;
   ctx.stroke();
@@ -623,7 +646,7 @@ function paintMass(ctx, rng, px, { shape, size, leaves }) {
     const depth = k / leaves;
     const light = (0.34 + 0.4 * depth + 0.16 * (r / lr)) * rng.range(0.85, 1.12);
     const warm = rng.range(-1, 1);
-    leaf(ctx, x, y, rng.range(0, Math.PI * 2), size * rng.range(0.75, 1.2), leafGrey(light, warm), leafGrey(light * 0.72, warm), leafGrey(Math.min(1, light * 1.2), warm), shape, px);
+    leaf(ctx, x, y, rng.range(0, Math.PI * 2), size * rng.range(0.75, 1.2), leafGrey(light, warm), null, null, shape, px);
   }
 }
 
@@ -637,27 +660,29 @@ function paintLitter(ctx, rng, px) {
     const y = 0.5 + Math.sin(a) * r;
     const [h, sat, l] = autumn(MAPLE_COLOURS, rng.next(), rng);
     const light = l * rng.range(0.55, 1.0);
-    leaf(ctx, x, y, rng.range(0, Math.PI * 2), rng.range(0.03, 0.05), hsl(h, sat, light), hsl(h - 4, sat, light * 0.7), hsl(h, sat, light * 0.8), rng.next() < 0.5 ? mapleShape : limeShape, px);
+    leaf(ctx, x, y, rng.range(0, Math.PI * 2), rng.range(0.03, 0.05), hsl(h, sat, light), null, null, rng.next() < 0.5 ? mapleShape : limeShape, px);
   }
 }
 
 /** The wood's floor: grass, moss and low herbs in a patch that thins out at its edge. */
 function paintFloor(ctx, rng, px) {
   ctx.lineCap = 'round';
-  for (let k = 0; k < 1300; k++) {
-    const a = rng.range(0, Math.PI * 2);
-    const r = 0.45 * Math.pow(rng.next(), 0.6);
-    if (rng.next() < r / 0.45 - 0.4) continue;
-    const x = 0.5 + Math.cos(a) * r;
-    const y = 0.5 + Math.sin(a) * r;
-    const l = rng.range(30, 62);
-    ctx.strokeStyle = hsl(rng.range(60, 100), rng.range(25, 45), l);
-    ctx.lineWidth = rng.range(2, 4.5) * px;
-    const b = rng.range(0, Math.PI * 2);
-    const len = rng.range(0.008, 0.03);
+  // (blades and tufts in eight tones, each tone stroked at once)
+  for (let tone = 0; tone < 8; tone++) {
+    ctx.strokeStyle = hsl(rng.range(60, 100), rng.range(25, 45), 30 + tone * 4.5);
+    ctx.lineWidth = rng.range(2.4, 4) * px;
     ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(b) * len, y + Math.sin(b) * len);
+    for (let k = 0; k < 160; k++) {
+      const a = rng.range(0, Math.PI * 2);
+      const r = 0.45 * Math.pow(rng.next(), 0.6);
+      if (rng.next() < r / 0.45 - 0.4) continue;
+      const x = 0.5 + Math.cos(a) * r;
+      const y = 0.5 + Math.sin(a) * r;
+      const b = rng.range(0, Math.PI * 2);
+      const len = rng.range(0.008, 0.03);
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(b) * len, y + Math.sin(b) * len);
+    }
     ctx.stroke();
   }
 }
@@ -692,6 +717,13 @@ function paintTwig(ctx, rng, px) {
  * @returns {{ texture: THREE.DataTexture, bytes: number, width: number, height: number }}
  */
 export function createFoliageAtlas(tile, rng, anisotropy = 4) {
+  const ms = {};
+  let clock = performance.now();
+  const lap = (name) => {
+    const now = performance.now();
+    ms[name] = Math.round(now - clock);
+    clock = now;
+  };
   const width = tile * TILE_COLS;
   const height = tile * TILE_ROWS;
   const canvas = document.createElement('canvas');
@@ -756,7 +788,9 @@ export function createFoliageAtlas(tile, rng, anisotropy = 4) {
       paintIn((k % TILE_COLS) * tile + (q % 2) * half, Math.floor(k / TILE_COLS) * tile + (q >> 1) * half, half, () => paintSprig(ctx, rng.fork(`sprig${k}-${q}`), px * 2, o));
     });
   }
+  lap('paint');
   const pixels = ctx.getImageData(0, 0, width, height).data;
+  lap('read');
   // The birch's tile and the floor's two are painted in colour and keep only their light and a hint of their hue (the
   // sprigs and the masses are painted that way to begin with): the tree's tint gives them their colour.
   for (const k of [TILE.BIRCH, TILE.LITTER, TILE.FLOOR]) {
@@ -773,8 +807,10 @@ export function createFoliageAtlas(tile, rng, anisotropy = 4) {
       }
     }
   }
+  lap('grey');
   const { levels } = alphaMips(pixels, width, height, { regions });
-  return { texture: chainTexture(levels, { anisotropy }), bytes: chainBytes(levels), width, height };
+  lap('mips');
+  return { texture: chainTexture(levels, { anisotropy }), bytes: chainBytes(levels), width, height, ms };
 }
 
 // ------------------------------------------------------------------------------------------------ bark

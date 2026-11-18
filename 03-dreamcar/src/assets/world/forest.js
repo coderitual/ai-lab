@@ -127,8 +127,11 @@ export function createTreeKit({ renderer, tier, coverage, rng, atmosphere }) {
   };
   const T = TIER[tier] ?? TIER.high;
   const foliage = createFoliageAtlas(T.tile, rng.fork('foliage'));
+  lap('foliage');
   const bark = createBarkTextures(T.bark, rng.fork('bark'));
-  lap('textures');
+  lap('bark');
+  ms.textures = ms.foliage + ms.bark;
+  ms.atlas = foliage.ms;
   // (the full trees are grown on every tier: the impostors are pictures of them, even where they are never drawn)
   const models = growTrees(VARIANTS, SPECIES_DATA, rng.fork('grow'), { full: true, barkSize: T.bark });
   lap('grow');
@@ -519,6 +522,25 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const Z0 = b.minZ - 250;
   const X1 = b.maxX + 250;
   const Z1 = b.maxZ + 250;
+  // Which parts of the map lie near a road (a coarse grid): only there do the road's rules apply, and only there is
+  // the nearest point of the road looked for, which is the dear part of planting. Far from every road the wood is
+  // only ever seen as cards on a hillside, and half as many trees stand there.
+  const NEAR = 48;
+  const nearW = Math.ceil((X1 - X0) / NEAR) + 1;
+  const nearH = Math.ceil((Z1 - Z0) / NEAR) + 1;
+  const nearRoad = new Uint8Array(nearW * nearH);
+  for (let s = 0; s < track.length; s += 16) {
+    track.pointAt(s, 0, point);
+    const cx = Math.floor((point.x - X0) / NEAR);
+    const cz = Math.floor((point.z - Z0) / NEAR);
+    for (let dz = -4; dz <= 4; dz++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        const ix = cx + dx;
+        const iz = cz + dz;
+        if (ix >= 0 && iz >= 0 && ix < nearW && iz < nearH) nearRoad[iz * nearW + ix] = 1;
+      }
+    }
+  }
   for (let z = Z0; z < Z1; z += LATTICE) {
     for (let x = X0; x < X1; x += LATTICE) {
       const px = x + plantRng.range(-0.45, 0.45) * LATTICE;
@@ -527,6 +549,18 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       const rank = plantRng.next();
       // (the cheap tests first: start-up time)
       if (rank > T.keep) continue;
+      if (!nearRoad[Math.floor((pz - Z0) / NEAR) * nearW + Math.floor((px - X0) / NEAR)]) {
+        // far from every road
+        if (rank > T.keep * 0.5 || keepOut(px, pz)) continue;
+        const f = terrain.forestAt(px, pz);
+        if (roll > Math.min(0.92, f * 1.15) && roll > 0.015) continue;
+        const y = terrain.heightAt(px, pz);
+        if (y < lakeLevel + 1 || plantRng.next() < 0.8 * smoothstep(75, 115, y)) continue;
+        const slope = Math.abs(terrain.heightAt(px + 2, pz + 2) - y) / 2.8;
+        if (slope > 0.9 || !free(px, pz, 2.8)) continue;
+        addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies('mixed', y, false, 0.05), { road: false, turned: 0.05, inside: 0.75, detail: 0.5 });
+        continue;
+      }
       if (px > valleyBox[0] - VALLEY_REACH && px < valleyBox[2] + VALLEY_REACH && pz > valleyBox[1] - VALLEY_REACH && pz < valleyBox[3] + VALLEY_REACH && inValley(px, pz)) continue;
       const f = terrain.forestAt(px, pz);
       // dense where the forest is, a few strays at its edges and on the meadows
