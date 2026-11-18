@@ -127,6 +127,10 @@ from straight behind, the silver going warm in a low sun.
   mid-range Android, both ways up, should set them. The pad could also learn
   where the thumb rests (a centre that settles to the thumb's habit between
   runs, never during one).
+- **The second half's wet road in split screen** (tools.md, "water on the
+  track"): at night one half of a split can show the wet road as a sheet of
+  water where the other does not; it follows the camera's place. Look at
+  which lamps light each view (lamps.js chooses them by the eye).
 - **Analog pedals for the slider and the arrows.** Where on BRAKE or GAS the
   finger is could set the pressure (the pad already gives an analog brake);
   not done: the pad came first.
