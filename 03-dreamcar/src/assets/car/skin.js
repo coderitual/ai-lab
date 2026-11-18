@@ -101,6 +101,41 @@ export function buildNet() {
   const noseCorner = NOSE - SECTIONS.corner;
   const tailCorner = CENTRE_TOP[CENTRE_TOP.length - 1][0] + SECTIONS.corner;
 
+  // Round the tail every section stands in one upright plane through an axis on the centre line where the
+  // main sections end (zAxis): the widest line (the bumper's plan curve) is divided evenly along its length,
+  // and the lower edge and the shoulder are cut by the plane through that point. Divided each by its own
+  // length, the three lines put the points of one section in different planes, and the twisted sections
+  // were dents and creases all over the boot's face and the bumper.
+  const zAxis = last - sweep(last);
+  const bearing = (p) => Math.atan2(p[0], zAxis - p[2]); // pi/2 square across the car, 0 straight back
+  const cut = (line, lo, a) => {
+    let s0 = lo;
+    let s1 = line.length;
+    for (let i = 0; i < 48; i++) {
+      const mid = (s0 + s1) / 2;
+      if (bearing(line.at(mid)) > a) s0 = mid;
+      else s1 = mid;
+    }
+    return line.at((s0 + s1) / 2);
+  };
+  const tailMasters = (f) => {
+    const Wp = widest.at(lerp(tailJoin[1], widest.length, f));
+    const a = bearing(Wp);
+    return [cut(lower, tailJoin[0], a), Wp, cut(shoulder, tailJoin[2], a)];
+  };
+
+  // The boot lid's top is one height over the plan, whichever section a point belongs to: the centre line's
+  // height at that z, crowned down to the lip by SHAPE.lidCrown. (Crowned per section, as the bonnet is, the
+  // lid's sections run diagonally across it and each brought its own crown: two dents beside the star.)
+  const lidAt = (z) => (z >= SECTIONS.tailStart ? shoulder.at(tailJoin[2]) : shoulder.at(shoulder.find(2, z, tailJoin[2], shoulder.length)));
+  const lidY = (x, z, S) => {
+    const yc0 = centreTop(z);
+    const edge = lidAt(z);
+    const w = Math.max(edge[0], x, 1e-6);
+    const ys = x >= edge[0] ? S[1] : edge[1];
+    return yc0 - (yc0 - ys) * (x / w) ** SHAPE.lidCrown;
+  };
+
   /** One section. `zone` says how it is placed: by the centre line's z (`main`) or by a fraction `f` of the way round an end. */
   function section(zone, value) {
     const pts = new Array(RAILS);
@@ -119,9 +154,9 @@ export function buildNet() {
       m = masters.map((line, i) => line.at(noseJoin[i] * (1 - value)));
     } else {
       q = last - value;
-      zc = settle(last, tailCorner, -0.8, value);
+      zc = settle(last, SECTIONS.lidCentre, -0.8, value);
       zf = settle(last, LOWER[LOWER.length - 1][2] + SECTIONS.corner, -0.8, value);
-      m = masters.map((line, i) => line.at(lerp(tailJoin[i], line.length, value)));
+      m = tailMasters(value);
     }
     const [L, W, S] = m;
     if (zone !== 'main' && value === 1) L[0] = W[0] = S[0] = 0;
@@ -151,7 +186,9 @@ export function buildNet() {
     if (!glasshouse) {
       // bonnet, boot lid and the ends: one crowned sweep from the centre line down to the shoulder
       SHAPE.deck.forEach((t, k) => {
-        pts[RAIL.belt + k] = [t * S[0], yc - (yc - S[1]) * t ** p, zc + (S[2] - zc) * Math.min(1, (t / 0.94) ** 2)];
+        const z = zc + (S[2] - zc) * Math.min(1, (t / 0.94) ** 2);
+        // round the tail the lid's height is the centre line's at the point's own z, crowned down to the lip
+        pts[RAIL.belt + k] = zone === 'tail' ? [t * S[0], lidY(t * S[0], z, S), z] : [t * S[0], yc - (yc - S[1]) * t ** p, z];
       });
     } else {
       const sw = sweep(value);

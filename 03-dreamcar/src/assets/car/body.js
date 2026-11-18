@@ -19,7 +19,7 @@ import * as THREE from 'three';
 import { ARCHES } from './features.js';
 
 /** Edge length the mesh aims for, per tier (m). */
-export const MESH_EDGE = { low: 0.095, medium: 0.055, high: 0.036 };
+export const MESH_EDGE = { low: 0.095, medium: 0.056, high: 0.036 };
 
 /**
  * Where to sample one parameter of the skin: the steps within each span of the control net, and the atlas

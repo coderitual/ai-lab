@@ -59,7 +59,35 @@ shoulder, the boot lid's lip, the foot of each screen) are rails placed close
 together, not kinks. The net is reflected in the centre plane, so the halves
 meet without a seam.
 
-`body.js` samples the surface once per tier at an edge length of 95 / 55 /
+Round the tail the sections fan from the last main section to the centre
+plane. That is where the surface is hardest to keep fair, and the game shows
+the tail all the time, so it follows four rules:
+
+- Every fan section stands in one upright plane through an axis on the centre
+  line (where the main sections end): the widest line is divided evenly, the
+  lower edge and the shoulder are cut by that plane.
+- The three lines it is cut from are smooth corners there: Lame curves,
+  sampled every 5 cm or so into the tables. Their plan curvature falls
+  steadily from the hip to the centre line; the earlier hand-placed points
+  changed its sign four times and every reflection in the tail wobbled.
+- The rails between the lines keep the proportions they have at the hip all
+  the way round. Proportions that changed round the fan gave every section a
+  different profile: dents beside the plate, a fold at the bumper's corner.
+- The boot lid's top is one height over the plan (`lidY` in `skin.js`: the
+  centre profile's height, crowned down to the lip by `SHAPE.lidCrown`), and
+  the lid's sections end on the centre line along `SECTIONS.lidCentre` to the
+  lip, not at one point. Crowned per section and all meeting at the lip's
+  centre, they made two dents and a crease from the star outwards.
+
+The lip itself is level across (0.925 at the corner to 1.008 on the centre
+line), with the lamps below it, as on the car; it used to dip 0.1 m to the
+lamps' upper edge, and the lamps stood on the crease like fins.
+
+To judge a change to the surface without a browser, the lane's tools render
+the skin alone in Node as a zebra (reflection bands) and as maps of its
+curvature along and across, where any concave patch shows at once.
+
+`body.js` samples the surface once per tier at an edge length of 95 / 56 /
 36 mm (low / medium / high), finer where rails crowd. Normals are the
 surface's own, so even the coarse mesh mirrors cleanly. The same vertices are
 drawn several times with different index lists: paint, glass, lenses, and a
@@ -108,19 +136,30 @@ distance keeps the false zero away.
 layer of metal flake under a clear coat.
 
 - **Base** (`PAINTS`: colour, metalness, roughness, flop, flake). Silver, this
-  car's high-tech silver: linear 0.60 / 0.62 / 0.66 (cool), metalness 0.92,
-  roughness 0.27, falling to 34 % edge-on (flop). At roughness 0.4 the metal
-  layer read as a grey satin veil next to the press and daylight photographs;
-  at 0.27 it mirrors the sky as a soft blue over bonnet and roof. The metal
-  layer's read of the probe is held to five times the probe's average round
-  that direction, so a small fierce thing in it (the sun's glare on the road
-  behind the car, a lamp) makes a highlight, not a burnt-out panel (the
-  owner's phone showed the whole tail white by day); the clear coat keeps the
-  crisp highlight. The broad metal sheen and the darker faces turned
-  away from the light are what make it metallic paint and not white plastic.
-- **Clear coat**, roughness 0.03, 1.6 times a plain lacquer's reflectance
-  (`COAT_GAIN`): the crisp mirror image over the sheen. Both layers mirror the
-  car's own reflection probe (`setReflections`), each at its own roughness.
+  car's high-tech silver: linear 0.60 / 0.62 / 0.665 (cool), metalness 0.82,
+  roughness 0.42, falling to 40 % edge-on (flop). A metallic paint, not
+  polished metal: the flake layer shades softly from light to dark across a
+  panel, light silver in the sun and mid grey turned away from it, and takes
+  the sun as a colour of its own as well as a broad sheen. Round 4's 0.92 /
+  0.27 mirrored everything, and next to the photographs the car read as
+  chrome; at 0.6 / 0.5 and a brighter base it read as white plastic.
+- **The flake layer's read of the probe** (`carSoftProbe`): a rough read is a
+  read of a coarse mip, and the mips are plain 2x2 averages, so at these
+  roughnesses a 128 or 256 cube is a few texels a face; filtered between
+  them, the wood's autumn crowns came out as large blocky yellow patches on
+  the bonnet and roof. The layer reads instead nine taps in a cone as wide as
+  its highlight, at a mip four times finer: a smooth bell of the
+  surroundings, no blocks, no face seams. What it shows is held to 65 % of
+  its colour, and the probe's average round that direction still caps a
+  small fierce thing in it (the sun's glare on the road behind the car, a
+  lamp) at five times, so that it makes a highlight, not a burnt-out panel.
+- **Clear coat**, roughness 0.03, a plain lacquer's reflectance (4 % face on,
+  `COAT_GAIN` 1): the only crisp reflection, strong only at grazing angles.
+  Its image is held to 45 % of its colour: at a grazing angle the nearly flat
+  bonnet magnified the wood's bright yellow crowns at the horizon into a
+  saturated yellow band across it (round 4 had the coat at 1.6 times, in full
+  colour). Both layers read the car's own reflection probe
+  (`setReflections`).
 - **Flake**. The flakes are far smaller than a pixel; together they are the
   sheen. But each is a small mirror, and one that happens to send the sun to
   the eye flashes. The surface is cut into cells never smaller than a pixel
@@ -329,6 +368,7 @@ in the viewer.
 | atlas resolution | `ATLAS_SIZE` in `atlas.js` |
 | a paint, or add one | `PAINTS` in `materials.js` |
 | flake, orange peel, the coat's strength | `carFlake`, the glint after `lights_fragment_end`, `COAT_GAIN` in `materials.js` |
+| how the paint blurs and tints what it mirrors | `GLSL_SOFT_PROBE` and the `soft` branch of `REFLECTIONS` in `materials.js` |
 | the black trims, seals, scoops, plate carriers, dishes, what is shaded | the region block and `carOcclusion` in `createPaintMaterial` |
 | the glass's tint, bands, heating lines | `createGlassMaterial` |
 | what a lamp is built of | `lampUnits.js`; how each part looks and how bright it is lit: `carLampPart` in `materials.js` |
@@ -404,21 +444,60 @@ over the tyres. Smaller than what the method can show at that size, or left:
 the brake discs are drilled on the car (plain here), the calipers larger;
 the side intake's inner detail; the shape of the mirror's foot.
 
+### Round five: the tail, the paint, the nose
+
+The owner's verdict on round four: the tail (what the game shows all the time)
+wobbled like dented foil, the paint read as chrome, yellow blotches sat on the
+bonnet, the grille was large and glittering. Staged again against the
+photographs (straight on the tail and the nose, the press picture outdoors,
+the studio one), each with the same fitted cameras:
+
+| what | before | after (from which picture) |
+| --- | --- | --- |
+| tail's surfaces | dents beside the plate, a fold at the bumper's corner, a crease from the star to the lamp | fair: convex both ways everywhere but the lip's fillet (see "The skin and its curves") (tail, striped studio) |
+| boot lid's lip | dipping 0.1 m to the lamps' upper edge: the lamps stood on the crease like fins | level across, the lamps below it (tail) |
+| widest line behind the hips | pinched in to 0.872 before the bumper's corner | carried at 0.898 into the corner: the bumper is the widest thing at the back (tail) |
+| paint | metalness 0.92, roughness 0.27, coat 1.6 times a lacquer: chrome | 0.82, 0.42, a plain lacquer; soft probe read (see "The paint") (press, studio, tail) |
+| grille's stars | 23 mm, 4 mm proud, on 40 x 30 mm: glitter | 16 mm, 2.5 mm proud, on 32 x 24 mm: fine dull points on black (nose) |
+| front bumper's corners | 0.84 to 0.88 wide: the front tyres showed outside the body from straight ahead | 0.86 to 0.90: hidden, as on the car (nose) |
+
+The grille's opening, the head lamps' outline, the tail lamps' outline and
+the front ride height were checked and agree with the photographs to a few
+pixels; they were left alone.
+
+What still differs:
+
+- **The wheels stand a little proud.** The body's widest point is 0.902 by
+  the front arch and 0.909 by the rear (1.818 overall, as published), but
+  the tyres' outer faces are at 0.9075 and 0.917 (`spec.js`: tracks 1.590 /
+  1.579 with 225 and 255 tyres). From ahead and to the side the front tyre
+  stands outside its arch. Tracks of about 1.574 / 1.559 would bring both
+  faces just inside the body; that changes the physics (`spec.js` is read
+  by it, and `docs/spec.md` holds its numbers), so it is left for whoever
+  owns the handling.
+- The front apron under the grille is simpler than the car's (deep black side
+  intakes framed by a painted wing): ours has slatted intakes and a plain
+  blade.
+- By day the coat still mirrors the wood's crowns at the horizon as a muted
+  olive band across the bonnet from low three-quarter views; the crowns in
+  the probe are brighter and more yellow than the dark trees of the press
+  picture.
+
 ## What each tier costs
 
-Re-measured after round two of the shape work (fewer, larger grille stars:
-the high tier fell by 2.4k triangles; the intakes, mirror and rails cost
-nothing). Measured in the viewer, one page at a time (headless Chromium on a 4-core
-machine, software WebGL; build time is
-`car.stats.buildMs`: everything from `createCar()` to the returned handle,
-shader compilation not included):
+Re-measured after round five (the tail's new corners and the finer grille
+stars cost about 1.3k triangles on the medium tier, which went over its
+113k budget; its edge length went from 55 to 56 mm). Measured in the viewer,
+one page at a time (headless Chromium on a 4-core machine, software WebGL;
+build time is `car.stats.buildMs`: everything from `createCar()` to the
+returned handle, shader compilation not included):
 
 | tier | triangles | draw calls (at rest) | build |
 | --- | --- | --- | --- |
-| low | 49.8k | 29 (25) | ~310-450 ms |
-| medium | 112.6k | 31 (27) | ~510-920 ms |
-| high | 185.6k | 31 (27) | ~750-970 ms |
-| ghost | 92.5k | 10 | ~150-190 ms |
+| low | 49.7k | 29 (25) | ~430 ms |
+| medium | 111.0k | 31 (27) | ~680-870 ms |
+| high | 185.0k | 31 (27) | ~990 ms |
+| ghost (not re-measured since round two) | 92.5k | 10 | ~150-190 ms |
 
 Plus one draw call for the contact shadow. The four blur shells are hidden at
 rest and the spokes at speed, so the count on the road is the smaller one.

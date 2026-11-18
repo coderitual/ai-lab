@@ -67,9 +67,9 @@ export const CENTRE_TOP = [
   [-1.7, 1.232],
   [-1.85, 1.146],
   [-1.96, 1.078, 1],
-  [-2.1, 1.062],
-  [-2.25, 1.044],
-  [-2.38, 1.024],
+  [-2.1, 1.0618],
+  [-2.25, 1.0427],
+  [-2.38, 1.0247],
   [-2.435, 1.017],
   [-2.449, 1.008],
 ];
@@ -83,9 +83,9 @@ export const LOWER = [
   [0.65, 0.174, 2.12],
   [0.75, 0.174, 2.07],
   [0.8, 0.176, 2.03],
-  [0.835, 0.18, 1.95],
-  [0.85, 0.188, 1.86],
-  [0.857, 0.198, 1.78],
+  [0.848, 0.18, 1.95],
+  [0.866, 0.19, 1.86],
+  [0.872, 0.2, 1.78],
   [0.86, 0.2, 1.4325],
   [0.86, 0.196, 1.047],
   [0.86, 0.186, 0.95],
@@ -98,12 +98,22 @@ export const LOWER = [
   [0.862, 0.225, -1.4325],
   [0.86, 0.25, -1.822],
   [0.855, 0.275, -1.95],
-  [0.838, 0.29, -2.1],
-  [0.795, 0.29, -2.25],
-  [0.715, 0.275, -2.38],
-  [0.6, 0.262, -2.445],
-  [0.45, 0.255, -2.478],
-  [0.25, 0.25, -2.492],
+  // round the tail: a Lame curve, (x / a)^3.0 + ((-2.0 - z) / 0.495)^2.2 = 1, sampled evenly (see SHAPE.lower)
+  [0.862, 0.282, -2],
+  [0.8574, 0.2816, -2.075],
+  [0.8412, 0.2801, -2.1484],
+  [0.812, 0.2776, -2.2176],
+  [0.7705, 0.2742, -2.2802],
+  [0.7183, 0.2703, -2.3342],
+  [0.6579, 0.2663, -2.3789],
+  [0.5916, 0.2625, -2.4145],
+  [0.5216, 0.2591, -2.4417],
+  [0.4491, 0.2563, -2.4619],
+  [0.3753, 0.254, -2.476],
+  [0.3006, 0.2523, -2.4853],
+  [0.2256, 0.2511, -2.4909],
+  [0.1504, 0.2504, -2.4938],
+  [0.0752, 0.2501, -2.4949],
   [0, 0.25, -2.495],
 ];
 
@@ -119,9 +129,9 @@ export const WIDEST = [
   [0.65, 0.45, 2.13],
   [0.75, 0.45, 2.08],
   [0.8, 0.45, 2.04],
-  [0.84, 0.45, 1.96],
-  [0.862, 0.46, 1.85],
-  [0.88, 0.55, 1.7],
+  [0.862, 0.45, 1.96],
+  [0.89, 0.465, 1.85],
+  [0.902, 0.56, 1.7],
   [0.905, 0.66, 1.4325],
   [0.892, 0.64, 1.1],
   [0.893, 0.64, 0.75],
@@ -132,15 +142,24 @@ export const WIDEST = [
   [0.907, 0.69, -1.1],
   [0.91, 0.69, -1.4325],
   [0.905, 0.66, -1.75],
-  [0.887, 0.6, -1.9],
-  [0.87, 0.5, -2.0],
-  [0.84, 0.47, -2.15],
-  [0.78, 0.47, -2.3],
-  [0.69, 0.47, -2.395],
-  [0.57, 0.47, -2.46],
-  [0.45, 0.47, -2.505],
-  [0.3, 0.47, -2.52],
-  [0, 0.47, TAIL],
+  [0.902, 0.6, -1.9],
+  // round the tail: a Lame curve, (x / a)^3.4 + ((-1.98 - z) / 0.5455)^3.0 = 1, sampled evenly (see SHAPE.lower)
+  [0.898, 0.5, -1.98],
+  [0.8971, 0.4983, -2.0625],
+  [0.8906, 0.4878, -2.1448],
+  [0.8732, 0.4715, -2.2253],
+  [0.84, 0.47, -2.3007],
+  [0.7897, 0.47, -2.3659],
+  [0.7255, 0.47, -2.4175],
+  [0.6524, 0.47, -2.4556],
+  [0.5744, 0.47, -2.4824],
+  [0.4939, 0.47, -2.5006],
+  [0.4122, 0.47, -2.5123],
+  [0.33, 0.47, -2.5194],
+  [0.2476, 0.47, -2.5232],
+  [0.1651, 0.47, -2.5249],
+  [0.0825, 0.47, -2.5254],
+  [0, 0.47, -2.5255],
 ];
 
 /**
@@ -171,15 +190,22 @@ export const SHOULDER = [
   [0.815, 0.955, -1.4325],
   [0.812, 0.952, -1.6],
   [0.815, 0.943, -1.8],
-  [0.822, 0.925, -1.93],
-  [0.818, 0.912, -2.0],
-  [0.8, 0.908, -2.06],
-  [0.76, 0.91, -2.116],
-  [0.7, 0.908, -2.197],
-  [0.64, 0.904, -2.267],
-  [0.6, 0.905, -2.3],
-  [0.5, 0.955, -2.38],
-  [0.3, 1.0, -2.435],
+  // round the tail: a Lame curve, (x / a)^2.7 + ((-1.93 - z) / 0.519)^2.0 = 1, sampled evenly (see SHAPE.lower)
+  [0.824, 0.925, -1.93],
+  [0.818, 0.9266, -2.0026],
+  [0.8001, 0.9311, -2.0733],
+  [0.7711, 0.9381, -2.1402],
+  [0.7319, 0.947, -2.2016],
+  [0.6838, 0.9569, -2.2564],
+  [0.6284, 0.967, -2.3038],
+  [0.5673, 0.9766, -2.3436],
+  [0.5018, 0.9851, -2.3758],
+  [0.4334, 0.9924, -2.401],
+  [0.3629, 0.9982, -2.4198],
+  [0.2912, 1.0024, -2.4331],
+  [0.2187, 1.0054, -2.4417],
+  [0.1459, 1.0071, -2.4466],
+  [0.073, 1.0078, -2.4486],
   [0, 1.008, -2.449],
 ];
 
@@ -259,6 +285,12 @@ export const SECTIONS = {
   tailStart: -1.975,
   noseSteps: 8,
   tailSteps: 8,
+  /**
+   * z on the centre line where the boot lid's part of the last section (the one in the centre plane) begins:
+   * round the tail the lid is a fan of sections from the lip to the centre line, and ending them all at the
+   * lip's centre made a point there that every section ran into (a pinched crease from the star outwards).
+   */
+  lidCentre: -2.25,
   /** the foot of the windscreen and of the rear screen on the centre line: the glasshouse is between them */
   cowl: 0.85,
   rearFoot: -1.965,
@@ -323,6 +355,12 @@ export const SHAPE = {
    * The rails between the lower edge and the widest line: for each, how far across (in plan) and how far up it
    * sits between the two, [q, across, up]. Along the doors they draw the skirt, the door's lower edge, the
    * lower crease and the flank; at the ends the bumpers' faces.
+   *
+   * Round the tail (q below the last main section) every rail keeps the proportions it has at the hip, and the
+   * three lines it is placed between are smooth corners (Lame curves sampled densely, not a handful of points
+   * placed by eye). The tail had its own proportions here, changing at q -2.3 and -2.75, over hand-placed
+   * corners whose plan curvature changed sign four times: every section of the fan had a different profile, and
+   * the boot's face and bumper mirrored dents, folds and a crease from the star to the lamp.
    */
   lower: [
     [
@@ -331,7 +369,6 @@ export const SHAPE = {
       [1.0, 0.53, 0.03],
       [-1.0, 0.53, 0.03],
       [-1.9, 0.4, 0.08],
-      [Q_TAIL, 0.3, 0.1],
     ],
     [
       [Q_NOSE, -0.5, 0.25],
@@ -339,7 +376,6 @@ export const SHAPE = {
       [1.0, 0.58, 0.18],
       [-1.0, 0.58, 0.18],
       [-1.9, 0.5, 0.25],
-      [Q_TAIL, 0.56, 0.28],
     ],
     [
       [Q_NOSE, -0.5, 0.5],
@@ -347,7 +383,6 @@ export const SHAPE = {
       [1.0, 0.73, 0.51],
       [-1.0, 0.73, 0.51],
       [-1.9, 0.8, 0.55],
-      [Q_TAIL, 0.88, 0.64],
     ],
     [
       [Q_NOSE, 0.3, 0.75],
@@ -355,7 +390,6 @@ export const SHAPE = {
       [1.0, 0.93, 0.755],
       [-1.0, 0.93, 0.755],
       [-1.9, 0.95, 0.8],
-      [Q_TAIL, 0.97, 0.85],
     ],
   ],
   /** The rails between the widest line and the shoulder, likewise: the flank's fullness, the haunches, the bumper's shelf under the tail lamps. */
@@ -368,9 +402,6 @@ export const SHAPE = {
       [-1.0, 0.06, 0.2],
       [-1.43, 0.05, 0.23],
       [-1.955, 0.06, 0.25],
-      [-2.3, 0.1, 0.3],
-      [-2.75, 0.3, 0.24],
-      [Q_TAIL, 0.45, 0.2],
     ],
     [
       [Q_NOSE, 0.5, 0.5],
@@ -380,9 +411,6 @@ export const SHAPE = {
       [-1.0, 0.17, 0.41],
       [-1.43, 0.26, 0.53],
       [-1.955, 0.25, 0.5],
-      [-2.3, 0.36, 0.55],
-      [-2.75, 0.7, 0.46],
-      [Q_TAIL, 0.75, 0.45],
     ],
     [
       [Q_NOSE, 0.78, 0.78],
@@ -392,9 +420,6 @@ export const SHAPE = {
       [-1.0, 0.52, 0.75],
       [-1.43, 0.63, 0.81],
       [-1.955, 0.62, 0.78],
-      [-2.3, 0.72, 0.8],
-      [-2.75, 1.0, 0.75],
-      [Q_TAIL, 1.0, 0.8],
     ],
   ],
   /**
@@ -402,6 +427,8 @@ export const SHAPE = {
    * (0) and the shoulder (1). The first six continue the glasshouse's own lines (belt, two on the glass, upper
    * edge of the glass, pillar, top edge), which is why they crowd towards the shoulder.
    */
+  /** the boot lid's crown across, as `crown` (one number: the lid's height is one function of the plan) */
+  lidCrown: 4,
   deck: [0.965, 0.955, 0.945, 0.93, 0.89, 0.84, 0.63, 0.42, 0.21, 0],
   /** height of the floor on the centre line, [q, y] */
   floor: [
