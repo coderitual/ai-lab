@@ -38,7 +38,7 @@ export const CANOPY = {
    * weight (schemes.js): frame e2's pines are tall and stand close (deep shade between the sun's patches), frame e5's
    * stand in open groups round sunny glades.
    */
-  schemes: { pinewood: { height: 27, density: 0.85 }, stonepine: { height: 17, density: 0.55 } },
+  schemes: { pinewood: { height: 24, density: 0.6 }, stonepine: { height: 17, density: 0.55 } },
 };
 
 import { schemeTable } from './schemes.js';

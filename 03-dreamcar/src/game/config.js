@@ -346,7 +346,7 @@ export const PHOTOS = {
   // (forest lane) e2: the forest road of the rise and the first ess, chase-like from behind and above the car, the
   // low sun crossing from the left; e5: the carousel's exit, on its outside ahead of the car, looking back at it
   // coming round the grass island of granite and pines
-  e2: { back: 6.2, right: 0.3, up: 2.0, yaw: 0, pitch: -5, fov: 50, t: 21.2, time: 'day' },
+  e2: { back: 6.2, right: 0.3, up: 2.0, yaw: 0, pitch: -5, fov: 50, t: 22.2, time: 'day' },
   e5: { back: -19.9, right: -3.7, up: 3.38, yaw: 198.5, pitch: -4.8, fov: 40, t: 63.8, time: 'day' },
 };
 

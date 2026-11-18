@@ -17,7 +17,7 @@ import { plantMaterial } from './treeMaterial.js';
 import { planeNoise } from './shading.js';
 import { GRASS } from './groundMaterial.js';
 import { boulderGeometry } from './boulders.js';
-import { createBendSigns, createCurbs } from './schemeFurniture.js';
+import { createBendSigns, createChevrons, createCurbs } from './schemeFurniture.js';
 import { schemeAt, schemeTable } from './schemes.js';
 
 const SURFACE_GRASS = 2;
@@ -468,11 +468,11 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
     const st = schemeTable(track);
     const pnoise = planeNoise(sr.int(1 << 30));
     const YELLOW = [0.78, 0.56, 0.035];
-    const PURPLE = [0.27, 0.11, 0.6];
+    const PURPLE = [0.24, 0.13, 0.46];
     // the boulders' shapes (boulders.js; on low the rocks' own), and how far each reaches out in plan per unit of size
     // at the largest scale it is given (1.2)
-    boulderGeo.round = tier === 'low' ? null : boulderGeometry(rng.fork('boulder-round'), { detail: tier === 'high' ? 3 : 2, kind: 'round', moss: 0.55 });
-    boulderGeo.block = tier === 'low' ? null : boulderGeometry(rng.fork('boulder-block'), { detail: tier === 'high' ? 3 : 2, kind: 'block', moss: 0.2 });
+    boulderGeo.round = tier === 'low' ? null : boulderGeometry(rng.fork('boulder-round'), { detail: tier === 'high' ? 4 : 3, kind: 'round', moss: 0.55 });
+    boulderGeo.block = tier === 'low' ? null : boulderGeometry(rng.fork('boulder-block'), { detail: tier === 'high' ? 4 : 3, kind: 'block', moss: 0.2 });
     const planOf = (g) => {
       let r = 1.25; // the rocks' own lumpy ball (boulder() above): at most 1.25
       if (g) {
@@ -486,9 +486,13 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
     const rocky = (kind, s, side, lat, size, moss, lift = 0) => {
       track.pointAt(s, lat, point);
       if (!ownStretch(s, point.x, point.z)) return false;
-      const y = terrain.heightOnTrack(s, lat) + lift;
+      // where the ground falls away from the road (the outside of a bend on a hillside), a big block stands up to the
+      // road's level all the same, reaching down to the ground: seen from the road it is not sunk out of sight
+      const ground = terrain.heightOnTrack(s, lat);
+      const drop = size > 2 ? Math.max(0, track.profile(s, side * track.edgeAt(s, side), prof).y - 0.6 - ground) : 0;
+      const y = ground + lift + drop * 0.5;
       const v = sr.range(0.85, 1.12);
-      const sc = [size * sr.range(0.85, 1.2), size * sr.range(0.85, 1.1), size * sr.range(0.85, 1.15)];
+      const sc = [size * sr.range(0.85, 1.2), (size + drop * 0.7) * sr.range(0.85, 1.1), size * sr.range(0.85, 1.15)];
       const tilt = sr.range(-0.12, 0.12);
       if (tier === 'low') {
         // (low: the rocks' own mesh and shape, the granite's tone)
@@ -524,9 +528,35 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
             bushItems.push(make(point.x, terrain.heightOnTrack(ss, latB) - 0.1, point.z, sr.range(0, Math.PI), [h * 1.6, h, h * 1.6], GRASS.bush.map((c) => c * v), h));
           }
         }
+        // (the owner's video) a face of pale granite along the outside of the bend's first half: big blocks side by side
+        // at the verge, a second tier stacked behind and above them, 8 to 12 m in all, shrubs at their feet
+        if (def.rockface) {
+          for (let d = 0.08 * len; d < 0.5 * len; d += sr.range(4, 6.5)) {
+            const s = track.wrap(run.s0 + d);
+            const side = -inside;
+            const size = sr.range(4, 6.5);
+            const edge = track.edgeAt(s, side);
+            rocky('block', s, side, side * (edge + size * PLAN + sr.range(0.2, 1.5)), size, 0.2, 0);
+            if (sr.next() < 0.75) {
+              const size2 = sr.range(3.5, 6);
+              rocky(sr.next() < 0.7 ? 'block' : 'round', track.wrap(s + sr.range(-2, 2)), side, side * (edge + size * PLAN * 2 + size2 * 0.4), size2, 0.2, size * 0.75);
+            }
+            if (T.bushes) {
+              for (let b = 0; b < 2; b++) {
+                const ss = track.wrap(s + sr.range(-3, 3));
+                const latB = side * (edge + sr.range(0.3, 1.2));
+                track.pointAt(ss, latB, point);
+                if (!ownStretch(ss, point.x, point.z)) continue;
+                const h = sr.range(0.6, 1.3);
+                bushItems.push(make(point.x, terrain.heightOnTrack(ss, latB) - 0.1, point.z, sr.range(0, Math.PI), [h * 1.6, h, h * 1.6], GRASS.bush.map((c) => c * sr.range(0.5, 0.75)), h));
+              }
+            }
+          }
+        }
         // lupins at the foot of the big boulders by the kerb
         if (T.grass > 0) {
-          for (let d = 0.72 * len; d < 0.9 * len; d += 0.3) {
+          for (let d = 0.72 * len; d < 0.9 * len; d += 0.8) {
+            if (pnoise.fbm(d / 6, 4.4, 2) < 0.5) continue;
             const s = track.wrap(run.s0 + d);
             const lat = inside * sr.range(pave + 0.4, track.edgeAt(s, inside) + 1.5);
             track.pointAt(s, lat, point);
@@ -562,13 +592,14 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
               if (!ownStretch(s, point.x, point.z)) continue;
               const out = (Math.abs(lat) - pave) / Math.max(1, edge - pave);
               const h = sr.range(0.35, 0.6) + 0.35 * Math.min(1, out) * sr.next();
-              const dry = sr.next() ** 3;
+              // (the owner's video: dry olive grass on the bend's verges)
+              const dry = sr.next() ** (def.verge === 'islands' ? 1.1 : 3);
               const v = sr.range(0.95, 1.35);
               grassItems.push(make(point.x, g.y - 0.03, point.z, sr.range(0, Math.PI), [h * 1.8, h, h * 1.8], GRASS.tuft.map((c, k) => (c + (GRASS.tuftDry[k] - c) * dry) * v), h));
             } else if (roll < (def.verge === 'meadow' ? 0.62 : 0.52) * w) {
               // flowers, in patches
               const patch = pnoise.fbm(s / 7 + side * 31, 2.2, 3);
-              if (patch < (def.verge === 'meadow' ? 0.56 : 0.5)) continue;
+              if (patch < (def.verge === 'meadow' ? 0.56 : 0.58)) continue;
               const lat = side * sr.range(pave + 0.6, edge + behind * 0.4);
               const g = groundAt(s, lat, side);
               if (g.surface >= 0 && g.surface !== SURFACE_GRASS) continue;
@@ -665,7 +696,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
   rocks.mesh.castShadow = tier !== 'low';
   parts.push(rocks);
   // (forest lane) the schemes' boulders, painted granite (boulders.js), on medium and high (low draws them as rocks)
-  const boulderMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, flat: true, vertexColors: true });
+  const boulderMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, flat: false, vertexColors: true });
   for (const [kind, items] of [
     ['round', boulderItems.round],
     ['block', boulderItems.block],
@@ -682,6 +713,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
   group.add(signs.group);
   const curbs = createCurbs({ track, terrain, material: signMaterial });
   group.add(curbs.group);
+  const chevrons = createChevrons({ track, terrain, material: signMaterial });
+  group.add(chevrons.group);
 
   const frustum = new THREE.Frustum();
   const projView = new THREE.Matrix4();
@@ -704,6 +737,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       signMaterial.dispose();
       signs.dispose();
       curbs.dispose();
+      chevrons.dispose();
       texture.dispose();
     },
   };

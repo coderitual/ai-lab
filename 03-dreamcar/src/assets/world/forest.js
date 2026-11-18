@@ -646,9 +646,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     const MIX = {
       // [species, variant or -1, share, height range (m)]
       pinewood: [
-        [PINE, PINE_A, 0.66, [21, 29]],
-        [SPRUCE, SPRUCE_B, 0.2, [19, 26]],
-        [FIR, -1, 0.14, [15, 21]],
+        [PINE, PINE_A, 0.84, [21, 29]],
+        [SPRUCE, SPRUCE_B, 0.11, [19, 26]],
+        [FIR, -1, 0.05, [15, 21]],
       ],
       stonepine: [
         [PINE, PINE_A, 0.58, [18, 26]],
@@ -682,7 +682,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       if (t.road) continue;
       // (e2) the wood behind the road's rows thinned, so that the low sun comes through between the crowns and lies on
       // the road in patches; under a closed canopy 60 to 90 m deep towards the sun the road was in plain shade
-      if (wood === 'pinewood' && schemeRng.next() < 0.45) continue;
+      if (wood === 'pinewood' && schemeRng.next() < 0.85) continue;
       const m = pick(wood);
       const variants = VARIANTS_OF[m[0]];
       t.variant = m[1] >= 0 ? m[1] : variants[schemeRng.int(variants.length)];
@@ -697,10 +697,10 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     // the scheme's own rows
     const ROWS_OF = {
       pinewood: [
-        { off: [0.2, 2.2], step: [3.6, 6.5], r: 2.6, detail: 1.8, inside: 0.15, lean: [0.0, 0.04] },
-        { off: [3.5, 7.5], step: [4, 7], r: 2.8, detail: 1.3, inside: 0.35 },
-        { off: [9, 15], step: [4.5, 8], r: 3, detail: 0.9, inside: 0.5 },
-        { off: [17, 27], step: [5, 9], r: 3.2, detail: 0.6, inside: 0.6 },
+        { off: [0.2, 2.2], step: [4.5, 8], r: 2.6, detail: 1.8, inside: 0.15, lean: [0.0, 0.04] },
+        { off: [3.5, 7.5], step: [6, 10], r: 2.8, detail: 1.3, inside: 0.35 },
+        { off: [9, 15], step: [8, 14], r: 3, detail: 0.9, inside: 0.5 },
+        { off: [17, 27], step: [10, 16], r: 3.2, detail: 0.6, inside: 0.6 },
       ],
       stonepine: [
         { off: [0.5, 4], step: [5, 11], r: 3.2, detail: 1.6, inside: 0.1, glade: 0.5 },

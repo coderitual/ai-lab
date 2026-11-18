@@ -249,7 +249,12 @@ treeMaterial.js, impostors.js, forest.js; numbers in design.md, "The forest".
   themselves, so they begin and end at a piece's end. Each part plants or
   places what the scheme asks from its own random stream (`fork('scheme')`)
   after everything else is placed, so that the rest of the lap is exactly as
-  it was.
+  it was. A scheme may draw the corridor's solid edges differently without
+  changing them (`curb`): to the cars the edge stays what the Track says (a
+  rail, rock), at the same distance; the world draws a low concrete
+  kerbstone there instead of a rail or a cut face (`schemes.js` `curbAt`,
+  read by rails.js, terrain.js's cliffs, trackside.js), so the physics and
+  its tests are untouched.
 - **Where trees stand** is asked of `track.woodAt(s, side)` from 2 m behind
   the barrier, plus the mass of the forest away from the road where the
   terrain says; a keep-out callback keeps the start area and the town free.
@@ -325,7 +330,10 @@ planes, everything beyond a plane pressed back onto it, which leaves the flat
 faces and sharp arrises of granite split along its joints. Painted per
 vertex: the granite flecked, lichen in pale patches, moss where a face looks
 at the sky (the grass's own green), the foot dark where it stands in the
-earth. Two shapes (a weathered `round` one and a split `block`), each one
+earth. Its corners are then merged and it is shaded smooth (detail 3 on
+medium, 4 on high: a facet of a 5 m boulder read as a low-poly model). Where
+the ground falls away from the road, a big block reaches up to the road's
+level all the same (taller, standing on the ground). Two shapes (a weathered `round` one and a split `block`), each one
 instanced mesh, scaled, turned and tilted per boulder. groundCover.js places
 each with its middle at least its plan radius (the shape's own widest reach
 in plan at the largest scale, plus 15 cm for the tilt) beyond the solid

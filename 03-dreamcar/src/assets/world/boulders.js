@@ -9,12 +9,13 @@
 // arrises of a block split along its joints, its edges then rounded by the
 // lumps. It is painted per vertex: pale granite flecked darker and lighter,
 // lichen in pale patches, moss on what faces the sky (more on the mossy kind),
-// and the foot darker where it stands in the earth. Shaded flat, facet by facet.
+// and the foot darker where it stands in the earth. Shaded smooth (its corners shared).
 //
 // Two shapes: 'round' (a weathered boulder) and 'block' (a split slab, the
 // outcrops' big pieces). Pure geometry: no textures.
 
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GRASS } from './groundMaterial.js';
 import { planeNoise } from './shading.js';
 
@@ -24,7 +25,7 @@ const GRANITE = { base: [0.25, 0.245, 0.23], fleck: 0.08, lichen: [0.31, 0.3, 0.
 const MOSS = GRASS.bush.map((c) => c * 0.95);
 
 /**
- * One boulder's geometry, about a unit ball (its foot to be sunk into the ground), non-indexed, with `color`.
+ * One boulder's geometry, about a unit ball (its foot to be sunk into the ground), indexed, with `color`.
  * @param {import('../../engine/rng.js').Rng} rng
  * @param {{ detail?: number, kind?: 'round'|'block', moss?: number }} o moss: how much of its top is mossy (0..1)
  */
@@ -58,45 +59,38 @@ export function boulderGeometry(rng, { detail = 2, kind = 'round', moss = 0.3 } 
     p.setXYZ(i, v.x, v.y, v.z);
   }
   g.deleteAttribute('uv');
-  g.computeVertexNormals();
-  const nor = g.attributes.normal;
-  // the faces' own normals (flat shading), for where moss grows
-  const count = p.count;
+  g.deleteAttribute('normal');
+  // (one vertex per corner, shared: smooth normals, so that the lumps read as a worn surface and the cuts as faces
+  // with rounded arrises, not as facets)
+  const m = mergeVertices(g, 1e-4);
+  g.dispose();
+  m.computeVertexNormals();
+  const mp = m.attributes.position;
+  const nor = m.attributes.normal;
+  const count = mp.count;
   const color = new Float32Array(count * 3);
   const shade = new Float32Array(count * 2);
-  const a = new THREE.Vector3();
-  const b = new THREE.Vector3();
-  const c = new THREE.Vector3();
-  const fn = new THREE.Vector3();
-  for (let f = 0; f < count; f += 3) {
-    a.fromBufferAttribute(p, f);
-    b.fromBufferAttribute(p, f + 1);
-    c.fromBufferAttribute(p, f + 2);
-    fn.subVectors(c, b).cross(a.clone().sub(b)).normalize();
-    for (let j = 0; j < 3; j++) {
-      const i = f + j;
-      v.fromBufferAttribute(p, i);
-      const fleck = (rng.next() - 0.5) * 2 * GRANITE.fleck;
-      let col = GRANITE.base.map((x) => x * (1 + fleck * 3));
-      // lichen in pale patches
-      const lichen = Math.max(0, noise.fbm(v.x * 2.3 + 11, v.z * 2.3 + v.y * 1.7, 2) - 0.6) * 3;
-      col = col.map((x, q) => x + (GRANITE.lichen[q] - x) * Math.min(1, lichen));
-      // moss on what faces the sky, in a ragged sheet
-      const sky = THREE.MathUtils.smoothstep(fn.y, 0.25, 0.8);
-      const sheet = THREE.MathUtils.smoothstep(noise.fbm(v.x * 1.7 + 5, v.z * 1.7 - v.y, 2) + moss * 0.9, 0.85, 1.15);
-      const m = Math.min(1, sky * sheet * (0.3 + moss));
-      col = col.map((x, q) => x + (MOSS[q] - x) * m);
-      // the foot, in the earth: dark and damp
-      const foot = 1 - THREE.MathUtils.smoothstep(v.y, -0.32, 0.05);
-      col = col.map((x, q) => x + (GRANITE.foot[q] - x) * foot * 0.85);
-      color.set(col, i * 3);
-      shade[i * 2] = 0.6 + 0.4 * THREE.MathUtils.smoothstep(v.y, -0.4, 0.35);
-      shade[i * 2 + 1] = 0;
-    }
+  for (let i = 0; i < count; i++) {
+    v.fromBufferAttribute(mp, i);
+    const fleck = (rng.next() - 0.5) * 2 * GRANITE.fleck;
+    let col = GRANITE.base.map((x) => x * (1 + fleck * 3));
+    // lichen in pale patches
+    const lichen = Math.max(0, noise.fbm(v.x * 2.3 + 11, v.z * 2.3 + v.y * 1.7, 2) - 0.6) * 3;
+    col = col.map((x, q) => x + (GRANITE.lichen[q] - x) * Math.min(1, lichen));
+    // moss on what faces the sky, in a ragged sheet
+    const sky = THREE.MathUtils.smoothstep(nor.getY(i), 0.3, 0.85);
+    const sheet = THREE.MathUtils.smoothstep(noise.fbm(v.x * 1.7 + 5, v.z * 1.7 - v.y, 2) + moss * 0.9, 0.85, 1.15);
+    const mo = Math.min(1, sky * sheet * (0.3 + moss));
+    col = col.map((x, q) => x + (MOSS[q] - x) * mo);
+    // the foot, in the earth: dark and damp
+    const foot = 1 - THREE.MathUtils.smoothstep(v.y, -0.32, 0.05);
+    col = col.map((x, q) => x + (GRANITE.foot[q] - x) * foot * 0.85);
+    color.set(col, i * 3);
+    shade[i * 2] = 0.6 + 0.4 * THREE.MathUtils.smoothstep(v.y, -0.4, 0.35);
+    shade[i * 2 + 1] = 0;
   }
-  void nor;
-  g.setAttribute('color', new THREE.BufferAttribute(color, 3));
-  g.setAttribute('aShade', new THREE.BufferAttribute(shade, 2));
-  g.computeBoundingSphere();
-  return g;
+  m.setAttribute('color', new THREE.BufferAttribute(color, 3));
+  m.setAttribute('aShade', new THREE.BufferAttribute(shade, 2));
+  m.computeBoundingSphere();
+  return m;
 }

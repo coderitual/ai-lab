@@ -253,7 +253,14 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     if (k < 0) continue;
     const def = st.defs[k];
     if (def.gap) gap = def.gap;
-    schemeBytes.set([st.on[i] && def.lines === 'double-yellow' ? 255 : 0, byte(st.w[i] * (def.asphalt ?? 0)), byte(st.w[i] * (def.cracks ?? 0)), byte(st.w[i] * (def.strip ?? 0))], i * 4);
+    // (r: 255 the lines; 200 or 150 the lines with yellow dashes beside them on the left or the right, over the first
+    // `dashes` m of a scheme's run: the inside of the bend that begins there)
+    let lines = st.on[i] && def.lines === 'double-yellow' ? 255 : 0;
+    if (lines && def.dashes) {
+      const run = st.runs.find((r) => r.def === def && track.wrap(i * ds - r.s0) <= track.wrap(r.s1 - r.s0));
+      if (run && track.wrap(i * ds - run.s0) < def.dashes) lines = track.curvature[Math.round(track.wrap(run.s0 + 30) / ds) % n] > 0 ? 200 : 150;
+    }
+    schemeBytes.set([lines, byte(st.w[i] * (def.asphalt ?? 0)), byte(st.w[i] * (def.cracks ?? 0)), byte(st.w[i] * (def.strip ?? 0))], i * 4);
   }
   const schemeTexture = new THREE.DataTexture(schemeBytes, n, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
   schemeTexture.magFilter = schemeTexture.minFilter = THREE.NearestFilter;
@@ -889,6 +896,9 @@ for ( int i = 0; i < ${GRID_SLOTS}; i ++ ) {
 }
 // (forest lane) the scheme's double yellow centre line, two solid lines either side of the centre
 float rYellow = step( 0.5, rScheme.r ) * roadCover( rA - ( CENTRE_HALF_GAP + ${(CENTRE_LINE.width / 2).toFixed(3)} ), ${(CENTRE_LINE.width / 2).toFixed(3)}, aaL );
+// and short yellow dashes beside it on the inside of a bend's first part (r 200: left, 150: right)
+float rDashSide = rScheme.r < 0.9 && rScheme.r > 0.5 ? ( rScheme.r > 0.7 ? 1.0 : -1.0 ) : 0.0;
+rYellow += abs( rDashSide ) * roadCover( rLat * rDashSide - ( CENTRE_HALF_GAP + 0.55 ), 0.06, aaL ) * roadCover( fract( rS / 3.0 ) - 0.5, 0.17, aaS / 3.0 );
 rMarks += rYellow;
 // worn: thin where the tyres run, gone in places, broken by the stones up close, newer where the road is
 float rWear = 0.55 + 0.25 * rBig.b + 0.2 * rMottle - 0.3 * rRubber + 0.2 * ( rAgg.g - 0.5 ) * rNear + 0.2 * ( 1.0 - rAge );

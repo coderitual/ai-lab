@@ -105,14 +105,17 @@ export const SIDES = {
  *   verge    'meadow' (long grass, ferns, yellow flowers) or 'islands' (grass islands with purple and yellow flowers)
  *   boulders 'mossy' (boulders among the trunks) or 'granite' (pale granite boulders and outcrops at the roadside)
  *   sign     a bend-warning sign this many metres before the piece, on its outside (0: none)
+ *   chevrons a row of this many chevron boards on the outside of the bend (0: none)
+ *   dashes   short yellow dashes beside the centre line on the inside, over the first `dashes` m of the bend (0: none)
+ *   rockface pale granite faces and outcrops along the outside of the bend (groundCover.js)
  *   curb     the solid edges on its pieces (rail or rock to the cars) are drawn as low concrete kerbstones this high
  *            (m): no rail, no cut face or cliff, no tyre walls, boards or marshal posts there
  * The two schemes answer the owner's frames e2 (a forest road in low side sun: the rise and the first ess) and e5 (a
  * mountain bend round an island of granite boulders: the carousel), design.md "The reference frames".
  */
 export const SCHEMES = {
-  pinewood: { lines: 'double-yellow', gap: 0.16, asphalt: 0.9, cracks: 0.6, strip: 0.32, kerb: [[0.4, 0.39, 0.37], [0.52, 0.51, 0.49]], wood: 'pinewood', verge: 'meadow', boulders: 'mossy', sign: 0, blend: 90 },
-  granite: { lines: 'double-yellow', gap: 0.16, asphalt: 0.5, cracks: 0.4, strip: 0.32, kerb: [[0.02, 0.09, 0.42], [0.62, 0.61, 0.58]], wood: 'stonepine', verge: 'islands', boulders: 'granite', sign: 90, curb: 0.32, blend: 70 },
+  pinewood: { lines: 'double-yellow', gap: 0.16, asphalt: 0.9, cracks: 0.6, strip: 0.32, kerb: [[0.4, 0.39, 0.37], [0.52, 0.51, 0.49]], wood: 'pinewood', verge: 'meadow', boulders: 'mossy', sign: 0, curb: 0.2, blend: 90 },
+  granite: { lines: 'double-yellow', gap: 0.16, asphalt: 0.5, cracks: 0.4, strip: 0.32, kerb: [[0.02, 0.09, 0.42], [0.62, 0.61, 0.58]], wood: 'stonepine', verge: 'islands', boulders: 'granite', sign: 90, chevrons: 6, dashes: 70, rockface: true, curb: 0.32, blend: 70 },
 };
 
 /** The named stretches, in driving order. */

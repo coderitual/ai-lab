@@ -224,3 +224,107 @@ export function createCurbs({ track, terrain, material }) {
     },
   };
 }
+
+/** Chevron boards (m): width, height, the board's foot above the ground, how far beyond the edge; paints (linear). */
+const CHEVRON = { w: 1.1, h: 0.75, foot: 0.45, beyond: 0.8, black: [0.015, 0.015, 0.016], yellow: [0.95, 0.62, 0.03], post: [0.3, 0.3, 0.29] };
+
+/**
+ * A row of chevron boards of our own drawing (a black board, two yellow arrowheads pointing the way the road turns)
+ * on the outside of the bend of each scheme that asks (`chevrons`: how many), facing the cars as they come in,
+ * spread over the bend's first part, beyond the solid edge. Coloured per vertex; one mesh for all of them.
+ * @param {object} o
+ * @param {object} o.track
+ * @param {object} o.terrain heightOnTrack, bakeAt
+ * @param {THREE.Material} o.material a flat, two-sided plants' material
+ */
+export function createChevrons({ track, terrain, material }) {
+  const st = schemeTable(track);
+  const pos = [];
+  const tint = [];
+  const bakeArr = [];
+  const index = [];
+  const pt = new THREE.Vector3();
+  const frame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
+  const bake = [0, 0, 0];
+  let count = 0;
+  for (const run of st.runs) {
+    const n = run.def.chevrons ?? 0;
+    if (!n) continue;
+    const len = track.wrap(run.s1 - run.s0);
+    let k = 0;
+    for (let d = 0; d < len; d += 5) k += track.curvature[Math.round(track.wrap(run.s0 + d) / track.ds) % track.count];
+    const turn = k < 0 ? -1 : 1;
+    const side = -turn;
+    for (let j = 0; j < n; j++) {
+      const s = track.wrap(run.s0 + 8 + j * Math.min(14, (len * 0.45) / n));
+      const lat = side * (track.edgeAt(s, side) + CHEVRON.beyond);
+      track.frameAt(s, frame);
+      track.pointAt(s, lat, pt);
+      const y = terrain.heightOnTrack(s, lat);
+      terrain.bakeAt(pt.x, pt.z, bake, 0);
+      // facing the oncoming cars, turned a little towards the road
+      const z = frame.tan.clone().negate().setY(0).normalize();
+      const x = new THREE.Vector3(0, 1, 0).cross(z).normalize();
+      const put = (u, v, w, col) => {
+        pos.push(pt.x + x.x * u + z.x * w, y + v, pt.z + x.z * u + z.z * w);
+        tint.push(...col, 1);
+        bakeArr.push(Math.min(1, bake[0] + 0.05), Math.min(1, bake[1] + 0.05), bake[2], 1);
+        return pos.length / 3 - 1;
+      };
+      const poly = (points, col, w) => {
+        const base = pos.length / 3;
+        for (const [u, v] of points) put(u, v, w, col);
+        for (let q = 1; q < points.length - 1; q++) index.push(base, base + q, base + q + 1);
+      };
+      const W = CHEVRON.w / 2;
+      const F = CHEVRON.foot;
+      const H = CHEVRON.h;
+      // two legs
+      for (const u of [-W * 0.7, W * 0.7]) poly([[u - 0.03, 0], [u + 0.03, 0], [u + 0.03, F + H], [u - 0.03, F + H]], CHEVRON.post, -0.03);
+      poly([[-W, F], [W, F], [W, F + H], [-W, F + H]], CHEVRON.black, 0);
+      // the arrowheads, pointing the way the road goes (+u: the driver's right)
+      const t = turn < 0 ? 1 : -1;
+      const m = F + H / 2;
+      for (const c of [-0.24, 0.16]) {
+        const a = c * W * 2;
+        const head = [
+          [a - 0.12 * t, m + 0.27],
+          [a + 0.02 * t, m + 0.27],
+          [a + 0.2 * t, m],
+          [a + 0.02 * t, m - 0.27],
+          [a - 0.12 * t, m - 0.27],
+          [a + 0.06 * t, m],
+        ];
+        // as two quads (the shape is not convex)
+        poly([head[0], head[1], head[2], head[5]], CHEVRON.yellow, 0.006);
+        poly([head[5], head[2], head[3], head[4]], CHEVRON.yellow, 0.006);
+      }
+      count++;
+    }
+  }
+  const group = new THREE.Group();
+  group.name = 'chevrons';
+  if (index.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('aTint', new THREE.Float32BufferAttribute(tint, 4));
+    g.setAttribute('aShade', new THREE.Float32BufferAttribute(new Array(pos.length / 3).fill([1, 0]).flat(), 2));
+    g.setAttribute('aBake', new THREE.Float32BufferAttribute(bakeArr, 4));
+    g.setIndex(index);
+    g.computeVertexNormals();
+    g.computeBoundingSphere();
+    const mesh = new THREE.Mesh(g, material);
+    mesh.name = 'chevrons';
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.matrixAutoUpdate = false;
+    group.add(mesh);
+  }
+  return {
+    group,
+    count,
+    dispose() {
+      for (const mm of group.children) mm.geometry.dispose();
+    },
+  };
+}

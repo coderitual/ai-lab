@@ -472,6 +472,15 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   edge, then a bright verge of long grass with ferns and yellow flowers;
   mossy boulders among the trunks; a forested hillside at the vanishing
   point under a bright sky with clouds.
+- **The owner's video** of the same game on the same kind of road
+  ("another detailed spec ... exact spec"; overcast; cut into sheets of its
+  best shots): long faces of pale grey granite rising 10 m and more straight
+  from the verge with pines on top, besides loose boulders; rows of five or
+  six yellow chevron arrows on black boards on the outside of the bends,
+  bright even in shade; the double yellow centre line with short yellow
+  dashes beside it into the bends; long blue and white kerbs on the inside
+  of each bend with a flat concrete strip behind; dry olive grass and dark
+  low shrubs on the verges; a red board here and there.
 - **E5**, the same game, a mountain bend: big pale granite boulders and
   outcrops right at the roadside, some as large as a van, shrubs between
   them; mixed pines and firs, a tall stone pine with a bare trunk on the
@@ -617,6 +626,62 @@ yellowing, larch green-gold, spruce and fir dark. Built in
   meshes out to some 150 m on medium. The floor: a grass patch under every
   tree of the road's rows, fallen leaves under every turned one. Shadows:
   impostor cards on a layer only the sun's shadow camera sees.
+
+**The two stretches of frames E2 and E5** (forest lane). The owner: "certain
+parts of the track can still be as they are, but I want it to have some parts
+that look like on the screenshots"; E5 is strict spec. Two pieces' looks are
+set by a `scheme` on the pieces of the plan (trackLayout.js `SCHEMES`; read
+through `schemes.js`), each blended into its neighbours over 70 to 90 m (the
+tree mix, the verge, the asphalt's tone), its lines starting and ending at its
+pieces' ends. Everything else on the lap is planted and placed exactly as
+before (the schemes' trees, cover and boulders come from their own random
+streams after the rest).
+
+- **E2, the forest road: the rise and the first ess** (557 to 906 m). The day's
+  sun crosses it square from the left (70 to 99 degrees off the road's
+  heading, 16 up): the only forest stretch it crosses from the side for its
+  whole length; the lap has no forest straight longer than the rise's 100 m
+  (a longer one would move every piece after it), so the rise and the gentle
+  first ess (260 m radius) are the frame's straight. Pines with long bare
+  stems (`pine-a`: the crown in the top 40 %, stubs of dead branches below),
+  a few spruces and firs, in four rows from 2 to 29 m behind the edges on
+  both sides; the mass of the wood behind them thinned by 70 % and turned to
+  the same conifers, so that the sun comes through between the crowns 50 to
+  90 m off towards it. Double yellow centre line; paler, older asphalt with
+  more sealed cracks; a flush concrete strip on the margin's outer side; the
+  kerbs bare pale concrete; no rail (the solid edge, a rail to the cars, is
+  drawn as a low concrete kerbstone, 0.2 m: `curb`), no tyre walls or boards;
+  long grass, ferns and patches of yellow flowers on the verge; mossy boulders
+  among the trunks. The canopy term (canopy.js) there: crowns 24 m high,
+  stopping 60 % of the sky.
+- **E5, the mountain bend: the carousel** (2732 to 2915 m). The only bend of
+  the lap that folds back on itself (190 degrees at 55 m radius), as the
+  frame's does round its island. Its inside was a rock face cut into the spur;
+  it is now a grass island (`SIDES.island`: to the cars the same rock edge at
+  the same distance, so the course drives exactly as before; the world draws
+  no cut face or cliff there, but a low concrete kerbstone, 0.32 m, at the
+  edge). The outside's rail, tyre walls, boards and marshal posts are not drawn
+  either (the same kerbstone), and no floodlight poles stand on the piece
+  (`lapLamps.skip`, as on D3's bend). Pale granite boulders in the frame's
+  places (`E5_ROCKS` in groundCover.js: a 5 m boulder and its neighbour on the
+  island by the exit, a rock in the island's middle, an outcrop of 2.4 to
+  5.8 m blocks stacked on the outside round the apex) and singly and in
+  outcrops along both sides, dark shrubs at their feet; pines, firs and
+  spruces in open groups round sunny glades, a full wood behind them all
+  round, a stone pine (`pine-b`) alone on the island near the apex; grass
+  islands with patches of purple lupins and yellow flowers; blue and white
+  kerbs; the double yellow line round the bend, with short yellow dashes
+  beside it on the inside over the bend's first 70 m; a bend sign of our own
+  (a yellow diamond, a black bent arrow) 90 m before the bend on its outside.
+  From the owner's video of the same kind of place ("exact spec", overcast,
+  read here by day): a face of pale granite along the outside of the bend's
+  first half (blocks of 4 to 6.5 m at the verge and a second tier stacked
+  behind and above them, 8 to 12 m in all, shrubs at their feet), a row of
+  six chevron boards of our own drawing (a black board, two yellow
+  arrowheads) on the outside over the bend's first part, and dry olive grass
+  on its verges.
+  The camera `e5` stands on the road 19 m past the car near the exit, looking
+  back at it across the island.
 
 Measured on software WebGL in this container (shared with other work, so the
 times scatter by a third), the forest alone in the main view:
