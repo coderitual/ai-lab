@@ -87,6 +87,15 @@ a thin line away. Nothing can be asked of the atlas beyond its 30 mm: a band
 wider than that inside a pane covers the whole pane (the rear screen's black
 band was 35 mm, and the screen was opaque).
 
+The shut lines are kept twice: unsigned (channel 2) and signed by the side of
+the nearest line (channel 6). Interpolated between texels, an unsigned
+distance only dips towards zero on a line, by as much as the texels happen
+to straddle it, so at the high tier the 3 mm gap came out as a row of dots
+at the texel pitch; the signed one passes through zero wherever the line is.
+The paint draws `max(|signed|, unsigned - 0.8 texel)`: where the sign flips
+away from any line (between two lines, past a line's end) the unsigned
+distance keeps the false zero away.
+
 | tier | atlas | bake (desktop) |
 | --- | --- | --- |
 | low | 512 x 256, x2 RGBA8 (1 MB) | ~110-150 ms |
@@ -127,14 +136,16 @@ layer of metal flake under a clear coat.
   The underside, the door's shoulder under the mirror, the arch lips, the
   band under the boot lid's lip, the plate's dish, the handle dishes, the
   scoops and both sides of every shut line take less of the indirect light.
-- **Shut lines**: a 3 mm dark gap (at least one pixel wide, fainter in
+- **Shut lines** (from the signed channel, see the atlas): a 3 mm dark gap (at least one pixel wide, fainter in
   proportion when a pixel is wider) with a little shade either side and a
   catch-light on the rounded far edge: the direction of the fall comes from
   the atlas, its steepness is set in the shader.
 - **Regions**: from the atlas the same shader turns into gloss black (window
   surround, B-pillar, the band under the glass's edge), the matte rubber seal
   round each pane, matte black (front lip, diffuser), bright metal (grille
-  frame), the grille's field with its diamond relief, red reflectors, the
+  frame), the grille's field (matte-ish black, coat 0.3: as a lacquered sheet
+  it mirrored the sky and the grille read grey) with its diamond relief and,
+  on the low tier, its stars (`GRILLE_STARS`, shared with `details.js`), red reflectors, the
   plate carriers, the parking sensors. The fuel flap, on the right only, is
   analytic.
 - The other paints (`graphite`, `blue`, `red`, `white`, `black`) are the
@@ -287,10 +298,16 @@ its dish.
 
 ### The contact shadow
 
-`shadow.js` bakes a small picture from the body's plan outline: densest under
-the sills and between the wheels (0.68 to 0.97), a near-black patch the size
-of each tyre's footprint inside a softer pad, fading over 6 cm outside the
-body (it was a soft blob with no contact on the owner's phone). It is not a child of the car: the game adds
+`shadow.js` bakes a small picture (64 x 128 on the low tier, 128 x 256
+above, over 2.9 x 6.0 m) from the body's plan outline: 0.86 to 0.97 under the
+car, and outside it two scales, a tight dark edge falling over 4 cm (from
+0.6) and a soft spread over 22 cm (from 0.26) for the sky the car hides; each
+tyre stands on a near-black patch as wide as its tread, reaching 2.5 cm past
+it, inside a softer pad. Round 3 had one 6 cm falloff from 0.68 (after a soft
+blob with no contact on the owner's phone); staged by day on the road
+(`?manual&auto&ap&q=medium&time=day&t=45`, 393 x 700 at 2x, and `&photo=d4`)
+the car still floated in a grey film. The road is dark asphalt, so even a
+near-black shadow on it is a modest change of tone. It is not a child of the car: the game adds
 `car.shadow` to the scene and `car.poseShadow(point, normal, yaw, strength)`
 lays it flat on the road while the body rolls and pitches above it.
 
@@ -345,6 +362,39 @@ f = 1933 px on 2576 x 1932), 5 to 11 px of residual, and laid beside it at
 | door mirrors | 0.135 high, 0.11 deep | 0.16 high, 0.13 deep (nose, and from the side) |
 | cabin through the glass | light grey seats | dark (from the side) |
 
+### Round two: the shape, against all six pictures
+
+The four photographs and the owner's two press-style pictures (front-left
+three-quarter in a studio and outdoors, the car's left side) were staged
+again, the press cameras fitted the same way with the focal length free (9
+points each: the star, both wheels' centres and rims, both door handles;
+under 1.2 px of residual), and our render's edges were laid in red over each
+picture (`edges.py` in the lane's tools) to read the silhouette. The front
+outlines were also projected onto the photograph straight on the nose as
+car-space polylines on the skin, with a grid of x and y, and redrawn there.
+
+| what | before | after (from which picture) |
+| --- | --- | --- |
+| side intakes | tall trapezoids from under the grille's corner down to the lip (y 0.23 to 0.46) | wedges under the grille's outer corners, tallest at the bumper's corner, the lower edge rising inwards (y 0.28 to 0.47) (nose) |
+| lower intake | a lozenge under the plate, 0.84 wide | a black band 1.36 wide from 0.22 to 0.28, so the painted blade sweeps between it and the side intakes (nose, both press pictures) |
+| grille's stars | 12 mm across on a 34 x 22 mm lattice: a sparse sprinkle | 23 mm across on 40 x 30 mm (`GRILLE_STARS`), as dense as the pictures show; fewer triangles |
+| grille's field | gloss black, mirrored the sky grey | black, coat 0.3 (nose; the "grille reads grey" fault) |
+| power domes | 9 mm, fading out at z 1.6 to 1.95 | 14 mm, running on to the bonnet's front edge (both press pictures) |
+| door mirror housing | a box (squareness 0.45), 0.16 high | rounded (0.68), 0.15 high (both press pictures) |
+| boot lid's rear face and the bumper below | vertical face over a 24 degree shelf: a dark band and a dent beside the plate | one gently curved face from the lip to the bumper's widest line (rails at q -2.75 and the tail's end) (tail) |
+| rear quarter under the tail lamp | an S in section (concave under the lamp): a dark crescent in every reflection | convex all the way down (rails at q -1.955 and -2.3) (tail, studio light) |
+| rear valance's lower edge | 0.26 to 0.35 up: the pipe trims hung below the body | 0.25 to 0.29: the trims sit inside the black valance (tail) |
+| pipe trims | bright sides 33 mm deep, standing off the bumper | bright only on the face and the first 8 mm; turned 14 degrees out, not 22 (tail) |
+| shade under the boot lid's lip | half the light over 6 cm | a quarter over 2.5 cm (tail) |
+| diffuser fins | sloping tops shaded as if facing the sky: a row of white ticks (tail, tunnel) | tops shaded as the face behind them |
+
+What still differs: the head lamps' insides are brighter and simpler than the
+real units; the slats in the side intakes catch the light more than the
+pictures' black intakes; the press cars' wheels (multi-spoke) and their front
+plate (none) are another trim of the same car and were not followed; from the
+low studio camera the front tyres look a little proud of the arches; the
+blade between the intakes has no sharp lower edge as on the car.
+
 What agreed and was left alone: the silhouette and the glasshouse, the rear
 screen (its lower edge only seemed higher: the glass mirrors the sky there),
 the grille and its star, the bonnet's badge ahead of its shut line, the plate
@@ -356,18 +406,18 @@ the side intake's inner detail; the shape of the mirror's foot.
 
 ## What each tier costs
 
-Re-measured after the corrections against the daylight photographs (counts
-unchanged: the lamp units and the wheel keep their sizes; the mirror is the
-same mesh larger). Measured in the viewer, one page at a time (headless Chromium on a 4-core
-machine, software WebGL, other renders running beside it; build time is
+Re-measured after round two of the shape work (fewer, larger grille stars:
+the high tier fell by 2.4k triangles; the intakes, mirror and rails cost
+nothing). Measured in the viewer, one page at a time (headless Chromium on a 4-core
+machine, software WebGL; build time is
 `car.stats.buildMs`: everything from `createCar()` to the returned handle,
 shader compilation not included):
 
 | tier | triangles | draw calls (at rest) | build |
 | --- | --- | --- | --- |
-| low | 49.9k | 29 (25) | ~370-450 ms |
-| medium | 112.8k | 31 (27) | ~740-920 ms |
-| high | 188.0k | 31 (27) | ~700-970 ms |
+| low | 49.8k | 29 (25) | ~310-450 ms |
+| medium | 112.6k | 31 (27) | ~510-920 ms |
+| high | 185.6k | 31 (27) | ~750-970 ms |
 | ghost | 92.5k | 10 | ~150-190 ms |
 
 Plus one draw call for the contact shadow. The four blur shells are hidden at
@@ -410,6 +460,11 @@ Most visible first:
   silver under a higher sun.
 - **Bloom** round the brake lamps is the frame pipeline's; at night it still
   tints the boot lid red.
+- **Tunnel lamp streaks**: the probe does see the tunnel's luminous panels
+  (they are ordinary meshes of the world, not in `probeHidden`); in a viewer
+  still in the bore (`s=1641`) they show as bright spots on the roof and the
+  glass. Whether they stretch into streaks at speed is the probe's refresh
+  and the frame's motion blur, not the car's.
 - In the light tunnel (`stripes=1&mirror=1`) the stripes pinch a little at
   the tail lamp's outer tip, where the shoulder, the lid's lip and the wing
   meet; the handle dishes' edges are slightly ragged as a plain mirror.

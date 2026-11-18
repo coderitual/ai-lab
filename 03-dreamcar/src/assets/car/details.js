@@ -398,7 +398,16 @@ export function buildDetails(samples, { tier, plate, skin, lay }) {
         matte.quad(V(X, 0.375, z0), V(X, 0.315, z0), V(X, 0.315, z0 - 0.016), V(X, 0.355, z0 - 0.016), V(Math.sign(dx), 0, 0));
       }
       const [x0, x1] = [s * x - 0.006, s * x + 0.006];
-      matte.quad(V(x0, 0.375, z0), V(x1, 0.375, z0), V(x1, 0.355, z0 - 0.016), V(x0, 0.355, z0 - 0.016), V(0, 1, -1));
+      // (its sloping top lit as if facing the sky made each fin a white tick under the tunnel's lamps and the sun:
+      // the fins stand in the valance's shade, so the top takes the light of the face behind it)
+      {
+        const q = [V(x0, 0.375, z0), V(x1, 0.375, z0), V(x1, 0.355, z0 - 0.016), V(x0, 0.355, z0 - 0.016)];
+        const shade = V(0, 0.15, -1).normalize();
+        const up = new THREE.Vector3().subVectors(q[1], q[0]).cross(new THREE.Vector3().subVectors(q[2], q[0])).y > 0;
+        const [a, b, c, d] = up ? q : [q[0], q[3], q[2], q[1]];
+        matte.smooth([a, b, c], [shade, shade, shade]);
+        matte.smooth([a, c, d], [shade, shade, shade]);
+      }
       matte.quad(V(x0, 0.355, z0 - 0.016), V(x1, 0.355, z0 - 0.016), V(x1, 0.315, z0 - 0.016), V(x0, 0.315, z0 - 0.016), V(0, 0, -1));
       matte.quad(V(x0, 0.315, z0), V(x1, 0.315, z0), V(x1, 0.315, z0 - 0.016), V(x0, 0.315, z0 - 0.016), V(0, -1, 0));
     }

@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { WHEELS } from './spec.js';
 
-const SIZE = { x: 2.6, z: 5.6, centreZ: -0.13 };
+const SIZE = { x: 2.9, z: 6.0, centreZ: -0.13 };
 
 /**
  * @param {Float32Array} positions the skin's sampled vertices (car space, left half first)
@@ -19,7 +19,7 @@ const SIZE = { x: 2.6, z: 5.6, centreZ: -0.13 };
  * @param {'low'|'medium'|'high'} tier
  */
 export function createContactShadow(positions, count, tier) {
-  const [w, h] = tier === 'low' ? [48, 96] : [96, 192];
+  const [w, h] = tier === 'low' ? [64, 128] : [128, 256];
   // the plan outline: half-width of the body below the waist, per row of the picture
   const half = new Float32Array(h);
   for (let i = 0; i < count; i++) {
@@ -40,12 +40,18 @@ export function createContactShadow(positions, count, tier) {
       const x = ((c + 0.5) / w - 0.5) * SIZE.x;
       const across = half[r] > 0 ? Math.abs(x) - half[r] : Math.hypot(Math.max(0, Math.abs(x) - 0.6), along);
       const outside = Math.max(0, across);
-      // (the owner's phone: "a soft dark blob with no contact": the edge is now tighter, the middle darker, and
-      // each tyre stands on a near-black patch the size of its footprint)
-      let a = Math.exp(-outside / 0.06) * (0.68 + 0.3 * Math.min(1, Math.max(0, -across / 0.3)));
+      // Two scales: a tight dark edge (4 cm) where the body meets the road, and a soft spread (22 cm) of the sky it
+      // hides; under the car the road sees almost no sky. (Round 3 had one 6 cm falloff from 0.68: from the chase
+      // camera and from above the car floated, a grey film round a car with no contact.)
+      let a = across <= 0
+        ? 0.86 + 0.11 * Math.min(1, -across / 0.2)
+        : 0.6 * Math.exp(-outside / 0.04) + 0.26 * Math.exp(-outside / 0.22);
+      // each tyre stands on a near-black patch as wide as its tread, which reaches a little past the body's outline
       for (const wheel of WHEELS) {
-        a += 0.35 * Math.exp(-(((x - wheel.x) / 0.14) ** 2) - (((z - wheel.z) / 0.3) ** 2));
-        a += 0.6 * Math.exp(-(((x - wheel.x) / 0.1) ** 4) - (((z - wheel.z) / 0.11) ** 4));
+        const tx = (x - wheel.x) / (wheel.tyre.width / 2 + 0.025);
+        const tz = (z - wheel.z) / 0.16;
+        a = Math.max(a, 0.97 * Math.exp(-(tx ** 4) - tz ** 4));
+        a = Math.max(a, 0.55 * Math.exp(-(((x - wheel.x) / 0.2) ** 2) - ((z - wheel.z) / 0.42) ** 2));
       }
       // laid flat, the plane's texture rows run from the nose (row 0) to the tail
       const o = ((h - 1 - r) * w + c) * 4;
