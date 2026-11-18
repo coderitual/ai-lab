@@ -523,7 +523,11 @@ export function impostorDepthMaterial(atlas) {
     Object.assign(shader.uniforms, impostorUniforms(atlas));
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\nattribute vec4 aImp;\n${IMP_PARS}`)
-      .replace('#include <begin_vertex>', `vec3 transformed;\n${IMP_CARD}`);
+      // (render lane) three.js (0.187, WebGLRenderer.setProgram) never sets isOrthographic for a depth material,
+      // so IMP_CARD took the perspective branch here and turned each card to the shadow camera's position, a few
+      // degrees off the light for trees away from the middle of the map. In a shadow map the card turns to the
+      // light itself: the shadow camera's own axis.
+      .replace('#include <begin_vertex>', `vec3 transformed;\n${IMP_CARD.replace(/isOrthographic \?/, 'true ?')}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\nuniform sampler2D uImpColor;\n${IMP_PARS}`)
       .replace('#include <map_fragment>', `{\n${IMP_READ}\n  if ( colour.a < 0.4 ) discard;\n}`);

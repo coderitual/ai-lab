@@ -486,7 +486,9 @@ yellowing, larch green-gold, spruce and fir dark. Built in
   rows (`plantRows`): D4's wall on the land side beyond the line (six rows
   14-19 m to 26-33 m tall from the barrier to 45 m back, nearly all maples,
   a dark fir or two in front); D3's bank (open rows of hornbeams with limes
-  and maples, the first leaning out over the road, the valley side of the bend
+  and maples, the first leaning out over the road, the three behind it 8-11,
+  10-14 and 15-22 m tall from 4 to 32 m back (their crowns are where the
+  low sun crosses the road's line, so their shade lies on it), the valley side of the bend
   kept to low growth; the bank rises gently, 0.12 in 1 (`SIDES.bank` in
   trackLayout.js), and the mass of the forest stands 125 m or more behind its
   barrier, so that the day's sun, 16 degrees up on the right of the bend,

@@ -432,9 +432,14 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     // sun, which stands behind them by day, comes through between the crowns and lies in patches on the road)
     const BANK = [
       { off: [-0.9, 0.4], step: [6, 8.5], r: 4, height: [16, 21], detail: 2, inside: 0, lean: [0.14, 0.27] },
-      { off: [5, 9], step: [8, 12], r: 4.5, height: [17, 22], detail: 1.7, inside: 0.1, lean: [0.03, 0.12] },
-      { off: [13, 21], step: [11, 17], r: 5.5, height: [16, 23], detail: 1.2, inside: 0.1 },
-      { off: [28, 44], step: [18, 30], r: 6, height: [16, 24], detail: 0.9, inside: 0.1 },
+      // (render lane) the rows behind are lower and closer than they were (17-24 m tall, 5 to 44 m back): the
+      // day's sun, 16 degrees up, passes over the road at 4 to 13 m above the ground 15 to 45 m away. The big
+      // trees at the wall have their crowns higher than that (their shade falls beyond the road, only their
+      // trunks cross it), so these lower crowns are the ones its light must come through to lie on the road in
+      // patches (frame D3)
+      { off: [4, 8], step: [5, 8], r: 4, height: [8, 11], detail: 1.7, inside: 0.1, lean: [0.03, 0.12] },
+      { off: [10, 16], step: [6, 10], r: 4.5, height: [10, 14], detail: 1.2, inside: 0.1 },
+      { off: [20, 32], step: [10, 16], r: 5.5, height: [15, 22], detail: 0.9, inside: 0.1 },
     ];
     plantRows(ledge.s0 - 30, 350, -1, BANK, bankAt, (r) => {
       const roll = plantRng.next();
