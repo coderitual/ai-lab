@@ -28,9 +28,12 @@ import { DIMS, STATIONS } from './spec.js';
 
 /** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
 export const PAINTS = {
-  // high-tech silver: this car. Cool and deep as in the daylight and press photographs: a metal layer smooth enough
-  // to mirror the sky as a soft blue over the bonnet and roof (0.4 read as a grey satin veil), darker edge-on
-  silver: { color: [0.6, 0.62, 0.66], metal: 0.92, rough: 0.27, flop: 0.34, flake: 1 },
+  // high-tech silver: this car. A metallic paint, not polished metal: a bright flake layer rough enough to shade
+  // softly from light to dark across a panel (light silver-white in the sun, mid grey turned away from it), part
+  // metal and part pigment, so it takes the sun's light as a colour of its own as well as a broad sheen; the clear
+  // coat above it carries the only sharp reflection, a lacquer's, strong at grazing angles only. At metalness 0.92
+  // and roughness 0.27 the layer mirrored everything and the car read as chrome.
+  silver: { color: [0.6, 0.62, 0.665], metal: 0.82, rough: 0.42, flop: 0.4, flake: 1 },
   graphite: { color: [0.16, 0.17, 0.18], metal: 1, rough: 0.34, flop: 0.45, flake: 1 },
   blue: { color: [0.018, 0.045, 0.19], metal: 0.85, rough: 0.32, flop: 0.35, flake: 1 },
   red: { color: [0.36, 0.014, 0.014], metal: 0.35, rough: 0.3, flop: 0.6, flake: 0.5 },
@@ -148,7 +151,7 @@ float carBox(vec2 p, vec2 c, vec2 half_, float r) {
  * How much stronger than a plain lacquer's (4 % face-on) the paint's clear coat mirrors: a little, so that the
  * mirror image reads through the bright flake layer under it the way it does on a polished car.
  */
-const COAT_GAIN = 1.6;
+const COAT_GAIN = 1.0;
 
 /**
  * A mirror that curves makes the picture in it small: neighbouring pixels then look at directions several texels of
@@ -168,7 +171,35 @@ const FOOTPRINT = 'sqrt(0.39 * max(length(dFdx(r)), length(dFdy(r))))';
  * sodium lamps and matt dark grey at night; now the lamp rows slide over it.
  */
 
-const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false) => /* glsl */ `
+/**
+ * The paint's flake layer is rough, and a rough read of the probe is a read of a coarse mip: the mips are plain 2x2
+ * averages, so at roughness 0.5 a 256 cube is a few texels a face, and bilinear filtering between them drew the
+ * wood's autumn crowns as large blocky yellow patches across the bonnet and roof, and a face's edge as a seam.
+ * `soft` reads instead a cone of nine taps (a ring of eight round the mirror direction, as wide as the layer's
+ * highlight, and the centre twice) at a mip four times finer: a smooth bell of the surroundings, no blocks, no
+ * seams. And the flakes are metal under a lacquer that is not quite clear: what they show is held to 65 % of its
+ * colour, so a coloured thing in the probe tints the panel and never paints a coloured patch on it. The clear coat's
+ * own crisp image (with `soft`) is held to 45 %: at a grazing angle the nearly flat bonnet magnified the wood's
+ * bright yellow crowns at the horizon into a saturated yellow band across it.
+ */
+const GLSL_SOFT_PROBE = /* glsl */ `
+vec3 carSoftProbe(vec3 r, float rough, float foot) {
+  vec3 t1 = normalize(cross(abs(r.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), r));
+  vec3 t2 = cross(r, t1);
+  float spread = 0.9 * rough * rough;
+  float lod = max(0.5 * rough, foot);
+  vec3 sum = 2.0 * probeSample(carProbe, r, lod);
+  for (int i = 0; i < 8; i++) {
+    float a = float(i) * 0.7853982 + 0.3927;
+    sum += probeSample(carProbe, normalize(r + spread * (cos(a) * t1 + sin(a) * t2)), lod);
+  }
+  sum *= 0.1;
+  float l = dot(sum, vec3(0.2126, 0.7152, 0.0722));
+  return mix(vec3(l), sum, 0.65);
+}
+`;
+
+const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false) => /* glsl */ `
 #include <lights_fragment_maps>
 #if defined( RE_IndirectSpecular )
   ${
@@ -179,6 +210,7 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false) => /* glsl */
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryClearcoatNormal), viewMatrix);
     ${ground ? 'r = carGround(r);' : ''}
     clearcoatRadiance = mix(clearcoatRadiance * carSky, carSane(probeSample(carProbe, r, max(material.clearcoatRoughness, ${FOOTPRINT})), clearcoatRadiance * carSky), carProbeOn);
+    ${soft ? 'clearcoatRadiance = mix(vec3(dot(clearcoatRadiance, vec3(0.2126, 0.7152, 0.0722))), clearcoatRadiance, 0.45);' : ''}
   }
   #else
   clearcoatRadiance *= carSky;
@@ -192,7 +224,7 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false) => /* glsl */
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryNormal), viewMatrix);
     ${ground ? 'r = carGround(r);' : ''}
-    vec3 seen = carSane(probeSample(carProbe, r, max(material.roughness, ${FOOTPRINT})), radiance * carSky);
+    vec3 seen = carSane(${soft ? `carSoftProbe(r, material.roughness, ${FOOTPRINT})` : `probeSample(carProbe, r, max(material.roughness, ${FOOTPRINT}))`}, radiance * carSky);
     // The metal layer is a blurred mirror: a small fierce thing in the probe (the sun's glare on the road behind,
     // a lamp) must not wash a whole panel white. What it takes is held to a few times the probe's average round
     // that direction; the clear coat above keeps the crisp highlight.
@@ -294,7 +326,7 @@ export function createPaintMaterial(shared, caps, paintName = 'silver', { should
     paintFlake: { value: paint.flake },
   };
   patch(material, { ...shared, ...own }, caps, {
-    fragmentPars: /* glsl */ `
+    fragmentPars: /* glsl */ `${GLSL_SOFT_PROBE}
 // where the shoulder's rail lies in the atlas (v), and the metres of skin the atlas spans that way
 #define SHOULDER_V ${shoulderV.toFixed(5)}
 #define EXTENT_V ${extentV.toFixed(4)}
@@ -648,7 +680,7 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
       ],
       ['#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += cEmit;'],
       ['#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  material.clearcoat *= cCoat;'],
-      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN)],
+      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN, false, true)],
       [
         '#include <lights_fragment_end>',
         /* glsl */ `#include <lights_fragment_end>

@@ -136,19 +136,30 @@ distance keeps the false zero away.
 layer of metal flake under a clear coat.
 
 - **Base** (`PAINTS`: colour, metalness, roughness, flop, flake). Silver, this
-  car's high-tech silver: linear 0.60 / 0.62 / 0.66 (cool), metalness 0.92,
-  roughness 0.27, falling to 34 % edge-on (flop). At roughness 0.4 the metal
-  layer read as a grey satin veil next to the press and daylight photographs;
-  at 0.27 it mirrors the sky as a soft blue over bonnet and roof. The metal
-  layer's read of the probe is held to five times the probe's average round
-  that direction, so a small fierce thing in it (the sun's glare on the road
-  behind the car, a lamp) makes a highlight, not a burnt-out panel (the
-  owner's phone showed the whole tail white by day); the clear coat keeps the
-  crisp highlight. The broad metal sheen and the darker faces turned
-  away from the light are what make it metallic paint and not white plastic.
-- **Clear coat**, roughness 0.03, 1.6 times a plain lacquer's reflectance
-  (`COAT_GAIN`): the crisp mirror image over the sheen. Both layers mirror the
-  car's own reflection probe (`setReflections`), each at its own roughness.
+  car's high-tech silver: linear 0.60 / 0.62 / 0.665 (cool), metalness 0.82,
+  roughness 0.42, falling to 40 % edge-on (flop). A metallic paint, not
+  polished metal: the flake layer shades softly from light to dark across a
+  panel, light silver in the sun and mid grey turned away from it, and takes
+  the sun as a colour of its own as well as a broad sheen. Round 4's 0.92 /
+  0.27 mirrored everything, and next to the photographs the car read as
+  chrome; at 0.6 / 0.5 and a brighter base it read as white plastic.
+- **The flake layer's read of the probe** (`carSoftProbe`): a rough read is a
+  read of a coarse mip, and the mips are plain 2x2 averages, so at these
+  roughnesses a 128 or 256 cube is a few texels a face; filtered between
+  them, the wood's autumn crowns came out as large blocky yellow patches on
+  the bonnet and roof. The layer reads instead nine taps in a cone as wide as
+  its highlight, at a mip four times finer: a smooth bell of the
+  surroundings, no blocks, no face seams. What it shows is held to 65 % of
+  its colour, and the probe's average round that direction still caps a
+  small fierce thing in it (the sun's glare on the road behind the car, a
+  lamp) at five times, so that it makes a highlight, not a burnt-out panel.
+- **Clear coat**, roughness 0.03, a plain lacquer's reflectance (4 % face on,
+  `COAT_GAIN` 1): the only crisp reflection, strong only at grazing angles.
+  Its image is held to 45 % of its colour: at a grazing angle the nearly flat
+  bonnet magnified the wood's bright yellow crowns at the horizon into a
+  saturated yellow band across it (round 4 had the coat at 1.6 times, in full
+  colour). Both layers read the car's own reflection probe
+  (`setReflections`).
 - **Flake**. The flakes are far smaller than a pixel; together they are the
   sheen. But each is a small mirror, and one that happens to send the sun to
   the eye flashes. The surface is cut into cells never smaller than a pixel
@@ -357,6 +368,7 @@ in the viewer.
 | atlas resolution | `ATLAS_SIZE` in `atlas.js` |
 | a paint, or add one | `PAINTS` in `materials.js` |
 | flake, orange peel, the coat's strength | `carFlake`, the glint after `lights_fragment_end`, `COAT_GAIN` in `materials.js` |
+| how the paint blurs and tints what it mirrors | `GLSL_SOFT_PROBE` and the `soft` branch of `REFLECTIONS` in `materials.js` |
 | the black trims, seals, scoops, plate carriers, dishes, what is shaded | the region block and `carOcclusion` in `createPaintMaterial` |
 | the glass's tint, bands, heating lines | `createGlassMaterial` |
 | what a lamp is built of | `lampUnits.js`; how each part looks and how bright it is lit: `carLampPart` in `materials.js` |
