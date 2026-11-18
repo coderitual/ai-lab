@@ -93,6 +93,16 @@ surface's own, so even the coarse mesh mirrors cleanly. The same vertices are
 drawn several times with different index lists: paint, glass, lenses, and a
 dark shell (every other vertex, BackSide) that shows through openings.
 
+The front wings and the rear hips flare out over the tyres (`SHAPE.flare` in
+`lines.js`, added to the flank's rails in `skin.js` by `flareAt`): an
+outward step of a few centimetres over each arch, rising and falling as a
+smootherstep along the car and weighted per rail, highest at the widest line
+and the rails just above it (the front has a second, higher step over its
+forward half, where the wing falls away to the head lamp). With it each
+tyre's outer face sits 9 to 15 mm inside its arch lip over the part of the
+lip that stands over the tyre (45 to 135 degrees round the arch; measured
+with `skin.sideX` along the lip's outline).
+
 Small forms a few millimetres high but sharp are not geometry; the paint
 shader shades them. The bonnet's power domes, the door's lower crease, the
 sill's groove and blade and the band round the arches are tilts of the normal
@@ -136,7 +146,7 @@ distance keeps the false zero away.
 layer of metal flake under a clear coat.
 
 - **Base** (`PAINTS`: colour, metalness, roughness, flop, flake). Silver, this
-  car's high-tech silver: linear 0.60 / 0.62 / 0.665 (cool), metalness 0.82,
+  car's high-tech silver: linear 0.59 / 0.615 / 0.675 (cool), metalness 0.82,
   roughness 0.42, falling to 40 % edge-on (flop). A metallic paint, not
   polished metal: the flake layer shades softly from light to dark across a
   panel, light silver in the sun and mid grey turned away from it, and takes
@@ -155,7 +165,8 @@ layer of metal flake under a clear coat.
   lamp) at five times, so that it makes a highlight, not a burnt-out panel.
 - **Clear coat**, roughness 0.03, a plain lacquer's reflectance (4 % face on,
   `COAT_GAIN` 1): the only crisp reflection, strong only at grazing angles.
-  Its image is held to 45 % of its colour: at a grazing angle the nearly flat
+  Its image is held to 30 % of its colour (45 % until round six, which still
+  left an olive band in low daylight): at a grazing angle the nearly flat
   bonnet magnified the wood's bright yellow crowns at the horizon into a
   saturated yellow band across it (round 4 had the coat at 1.6 times, in full
   colour). Both layers read the car's own reflection probe
@@ -239,7 +250,14 @@ same depth with premultiplied alpha, so the reflection (the probe, at
 roughness 0.02) is not dimmed by the transparency. Windscreen and front door
 glass pass about half the light (55 % and 50 %: the photographs show dark
 glass), the rear doors, quarter lights
-and rear screen 15 % (privacy glass, as on this car), the roof 6 %. Each pane
+and rear screen 15 % (privacy glass, as on this car), the roof 6 %. The
+sun's reflection in a pane (`directSpecular` after `lights_fragment_end`) is
+held to 2.5 times the brightness of a sunlit white wall, the roof's to 0.9:
+at roughness 0.02 the peak is tens of thousands of times that, and from the
+chase camera by day it lay on the roof as a blown blob that the bloom spread
+(cyan where a channel overflowed). The roof also mirrors its surroundings at
+45 % (a coated, dark panel), rolled off above a tenth of the sun's light, so
+the bright sky round a low sun at a grazing angle does not fill it. Each pane
 has its black band under the edge (25 mm on the windscreen, 28 on the rear
 screen); the rear screen carries its fourteen heating lines, drawn only where they
 stand eight pixels or more apart (closer, at a phone's reduced resolution,
@@ -277,11 +295,17 @@ material over the same skin.
   them (brake light; the outer piece's band is also the indicator), the
   reversing window by the inner tip.
 - **Emission** is the same by day and at night, when the exposure is about 30
-  times higher. The tail light's blades are 0.4: at night only the red
-  channel clips and they stay red (at 7 they were white dashes). The brake
-  band is 9: lit under the sun, a white core in a red glow at night, as in a
-  photograph. The third brake light is 18, the eyebrow 3.5, the projector's
-  dome 0.5.
+  times higher. The light signature is the two rows of blades (0.55: at night
+  only the red channel clips and they stay red; at 7 they were white dashes)
+  and the slim band between them, the inner line (1.4 with the tail light: a
+  brighter spine). The housing behind them glows only faintly (0.012; at 0.05
+  the whole lamp glowed and the bloom made one red blob of it). With the brake
+  light the band is 9 (a white core in a red glow at night, as in a
+  photograph), the blades 2.75 and the housing 0.09: clearly brighter than
+  the tail light alone. The paint round the tail lamps takes a faint red
+  within 3 cm of the lens (`cEmit`, 0.01 with the tail light, 0.06 braking):
+  the lamp spot in `lamps.js` cannot light the car's own panels. The third
+  brake light is 18, the eyebrow 3.5, the projector's dome 0.5.
 - **Light cast** (`lamps.js`): two spot lights at 5700 K with a picture of
   the beam (`SpotLight.map`): dipped beam's cut-off with its kick-up to the
   right, main beam's spot added; shadows on the high tier. One red spot at the
@@ -363,6 +387,7 @@ in the viewer.
 | --- | --- |
 | a dimension, wheel position, lamp position | `spec.js` (the physics reads it too) |
 | the body's shape | the tables in `lines.js`; check with `pin=` against the photographs |
+| how far the wings and hips stand out over the tyres | `SHAPE.flare` in `lines.js` |
 | how fine the mesh is | `MESH_EDGE` in `body.js` |
 | where a window, lens, shut line or opening is | its outline in `features.js` |
 | atlas resolution | `ATLAS_SIZE` in `atlas.js` |
@@ -467,36 +492,53 @@ pixels; they were left alone.
 
 What still differs:
 
-- **The wheels stand a little proud.** The body's widest point is 0.902 by
-  the front arch and 0.909 by the rear (1.818 overall, as published), but
-  the tyres' outer faces are at 0.9075 and 0.917 (`spec.js`: tracks 1.590 /
-  1.579 with 225 and 255 tyres). From ahead and to the side the front tyre
-  stands outside its arch. Tracks of about 1.574 / 1.559 would bring both
-  faces just inside the body; that changes the physics (`spec.js` is read
-  by it, and `docs/spec.md` holds its numbers), so it is left for whoever
-  owns the handling.
-- The front apron under the grille is simpler than the car's (deep black side
-  intakes framed by a painted wing): ours has slatted intakes and a plain
-  blade.
 - By day the coat still mirrors the wood's crowns at the horizon as a muted
   olive band across the bonnet from low three-quarter views; the crowns in
   the probe are brighter and more yellow than the dark trees of the press
   picture.
 
+### Round six: the arches, the roof glass, the lamps, the apron
+
+| what | before | after |
+| --- | --- | --- |
+| glass roof, chase camera by day | the sun and the bright sky round it mirrored in full: a blown blob on the roof, spread by the bloom | a dark panel with a small clean highlight (see "The glass"); the same at dusk |
+| tail lamps lit | the whole housing glowing (0.05): with the bloom each lamp a red blob, the blades faint ticks in it | the blades (0.55) and a bright inner line (1.4) on a dark red housing (0.012): a light signature; braking, band 9, blades 2.75, housing 0.09; a faint red on the paint round each lens |
+| third brake light | lit on every face: from ahead it glowed through the cabin and the windscreen | lit backwards only |
+| side intakes | wedges from x 0.43 to 0.80 under the grille's outer corners, two light grey slats | from x 0.38, reaching in under the grille's lower edge; slats and the lower intake's bars in the cabin's dark material (they read light grey as matte trim facing the sky) |
+| lower intake | a band 0.056 high | 0.08 high, with upright bars 0.105 apart: the painted blade is a slim wing between two black openings (nose) |
+| silver | 0.60 / 0.62 / 0.665 | 0.59 / 0.615 / 0.675, a little cooler (all four daylight photographs) |
+| wheel arches | body 0.902 wide (half) by the front arch, 0.909 by the rear: both tyres' faces (0.9075, 0.917) stood outside their lips by up to 34 mm | wings and hips flared (`SHAPE.flare`): 0.932 / 0.933, each tyre 9 to 15 mm inside its lip; the plan line falls smoothly from the hip into the bumper, which stays the widest thing below the lamps |
+
+The tracks (1.590 / 1.579, `spec.js`) and the tyres were left as they are.
+With them the body is 1.866 over the flares, 46 mm more than the published
+1.820: a 255 rear tyre on a 1.579 track is 1.834 over its faces, so the
+published width and the tracks cannot both be right. `DIMS.width` (read by
+the physics) keeps the published figure.
+
+What still differs after round six: the side intakes on the car are taller
+still and the blade between them sweeps as a wide smile under the plate (ours
+is straighter); the photographs show no chrome strip on the lower lip, so
+none was added. The head lamps were judged at night from ahead and left as
+they were (eyebrow, projector domes). The tunnel was not staged (the chase
+camera at `t=33` of this build is outside it). At night the plate lamps light
+the dish round the plate brightly.
+
 ## What each tier costs
 
-Re-measured after round five (the tail's new corners and the finer grille
-stars cost about 1.3k triangles on the medium tier, which went over its
-113k budget; its edge length went from 55 to 56 mm). Measured in the viewer,
+Re-measured after round six (the arches' flare moves the net's points and
+adds none; the apron's bars and the re-cut slats are about the same as the
+slats were). Round five's tail corners and finer grille stars cost about 1.3k
+triangles on the medium tier, which went over its 113k budget; its edge
+length went from 55 to 56 mm. Measured in the viewer,
 one page at a time (headless Chromium on a 4-core machine, software WebGL;
 build time is `car.stats.buildMs`: everything from `createCar()` to the
 returned handle, shader compilation not included):
 
 | tier | triangles | draw calls (at rest) | build |
 | --- | --- | --- | --- |
-| low | 49.7k | 29 (25) | ~430 ms |
+| low | 49.8k | 29 (25) | ~415-430 ms |
 | medium | 111.0k | 31 (27) | ~680-870 ms |
-| high | 185.0k | 31 (27) | ~990 ms |
+| high | 185.2k | 31 (27) | ~1000 ms |
 | ghost (not re-measured since round two) | 92.5k | 10 | ~150-190 ms |
 
 Plus one draw call for the contact shadow. The four blur shells are hidden at

@@ -275,9 +275,14 @@ export function buildDetails(samples, { tier, plate, skin, lay }) {
     chrome.addMirrored(left);
   }
 
-  // ---- the front apron's intakes (5.3): two slats and the air curtain's blade each side, one slat in the middle
+  // ---- the front apron's intakes (5.3): two slats and the air curtain's blade each side; upright bars in the
+  // lower intake. The slats and bars are dark plastic deep in a recess (the cabin's material: lit by what sun
+  // reaches them, a slice of the sky): as matte trim facing the sky they read light grey next to the photographs'
+  // black intakes.
   {
-    const left = { matte: new Tris(), gloss: new Tris() };
+    // (on the low tier, which has no cabin, they go in with the matte trim rather than cost a draw call)
+    const slatTo = low ? matte : dark;
+    const left = { slats: new Tris(), gloss: new Tris() };
     const skinZ = (x, y) => castNose(V(x, y, 3), V(0, 0, -1)).point.z;
     const slat = (y, x0, x1, back, to) => {
       const pts = [];
@@ -288,14 +293,21 @@ export function buildDetails(samples, { tier, plate, skin, lay }) {
       // a blade 12 mm high leaning back, 35 mm deep
       bar(to, pts, V(0, 0.25, 1).normalize(), 0.006, 0.035, 0);
     };
-    const [ui, li] = INTAKE_SIDE;
+    const [ui, li, lo, uo] = INTAKE_SIDE;
     const innerX = (y) => ui[0] + ((li[0] - ui[0]) * (ui[1] - y)) / (ui[1] - li[1]);
-    for (const y of [0.385, 0.425]) slat(y, innerX(y) - 0.015, 0.79, 0.028, left.matte);
-    slat(0.248, 0.0, INTAKE_CENTRE[2][0] - 0.01, 0.022, left.matte);
+    const outerX = (y) => lo[0] + ((uo[0] - lo[0]) * (y - lo[1])) / (uo[1] - lo[1]);
+    for (const y of [0.395, 0.432]) slat(y, innerX(y) - 0.015, outerX(y) - 0.02, 0.028, left.slats);
+    // the lower intake's bars: upright, 10 mm thick, 30 mm deep, one on the centre line
+    const [c0, c1, c2] = INTAKE_CENTRE;
+    for (let x = 0; x < c2[0] - 0.04; x += 0.105) {
+      const top = x < c1[0] ? c0[1] + ((c1[1] - c0[1]) * x) / c1[0] : c1[1] + ((c2[1] - c1[1]) * (x - c1[0])) / (c2[0] - c1[0]);
+      const pts = [0.222, (0.222 + top) / 2, top].map((y) => V(x, y, skinZ(x, y) - 0.026));
+      bar(x === 0 ? slatTo : left.slats, pts, V(0, 0, 1), 0.005, 0.03, 0);
+    }
     // the air curtain: an upright gloss black blade against the outer edge, standing clear of the slot behind it
-    const blade = [0.295, 0.35, 0.405, 0.458].map((y) => V(0.775, y, skinZ(0.775, y) - 0.012));
+    const blade = [0.315, 0.365, 0.415, 0.46].map((y) => V(outerX(y) - 0.012, y, skinZ(outerX(y) - 0.012, y) - 0.012));
     bar(left.gloss, blade, V(0.35, 0, 1).normalize(), 0.0125, 0.03, 0);
-    matte.addMirrored(left.matte);
+    slatTo.addMirrored(left.slats);
     gloss.addMirrored(left.gloss);
   }
 

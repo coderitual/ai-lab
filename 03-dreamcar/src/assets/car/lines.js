@@ -449,4 +449,20 @@ export const SHAPE = {
     [-1.9, 0.012],
   ],
   glassFull: 0.004,
+  /**
+   * The wheel arches' flare: the front wings and the rear hips stand out over the tyres, so that each tyre's
+   * outer face (spec.js: the real tracks and tyre widths) sits 8 to 15 mm inside its arch lip. An outward step
+   * of `d` metres added to the flank's rails over [z0..z3] (z of the point), rising from z0 to z1, full to z2 and
+   * falling to z3 (each a smootherstep, so the surface stays curvature-continuous), times `rails[k]` for the
+   * rail RAIL.lower + k (the lower edge, four rails up to the widest line, the widest line, three rails up to the
+   * shoulder). The widest line's table above is the body without it.
+   */
+  flare: [
+    // the front wing: over the whole arch, and a second, higher step over its front half, where the wing falls
+    // away towards the head lamp
+    { z0: 0.72, z1: 1.05, z2: 1.62, z3: 2.18, d: 0.022, rails: [0, 0.2, 0.55, 1.0, 1.3, 1.2, 0.95, 0.75, 0.35] },
+    { z0: 1.1, z1: 1.55, z2: 1.75, z3: 2.12, d: 0.03, rails: [0, 0, 0, 0, 0.05, 0.1, 0.8, 1.1, 0.7] },
+    // the rear hip
+    { z0: -0.7, z1: -1.1, z2: -1.78, z3: -2.25, d: 0.018, rails: [0, 0.25, 0.65, 1.15, 1.5, 1.3, 0.7, 0.45, 0.2] },
+  ],
 };
