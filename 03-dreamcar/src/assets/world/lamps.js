@@ -122,7 +122,8 @@ export function createLamps({ track, caps, tier, atmosphere }) {
   }
 
   // ---- the glow on the ground: a patch of the corridor's surface under each lamp
-  const glowGeometry = buildGlowGeometry(track, lamps);
+  // (picture lane) one mesh per kind, so that a kind switched off (the street lamps by day) is not drawn at all
+  const glowGeometries = Object.keys(LAMP_KINDS).map((kind) => [kind, byKind(kind)]).filter(([, l]) => l.length).map(([kind, l]) => [kind, buildGlowGeometry(track, l)]);
   const glowMaterial = new THREE.ShaderMaterial({
     defines: { ...targetDefines(caps), LAMPS: Math.max(1, lamps.length) },
     uniforms: { ...atmosphere.uniforms, uReal: real, uOn: onUniform, uAlbedo: { value: GROUND_ALBEDO } },
@@ -163,10 +164,14 @@ void main() {
     polygonOffsetFactor: -2,
     polygonOffsetUnits: -4,
   });
-  const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-  glow.name = 'lamp-glow';
-  glow.renderOrder = 1;
-  group.add(glow);
+  const glows = glowGeometries.map(([kind, geometry]) => {
+    const glow = new THREE.Mesh(geometry, glowMaterial);
+    glow.name = `lamp-glow-${kind}`;
+    glow.renderOrder = 1;
+    glow.userData.kind = kind;
+    group.add(glow);
+    return glow;
+  });
 
   // ---- the pool of real lights
   const size = POOL[tier] ?? 4;
@@ -216,6 +221,8 @@ void main() {
   return {
     group,
     lamps,
+    /** The glow on the ground, one mesh per kind of lamp. */
+    glows,
     /** Each lamp's share of the real light (a uniform's value object: shared with the bore). */
     real,
     on: onUniform,
@@ -224,6 +231,7 @@ void main() {
       on.street = time.lamps.street;
       on.tunnel = time.lamps.tunnel;
       lamps.forEach((lamp, i) => (onUniform.value[i] = on[lamp.kind]));
+      for (const glow of glows) glow.visible = on[glow.userData.kind] > 0;
       for (const [kind, material] of Object.entries(emitters)) {
         const spec = LAMP_KINDS[kind];
         material.color.setRGB(...spec.color.map((c) => c * spec.head * on[kind]));
@@ -234,7 +242,7 @@ void main() {
     },
     stats: { lamps: lamps.length, pool: size },
     dispose() {
-      glowGeometry.dispose();
+      for (const [, geometry] of glowGeometries) geometry.dispose();
       glowMaterial.dispose();
     },
   };
@@ -270,13 +278,16 @@ function buildGlowGeometry(track, lamps) {
     const centre = lamp.lat - lamp.side * s.arm;
     const from = Math.max(lo, centre - reach);
     const to = Math.min(hi, centre + reach);
+    // (picture lane) the light is worked out per pixel: the grid only has to follow the surface, which bends at the
+    // pavement's edges (columns there) and hardly at all along the road. It was 10 columns and a row every metre:
+    // 28 thousand triangles for the tunnel's lamps alone, drawn two and three deep where the patches overlap.
     const cols = new Set([from, to]);
-    for (let k = 0; k <= 10; k++) cols.add(from + ((to - from) * k) / 10);
+    for (let k = 0; k <= 4; k++) cols.add(from + ((to - from) * k) / 4);
     for (const kink of [track.halfWidth, track.halfWidth + 0.6]) {
       for (const sign of [1, -1]) if (sign * kink > from && sign * kink < to) cols.add(sign * kink);
     }
     const lats = [...cols].sort((x, y) => x - y);
-    const rows = Math.max(4, Math.ceil((2 * reach) / 2));
+    const rows = Math.max(4, Math.ceil((2 * reach) / 5));
     const base = pos.length / 3;
     const cos = [Math.cos(s.angle), Math.cos(s.angle * (1 - s.penumbra))];
     for (let r = 0; r <= rows; r++) {

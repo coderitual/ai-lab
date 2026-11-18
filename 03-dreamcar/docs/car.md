@@ -237,7 +237,7 @@ material over the same skin.
   edges; two rows of slanted blades (tail light), the smooth band between
   them (brake light; the outer piece's band is also the indicator), the
   reversing window by the inner tip.
-- **Emission** is the same by day and at night, when the exposure is 18
+- **Emission** is the same by day and at night, when the exposure is about 30
   times higher. The tail light's blades are 0.4: at night only the red
   channel clips and they stay red (at 7 they were white dashes). The brake
   band is 9: lit under the sun, a white core in a red glow at night, as in a

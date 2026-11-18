@@ -20,6 +20,12 @@
 import * as THREE from 'three';
 import { ldrEncodingInstalled } from './glsl.js';
 
+/**
+ * A layer only reflection probes see (the game's cameras have only layer 0): a cheaper stand-in for something
+ * big goes on it, and the full thing draws nothing when `camera.layers.isEnabled(PROBE_LAYER)`.
+ */
+export const PROBE_LAYER = 30;
+
 /** Where each face looks and which way is up in it: OpenGL's cube faces, in the order +X -X +Y -Y +Z -Z. */
 const FACES = [
   { look: [1, 0, 0], up: [0, 1, 0] },
@@ -63,6 +69,8 @@ export class ReflectionProbe {
      * Lights must stay visible to it, or three.js builds a second set of shaders for the probe's light count.
      */
     this.layers = new THREE.Layers();
+    // and PROBE_LAYER, which no other camera has: what is on it alone is drawn for probes only (a cheaper stand-in)
+    this.layers.enable(PROBE_LAYER);
 
     // A negative field of view turns the picture upside down and left to right, which is how a cube face is
     // stored (three.js's CubeCamera does the same).

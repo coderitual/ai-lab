@@ -187,17 +187,19 @@ export const TIMES = {
     },
     // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
     // (round three) the drawn sky was raised to the frames' brightness; its light on the scene is kept where it was
-    env: { intensity: 0.72 },
+    // (picture lane) less fill (was 0.72 and 0.16) and more contrast: the shade stood about a stop under the
+    // sunlit ground and D1's blacks were grey (p1 30 levels against the frame's 10)
+    env: { intensity: 0.6 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
-    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.16 },
+    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.13 },
     fog: { color: [0.26, 0.35, 0.52], sun: [0.06, 0.04, 0.02], sunLobe: 16, density: 0.0001, heightFalloff: 0.011, air: 0.00006 },
-    exposure: 0.66,
+    exposure: 0.68,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
     tunnelExposure: 5.6,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.06, saturation: 1.14, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015, ao: 0.8, star: 0.02 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.14, saturation: 1.18, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.0003, glare: 0.015, ao: 0.8, star: 0.02 },
     lamps: { street: 0, tunnel: 1, windows: 0 },
     wetness: 0,
     carLights: 'drl',
@@ -231,12 +233,12 @@ export const TIMES = {
     env: { intensity: 0.6 },
     ambient: { sky: [0.95, 0.78, 0.6], ground: [1.0, 0.62, 0.34], intensity: 0.014 },
     fog: { color: [0.1, 0.068, 0.042], sun: [0.4, 0.19, 0.06], sunLobe: 6, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
-    exposure: 4.5,
+    exposure: 4.2,
     tunnelExposure: 6,
     look: {
       flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 },
-      contrast: 1.14,
-      saturation: 1.12,
+      contrast: 1.2,
+      saturation: 1.16,
       tint: [1.05, 1.0, 0.9],
       lift: [0.0004, 0.00025, 0.0001],
       vignette: 0.3,
@@ -285,7 +287,8 @@ export const TIMES = {
     // lamp within 30 m burnt to white; reference B is darker, its lights brighter against it)
     // (look lane, day stage: the lead found night far darker than reference B, where nothing is black but the far
     // hills: the moon x2.2, the sky x2 and the fill x3 instead of more exposure, so the lamps do not burn)
-    exposure: 18,
+    // (picture lane) was 18: away from the lamps the lower half of the frame was black (p10 of 4 levels)
+    exposure: 22,
     // the lit tunnel is two stops brighter than the moonlit road outside
     tunnelExposure: 8,
     look: { contrast: 1.12, saturation: 0.94, tint: [0.95, 0.985, 1.05], lift: [0.0006, 0.0009, 0.0018], vignette: 0.32, chroma: 0.0012, grain: 1.2, bloom: 0.15, ghosts: 0, ao: 0.9, star: 0.015, halo: 0.15 },

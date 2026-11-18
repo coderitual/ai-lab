@@ -1,7 +1,8 @@
 // Skid marks: one ribbon per wheel, laid where a tyre slides, kept for the whole run.
 //
 // All the wheels of all the cars share one mesh and one draw call. Each wheel owns a ring of `perWheel`
-// quads; a quad joins the last point laid to the new one, a tyre's width across, lifted a little off the
+// quads, interleaved with the other wheels' (slot k of wheel w is quad k x wheels + w), so that only the slots
+// some wheel has used are drawn: a run without a slide draws nothing (picture lane). A quad joins the last point laid to the new one, a tyre's width across, lifted a little off the
 // road along its normal. Its four corners carry an alpha (how dark the rubber is there), so a mark fades in
 // as the slide builds and out as it ends. When a ring is full the oldest quad is reused, and only the quads
 // written since the last frame are sent to the GPU.
@@ -62,6 +63,8 @@ export class SkidMarks {
     this._next = new Int32Array(wheels);
     this._last = new Float32Array(wheels * 7);
     this._has = new Uint8Array(wheels);
+    /** The most slots any wheel has filled: what is drawn. */
+    this._used = 0;
     this._dirtyLo = Infinity;
     this._dirtyHi = -1;
     /** Quads laid since the start (for tests). */
@@ -75,6 +78,8 @@ export class SkidMarks {
     this.color.array.fill(0);
     this._next.fill(0);
     this._has.fill(0);
+    this._used = 0;
+    this.geometry.setDrawRange(0, 0);
     this._dirtyLo = 0;
     this._dirtyHi = this.wheels * this.perWheel - 1;
     this.laid = 0;
@@ -105,8 +110,10 @@ export class SkidMarks {
     const L = this._last;
     const o = w * 7;
     if (this._has[w]) {
-      const q = w * this.perWheel + this._next[w];
+      const q = this._next[w] * this.wheels + w;
       this._next[w] = (this._next[w] + 1) % this.perWheel;
+      if (this._used < this.perWheel && this._next[w] > this._used) this._used = this._next[w];
+      if (this._next[w] === 0) this._used = this.perWheel;
       const p = this.position.array;
       const c = this.color.array;
       const v = q * 12;
@@ -145,6 +152,7 @@ export class SkidMarks {
   /** Send what changed to the GPU (once per drawn frame is enough). */
   upload() {
     if (this._dirtyHi < 0) return;
+    this.geometry.setDrawRange(0, this._used * this.wheels * 6);
     const lo = this._dirtyLo;
     const n = this._dirtyHi - lo + 1;
     this.position.clearUpdateRanges();

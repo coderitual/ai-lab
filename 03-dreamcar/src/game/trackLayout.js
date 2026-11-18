@@ -156,7 +156,11 @@ const SEGMENTS = [
   // The ledge: fast downhill sweepers along the hillside. The first, a left, has the valley open on its inside over
   // a low wall and a wooded bank on its outside (and no kerb on its inside: a white line, the paved margin and
   // rough grass, as in frame D3); the second, a right, runs under rock with a rail and the drop outside.
-  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 10, g: -7.5, gk: [[0.3, -7.5]], L: 'balcony', R: 'bank', runoff: 'R', kerb: false },
+  // (picture lane) ledge1 is banked 7 degrees, not 10: the day's sun (16 degrees up) stands square to its right, so
+  // the banking tilts the road away from it; at 10 the sun grazed the asphalt at 6 degrees and the bank's tree shade
+  // could not be told from the light round it. At 7 the asphalt takes half as much again. (4 and 5 degrees were
+  // tried: they put the drift and crest tests of tools/unit.mjs over their limits.)
+  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 7, g: -7.5, gk: [[0.3, -7.5]], L: 'balcony', R: 'bank', runoff: 'R', kerb: false },
   { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: -7.5, L: 'midRun', R: 'rock', runoff: 'L' },
 
   // Gully bridge: straight across a gully on piers.

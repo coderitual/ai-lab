@@ -147,6 +147,16 @@ machine without a GPU, and only what is listed here.
   d1, d3 and d4 and 393x852 at device scale 2 for the chase view on the sky
   road and in the tunnel; `node tools/unit.mjs` passed (4 files). Not looked
   at on `low` or `high`, at night, or in motion; the playtest was not run.
+- **The picture lane's changes** (meshes cut into pieces for culling, the
+  probe's cadence and stand-in massif, the lamps' glow, skid marks, the
+  ledge bend's banking 10 to 7 degrees, the grade of the three times of day):
+  triangles counted per pass at phone shape on low and medium (spec.md,
+  "Quality tiers and budgets"); stills on software WebGL at `medium`, 1280x720
+  for d1, d3, d4 and a night chase, 393x852 at scale 2 for the sky road by day
+  and the grid by night, compared by eye and with `lookstats.py` before and
+  after; `node tools/unit.mjs` passed and `node tools/handling.mjs` was run
+  for spec.md. Not looked at on `high`; the playtest was not run; frame times
+  were not measured, only triangles and draw calls.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
@@ -164,10 +174,11 @@ Read this before believing anything above about a device.
   frame of the full world takes tens of seconds to draw. No frame rate on
   any real GPU has been measured. The adaptive render scale has been seen to
   step, never on a real device.
-- **The budgets.** The low tier was measured over its budget (432 k
-  triangles, 173 draw calls against 250 k and 150) on the merged head of the
-  rework; medium's shadow cascades and wet mirror were over their share at
-  the start area. Not re-measured after the last lanes landed.
+- **The budgets.** Counted, not timed: after the picture lane's work the low
+  tier is at 253 to 328 k triangles and 168 to 230 draw calls (budget 250 k
+  and 150), medium at 0.67 to 1.04 M by day and up to 1.31 M by night
+  (budget 600 k). Both are still over. Whether a phone draws them at a
+  usable frame rate is unknown.
 - **Browsers.** Only Chromium. Safari (desktop and iOS) and Firefox are
   untested, including WebGL 2 on older iOS, half-float targets, the
   multisampled half-float probe (`caps.msaaHdr`) and audio unlocking.

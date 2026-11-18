@@ -336,10 +336,12 @@ with a short `advance` after loading.
   and bright at the horizon, with small lit cumulus (grey-blue bases, silver
   rims near the sun); a compact sun with a soft aureole; dry asphalt. The
   drawn sky is as bright as the frames' (pale blue, paling to the horizon);
-  its light on the scene is set apart (`env.intensity` 0.72, fill 0.16), so
-  that the shade stays open: sunlit level ground about 2.1 from the sun
-  against about 0.8 of sky and fill (some 1.5 to 2 stops; D1's shaded
-  mid-tones measured: p10 38 against the frame's 40); exposure 0.66. Haze in two layers: the valley haze (hundreds of metres)
+  its light on the scene is set apart (`env.intensity` 0.6, fill 0.13), so
+  that the shade stays open but deep: sunlit level ground about 2.1 from the
+  sun against about 0.65 of sky and fill (about 1.7 stops); exposure 0.68,
+  contrast 1.14, saturation 1.18 (picture lane: with 0.72, 0.16 and 1.06 the
+  blacks of the D1 still were grey, p1 30 levels against the frame's 10; now
+  18, and the sky's blue nearer the frame's). Haze in two layers: the valley haze (hundreds of metres)
   and a thin air with a 1.4 km scale height that lifts and blues the far
   land kilometres away, warmer towards the sun. A limestone massif (far.js)
   fills the background, its skyline read off D1 from D1's camera: a great
@@ -363,7 +365,7 @@ with a short `advance` after loading.
   land fades into is gold-brown, the sky's fill is warm, and the grade warms
   the white balance (tint 1.05, 1.0, 0.9) with rust in the shadows and gold in
   the highlights (split toning); clouds lit from below that the paint
-  mirrors; the fill is low (env 0.6, exposure 4.5), so the lit crowns and the
+  mirrors; the fill is low (env 0.6, exposure 4.2, contrast 1.2), so the lit crowns and the
   lamps carry the picture and the shade stays deep and warm. Dry. Lamps and
   windows are on.
 - **Night:** a three-quarter moon low ahead and a little left of the start

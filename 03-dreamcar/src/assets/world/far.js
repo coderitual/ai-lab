@@ -28,6 +28,7 @@ import { GLSL_HASH, GLSL_NOISE, GLSL_TARGET, targetDefines } from '../../engine/
 import { ATMOSPHERE_PARS } from './atmosphere.js';
 import { extend, planeNoise, smoothstep, withBake } from './shading.js';
 import { TIMES } from './lighting.js';
+import { PROBE_LAYER } from '../../engine/ReflectionProbe.js';
 
 /** The rings: distance from the middle of the course (m), the ridge's height range (m), columns round. */
 const RINGS = [
@@ -371,7 +372,8 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     geometry.setIndex(index);
     geometry.computeVertexNormals();
     // make sure the normals point up
-    if (geometry.attributes.normal.getY(at(cols >> 1, rows >> 1)) < 0) {
+    const flipped = geometry.attributes.normal.getY(at(cols >> 1, rows >> 1)) < 0;
+    if (flipped) {
       for (let k = 0; k < index.length; k += 3) [index[k + 1], index[k + 2]] = [index[k + 2], index[k + 1]];
       geometry.setIndex(index);
       geometry.computeVertexNormals();
@@ -441,6 +443,36 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
     mountains.push(mesh);
+    // (picture lane) What the cars' reflection probes draw instead: the same vertices on every other column and
+    // row, a quarter of the triangles. A probe's face is 64 to 256 texels across 90 degrees: the massif is a band a
+    // few texels high in it, and the full grid only cost its triangles (some 90 thousand a face on medium).
+    const coarse = [];
+    for (let j = 0; j < rows; j += 2) {
+      const j1 = Math.min(rows, j + 2);
+      for (let i = 0; i < cols; i += 2) {
+        const i1 = Math.min(cols, i + 2);
+        const p = at(i, j);
+        const q = at(i, j1);
+        const a = at(i1, j);
+        const b = at(i1, j1);
+        if (flipped) coarse.push(p, a, q, a, b, q);
+        else coarse.push(p, q, a, a, q, b);
+      }
+    }
+    const probeGeometry = new THREE.BufferGeometry();
+    for (const [name, attribute] of Object.entries(geometry.attributes)) probeGeometry.setAttribute(name, attribute);
+    probeGeometry.setIndex(coarse);
+    const probeMesh = new THREE.Mesh(probeGeometry, mesh.material);
+    probeMesh.name = 'far-massif-probe';
+    probeMesh.renderOrder = mesh.renderOrder;
+    probeMesh.frustumCulled = false;
+    probeMesh.matrixAutoUpdate = false;
+    probeMesh.layers.set(PROBE_LAYER);
+    // the full grid draws nothing for a probe's camera (it is on layer 0, which every camera sees)
+    const full = index.length;
+    mesh.onBeforeRender = (_r, _s, camera) => geometry.setDrawRange(0, camera.layers.isEnabled(PROBE_LAYER) ? 0 : full);
+    group.add(probeMesh);
+    mountains.push(probeMesh);
   }
 
   // ---------------------------------------------------------------- mist
