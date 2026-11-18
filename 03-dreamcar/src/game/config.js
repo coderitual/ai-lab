@@ -345,7 +345,7 @@ export const PHOTOS = {
   d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
   d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
-  e1: { back: -12, right: -7, up: 6, yaw: 145, pitch: -6, fov: 55, t: 56, time: 'day' },
+  e1: { back: -10, right: -2, up: 4.5, yaw: 152, pitch: -5, fov: 52, t: 56, time: 'day' },
 };
 
 /**

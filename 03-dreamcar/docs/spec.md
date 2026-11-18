@@ -450,6 +450,11 @@ there is dry) and its calls go to the probe's second face
 (`PROBE.tunnelFaces`). The approach was over both call budgets before the
 tunnel changed and still is.
 
+**The sea** (sea lane, 2026-11-18, the same counting at 393x852, device scale 1, t = 45 and 50 on the sky road,
+before and after): low by day 129 / 143 calls and 302 / 327 k triangles before, 132 / 144 and 270 / 291 k after (the
+drowned ground left out more than pays for the sea's flat disc); medium by night 214 / 228 calls and 0.91 / 1.00 M
+before, 216 / 230 and 0.89 / 0.95 M after (the sea one call, 19.9 k triangles, in the scene).
+
 None of these was measured on a real GPU or phone.
 
 ## Sound
