@@ -28,7 +28,9 @@ import { DIMS, STATIONS } from './spec.js';
 
 /** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
 export const PAINTS = {
-  silver: { color: [0.56, 0.563, 0.57], metal: 0.9, rough: 0.4, flop: 0.42, flake: 1 }, // high-tech silver: this car
+  // high-tech silver: this car. Cool and deep as in the daylight and press photographs: a metal layer smooth enough
+  // to mirror the sky as a soft blue over the bonnet and roof (0.4 read as a grey satin veil), darker edge-on
+  silver: { color: [0.6, 0.62, 0.66], metal: 0.92, rough: 0.27, flop: 0.34, flake: 1 },
   graphite: { color: [0.16, 0.17, 0.18], metal: 1, rough: 0.34, flop: 0.45, flake: 1 },
   blue: { color: [0.018, 0.045, 0.19], metal: 0.85, rough: 0.32, flop: 0.35, flake: 1 },
   red: { color: [0.36, 0.014, 0.014], metal: 0.35, rough: 0.3, flop: 0.6, flake: 0.5 },
@@ -166,7 +168,7 @@ const FOOTPRINT = 'sqrt(0.39 * max(length(dFdx(r)), length(dFdy(r))))';
  * sodium lamps and matt dark grey at night; now the lamp rows slide over it.
  */
 
-const REFLECTIONS = (coat, base = !coat, gain = 1, ground = true) => /* glsl */ `
+const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false) => /* glsl */ `
 #include <lights_fragment_maps>
 #if defined( RE_IndirectSpecular )
   ${
@@ -190,7 +192,15 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, ground = true) => /* glsl */ 
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryNormal), viewMatrix);
     ${ground ? 'r = carGround(r);' : ''}
-    radiance = mix(radiance * carSky, carSane(probeSample(carProbe, r, max(material.roughness, ${FOOTPRINT})), radiance * carSky), carProbeOn);
+    vec3 seen = carSane(probeSample(carProbe, r, max(material.roughness, ${FOOTPRINT})), radiance * carSky);
+    // The metal layer is a blurred mirror: a small fierce thing in the probe (the sun's glare on the road behind,
+    // a lamp) must not wash a whole panel white. What it takes is held to a few times the probe's average round
+    // that direction; the clear coat above keeps the crisp highlight.
+    vec3 around = carSane(probeSample(carProbe, r, 1.0), seen);
+    float cap = 5.0 * max(max(around.r, max(around.g, around.b)), 1e-5);
+    float peak = max(seen.r, max(seen.g, seen.b));
+    if (peak > cap) seen *= (cap + 0.1 * (peak - cap)) / peak;
+    radiance = mix(radiance * carSky, seen, carProbeOn);
   }`
       : `
   radiance *= carSky;`
@@ -694,7 +704,7 @@ export function createGlassMaterial(shared, caps, channel) {
   ${
     channel === 0
       ? `if (vCarPos.y > 1.36 && abs(vCarPos.x) < 0.56 && vCarPos.z < 0.05 && vCarPos.z > -1.25 && n.y > 0.6) { transmit = 0.06; frit = 0.015; }
-  else if (n.y > 0.45 && vCarPos.z > -0.1) { transmit = 0.75; frit = 0.025; }
+  else if (n.y > 0.45 && vCarPos.z > -0.1) { transmit = 0.55; frit = 0.025; }
   else if (n.y > 0.45) {
     // (the atlas holds distances to 30 mm: a band any wider would cover the whole pane)
     transmit = 0.15; frit = 0.028;
@@ -704,8 +714,11 @@ export function createGlassMaterial(shared, caps, channel) {
     float off = abs(t - k) * 0.032;
     float w = max(fwidth(t) * 0.032, 1e-5);
     heat = clamp((0.0006 - off) / w + 0.5, 0.0, 1.0) * min(1.0, 0.0012 / w) * carCover(d + frit);
+    // only where the lines stand 8 pixels or more apart: closer, at a phone's reduced resolution, they beat
+    // against the pixels into a banded moire over the whole screen
+    heat *= smoothstep(4.0, 8.0, 1.0 / max(fwidth(t), 1e-5));
   }
-  else if (vCarPos.z > -0.4) { transmit = 0.72; frit = 0.0; }
+  else if (vCarPos.z > -0.4) { transmit = 0.5; frit = 0.0; }
   else { transmit = 0.15; frit = 0.0; }`
       : `transmit = vCarPos.z > 0.0 ? 0.94 : 0.74; frit = 0.0;
   // the tail lamp's lens is clear red (the daylight photographs: a bright cherry red unlit, not smoked): it has a
@@ -752,6 +765,13 @@ export function createDarkMaterial(side, value = 0.015, roughness = 0.9, { direc
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <aomap_fragment>',
         `#include <aomap_fragment>\n  reflectedLight.indirectDiffuse *= ${sky.toFixed(3)};\n  reflectedLight.indirectSpecular *= ${sky.toFixed(3)};`,
+      );
+    }
+    if (direct) {
+      // black leather: the low sun's sheen on it read as cream leather through the glass
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <lights_fragment_end>',
+        '#include <lights_fragment_end>\n  reflectedLight.directSpecular *= 0.15;',
       );
     }
     if (!direct) {
