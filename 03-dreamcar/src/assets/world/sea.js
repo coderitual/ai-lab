@@ -401,12 +401,18 @@ reflectedLight.directDiffuse += seaScatter;
   vec3 lamp = vec3( 0.0 );
   for ( int i = 0; i < SEA_LAMPS; i ++ ) {
     if ( uSeaGlintPos[ i ].w <= 0.0 ) continue;
-    vec3 dev = normalize( uSeaGlintPos[ i ].xyz - vSeaWorld ) - lR;
+    vec3 toLamp = normalize( uSeaGlintPos[ i ].xyz - vSeaWorld );
+    // (only about the mirrored direction: a lamp behind the reflected ray projects onto nothing)
+    float facing = dot( toLamp, lR );
+    if ( facing < 0.8 ) continue;
+    vec3 dev = toLamp - lR;
     float x = dot( dev, lA ) / ( ${SEA_LOOK.lamp.across.toFixed(3)} * lW );
     float y = dot( dev, lB ) / ( ${SEA_LOOK.lamp.along.toFixed(3)} * lW );
-    lamp += uSeaGlintColor[ i ] * ( uSeaGlintPos[ i ].w * exp( - x * x - y * y ) / lW );
+    lamp += uSeaGlintColor[ i ] * ( uSeaGlintPos[ i ].w * exp( - x * x - y * y ) * smoothstep( 0.8, 0.95, facing ) / lW );
   }
-  reflectedLight.directSpecular += lamp * lF * ${SEA_LOOK.lamp.gain.toFixed(3)} * ( 1.0 - seaFoam );
+  lamp *= lF * ${SEA_LOOK.lamp.gain.toFixed(3)};
+  // a lamp in the water glares, it does not burn a hole (as on the wet road)
+  reflectedLight.directSpecular += lamp * 3.0 / ( 3.0 + max( lamp.r, max( lamp.g, lamp.b ) ) ) * ( 1.0 - seaFoam );
 }
 #endif
 `;

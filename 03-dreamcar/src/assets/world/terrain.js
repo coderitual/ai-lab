@@ -74,7 +74,7 @@ const STRAIGHT_VIEW = { x0: -450, x1: 250, slope: 0.1 };
  * the straight is a bay of the same sea, reaching `bayWest` times as far west as east, where it opens to it.
  * `cliff`: rise per metre of the land above the water's edge; `shelf`: fall per metre of the seabed beyond it, down to
  * `deep`; `soft`: degrees over which the coast turns from sea to mainland (and as much again of wander); `stacks`: how
- * many sea stacks stand off the coast.
+ * many sea stacks stand off the coast; `bridgeShore`: beside the sky road's piers the water begins at most this far out.
  * `map`: the sea map's texels a side and its half width (m) round the middle (see seaMap below).
  */
 const SEA = {
@@ -86,6 +86,7 @@ const SEA = {
   deep: 45,
   bayWest: 2.2,
   stacks: 7,
+  bridgeShore: 45,
   map: { size: 512, half: 2400 },
 };
 
@@ -198,6 +199,8 @@ const FOOT = 0.8;
       ravine[i % n] = Math.max(1.5, drop * Math.pow(v, gully ? 1.4 : 0.6) + notch);
     }
   }
+  /** On a bridge long enough to span a valley along it (the sky road), not a gully across it. */
+  const longBridge = (s) => track.bridges.some((b) => b.s1 - b.s0 >= GULLY_LENGTH && track.wrap(s - b.s0) <= b.s1 - b.s0);
   const zoneOf = (s) => {
     const i = Math.round(wrap(s) / ds) % n;
     return cover[i] >= 0 ? 1 : ravine[i] >= 0 ? 2 : 0;
@@ -225,8 +228,9 @@ const FOOT = 0.8;
   /** Metres beyond the solid edge where the water begins. */
   const shoreAt = (x, z) => SEA.shore[0] + (SEA.shore[1] - SEA.shore[0]) * smoothstep(0.3, 0.7, noise.fbm(x / 520 + 13, z / 520 - 7, 3));
   /** The coast's profile at d m beyond the solid edge, from a road whose ground is at `base`. */
-  const coastAt = (x, z, base, d) => {
-    const shore = shoreAt(x, z);
+  const coastAt = (x, z, base, d, bridge) => {
+    // (beside the sky road's piers the water comes in closer: the viaduct stands in front of it)
+    const shore = bridge ? Math.min(shoreAt(x, z), SEA.bridgeShore) : shoreAt(x, z);
     const fall = d < shore ? SEA.cliff : SEA.shelf;
     return Math.max(lakeLevel - SEA.deep, Math.min(base - 0.25 * d, lakeLevel + fall * (shore - d)));
   };
@@ -320,7 +324,7 @@ const FOOT = 0.8;
           // (sea lane) towards the sea the land falls from the road to the water's edge, steeply at the last, and
           // the seabed shelves away beyond it
           const sea = seaSector(x, z);
-          if (sea > 0) v += (coastAt(x, z, base, d) - v) * sea;
+          if (sea > 0) v += (coastAt(x, z, base, d, zoneOf(spot.s) === 2 && longBridge(spot.s)) - v) * sea;
           if ((sea > 0.5 && d > shoreAt(x, z) + 30) || lakeE(x, z) < 0.8) seaSeed[j * mx + i] = 1;
         }
         macro[j * mx + i] = v;

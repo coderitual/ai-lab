@@ -332,12 +332,16 @@ export const CAMERA = {
  * from the start of a run at RULES.autopilotPace; `time`, the time of day), used when the address does not give
  * them. D1: the run-up to the line, low behind and right of the car, yawed left; D3: the ledge's first bend, low
  * behind and left, looking down it; D4: the grid at golden hour just after the lights go out (the lamps show green), low on the lake side behind
- * the car, looking forward and right at the land side with the gantry's lamps in the picture.
+ * the car, looking forward and right at the land side with the gantry's lamps in the picture. E1 (sea lane: the owner's
+ * coast road frame): on the climb after the sky road, ahead of the car and high on its sea side, looking back down the
+ * coast road at it, the cut slope on the left, the rail on white posts, the viaduct on its piers and the sea beyond on
+ * the right.
  */
 export const PHOTOS = {
   d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
   d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
+  e1: { back: -12, right: -7, up: 6, yaw: 145, pitch: -6, fov: 55, t: 56, time: 'day' },
 };
 
 /**
