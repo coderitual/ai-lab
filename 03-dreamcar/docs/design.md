@@ -508,7 +508,7 @@ blooming rectangle that grows; the world reappears in it as the eye adapts.
 |---|---|---|
 | section | box about 15 x 6.5 m | 12 m road + 1.5 m to each kerb face, 1 m walkways, walls 17 m apart, ceiling 6.4 m, chamfer 0.9 x 0.7 m |
 | fittings | pairs every 2 to 3 m at the entrance, single every 6 to 8 m | pairs every 2 m over the first 60 m, single every 3 m to 130 m and over the last 36 m, every 6 m between; bars 1.25 x 0.24 m |
-| light | cool white, entrance brighter | lamps every 12 m on each side, 0.9 0.96 1.0, the entrance's 2.4 times as bright over 60 m, easing to the interior's over 70 m; the last 36 m 1.4 times |
+| light | cool white, entrance brighter | lamps every 12 m on each side, 0.9 0.96 1.0, the entrance's 2.4 times as bright over 60 m, easing to the interior's over 70 m; the last 36 m 1.4 times (by day; half of that extra at golden hour, none at night) |
 | walls | pale cast panels | panels 5 m long, a joint along the dado at 1.15 m, grime at the foot |
 | on the walls | green lights, doors, signs, fire points | guidance lights every 12.5 m at 1 m; a door with a lit frame and a sign every 60 m, alternating sides; a fire point between |
 | under the ceiling | lane signals, jet fans, pipe, trays | lane signals at the entrance and every 120 m; jet fans in pairs every 110 m from 70 m in; a pipe and a tray the whole length (not on low) |

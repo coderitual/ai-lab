@@ -436,10 +436,17 @@ export const FX = {
  * on medium a face every other frame at speed (the cube is new every 12 frames, 0.2 s at 60 Hz) and two every
  * third frame standing still kept the frame near its budget (docs/spec.md, "Budgets").
  */
+/**
+ * (tunnel lane) In the tunnel (the car's sky below `tunnelSky`) the faces see no further than `tunnelFar` m (the box
+ * hides the rest; what lies beyond is culled, which pays for it) and `tunnelFaces` are redrawn at speed: the lines of
+ * luminaires slide over the paint, and a cube that is a fifth of a second old shows them where the car was 13 m ago.
+ */
 export const PROBE = {
-  low: { size: 64, faces: 1, every: 2, stillSize: 128, stillFaces: 1, stillEvery: 2 },
-  medium: { size: 128, faces: 1, every: 2, stillSize: 256, stillFaces: 2, stillEvery: 3 },
-  high: { size: 256, faces: 2, every: 1, stillSize: 512, stillFaces: 3, stillEvery: 1 },
+  low: { size: 64, faces: 1, every: 2, stillSize: 128, stillFaces: 1, stillEvery: 2, tunnelFaces: 1 },
+  medium: { size: 128, faces: 1, every: 2, stillSize: 256, stillFaces: 2, stillEvery: 3, tunnelFaces: 2 },
+  high: { size: 256, faces: 2, every: 1, stillSize: 512, stillFaces: 3, stillEvery: 1, tunnelFaces: 3 },
+  tunnelSky: 0.02,
+  tunnelFar: 160,
   stillBelow: 1.5,
   movingAbove: 4,
 };

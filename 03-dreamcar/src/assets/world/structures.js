@@ -61,7 +61,7 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng, 
     // (picture lane) on the low tier a probe's face is 64 texels across 90 degrees: posts, rails and the glow under
     // the lamps are less than a texel in it, and each cost a draw call
     // (finish lane) on medium too the rails (a few texels of a 128-texel face; a draw call per piece in every face)
-    probeHidden: tier === 'low' ? [...dressing.probeHidden, rails.group, posts.group, ...lamps.glows] : [...dressing.probeHidden, rails.group],
+    probeHidden: [...tunnels.probeHidden, ...(tier === 'low' ? [...dressing.probeHidden, rails.group, posts.group, ...lamps.glows] : [...dressing.probeHidden, rails.group])],
     /** The lamps' halos, which only the road's mirror shows (lamps.js). */
     halos: lamps.halos,
     /**

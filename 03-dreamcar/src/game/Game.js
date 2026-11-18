@@ -1182,7 +1182,8 @@ export class Game {
         }
       }
       const probeEvery = view.still ? (table.stillEvery ?? 1) : table.every;
-      const probeFaces = view.still ? table.stillFaces : table.faces;
+      const inTunnel = view.racer.vehicle.sky < PROBE.tunnelSky;
+      const probeFaces = view.still ? table.stillFaces : inTunnel ? (table.tunnelFaces ?? table.faces) : table.faces;
       if (view.probe && this.engine.frame % (probeEvery * n) === i * probeEvery) {
         probeAt.copy(car.box.center).applyMatrix4(car.object.matrixWorld);
         probeHidden.length = 0;
@@ -1194,7 +1195,7 @@ export class Game {
         if (this.ghostCar) probeHidden.push(this.ghostCar.object);
         // smoke and sparks in a reflection would smear over the whole car
         probeHidden.push(...this.effects.objects);
-        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces);
+        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces, inTunnel ? PROBE.tunnelFar : undefined);
       }
       this.pipeline.render(this.world.scene, view.camera, view.rect, view.frame);
       view.rig.cut = false;

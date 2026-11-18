@@ -39,6 +39,7 @@
 
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE } from '../../engine/glsl.js';
+import { PROBE_LAYER } from '../../engine/ReflectionProbe.js';
 import { levelFrame } from './furniture.js';
 import { LAMP_KINDS, SPOT_GLSL } from './lamps.js';
 import { BORE_UNIFORMS, extend, withBake } from './shading.js';
@@ -58,14 +59,20 @@ const SHELL = 0.5;
 /** Rows of the box along the road: one every this many metres, per tier (its faces are flat: a 1000 m bend needs few). */
 const ROW = { low: 4, medium: 2, high: 2 };
 /** The box's own light bounced about, as a share of what one lamp lays on the wall beside it. */
-const BOUNCE = 0.32;
+const BOUNCE = 0.45;
 /**
  * The luminaires: how far in from the wall (m, on the ceiling at the haunch's foot), their emitter's size across and
  * along, the gap between a pair's two bars, and the zones: pairs of bars every `entrance[1]` m over the first
  * `entrance[0]` m, single bars every `transition[1]` m to `transition[0]` m in and over the last `exit[0]` m, and
  * every `interior` m between. Their radiance is LAMP_KINDS.tunnel.head times its colour.
  */
-const LUMINAIRE = { inset: 1.15, across: 0.24, along: 1.25, pair: 0.34, entrance: [60, 2.0], transition: [130, 3.0], exit: [36, 3.0], interior: 6 };
+const LUMINAIRE = { inset: 1.15, across: 0.24, along: 1.25, alongPair: 0.7, pair: 0.34, entrance: [60, 2.0], transition: [130, 3.0], exit: [36, 3.0], interior: 6 };
+/**
+ * What the cars' reflection probes see of the fittings instead (a stand-in on PROBE_LAYER): a bar as wide as `across`
+ * (m) and `along` times as long, at `radiance` of the fittings' own. A fitting 0.24 m wide 5 m away is half a texel of a
+ * 128-texel face: it flickered in and out of the paint and lost half its light in the filter.
+ */
+const PROBE_BAR = { across: 0.6, along: 1.2, radiance: 0.8 };
 /** An emergency door with its lit frame and a green sign over it every NICHE m (alternating sides); a fire point between. */
 const NICHE = 60;
 /** Green guidance lights along both walls, every GUIDE m, GUIDE_H over the road. */
@@ -118,7 +125,7 @@ const PAINT = {
 };
 /** Radiance (scene units, linear) of what glows. */
 const GLOW = {
-  green: [0.1, 1.0, 0.3],
+  green: [0.06, 0.6, 0.18],
   guide: [0.15, 3.2, 0.6],
   red: [2.6, 0.1, 0.12],
   arrow: [0.3, 3.0, 0.9],
@@ -285,6 +292,8 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
   const low = tier === 'low';
   /** The veils of daylight in the mouths: their material, a point of the sheet and the way out. */
   const veils = [];
+  /** What the reflection probes leave out: the emitters as the eye sees them (they see a stand-in: PROBE_BAR). */
+  const probeHidden = [];
   const eye = new THREE.Vector3();
   const spec = LAMP_KINDS.tunnel;
 
@@ -307,6 +316,7 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
     const lampH = tunnelLamps.length ? tunnelLamps[0].head.y - track.frameAt(tunnelLamps[0].s, frame).pos.y : CEILING - 0.3;
     const leftFirst = tunnelLamps.length && tunnelLamps[0].side > 0;
     const glow = new Parts();
+    const probeGlow = new Parts();
     const paint = new Parts();
     const cast = new Parts();
     const screens = new Parts();
@@ -362,11 +372,13 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
     for (let d = 1.5; d < length - 1; ) {
       const { M } = place(track, t.s0 + d);
       const pair = d < LUMINAIRE.entrance[0];
+      const along = pair ? LUMINAIRE.alongPair : LUMINAIRE.along;
       for (const side of [1, -1]) {
         for (const lat of pair ? [lumLat + LUMINAIRE.pair / 2, lumLat - LUMINAIRE.pair / 2] : [lumLat]) {
-          glow.add(UNIT_BOX, M(side * lat, CEILING - 0.11, 0, [LUMINAIRE.across, 0.02, LUMINAIRE.along]), lumColor);
-          if (!low) paint.add(UNIT_BOX, M(side * lat, CEILING - 0.05, 0, [LUMINAIRE.across + 0.1, 0.1, LUMINAIRE.along + 0.1]), PAINT.housing);
+          glow.add(UNIT_BOX, M(side * lat, CEILING - 0.11, 0, [LUMINAIRE.across, 0.02, along]), lumColor);
+          if (!low) paint.add(UNIT_BOX, M(side * lat, CEILING - 0.05, 0, [LUMINAIRE.across + 0.1, 0.1, along + 0.1]), PAINT.housing);
         }
+        probeGlow.add(UNIT_BOX, M(side * lumLat, CEILING - 0.11, 0, [PROBE_BAR.across, 0.02, along * PROBE_BAR.along]), lumColor.map((c) => c * PROBE_BAR.radiance));
       }
       d += spacingAt(d, length - d);
     }
@@ -407,9 +419,9 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
       for (let d = 0; d < length; d += STEP) {
         const len = Math.min(STEP, length - d);
         const { M } = place(track, t.s0 + d + len / 2);
-        paint.add(pipe, M(4.6, CEILING - 0.3, 0, [1, 1, len]), PAINT.pipe);
-        paint.add(UNIT_BOX, M(-5.0, CEILING - 0.14, 0, [0.6, 0.08, len]), PAINT.galvanised);
-        paint.add(UNIT_BOX, M(4.6, CEILING - 0.1, 0, [0.06, 0.2, 0.06]), PAINT.steel);
+        paint.add(pipe, M(6.0, CEILING - 0.3, 0, [1, 1, len]), PAINT.pipe);
+        paint.add(UNIT_BOX, M(-5.9, CEILING - 0.14, 0, [0.6, 0.08, len]), PAINT.galvanised);
+        paint.add(UNIT_BOX, M(6.0, CEILING - 0.1, 0, [0.06, 0.2, 0.06]), PAINT.steel);
       }
       pipe.dispose();
     }
@@ -473,6 +485,7 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
 
     for (const [parts, material, name, shadow] of [
       [glow, glowMaterial, 'tunnel-glow', false],
+      [probeGlow, glowMaterial, 'tunnel-probe-glow', false],
       [paint, paintMaterial, 'tunnel-fittings', true],
       [cast, concrete, 'tunnel-concrete', true],
       [screens, screenMaterial, 'tunnel-screens', true],
@@ -484,6 +497,9 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
       mesh.castShadow = shadow;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
+      // the fittings as the probes see them: on the probes' layer alone; the probes leave out what the eye sees
+      if (parts === probeGlow) mesh.layers.set(PROBE_LAYER);
+      if (parts === glow) probeHidden.push(mesh);
       group.add(mesh);
       disposables.push(geometry);
     }
@@ -491,6 +507,7 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
 
   return {
     group,
+    probeHidden,
     /** The tunnel's lamps follow lighting.js (on at every time of day there is). */
     setTime(time) {
       glowMaterial.color.setScalar(time.lamps?.tunnel ?? 1);
@@ -883,7 +900,7 @@ vec3 boreLampLight(vec3 P, vec3 N) {
   float panel = floor(s / ${f(PANEL)});
   float joint = 1.0 - smoothstep(0.01, 0.01 + aa, abs(fract(s / ${f(PANEL)} + 0.5) - 0.5) * ${f(PANEL)});
   joint = max(joint, 1.0 - smoothstep(0.008, 0.008 + fwidth(h) + 1.0e-3, abs(h - ${f(DADO)})));
-  vec3 paint = vec3(0.47, 0.455, 0.42) * (0.94 + 0.08 * hash11(panel * 7.13 + sign(vLocal.y) * 3.0)) * (0.9 + 0.14 * blot);
+  vec3 paint = vec3(0.5, 0.47, 0.41) * (0.94 + 0.08 * hash11(panel * 7.13 + sign(vLocal.y) * 3.0)) * (0.9 + 0.14 * blot);
   paint *= mix(0.72, 1.0, smoothstep(0.25, ${f(DADO + 0.2)}, h + 0.3 * (streak - 0.5)));
   paint *= mix(1.0, 0.86, smoothstep(3.5, ${f(CEILING)}, h));
   paint *= 1.0 - 0.5 * joint * fine;

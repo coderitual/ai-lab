@@ -124,6 +124,9 @@ export function createLamps({ track, terrain = null, caps, tier, atmosphere, gli
   const real = new Float32Array(Math.max(1, lamps.length));
   /** How far each kind is turned up (lighting.js lamps; the floodlights go with the street lamps). */
   const on = { street: 0, lap: 0, tunnel: 1 };
+  /** How much of a lamp's own gain over its kind's light is on (lighting.js lamps.entrance: the tunnel's zones). */
+  let boost = 1;
+  const gainOf = (lamp) => 1 + (lamp.gain - 1) * boost;
   /** Per lamp: red how far it is on, green its share of the pool (read by the glow and by the bore's baked light), blue
    * its gain over its kind's light, a quarter of it (the tunnel's zones: tunnel.js reads it). */
   const shareData = new Uint8Array(Math.max(1, lamps.length) * 4);
@@ -134,7 +137,7 @@ export function createLamps({ track, terrain = null, caps, tier, atmosphere, gli
     for (let i = 0; i < lamps.length; i++) {
       shareData[i * 4] = Math.round(255 * on[lamps[i].kind]);
       shareData[i * 4 + 1] = Math.round(255 * real[i]);
-      shareData[i * 4 + 2] = Math.round(255 * Math.min(1, lamps[i].gain / 4));
+      shareData[i * 4 + 2] = Math.round(255 * Math.min(1, gainOf(lamps[i]) / 4));
     }
     shares.needsUpdate = true;
   };
@@ -209,8 +212,9 @@ uniform float uWet;
 varying vec3 vWorld; varying vec3 vNormal; varying vec3 vLampPos; varying vec3 vLampDir;
 varying vec4 vSpec; varying vec3 vColor; flat varying int vIndex;
 void main() {
-  vec2 lamp = texelFetch(uShares, ivec2(vIndex, 0), 0).rg;
-  float share = lamp.r * (1.0 - lamp.g);
+  vec3 lamp = texelFetch(uShares, ivec2(vIndex, 0), 0).rgb;
+  // (on, its share of the real pool, its gain over its kind's light / 4)
+  float share = lamp.r * (1.0 - lamp.g) * lamp.b * 4.0;
   float E = share * spotIrradiance(vWorld, normalize(vNormal), vLampPos, vLampDir, vSpec.x, vSpec.y, vSpec.zw);
   vec3 ray = vWorld - cameraPosition;
   // (night lane) wet ground is darker: its pores are full and what it does not soak up it mirrors (road.js)
@@ -368,7 +372,7 @@ void main() {
       light.target.position.copy(lamp.head).add(lamp.dir);
       light.target.updateMatrixWorld();
       light.color.setRGB(...spec.color);
-      light.intensity = spec.intensity * lamp.gain * lit * w;
+      light.intensity = spec.intensity * gainOf(lamp) * lit * w;
       light.distance = spec.range;
       light.angle = spec.angle;
       light.penumbra = spec.penumbra;
@@ -435,6 +439,7 @@ void main() {
       on.street = time.lamps.street;
       on.lap = time.lamps.street;
       on.tunnel = time.lamps.tunnel;
+      boost = time.lamps.entrance ?? 1;
       writeShares();
       for (const glow of glows) glow.visible = on[glow.userData.kind] > 0;
       // (the poled emitters' colour and radiance are in their vertex colours; a lamp switched off is not drawn)
@@ -573,7 +578,7 @@ function buildGlowGeometry(track, lamps) {
         nor.push(n.x, n.y, n.z);
         lampPos.push(lamp.head.x, lamp.head.y, lamp.head.z);
         lampDir.push(lamp.dir.x, lamp.dir.y, lamp.dir.z);
-        spec.push(s.intensity * lamp.gain, s.range, cos[0], cos[1]);
+        spec.push(s.intensity, s.range, cos[0], cos[1]);
         color.push(...s.color);
         ids.push(lamp.index);
       }
