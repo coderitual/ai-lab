@@ -569,13 +569,15 @@ comes from behind the camera's left and lights the face.
   course is untouched, but nothing grows behind the long right's rails any
   more (`shoreRun`, `shoreUp`: the woods hid the water). Off the outer side the swell runs big (waves.js
   `BOOST`): its three long waves 2.5 times their height at the middle of a
-  circle of 360 m, so that sets of rollers about 3 to 5 m from crest to
-  trough come in beside the road and bunch up into foam behind their crests;
+  circle of 360 m (up to about 3 to 4 m from crest to trough in the sets);
   the same factor moves the mesh (medium, high), shades the normals (low)
   and answers `sampleWaves`. It stops short of the straight, whose bay
-  frames D1 and D4 look over. `?photo=waves` stands low on the causeway on
-  the bay side. Left out: spray thrown up against the bank, and breakers
-  that curl over (the waves bunch and foam; they do not break as a lip).
+  frames D1 and D4 look over. `?photo=waves` looks over the lagoon beside
+  the causeway. Not yet what the owner asked for: in the first stills the
+  water is close on the lagoon side and glitters, but the boosted swell does
+  not read as rollers from the road (150 m waves 3 m high are gentle slopes
+  at that range); spray against the bank, breakers that curl over and a
+  finer inner mesh near the eye are not built.
 - **The coast road** (`coastDown`, `coastRun`, `coastTop` in trackLayout.js:
   the climb, the carousel, the crest and the plunge): on the sea side the
   steel rail stands on white posts and nothing grows that would hide the
