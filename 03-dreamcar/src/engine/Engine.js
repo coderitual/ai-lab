@@ -174,7 +174,29 @@ export class Engine {
       // without preventDefault the browser never restores the context
       e.preventDefault();
       this.contextLost = true;
+      life++;
     };
+    // Objects made before a context was lost belong to the dead context: deleting one afterwards does nothing but
+    // log a warning, and three.js still holds them (in its properties of every texture, target and geometry made
+    // before the loss) and deletes them when their owner is next resized or disposed. Each object remembers which
+    // life of the context made it, and a delete of one from an earlier life is dropped here.
+    const gl = renderer.getContext();
+    const lives = new WeakMap();
+    let life = 0;
+    for (const kind of ['Texture', 'Buffer', 'Framebuffer', 'Renderbuffer', 'Program', 'Shader', 'VertexArray', 'Query', 'Sampler', 'TransformFeedback']) {
+      const create = gl[`create${kind}`];
+      const remove = gl[`delete${kind}`];
+      if (typeof create !== 'function' || typeof remove !== 'function') continue;
+      gl[`create${kind}`] = function (...args) {
+        const made = create.apply(gl, args);
+        if (made && life > 0) lives.set(made, life);
+        return made;
+      };
+      gl[`delete${kind}`] = function (object) {
+        if (object && (lives.get(object) || 0) !== life) return;
+        remove.call(gl, object);
+      };
+    }
     this._onRestored = () => {
       // three.js has rebuilt its own state and uploads textures and geometry again when they are next used;
       // whatever only lived on the GPU (pictures drawn into render targets) is rebuilt by its owner
