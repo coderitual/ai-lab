@@ -124,6 +124,15 @@ machine without a GPU, and only what is listed here.
   keyboard driver (scripted drivers, in Node). Run for this document:
   passed.
 - **The rules** (`tools/unit.mjs`, race): 82 checks, passed.
+- **The sea** (`tools/unit.mjs`, sea; sea lane, 2026-11-18): the coast
+  presets keep the corridor of the presets they replaced; no water within
+  2 m beyond any solid edge (1.5 m over the water at the lowest); open water
+  within 80 to 205 m of the sea side of the sky road, the climb, the
+  carousel, the crest and the plunge; the bay off the start line; the sea
+  map; the waves deterministic. Its look was judged in stills of the
+  medium tier only (day, golden hour, night, and the chase at phone shape),
+  beside the owner's coast road frame (E1); the low tier's flat disc was
+  counted (spec.md, budgets) but looked at in no still.
 - **The feel** (`tools/unit.mjs`, drift): 7 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
@@ -245,5 +254,10 @@ Read this before believing anything above about a device.
   the board and ghost storage after many laps, and the time-of-day fade
   repeated many times are untested.
 - **Wet grip.** The wet road at night is a look; the tyres do not notice it.
+- **The sea** (sea lane): the waves' motion was only seen in stills (no
+  frame sequence was watched for shimmer or swimming of the disc that
+  follows the eye); the high tier's sea, split screen over the sea, the
+  surf from close by (no camera stood on a shore) and the low tier's look
+  were not looked at; the sea's cost on a real GPU is unknown.
 - **Accessibility** beyond keyboard reachability of the buttons (screen
   readers, colour blindness, reduced motion) has not been considered.
