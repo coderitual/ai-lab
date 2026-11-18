@@ -38,8 +38,8 @@ import { clamp } from './math.js';
  * zone's width, from `half.min` to `half.max`; it is shortened to stay clear of the pedals down to `half.ok`, and
  * beyond that the pedals in its way stand above it instead (BRAKE beside GAS on an upright phone; all of them on
  * half of one). Its knob's radius, and its centre `lift` px above the bottom edge. The arrows' and the pedals' radii; `gap` between controls and
- * `margin` from the edges. On a zone lower than `lowBelow` px (a stacked half on a phone) DRIFT stands beside the
- * pedals instead of above them. A finger finds a pedal within `slop` px more than its drawn radius.
+ * `margin` from the edges. On a zone lower than `lowBelow` px (a stacked half on a phone) or narrower than
+ * `thinBelow` (half an upright phone) DRIFT stands beside the pedals instead of above them. A finger finds a pedal within `slop` px more than its drawn radius.
  */
 export const TOUCH = {
   steerShare: 0.5,
@@ -48,12 +48,13 @@ export const TOUCH = {
   gap: 12,
   half: { base: 56, perWidth: 0.05, min: 48, ok: 70, max: 92 },
   knob: 26,
-  lift: 40,
+  lift: 26,
   arrow: 38,
   gas: 44,
   brake: 40,
   drift: 34,
   lowBelow: 330,
+  thinBelow: 300,
   slop: 8,
 };
 const PAD_DEAD = 0.12; // of the stick's travel that does nothing
@@ -265,7 +266,7 @@ export class Input {
     const corner = { x: right - c, y: bottom - c, r: c };
     const gas = manual ? corner : null;
     const brake = manual ? { x: corner.x - c - T.gap - T.brake, y: bottom - T.brake, r: T.brake } : corner;
-    const low = h < T.lowBelow;
+    const low = h < T.lowBelow || w < T.thinBelow;
     const leftmost = manual ? brake : corner;
     const drift = low
       ? { x: leftmost.x - leftmost.r - T.gap - T.drift, y: bottom - T.drift, r: T.drift }

@@ -625,8 +625,9 @@ const SECTIONS = {
       const gas = at(L, L.gas);
       await pointer(p, 'pointerdown', 5, gas[0], gas[1]);
       await p.advance(0.3);
-      d = await p.d0();
-      check(`${w}x${h}: GAS drives, the steering thumb still steering`, d.throttle > 0.5 && Math.abs((await raw(p)) - 0.3) < 0.02, `throttle ${d.throttle}`);
+      // (the pedal as the hands give it: what reaches the wheels may be less, the traction control's share)
+      const pedal = await p.page.evaluate('window.__dreamcar.game.racers[0].controls.throttle');
+      check(`${w}x${h}: GAS drives, the steering thumb still steering`, pedal > 0.9 && Math.abs((await raw(p)) - 0.3) < 0.02, `pedal ${pedal}, applied ${(await p.d0()).throttle}`);
       const brake2 = at(L, L.brake);
       await pointer(p, 'pointerdown', 2, brake2[0], brake2[1]);
       await p.advance(0.2);
@@ -820,11 +821,13 @@ const SECTIONS = {
           else st.removeProperty(`--${k}`);
         }
       }, insets || null);
-      for (const layout of insets ? ['solo'] : ['solo', 'wide', 'tall']) {
+      // (on touch, solo once more with the throttle on manual: GAS in the corner, BRAKE beside it)
+      for (const layout of insets ? ['solo'] : mobile ? ['solo', 'wide', 'tall', 'manual'] : ['solo', 'wide', 'tall']) {
         await p.page.evaluate((layout) => {
           const g = window.__dreamcar.game;
-          const mode = layout === 'solo' ? 'solo' : 'split';
-          if (layout !== 'solo') window.__dreamcar.set('view.split', layout);
+          g.action(layout === 'manual' ? 'throttle:manual' : 'throttle:auto');
+          const mode = layout === 'solo' || layout === 'manual' ? 'solo' : 'split';
+          if (mode === 'split') window.__dreamcar.set('view.split', layout);
           if (g.mode !== mode) {
             g.leave();
             g.setup(mode);

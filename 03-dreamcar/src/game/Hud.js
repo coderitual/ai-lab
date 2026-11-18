@@ -305,7 +305,7 @@ export class ViewHud {
     // and stay in the corners, clear of the car in the middle; an upright picture gets a little more
     const u = tall ? w / 62 : (Math.min(w, (h * 16) / 9) / 100) * 0.72;
     s.setProperty('--u', `${Math.max(3.6, Math.min(u, 10)).toFixed(2)}px`);
-    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330).flag('low', h < TOUCH.lowBelow);
+    this.cell.flag('tall', tall).flag('narrow', w < 700).flag('small', w < 460).flag('short', h < 330).flag('low', h < TOUCH.lowBelow).flag('thin', w < TOUCH.thinBelow);
   }
 
   setVisible(on) {
@@ -473,6 +473,7 @@ export class ViewHud {
   setControls(c) {
     const L = c.layout;
     const arrows = L.steering === 'arrows';
+    this.cell.flag('manual', !!L.gas);
     if (L.key !== this._ctlKey) {
       this._ctlKey = L.key;
       const place = (cellOf, x, y, w, h) => {

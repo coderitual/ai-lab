@@ -756,50 +756,54 @@
   }
 }
 
-/* ---- touch: where the readouts go. The bottom corners are the thumbs': on a wide view the speed goes to the top
-   middle (the moments come under it), the map stands above the steering; on a narrow wide one (a side-by-side half)
-   the speed stands above the pedals; on an upright one the speed and the map stand above the steering. */
+/* ---- touch: where the readouts go. The bottom corners are the thumbs'; nothing else stands there.
+   A wide view: the speed just left of the pedals (on auto BRAKE alone is in the corner; on manual it stands
+   above BRAKE, left of DRIFT), the map above the steering. A narrow wide view (a side-by-side half on a phone):
+   the speed above the pedals. A low view (a stacked half): the speed at the top, beside the lap. An upright view:
+   the speed and the map above the steering; on a thin one (half of an upright phone) the speed under the lap and
+   no map. Every offset is the pedals' size in Input's TOUCH plus the gap. */
 
-.hud .view.touch:not(.tall) .cluster {
-  right: auto;
-  bottom: auto;
-  left: calc(50% - var(--u) * 12);
-  top: calc(var(--pad) + var(--st));
+.hud .view.touch .cluster,
+.hud .view.touch .slide {
+  right: calc(var(--sr) + 110px);
 }
-.hud .view.touch:not(.tall) .slide {
-  right: auto;
-  bottom: auto;
-  left: calc(50% - var(--u) * 12);
-  top: calc(var(--pad) + var(--st) + var(--u) * 19);
+.hud .view.touch.manual .cluster {
+  right: calc(var(--sr) + 108px);
+  bottom: calc(var(--sb) + 110px);
 }
-.hud .view.touch:not(.tall) .flash,
-.hud .view.touch:not(.tall) .banner,
-.hud .view.touch:not(.tall) .lamps {
-  top: calc(var(--pad) + var(--st) + var(--u) * 23);
-}
-.hud .view.touch:not(.tall).flashing .banner {
-  top: calc(var(--pad) + var(--st) + var(--u) * 31);
+.hud .view.touch.manual .slide {
+  right: calc(var(--sr) + 108px);
+  bottom: calc(var(--sb) + 110px + var(--u) * 19.5);
 }
 .hud .view.touch .map {
   bottom: calc(var(--sb) + 112px);
 }
 .hud .view.touch.narrow:not(.tall) .cluster {
-  left: auto;
-  top: auto;
   right: calc(var(--pad) + var(--sr));
   bottom: calc(var(--sb) + 206px);
 }
 .hud .view.touch.narrow:not(.tall) .slide {
-  left: auto;
-  top: auto;
   right: calc(var(--pad) + var(--sr));
   bottom: calc(var(--sb) + 206px + var(--u) * 19.5);
+}
+.hud .view.touch.low .cluster {
+  right: auto;
+  bottom: auto;
+  left: calc(var(--pad) + var(--sl) + var(--u) * 30);
+  top: calc(var(--pad) + var(--st));
+}
+.hud .view.touch.low .slide {
+  right: auto;
+  bottom: auto;
+  left: calc(var(--pad) + var(--sl) + var(--u) * 30);
+  top: calc(var(--pad) + var(--st) + var(--u) * 19.5);
 }
 .hud .view.touch.tall .cluster,
 .hud .view.touch.tall .slide {
   right: auto;
   left: calc(var(--pad) + var(--sl));
   bottom: calc(var(--sb) + 112px);
+  width: calc(var(--u) * 20);
 }
 .hud .view.touch.tall .slide {
   bottom: calc(var(--sb) + 112px + var(--u) * 19.5);
@@ -810,7 +814,17 @@
 .hud .view.touch.tall.small .cluster,
 .hud .view.touch.tall.small .slide {
   left: 6px;
-  width: calc(var(--u) * 21);
+}
+.hud .view.touch.thin .map {
+  display: none;
+}
+.hud .view.touch.thin .cluster {
+  bottom: auto;
+  top: calc(var(--pad) + var(--st) + var(--u) * 18);
+}
+.hud .view.touch.thin .slide {
+  bottom: auto;
+  top: calc(var(--pad) + var(--st) + var(--u) * 37);
 }
 
 /* ---- the buttons: small and together, at the right under the time to beat, away from the thumbs and the figures */
