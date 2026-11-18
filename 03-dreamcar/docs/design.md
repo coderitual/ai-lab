@@ -151,7 +151,11 @@ boards before the carousel, marshal posts, the start gantry. Road furniture is
 drawn from scratch and carries no real names or words: the circuit is called
 Calvenna, and the boards advertise made-up firms (Varno, Torvel, Miralta,
 Brennik, Oskali, Lundar, Pellora, Arvent, Solmere) with simple abstract marks,
-in the project's own stroke letters (`src/assets/world/signs.js`).
+in the project's own letters (`src/assets/world/signs.js`): a heavy display
+face of capitals built from filled shapes on each letter's box (stems,
+bands, rounded rings), so that every letter is the same height, the ends of
+the diagonals are cut level and the points of A, V and W are flat; digits
+keep the plate's stroke letters.
 
 The start (`src/assets/world/dressing.js` gathers it): a steel truss on two
 lattice towers across the line, the circuit's name board on both faces, and
@@ -353,10 +357,15 @@ with a short `advance` after loading.
   straight. Its orange light crosses the straight almost level, so whatever
   stands on the lake side throws shadows 25 to 30 m long over the grid while
   the trees, the gantry and the buildings on the land side, and the massif,
-  stand in red-orange light. The sky is a warm haze low down deepening to a
-  dusky blue-violet overhead, with clouds lit from below that the paint
-  mirrors; the fill is low (env 0.7 of a dim sky, exposure 4.5), so the lit
-  crowns and the lamps carry the picture. Dry. Lamps and windows are on.
+  stand in red-orange light. Golden, never violet (render lane, after the
+  owner's "small shading problems" and D4 beside our still): the sky is a gold
+  haze low down paling into a clear light blue overhead, the haze the far
+  land fades into is gold-brown, the sky's fill is warm, and the grade warms
+  the white balance (tint 1.05, 1.0, 0.9) with rust in the shadows and gold in
+  the highlights (split toning); clouds lit from below that the paint
+  mirrors; the fill is low (env 0.6, exposure 4.5), so the lit crowns and the
+  lamps carry the picture and the shade stays deep and warm. Dry. Lamps and
+  windows are on.
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
@@ -478,7 +487,11 @@ yellowing, larch green-gold, spruce and fir dark. Built in
   14-19 m to 26-33 m tall from the barrier to 45 m back, nearly all maples,
   a dark fir or two in front); D3's bank (open rows of hornbeams with limes
   and maples, the first leaning out over the road, the valley side of the bend
-  kept to low growth); D1's middle distance (low round green trees behind the
+  kept to low growth; the bank rises gently, 0.12 in 1 (`SIDES.bank` in
+  trackLayout.js), and the mass of the forest stands 125 m or more behind its
+  barrier, so that the day's sun, 16 degrees up on the right of the bend,
+  comes in under and between the crowns and lies on the road in patches: on
+  a bank steeper than the sun the whole bend was in shade); D1's middle distance (low round green trees behind the
   rows of the first bend). Far from every road the forest is planted at half
   the density, without asking the Track. Levels per tier (m): full to 0 / 58
   / 80, reduced to 55 / 80 / 110, impostors to 650 / 900 / 1200; a tree's

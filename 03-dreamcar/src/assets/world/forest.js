@@ -579,8 +579,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         const beyond = Math.abs(spot.lat) - track.edgeAt(spot.s, side);
         const wood = woodAt(track, noise, spot.s, side);
         if (!wood && beyond < (ledgeAt(spot.s) ? 140 : 30)) continue;
-        // (D3's bank is planted by hand, openly: the mass of the forest begins behind it)
-        if (bankAt(spot.s, side) && beyond < 62) continue;
+        // (D3's bank is planted by hand, openly: the mass of the forest begins well behind it, beyond where the
+        // day's low sun, which comes in over the bank, passes above the crowns: render lane, was 62 m)
+        if (bankAt(spot.s, side) && beyond < 125) continue;
         // near the road the mass of the forest is of the road's own kind of wood
         nearMix = wood && beyond < 90 ? wood.mix : 'mixed';
       }

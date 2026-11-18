@@ -85,9 +85,9 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   const lowTier = tier === 'low';
 
   // ---------------------------------------------------------------- mountains
-  const mountainMaterial = (order) => {
+  const mountainMaterial = (order, relief = false) => {
     const m = atmosphere.patch(
-      extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 }), 'far-mountain', (shader) => {
+      extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 }), `far-mountain${relief ? '-relief' : ''}`, (shader) => {
         // at the back of the depth range, in front of the sky only (see above)
         shader.vertexShader = shader.vertexShader.replace(
           '#include <project_vertex>',
@@ -105,8 +105,51 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   float footprint = length(fwidth(vRockWorld));
   float mottle = fbm(vRockWorld.xz / 140.0 + vRockWorld.y / 230.0, 2) - 0.5;
   diffuseColor.rgb *= 1.0 + 0.35 * mottle * smoothstep(60.0, 15.0, footprint);
+  // (render lane) What makes a far mountain read as rock in haze rather than one blue-grey surface (D1): the
+  // limestone in beds, pale and grey by turns, slightly dipping and warped; dark streaks where water and scree run
+  // down the faces; dark specks of pine on every ledge gentle enough to hold them; all of it world-space and
+  // smooth noise, faded out where a pixel covers more than its scale, so nothing shimmers. Only on bare rock (the
+  // vertex colour says where: the wood below the tree line is dark green).
+  vec3 gN = normalize(cross(dFdx(vRockWorld), dFdy(vRockWorld)));
+  float flatness = abs(gN.y);
+  float rockShare = smoothstep(0.07, 0.17, diffuseColor.g);
+  float bedAt = (vRockWorld.y + 60.0 * fbm(vRockWorld.xz / 900.0, 2) + 0.05 * (vRockWorld.x + vRockWorld.z)) / 22.0;
+  float bedTone = hash11(floor(bedAt) + 7.0);
+  float ledge = smoothstep(0.78, 0.97, fract(bedAt));
+  float beds = ((bedTone - 0.5) * 0.42 - 0.3 * ledge) * (1.0 - smoothstep(6.0, 16.0, footprint));
+  float streakN = fbm(vec2(dot(vRockWorld.xz, vec2(0.71, 0.7)) / 34.0, vRockWorld.y / 520.0), 3);
+  float streak = smoothstep(0.52, 0.75, streakN) * (1.0 - smoothstep(5.0, 14.0, footprint));
+  float pine = smoothstep(0.55, 0.85, flatness) * smoothstep(0.56, 0.7, fbm(vRockWorld.xz / 45.0, 3)) * (1.0 - smoothstep(10.0, 30.0, footprint));
+  vec3 rockCol = diffuseColor.rgb * (1.0 + beds) * (1.0 - 0.38 * streak);
+  rockCol = mix(rockCol, vec3(0.03, 0.045, 0.028), 0.75 * pine);
+  // the gentle ground above the tree line is scree and turf, lighter, with the ledges catching the sky
+  diffuseColor.rgb = mix(diffuseColor.rgb, rockCol, rockShare);
 }`,
           );
+        if (relief) {
+          // (render lane) the faces' relief in the light: the normal tipped by the slope of a world-space field of
+          // ridges and buttresses some 60 to 200 m across (finite differences of smooth noise in world space, not
+          // screen derivatives, so it does not speckle), so that under the low sun facets light up and turn away
+          // between the gullies the geometry has. Faded out where a pixel covers more than the field's finest
+          // scale. Medium and high only.
+          shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <normal_fragment_maps>',
+            `#include <normal_fragment_maps>
+{
+  float fp = length(fwidth(vRockWorld));
+  float reliefFade = 1.0 - smoothstep(18.0, 45.0, fp);
+  if (reliefFade > 0.0) {
+    vec3 q = vRockWorld / vec3(110.0, 160.0, 110.0);
+    float e = 0.08;
+    float h0 = fbm(q, 3);
+    vec3 g = vec3(fbm(q + vec3(e, 0.0, 0.0), 3) - h0, fbm(q + vec3(0.0, e, 0.0), 3) - h0, fbm(q + vec3(0.0, 0.0, e), 3) - h0) / e;
+    vec3 gv = (viewMatrix * vec4(g, 0.0)).xyz;
+    gv -= normal * dot(gv, normal);
+    normal = normalize(normal - 0.55 * reliefFade * gv);
+  }
+}`,
+          );
+        }
         shader.vertexShader = shader.vertexShader
           .replace('#include <common>', '#include <common>\nvarying vec3 vRockWorld;')
           .replace('#include <project_vertex>', '#include <project_vertex>\nvRockWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
@@ -391,7 +434,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
     massifTriangles = index.length / 3;
-    const mesh = new THREE.Mesh(geometry, withBake(mountainMaterial(3)));
+    const mesh = new THREE.Mesh(geometry, withBake(mountainMaterial(3, !lowTier)));
     mesh.name = 'far-massif';
     mesh.renderOrder = -26; // after the rings: it stands in front of them
     mesh.frustumCulled = false;

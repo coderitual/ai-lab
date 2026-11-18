@@ -49,7 +49,9 @@ const BOUNCE = 0.2;
 const MOUTH = { veil: 1.3, near: 12, far: 70, grey: 0.7 };
 /** The luminous panel under each lamp: metres along the road, across and thick; how far it leans to face the road
  * (rad); how far in from the wall and under the lamp's head it hangs (m); its radiance against the lamp's colour. */
-const LUMINAIRE = { along: 1.5, across: 0.42, thick: 0.08, lean: 0.75, inset: 0.32, drop: 0.3, radiance: 9 };
+// (render lane: radiance 9 read as a pale smudge at the tunnel's exposure; 40 is a fitting that glares and blooms,
+// streaks by at speed, and gives the car's probe something bright to mirror)
+const LUMINAIRE = { along: 1.5, across: 0.42, thick: 0.08, lean: 0.75, inset: 0.32, drop: 0.3, radiance: 40 };
 /** The portal: how far the face reaches beyond the walls and above the road, and the collar round the opening. */
 const FACE_WIDE = 9;
 const COLLAR = { width: 0.7, depth: 0.6 };

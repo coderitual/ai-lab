@@ -166,8 +166,13 @@ const FXAA = { subpixel: 0.3, threshold: 0.1, steps: 7 };
  * and scene-light levels, so the shadow is the same size on every screen and at every render scale.
  */
 const AO = {
-  /** How far round a point the occluders are looked for, in metres. */
-  radius: 1.2,
+  /**
+   * How far round a point the occluders are looked for, in metres. (render lane: 1.2 m drew a dark halo a car's
+   * width round the car on sunlit road, as a soft blob that read as its shadow; the term darkens the finished
+   * picture, sun and all, so it must stay a contact shade: 0.7 m keeps the dark under sills, at the foot of walls
+   * and in window reveals and loses the halo)
+   */
+  radius: 0.7,
   /** ...but never further than this share of the view's height: a wall a metre from the lens would take seconds. */
   maxScreen: 0.12,
   /** The occlusion fades out between these distances from the camera (m): far away it would be depth noise. */

@@ -203,33 +203,55 @@ export const TIMES = {
     carLights: 'drl',
   },
 
-  // (sky lane) GOLDEN HOUR, late (D4): dry, the sun 2 degrees up and red-orange, the sky a warm haze low down
-  // deepening to dusky blue-violet overhead, the clouds lit from below; the fill low, so that the lit crowns and the
-  // lamps carry the picture. The lamps and windows are on.
+  // (sky lane) GOLDEN HOUR, late (D4): dry, the sun 2 degrees up and red-orange; the fill low, so that the lit
+  // crowns and the lamps carry the picture. The lamps and windows are on.
+  // (render lane) golden, not violet: D4 is warm gold light on everything and deep WARM shade. The sky is a gold
+  // haze low down (the band) paling through a soft warm white into a clear, light blue overhead, never violet; the
+  // haze the far land fades into is gold-brown; the fill from the sky is warm (the sky's own light comes through
+  // the environment map, which is drawn from this sky); the grade warms the white balance and puts rust in the
+  // shadows and gold in the highlights.
   dusk: {
     name: 'dusk',
-    sun: { dir: DUSK_SUN, color: [1.0, 0.48, 0.2], intensity: 2.6 },
+    sun: { dir: DUSK_SUN, color: [1.0, 0.56, 0.24], intensity: 2.8 },
     sky: {
-      zenith: [0.009, 0.014, 0.045],
-      horizon: [0.11, 0.07, 0.055],
-      falloff: 0.18,
+      zenith: [0.02, 0.034, 0.068],
+      horizon: [0.17, 0.11, 0.06],
+      falloff: 0.2,
       phase: 0.3,
-      glow: { color: [1.0, 0.5, 0.22], wide: [0.4, 0.55], tight: [16, 0.985] },
+      glow: { color: [1.0, 0.58, 0.26], wide: [0.55, 0.55], tight: [18, 0.985] },
       disc: { size: 0.45, radiance: 600, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
-      // the rose belt low all round, gold under the sun (sky.js: radiance at the horizon, height)
-      band: { color: [0.09, 0.045, 0.03], height: 0.14 },
-      ground: [0.03, 0.026, 0.024],
+      // the gold belt low all round, deeper under the sun (sky.js: radiance at the horizon, height)
+      band: { color: [0.15, 0.085, 0.036], height: 0.16 },
+      ground: [0.036, 0.027, 0.018],
       stars: 0,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      clouds: { cover: 0.45, wisps: 0.4, lit: 0.07, silver: 1.6, shade: [0.022, 0.018, 0.032], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.45, wisps: 0.4, lit: 0.09, silver: 1.6, shade: [0.032, 0.024, 0.024], drift: [0.0011, 0.0004] },
     },
-    env: { intensity: 0.7 },
-    ambient: { sky: [0.6, 0.6, 0.9], ground: [1.0, 0.6, 0.35], intensity: 0.012 },
-    fog: { color: [0.075, 0.055, 0.06], sun: [0.35, 0.15, 0.05], sunLobe: 6, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
+    env: { intensity: 0.6 },
+    ambient: { sky: [0.95, 0.78, 0.6], ground: [1.0, 0.62, 0.34], intensity: 0.014 },
+    fog: { color: [0.1, 0.068, 0.042], sun: [0.4, 0.19, 0.06], sunLobe: 6, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
     exposure: 4.5,
     tunnelExposure: 6,
-    look: { flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 }, contrast: 1.12, saturation: 1.08, tint: [0.97, 1.0, 1.02], lift: [0, 0, 0], vignette: 0.28, chroma: 0.001, grain: 0.6, bloom: 0.09, ghosts: 0.0003, glare: 0.03, ao: 1.0, star: 0.015, halo: 0.05 },
+    look: {
+      flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 },
+      contrast: 1.14,
+      saturation: 1.12,
+      tint: [1.05, 1.0, 0.9],
+      lift: [0.0004, 0.00025, 0.0001],
+      vignette: 0.3,
+      chroma: 0.001,
+      grain: 0.6,
+      bloom: 0.09,
+      ghosts: 0.0003,
+      glare: 0.03,
+      ao: 1.0,
+      star: 0.015,
+      halo: 0.05,
+      splitShadows: [1.06, 0.98, 0.9],
+      splitHighlights: [1.05, 1.0, 0.88],
+      splitBalance: 0.45,
+    },
     lamps: { street: 1, tunnel: 1, windows: 0.7 },
     wetness: 0,
     carLights: 'low',

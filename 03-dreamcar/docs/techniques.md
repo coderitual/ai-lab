@@ -246,6 +246,34 @@ The sun and moon are placed against the straight's heading
 (`lighting.js` `PLACES`, `placeLights`), not on the map: move the straight and
 the day's sun still stands down it.
 
+The massif's pixels add what its vertices cannot carry (render lane): beds
+of limestone about 22 m thick, pale and grey by turns, slightly dipping and
+warped; dark streaks where water and scree run down the faces; dark specks
+of pine on every ledge gentle enough to hold them; and, on medium and high,
+the normal tipped by the slope of a world-space field of buttresses some 60
+to 200 m across (finite differences of smooth 3D noise, not screen
+derivatives, so it does not speckle), so that under the low sun facets light
+up and turn away between the gullies. Each fades out where a pixel covers
+more than its scale.
+
+## The sun's shadow
+
+`sun.js`: one directional light, one shadow map that follows each view
+(`prepareView`): a square a little ahead of the car along the camera's
+heading, moved in whole texels so the edges do not crawl, faded out over the
+last 8 % of the square. Under a low sun a square map is mostly wasted: level
+ground of the square spans only `reach` x sin(height) in the light's view.
+So the map is cut to that plus 14 m (`RECEIVER_HEIGHT`: the car, walls,
+boards, the lower crowns) times cos(height): by day (16 degrees) about 27 m
+instead of 56 on medium, twice as many texels along the ground towards the
+sun; at golden hour (2 degrees) about 16 m, three and a half times. Occluders
+need no room of their own: whatever shades a point of the ground lies on the
+same line to the sun, so it is in the map wherever the point is. The normal
+offset is 0.8 of the larger texel (it was 1.6, which under a 16 degree sun
+lifted the road 9 cm into the light and set the car's shadow 30 cm off its
+tyres). The car also lays its own contact shadow (the CAR lane's
+`car/shadow.js`), which no map is fine enough to draw.
+
 ## The asphalt
 
 `road.js`, `roadTextures.js`, `corridor.js`, `roadHistory.js`.

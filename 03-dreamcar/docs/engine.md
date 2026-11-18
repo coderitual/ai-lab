@@ -79,8 +79,9 @@ Ambient Obscurance:
   smaller depth step is taken, so a normal at a silhouette is not tilted by the
   other surface.
 - **Samples.** `aoSamples` per pixel (TIERS: 0 low, 8 medium, 14 high) on a
-  spiral that winds `aoTurns` times (5, 9) inside a disc of 1.2 m
-  (`AO.radius`) projected to the screen, capped at 12 % of the view's height
+  spiral that winds `aoTurns` times (5, 9) inside a disc of 0.7 m
+  (`AO.radius`; it was 1.2 m, which laid a dark halo a car's width round
+  the car on sunlit road that read as a soft blob of shadow) projected to the screen, capped at 12 % of the view's height
   (`AO.maxScreen`). Each sample counts by the cosine between the normal and
   the way to it, minus a bias that grows with distance (depth steps grow with
   it), times a falloff `1 - d²/r²`. The term is `1 - gain x mean`, gain 5.
@@ -282,11 +283,11 @@ beside D1 and A, golden hour beside D4 and D2, night beside B):
 
 | | day | dusk (golden hour) | night |
 | --- | --- | --- | --- |
-| `contrast` | 1.06 | 1.12 | 1.12 |
-| `saturation` | 1.14 | 1.08 | 0.94 |
-| `tint` | [1.0, 0.99, 0.965] | [0.97, 1.0, 1.02] | [0.95, 0.985, 1.05] |
-| `lift` | [0.0004, 0.0006, 0.001] | none | [0.0006, 0.0009, 0.0018] |
-| `vignette` | 0.28 | 0.28 | 0.32 |
+| `contrast` | 1.06 | 1.14 | 1.12 |
+| `saturation` | 1.14 | 1.12 | 0.94 |
+| `tint` | [1.0, 0.99, 0.965] | [1.05, 1.0, 0.9] | [0.95, 0.985, 1.05] |
+| `lift` | [0.0004, 0.0006, 0.001] | [0.0004, 0.00025, 0.0001] | [0.0006, 0.0009, 0.0018] |
+| `vignette` | 0.28 | 0.3 | 0.32 |
 | `chroma` | 0.0012 | 0.001 | 0.0012 |
 | `grain` | 0.5 | 0.6 | 1.2 |
 | `bloom` | 0.05 | 0.09 | 0.15 |
@@ -296,7 +297,7 @@ beside D1 and A, golden hour beside D4 and D2, night beside B):
 | `flare` | the sun, light 1.0, reach 0.6, sky 0.3 | the low sun, light 0.6, reach 0.5, sky 0.1 | none |
 | `star` | 0.02 (sun glints on paint and glass) | 0.015 | 0.015 |
 | `ao` | 0.8 (fades out on sunlit surfaces brighter than white anyway) | 1.0 | 0.9 |
-| split toning | none | none | none |
+| split toning | none | shadows [1.06, 0.98, 0.9], highlights [1.05, 1.0, 0.88], balance 0.45 (rust in the shade, gold in the light) | none |
 
 Split toning tried for the old wet violet dusk: `splitShadows`
 [1.1, 0.98, 0.92], `splitHighlights` [0.9, 1.02, 1.15], `splitBalance` 0.45.

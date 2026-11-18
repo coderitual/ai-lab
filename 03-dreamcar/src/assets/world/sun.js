@@ -3,8 +3,13 @@
 // lights: the time of day changes their colours and strengths, never their
 // number, so no shader is compiled again when it changes.
 //
-// The shadow is one map that follows each view. Four things make it hold up
-// under a sun 24 degrees high:
+// The shadow is one map that follows each view. Five things make it hold up
+// under a sun 16 degrees high:
+//  - (render lane) It is no taller in the light's view than the ground of the
+//    square needs: reach x sin(height) plus what stands on it. Under a low sun
+//    a square map wastes most of its rows on ground far beyond the square;
+//    cut to size, the same map is two to three times finer along the ground
+//    towards the sun, and the car's shadow gets a crisp outline.
 //  - It covers a square of the light's own view, a little ahead of the car in
 //    the direction the camera looks. A low light looks along the ground, so
 //    that square is a long strip of country towards the sun: the trees whose
@@ -42,8 +47,19 @@ const CASTER_HEIGHT = 110;
 const GROUND_DROP = 45;
 /** The share of the square, from its edge inwards, over which the shadow fades away. */
 const EDGE_FADE = 0.08;
-/** Depth the shadow is pushed away from the light (m), and how far a surface is lifted off itself, in texels. */
-const BIAS = { depth: 0.02, normal: 1.6 };
+/**
+ * (render lane) How high above the ground a surface that RECEIVES the shadow may stand and still be inside the map
+ * (m): the car, walls, boards, the lower crowns. The map's height in the light's view is cut to what level ground of
+ * the square plus this needs (see setTime), not the whole square: under a low sun that is two to three times as
+ * many texels along the ground towards the sun.
+ */
+const RECEIVER_HEIGHT = 14;
+/**
+ * Depth the shadow is pushed away from the light (m), and how far a surface is lifted off itself, in texels.
+ * (render lane: the lift was 1.6 texels: under a 16 degree sun that lifted the road some 9 cm into the light and
+ * moved the car's shadow 30 cm away from its tyres; with the finer map 0.8 texel does without acne)
+ */
+const BIAS = { depth: 0.02, normal: 0.8 };
 
 let fadeInstalled = false;
 
@@ -86,7 +102,9 @@ function installShadowFade() {
 export function createSun({ renderer, tier, shadows }) {
   installShadowFade();
   const { size, reach, radius } = SHADOW[tier];
+  // the map's texels across the light's view (x) and up it (y): y is set per time of day, from the light's height
   const texel = (2 * reach) / size;
+  let texelUp = texel;
 
   renderer.shadowMap.enabled = shadows;
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -155,8 +173,16 @@ export function createSun({ renderer, tier, shadows }) {
       // Level ground at the square's top and bottom edges lies reach / tan(height) nearer to or further from
       // the light than its centre: a low light needs a deep map.
       const slope = dir.y / Math.hypot(dir.x, dir.z);
-      const towards = reach / slope + CASTER_HEIGHT / dir.y;
-      const away = reach / slope + GROUND_DROP;
+      // (render lane) Up the light's view, level ground of the square spans only reach x sin(height); what stands
+      // on it reaches RECEIVER_HEIGHT x cos(height) higher. A map no taller than that puts all its texels where
+      // the shadows fall: under the day's 16 degree sun twice as fine along the ground as a square map.
+      const sinH = Math.min(1, Math.max(0.02, dir.y));
+      const upReach = Math.min(reach, reach * sinH + RECEIVER_HEIGHT * Math.sqrt(1 - sinH * sinH));
+      shadow.camera.top = upReach;
+      shadow.camera.bottom = -upReach;
+      texelUp = (2 * upReach) / size;
+      const towards = upReach / slope + CASTER_HEIGHT / dir.y;
+      const away = upReach / slope + GROUND_DROP;
       standOff = towards + 10;
       shadow.camera.near = 10;
       shadow.camera.far = standOff + away;
@@ -178,7 +204,7 @@ export function createSun({ renderer, tier, shadows }) {
       centre.copy(focus);
       if (level > 0.2) centre.addScaledVector(ahead, (reach - BEHIND) / level);
       const x = Math.round(centre.dot(right) / texel) * texel;
-      const y = Math.round(centre.dot(up) / texel) * texel;
+      const y = Math.round(centre.dot(up) / texelUp) * texelUp;
       const z = centre.dot(dir);
       centre.set(0, 0, 0).addScaledVector(right, x).addScaledVector(up, y).addScaledVector(dir, z);
       light.target.position.copy(centre);

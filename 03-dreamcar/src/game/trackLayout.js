@@ -70,7 +70,10 @@ export const SIDES = {
   // the ledge's first bend: a low wall with boards on both sides; on the inside the ground falls away to the valley
   // and the view is open, on the outside a wooded bank rises close behind the wall (broadleaves, back-lit by day)
   balcony: { kind: 'wall', edge: [3, 4], slope: -0.03, far: -0.35, verge: 'grass', wood: null },
-  bank: { kind: 'wall', edge: [3.5, 5], slope: 0.07, far: 0.45, verge: 'grass', wood: 'broadleaf' },
+  // (render lane) a gentle bank (far 0.12, was 0.45): the day's sun, 16 degrees up, stands on the right of this bend;
+  // a hillside steeper than the sun put the whole bend in its shade. On a gentle one the sun comes in UNDER the
+  // bank's crowns and through them, and lies on the road in patches (frame D3's dappled light).
+  bank: { kind: 'wall', edge: [3.5, 5], slope: 0.04, far: 0.12, verge: 'grass', wood: 'broadleaf' },
   // the road cut into the hill: a narrow verge, then the rock face
   rock: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null },
   // structures: paved right up to the wall or the parapet
