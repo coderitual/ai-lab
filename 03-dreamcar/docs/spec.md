@@ -399,6 +399,14 @@ places on the lap were not counted. Triangles hardly moved (low 293 to
 About a quarter of every pass's calls is the car (25 in the scene and in the
 mirror, 14 in the shadow map), which this lane did not touch.
 
+**After the day lane** (same tool and moments, plus the run-up to the line at
+t = 100; the head before the lane in brackets): low by day 133 (133), 140
+(140), 153 (152) at the ledge bend, 145 (141) on the run-up; triangles 292,
+338, 366 and 349 k (297, 340, 367, 353 k: the straight's thinned boards more
+than pay for the green hill and the rows of trees). Medium by night 291
+(291), 266 (267), 278 (278), 257 (244). The ledge bend on low was already
+over 150 before the lane, and the green hill adds one call there.
+
 None of these was measured on a real GPU or phone.
 
 ## Sound

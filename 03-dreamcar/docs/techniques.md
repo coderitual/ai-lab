@@ -232,7 +232,7 @@ the frame's bloom and flare make the glare from real brightness. Two layers
 of cloud lit from the side the light comes from, with grey-blue bases and
 silver rims near the sun; at golden hour, lit from below. The cumulus noise is
 pushed up round one place in the sky (lighting.js `clouds.group`, placed
-against the straight's heading like the sun: 30 degrees left of it, 27 up), so
+against the straight's heading like the sun: 30 degrees left of it, 30 up), so
 that D1's group of big heaps over the massif's shoulder is there whatever the
 noise does elsewhere; their rims are cut sharp (a 0.07 wide edge). By night the same
 shader draws the moon, airglow and the Milky Way; stars are points a pixel or

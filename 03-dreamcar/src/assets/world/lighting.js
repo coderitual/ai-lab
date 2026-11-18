@@ -136,7 +136,7 @@ export function towards(bearing, elevation) {
  *   dusk   125 degrees left of the heading (out over the lake, behind the driver's left shoulder), 2 up.
  *   moon   8 degrees left of the heading, 17 up, beside the massif's main peak.
  */
-export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 2 }, moon: { left: 8, up: 17 }, clouds: { left: 30, up: 27 } };
+export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 2 }, moon: { left: 8, up: 17 }, clouds: { left: 30, up: 30 } };
 const SUN = towards(90 - PLACES.day.left, PLACES.day.up);
 /**
  * (day lane) Where the group of cumulus stands (sky.js `group`): over the massif's great shoulder, left of its main
@@ -199,7 +199,7 @@ export const TIMES = {
       airglow: [0, 0, 0],
       // (day lane) D1's cumulus: crisp white tops (the frame clips them), soft grey bases, a group of big heaps
       // over the massif's shoulder and a few small ones by the sun; the rest of the sky clear
-      clouds: { cover: 0.36, wisps: 0.2, lit: 0.3, silver: 1.6, shade: [0.3, 0.34, 0.42], drift: [0.0011, 0.0004], group: { dir: CLOUD_GROUP, size: 0.62, amount: 0.4 } },
+      clouds: { cover: 0.36, wisps: 0.2, lit: 0.3, silver: 1.6, shade: [0.3, 0.34, 0.42], drift: [0.0011, 0.0004], group: { dir: CLOUD_GROUP, size: 0.55, amount: 0.42 } },
     },
     // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
     // (round three) the drawn sky was raised to the frames' brightness; its light on the scene is kept where it was

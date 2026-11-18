@@ -184,6 +184,22 @@ machine without a GPU, and only what is listed here.
   ones made); the rails' reflectors were. Not looked at on `high`, in split
   screen at night or in motion; the playtest and the soundtest were not
   run. The page raised no console error in any of these loads.
+- **The day lane's changes** (a bluer day sky and a group of cumulus placed
+  over the massif's shoulder, the massif darker with ribs, scree fans,
+  buttresses and a back-lit rim, its saddle raised; the straight's tall
+  boards in two groups with green rows behind the warm-painted low wall; a
+  darker, more contrasty asphalt with a narrower glare; the D3 preset
+  restaged; the green hill beyond the lake; low boards on the ledge's inside
+  wall; thinner valley mist by day): four rounds of stills on software WebGL
+  at `medium` 1280x720 for d1 and d3 beside the frames, d4 once at the end
+  and the d1 place by night once; compositions found on `low`; draw calls and
+  triangles counted with the picture lane's measure tool at phone shape
+  (low by day, medium by night, t = 0, 33, 79, 100) against the head before
+  the lane; `node tools/unit.mjs` passed. The golden-hour sun's clearance of
+  the green hill was worked out on paper, not seen in a still (the one
+  staged towards it looked into the stand). Not looked at on `high`, in
+  motion, in split screen or in the chase view; the playtest, the soundtest
+  and the docs' screenshots were not run.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
