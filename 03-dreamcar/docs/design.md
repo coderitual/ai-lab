@@ -492,6 +492,21 @@ yellowing, larch green-gold, spruce and fir dark. Built in
 Measured on software WebGL in this container (shared with other work, so the
 times scatter by a third), the forest alone in the main view:
 
-FOREST_NUMBERS
+| place (camera) | tier | draw calls | triangles | full / reduced / impostors |
+| --- | --- | --- | --- | --- |
+| D4 (`photo=d4`) | low | 4 | 20 k | 0 / 11 / 1677 |
+| D4 | medium | 9 | 153 k | 23 / 19 / 3310 |
+| D4 | high | 10 | 295 k | 44 / 37 / 5224 |
+| D3 (`photo=d3`) | low | 6 | 13 k | 0 / 9 / 228 |
+| D3 | medium | 10 | 79 k | 15 / 8 / 1390 |
+| green wood (chase, `t=14`) | low | 13 | 71 k | 0 / 59 / 1689 |
+| green wood | medium | 23 | 276 k | 54 / 58 / 2783 |
+
+Budgets for the forest in a chase frame: 40 / 120 k (low), 80 / 300 k
+(medium), 120 / 600 k (high). Start-up of the forest (plant, textures, grow,
+bake, meshes): about 1.3 s on medium (400 / 450-550 / 200 / 100-160 / 80-160
+ms) and 1.1-1.3 s on low (300 / 400-550 / 150-200 / 50-120 / 60-120 ms):
+over the 1 s and 0.7 s aimed at. Textures 47.7 MB (medium, high), 23 MB
+(low).
 
 Not measured on a real phone or a real GPU.
