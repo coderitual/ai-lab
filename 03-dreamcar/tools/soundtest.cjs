@@ -267,7 +267,7 @@ function report(label, d) {
     const SKID = 1.6;
     const states = [cruise({ speed: 25 }), cruise({ speed: 25, skid: 0.1, slipLat: 1 }), cruise({ speed: 25, skid: 0.25, slipLat: 1 }),
       cruise({ speed: 25, skid: 0.9, slipLat: 1 }), cruise({ speed: 25 }),
-      cruise({ speed: 25, surface: 2, skid: 0.7, slipLat: 1 }), cruise({ speed: 25, surface: 2 }), cruise({ speed: 25, surface: 1 }),
+      cruise({ speed: 25, surface: 2, skid: 0.7, slipLat: 1 }), cruise({ speed: 25, surface: 2 }), cruise({ speed: 12.5, surface: 4 }),
       cruise({ speed: 8, rpm: 4000, throttle: 0.8, gear: 1, skid: 0.7, slipLong: 1, slipLat: 0 }), cruise({ speed: 25 })];
     const r = remember('tyres', await render({ duration: states.length * SKID, cars: [{ keys: stairs(states, SKID) }] }));
     const rows = states.map((s, i) => {
@@ -294,8 +294,8 @@ function report(label, d) {
     check('tyres: on grass they scrub, they do not sing', grass.stands < 8 && grass.scrub > none.scrub + 8 && grassRoll.scrub > none.scrub + 3,
       `sliding on grass: nothing stands more than ${f1(grass.stands)} dB out, 1.5-4 kHz up ${f0(grass.scrub - none.scrub)} dB; rolling on it: up ${f0(grassRoll.scrub - none.scrub)} dB`);
     const strip = lab.partials(shoulder.d.spec, { f0: 15, f1: 45, count: 1, floor: 0 })[0];
-    check('tyres: the shoulder thrums at the rate its bumps go by', shoulder.thrum > none.thrum + 8 && Math.abs(strip.f / (25 / 0.9) - 1) < 0.04,
-      `20-45 Hz up ${f0(shoulder.thrum - none.thrum)} dB; strongest at ${f1(strip.f)} Hz for ${f1(25 / 0.9)} (25 m/s over 0.9 m)`);
+    check('tyres: the kerb thrums at the rate its bumps go by', shoulder.thrum > none.thrum + 8 && Math.abs(strip.f / (12.5 / 0.45) - 1) < 0.04,
+      `20-45 Hz up ${f0(shoulder.thrum - none.thrum)} dB; strongest at ${f1(strip.f)} Hz for ${f1(12.5 / 0.45)} (12.5 m/s over its 0.45 m teeth)`);
     check('tyres: wheelspin is the rougher, lower band', spin.rough > rows[9].rough + 8 && spin.stands < limit.stands,
       `450-1000 Hz up ${f0(spin.rough - rows[9].rough)} dB over the engine at the same revs... against a later cruise`);
   }

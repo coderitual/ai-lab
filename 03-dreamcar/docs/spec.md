@@ -407,8 +407,8 @@ Everything is synthesised in `src/game/Sound.js` on `src/engine/Audio.js`:
 the engine (two oscillators locked to the firing frequency, rpm / 30 Hz,
 through a saturation, a formant near 650 Hz, a rasp near 1.35 kHz and a
 low-pass that opens with rpm squared), intake noise, a turbocharger whistle,
-gear changes (cut, thump, glide), tyres (squeal, scrub), wind, road and kerb
-rumble, scrapes and impacts, the start's ticks and go, and a reverb that
+gear changes (cut, thump, glide), tyres (squeal, scrub), wind (band-passed, then low-passed at 1.4 kHz so its skirts make no clicks at 200 km/h), road and kerb
+rumble (the kerb's teeth, 0.45 m apart, thrum at speed / 0.45 Hz; the paved margin hardly at all), scrapes and impacts, the start's ticks and go, and a reverb that
 grows in the tunnel. In split screen the two cars sit 0.7 either side of the
 stereo picture. Sound starts on the first touch or key (the browsers' rule).
 `tools/soundtest.cjs` measures it: 62 checks.
