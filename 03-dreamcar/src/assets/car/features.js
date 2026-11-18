@@ -209,10 +209,11 @@ export const GRILLE_HALF = [[0, 0.71, 2.2675], [0.15, 0.708, 2.262], [0.3, 0.7, 
   [0.3, 0.465, 2.226], [0.15, 0.462, 2.242], [0, 0.462, 2.247]];
 /**
  * The grille's small stars (5.1): a staggered lattice, rows `dy` apart from y0 up, `dx` apart along a row (every
- * other row shifted by half), each star's arms `arm` long. The photographs show about thirteen stars across a half,
- * each nearly 25 mm across: the sheet's 12 mm stars at 34 x 22 mm read as a sparse sprinkle of dots.
+ * other row shifted by half), each star's arms `arm` long. The photograph straight on the nose shows them as fine
+ * dull points on black, about sixteen across a half: round 4's 23 mm stars on 40 x 30 mm glittered and the
+ * grille read large and bright. (The sheet's 12 mm stars at 34 x 22 mm were a sparse sprinkle.)
  */
-export const GRILLE_STARS = { y0: 0.478, dy: 0.03, dx: 0.04, arm: 0.0115 };
+export const GRILLE_STARS = { y0: 0.476, dy: 0.024, dx: 0.032, arm: 0.008 };
 /** The side intake's opening (5.3), left, in front view [x, y]: upper inner, lower inner, lower outer, upper outer. */
 export const INTAKE_SIDE = [[0.43, 0.455], [0.47, 0.365], [0.8, 0.282], [0.79, 0.468]];
 /**

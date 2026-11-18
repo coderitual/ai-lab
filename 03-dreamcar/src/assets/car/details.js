@@ -201,9 +201,9 @@ function cabin(dark, emit) {
   screen(0.18, 0.27, 0, 0.84, 0.36, -0.52);
 }
 
-/** One of the grille's small stars (5.1): three arms (GRILLE_STARS.arm) rising to a point 4 mm proud, six facets. */
+/** One of the grille's small stars (5.1): three arms (GRILLE_STARS.arm) rising to a point 2.5 mm proud, six facets. */
 function pin(t, matrix, out) {
-  const apex = V(0, 0, 0.004).applyMatrix4(matrix);
+  const apex = V(0, 0, 0.0025).applyMatrix4(matrix);
   const pts = [];
   for (let i = 0; i < 6; i++) {
     const a = Math.PI / 2 + (i * Math.PI) / 3;

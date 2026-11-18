@@ -444,6 +444,45 @@ over the tyres. Smaller than what the method can show at that size, or left:
 the brake discs are drilled on the car (plain here), the calipers larger;
 the side intake's inner detail; the shape of the mirror's foot.
 
+### Round five: the tail, the paint, the nose
+
+The owner's verdict on round four: the tail (what the game shows all the time)
+wobbled like dented foil, the paint read as chrome, yellow blotches sat on the
+bonnet, the grille was large and glittering. Staged again against the
+photographs (straight on the tail and the nose, the press picture outdoors,
+the studio one), each with the same fitted cameras:
+
+| what | before | after (from which picture) |
+| --- | --- | --- |
+| tail's surfaces | dents beside the plate, a fold at the bumper's corner, a crease from the star to the lamp | fair: convex both ways everywhere but the lip's fillet (see "The skin and its curves") (tail, striped studio) |
+| boot lid's lip | dipping 0.1 m to the lamps' upper edge: the lamps stood on the crease like fins | level across, the lamps below it (tail) |
+| widest line behind the hips | pinched in to 0.872 before the bumper's corner | carried at 0.898 into the corner: the bumper is the widest thing at the back (tail) |
+| paint | metalness 0.92, roughness 0.27, coat 1.6 times a lacquer: chrome | 0.82, 0.42, a plain lacquer; soft probe read (see "The paint") (press, studio, tail) |
+| grille's stars | 23 mm, 4 mm proud, on 40 x 30 mm: glitter | 16 mm, 2.5 mm proud, on 32 x 24 mm: fine dull points on black (nose) |
+| front bumper's corners | 0.84 to 0.88 wide: the front tyres showed outside the body from straight ahead | 0.86 to 0.90: hidden, as on the car (nose) |
+
+The grille's opening, the head lamps' outline, the tail lamps' outline and
+the front ride height were checked and agree with the photographs to a few
+pixels; they were left alone.
+
+What still differs:
+
+- **The wheels stand a little proud.** The body's widest point is 0.902 by
+  the front arch and 0.909 by the rear (1.818 overall, as published), but
+  the tyres' outer faces are at 0.9075 and 0.917 (`spec.js`: tracks 1.590 /
+  1.579 with 225 and 255 tyres). From ahead and to the side the front tyre
+  stands outside its arch. Tracks of about 1.574 / 1.559 would bring both
+  faces just inside the body; that changes the physics (`spec.js` is read
+  by it, and `docs/spec.md` holds its numbers), so it is left for whoever
+  owns the handling.
+- The front apron under the grille is simpler than the car's (deep black side
+  intakes framed by a painted wing): ours has slatted intakes and a plain
+  blade.
+- By day the coat still mirrors the wood's crowns at the horizon as a muted
+  olive band across the bonnet from low three-quarter views; the crowns in
+  the probe are brighter and more yellow than the dark trees of the press
+  picture.
+
 ## What each tier costs
 
 Re-measured after round two of the shape work (fewer, larger grille stars:
