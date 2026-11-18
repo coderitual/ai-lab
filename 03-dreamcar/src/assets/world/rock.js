@@ -29,8 +29,9 @@ const STEP = { low: 3, medium: 1, high: 1 };
  * @param {import('./terrain.js').Terrain} options.terrain
  * @param {import('../../engine/caps.js').Tier} options.tier
  * @param {import('../../engine/rng.js').Rng} options.rng
+ * @param {(s: number, side: number) => boolean} [options.except] where no rock face is drawn (something else stands there)
  */
-export function createRockFaces({ track, terrain, tier, rng }) {
+export function createRockFaces({ track, terrain, tier, rng, except = null }) {
   const noise = planeNoise(rng.int(1 << 30));
   const step = STEP[tier] ?? 1;
   const FACE_ROWS = FACE_ROWS_BY_TIER[tier] ?? 14;
@@ -62,7 +63,8 @@ export function createRockFaces({ track, terrain, tier, rng }) {
     };
     for (let i = 0; i <= n; i += step) {
       const c = terrain.cliffAt(i * ds, side);
-      if (c.height > 0.3 && i < n) run.push(i * ds);
+      // (tunnel lane) not where something else stands at the edge instead (the tunnel's concrete cuttings)
+      if (c.height > 0.3 && i < n && !except?.(i * ds, side)) run.push(i * ds);
       else flush();
     }
     flush();

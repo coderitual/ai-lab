@@ -46,6 +46,7 @@ import { createRoad } from './road.js';
 import { createRockFaces } from './rock.js';
 import { keepOut as startKeepOut } from './startPlan.js';
 import { createStructures } from './structures.js';
+import { concreteCut } from './tunnel.js';
 import { createStuds } from './studs.js';
 import { createKerbs } from './kerbs.js';
 import { ROW_STEP, createTerrain } from './terrain.js';
@@ -156,7 +157,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   lap('road');
   const kerbs = createKerbs({ track, caps, tier, atmosphere, terrain });
   lap('kerbs');
-  const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock') });
+  // (the tunnel's cuttings are concrete: tunnel.js builds them where concreteCut says)
+  const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock'), except: (s) => !!concreteCut(track, s) });
   lap('rock');
   const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
   lap('lake');

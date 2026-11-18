@@ -40,7 +40,7 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng, 
 
   const lamps = createLamps({ track, terrain, caps, tier, atmosphere, glints });
   lap('lamps');
-  const tunnels = createTunnels({ track, terrain, atmosphere, lamps });
+  const tunnels = createTunnels({ track, terrain, atmosphere, lamps, tier });
   lap('tunnel');
   const rails = createRails({ track, tier, atmosphere });
   lap('rails');
