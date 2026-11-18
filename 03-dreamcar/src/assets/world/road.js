@@ -115,6 +115,17 @@ const GLINT = { across: 0.006, along: 0.12, gain: 0.12 };
  * lamps themselves too small to streak: seen from under the road they are thin bars edge on.
  */
 const TAIL_GLINT = { across: 0.05, along: 0.3, radiance: 1.6, brake: 3, gain: 0.6, color: [1.0, 0.03, 0.015] };
+/**
+ * (tunnel lane) Under the tunnel's roof the dry asphalt mirrors, softly (TUNNEL_SHEEN): the two lines of luminaires
+ * (shading.js BORE_UNIFORMS: where they are and how bright), blurred `blur[0]` m across plus `blur[1]` m for every
+ * metre the ray travels to them, at `gain` of the sky's sheen; and the cars' tail lamps as short broad streaks
+ * (`tail`: gain against the wet road's, and the lobe's width across and along). And each car shades the road under
+ * it from the box's diffuse light (`shade`: how much at most, the half length and half width of the car's plan, the
+ * soft edge's width, m), as the sun's shadow map, which does not reach in, would not. And the light the pale walls
+ * and ceiling send down onto it (`bounce` times the lining's radiance, shading.js uBoreGlow: what the sky's fill is
+ * outside), which the cars shade too.
+ */
+const TUNNEL_SHEEN = { blur: [0.18, 0.06], gain: 0.5, tail: [0.35, 0.12, 0.8], shade: [0.55, 2.1, 0.8, 0.75], bounce: 5 };
 /** The thin film on wet asphalt outside the puddles: how much of a puddle's mirror it shows (always streaked). */
 const FILM = { share: 0.55 };
 
@@ -288,7 +299,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
       .replace('#include <normal_fragment_maps>', ASPHALT_NORMAL)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${ASPHALT_BEADS}`)
       .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>\n${WET_SPECULAR}`)
-      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${ASPHALT_SKY}\n${WET_MIRROR}\n${WET_GLINTS}`);
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${ASPHALT_SKY}\n${WET_MIRROR}\n${WET_GLINTS}\n${TUNNEL_SHEEN_GLSL}`);
   });
   withBake(material);
   // the low sun's glare: a second, anisotropic lobe on every direct light, after the bake has unrolled the loop
@@ -491,6 +502,70 @@ if ( vRoadWorld.w > 0.5 && uWet > 0.02 ) {
 `;
 
 /**
+ * (tunnel lane) GLSL (fragment, after the lights): under the tunnel's roof (TUNNEL_SHEEN). The mirrored ray is
+ * followed up to the plane of the luminaires; where it meets it, across the road, says how near it passes to either
+ * line of them, blurred more the further it travels; along the road, how densely the line is lit there (the
+ * entrance zone's pairs of bars, the interior's spaced ones). Not in a reflection probe's faces.
+ */
+const TUNNEL_SHEEN_GLSL = /* glsl */ `
+if ( vRoadWorld.w > 0.5 && vRoad.w < 0.6 && uBoreZone.y > uBoreZone.x ) {
+  float tIn = 1.0 - smoothstep( 0.0, 0.6, vRoad.w );
+  vec3 tP = vRoadWorld.xyz;
+  vec3 tV = normalize( cameraPosition - tP );
+  vec3 tN = normalize( ( vec4( nonPerturbedNormal, 0.0 ) * viewMatrix ).xyz );
+  vec3 tA = normalize( vRoadAlong.xyz - tN * dot( vRoadAlong.xyz, tN ) );
+  vec3 tL = cross( tN, tA );
+  vec3 tR = reflect( - tV, tN );
+  float tNoV = clamp( dot( tN, tV ), 0.0, 1.0 );
+  float tW = roadSkySheen * pow( 1.0 - tNoV, ${SKY_SHEEN.power.toFixed(1)} );
+  float tUp = dot( tR, tN );
+  vec3 tAdd = vec3( 0.0 );
+  if ( tUp > 0.03 ) {
+    float tT = uBoreLines.y / tUp;
+    float hitLat = vRoad.x + dot( tR, tL ) * tT;
+    float hitS = vRoad.y + dot( tR, tA ) * tT;
+    float w = ${TUNNEL_SHEEN.blur[0].toFixed(2)} + ${TUNNEL_SHEEN.blur[1].toFixed(3)} * tT * tT * tUp;
+    float d = ( abs( hitLat ) - uBoreLines.x ) / w;
+    float across = exp( - d * d ) * uBoreLines.w / ( 1.7725 * w );
+    float into = hitS - uBoreZone.x;
+    float toExit = uBoreZone.y - hitS;
+    float duty = mix( 1.25, 0.42, smoothstep( 50.0, 70.0, into ) );
+    duty = mix( duty, uBoreZone.z, smoothstep( 120.0, 140.0, into ) );
+    duty = max( duty, 0.42 * ( 1.0 - smoothstep( uBoreZone.w - 10.0, uBoreZone.w + 10.0, toExit ) ) );
+    duty *= smoothstep( -1.0, 1.0, into ) * smoothstep( -1.0, 1.0, toExit );
+    tAdd += uBoreLineColor * ( uBoreLines.z * duty * across * ${TUNNEL_SHEEN.gain.toFixed(3)} );
+  }
+  // the tail lamps, short and broad in the dry stone
+  float tTail = 0.0;
+  for ( int i = 0; i < ${BEAMS}; i ++ ) {
+    if ( uTailPower[ i ] <= 0.0 ) continue;
+    for ( int k = 0; k < 2; k ++ ) {
+      vec3 lamp = uTailPos[ i * 2 + k ];
+      float behind = smoothstep( -0.1, 0.4, dot( normalize( tP - lamp ), - uBeamDir[ i ] ) );
+      tTail += uTailPower[ i ] * behind * wetGlint( tP, tN, tV, lamp, ${TUNNEL_SHEEN.tail[1].toFixed(3)}, ${TUNNEL_SHEEN.tail[2].toFixed(3)} );
+    }
+  }
+  tAdd += vec3( ${TAIL_GLINT.color.map((c) => c.toFixed(3)).join(', ')} ) * ( ${(TUNNEL_SHEEN.tail[0] * TAIL_GLINT.gain).toFixed(3)} * 3.0 * tTail / ( 3.0 + tTail ) );
+  reflectedLight.indirectSpecular += tAdd * ( tW * tIn );
+  // the cars' shade on the road under them: a soft rounded box round each car's plan
+  float tShade = 1.0;
+  for ( int i = 0; i < ${BEAMS}; i ++ ) {
+    vec3 f = normalize( vec3( uBeamDir[ i ].x, 0.0, uBeamDir[ i ].z ) + vec3( 0.0, 0.0, 1.0e-4 ) );
+    vec3 c = uBeamPos[ i ] - f * ${(2.2 - 0.13).toFixed(2)};
+    vec3 q = tP - c;
+    if ( abs( q.y ) > 2.0 ) continue;
+    vec2 e = max( abs( vec2( dot( q.xz, f.xz ), dot( q.xz, vec2( - f.z, f.x ) ) ) ) - vec2( ${TUNNEL_SHEEN.shade[1].toFixed(2)}, ${TUNNEL_SHEEN.shade[2].toFixed(2)} ), 0.0 );
+    float r = length( e ) / ${TUNNEL_SHEEN.shade[3].toFixed(2)};
+    tShade *= 1.0 - ${TUNNEL_SHEEN.shade[0].toFixed(2)} * exp( - r * r );
+  }
+  tShade = mix( 1.0, tShade, tIn );
+  reflectedLight.indirectDiffuse += material.diffuseColor * uBoreGlow * ( ${TUNNEL_SHEEN.bounce.toFixed(2)} * tIn * tShade );
+  reflectedLight.directDiffuse *= tShade;
+  reflectedLight.directSpecular *= tShade;
+}
+`;
+
+/**
  * GLSL (fragment, after lights_pars_begin): the asphalt's glare (SHEEN). One anisotropic GGX lobe whose axes are the
  * view's direction laid on the road and the direction across it, on every direct light, added to what is kept of
  * the material's own.
@@ -554,6 +629,9 @@ uniform vec4 uGrid[${GRID_SLOTS}];
 uniform float uHalf;
 uniform float uWet;
 uniform vec3 uBoreGlow;
+uniform vec4 uBoreLines;
+uniform vec3 uBoreLineColor;
+uniform vec4 uBoreZone;
 uniform vec3 uBeamPos[${BEAMS}];
 uniform vec3 uBeamDir[${BEAMS}];
 uniform float uBeamPower[${BEAMS}];

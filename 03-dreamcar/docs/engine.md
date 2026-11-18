@@ -322,7 +322,10 @@ level from roughness: `level = log2(1.65 r² size)`, clamped. The mips are plain
 must carry `targetDefines(caps)` so the 8-bit fallback's encoding is undone.
 
 The probe redraws `faces` of its six faces per update, round and round; the
-first update after construction or `reset()` draws all six. Its cameras see
+first update after construction or `reset()` draws all six. An update may give
+its faces a nearer far plane than the probe was made with (`far`): in an
+enclosed place (the tunnel, game/config.js `PROBE.tunnelFar`) what lies beyond
+is culled, which pays for redrawing more faces there. Its cameras see
 layer 0 and `PROBE_LAYER` (30), which no other camera has: a cheaper stand-in
 for something big lives on that layer alone, and the full thing draws nothing
 when `camera.layers.isEnabled(PROBE_LAYER)` (the massif does this). Its cameras skip

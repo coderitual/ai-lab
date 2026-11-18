@@ -192,6 +192,20 @@ machine without a GPU, and only what is listed here.
   ones made); the rails' reflectors were. Not looked at on `high`, in split
   screen at night or in motion; the playtest and the soundtest were not
   run. The page raised no console error in any of these loads.
+- **The tunnel lane's changes** (the box tunnel, its portals and cuttings,
+  the lamps' zones and cool white, the road's sheen and the cars' shade in the
+  tunnel, the probe's cadence and reach there, no wet mirror under the roof):
+  stills on software WebGL at `medium` 1280x720 by day in four rounds at six
+  places of the autopilot run (t = 34.5, 36.2, 37.2, 39.4, 42.2, 43.1), put
+  beside the owner's video's frames (approach, portal, near the entrance,
+  deep inside) and judged by eye; by night and at golden hour at four of
+  them; from a low rear three-quarter photo camera and at 393x700 inside; at
+  `low` 1280x720 by day once. Draw calls and triangles counted at four
+  moments before and after (`low` by day at 393x852, `medium` by night at
+  1280x720: spec.md). `node tools/unit.mjs` passed (4 files). Not looked at
+  on `high`, in split screen, in motion or with a player driving; the
+  playtest (which has no tunnel section) and the soundtest were not run (the
+  sound's tunnel reverb reads the Track's sky, which did not move).
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.

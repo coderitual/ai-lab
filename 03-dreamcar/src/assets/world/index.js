@@ -46,6 +46,7 @@ import { createRoad } from './road.js';
 import { createRockFaces } from './rock.js';
 import { keepOut as startKeepOut } from './startPlan.js';
 import { createStructures } from './structures.js';
+import { concreteCut } from './tunnel.js';
 import { createStuds } from './studs.js';
 import { createKerbs } from './kerbs.js';
 import { ROW_STEP, createTerrain } from './terrain.js';
@@ -156,7 +157,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   lap('road');
   const kerbs = createKerbs({ track, caps, tier, atmosphere, terrain });
   lap('kerbs');
-  const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock') });
+  // (the tunnel's cuttings are concrete: tunnel.js builds them where concreteCut says)
+  const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock'), except: (s) => !!concreteCut(track, s) });
   lap('rock');
   const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
   lap('lake');
@@ -316,7 +318,9 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       sun.setFill(open);
       // the wet road's reflection, about the road's plane under this view's car (skyOver has just located it)
       if (mirror) {
-        if (wetness > 0.02 && camera.isPerspectiveCamera) {
+        // (tunnel lane) not under the tunnel's roof, where the road is dry and the wet road outside is a patch of light
+        // in the far mouth: there the mirror's draw calls go to the car's probe instead (PROBE.tunnelFaces)
+        if (wetness > 0.02 && camera.isPerspectiveCamera && open > 0.02) {
           const s = Math.min(track.length - 1e-3, Math.max(0, spot.s));
           const lat = Math.max(-track.halfWidth, Math.min(track.halfWidth, spot.lat));
           track.frameAt(s, mirrorFrame);

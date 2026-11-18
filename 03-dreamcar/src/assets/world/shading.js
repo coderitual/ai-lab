@@ -37,7 +37,15 @@ export const WET_UNIFORMS = { uWet: { value: 0 } };
  * it from its own lamps and paint, and the asphalt under that roof mirrors it at a glancing angle (road.js), as it
  * mirrors the sky outside.
  */
-export const BORE_UNIFORMS = { uBoreGlow: { value: new THREE.Vector3() } };
+export const BORE_UNIFORMS = {
+  uBoreGlow: { value: new THREE.Vector3() },
+  // (tunnel lane) the two lines of luminaires along the haunches, for the road's reflection of them (road.js
+  // TUNNEL_SHEEN): lat of the lines, their height over the road, their radiance (a bar's, against the colour), 0
+  uBoreLines: { value: new THREE.Vector4(0, 6, 0, 0) },
+  uBoreLineColor: { value: new THREE.Vector3(1, 1, 1) },
+  // where the tunnel is (s0, s1) and the share of the interior's length that is lit, and the exit zone's length
+  uBoreZone: { value: new THREE.Vector4(0, -1, 0.2, 36) },
+};
 
 /**
  * Adds an edit to a material's shader, after whatever edits it already has, and gives it a cache key of its own.

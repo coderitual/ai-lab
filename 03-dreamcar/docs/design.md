@@ -100,7 +100,7 @@ white kerb in the bends and a paved margin elsewhere, then mown grass 3 to 10 m
 wide (widest on the outside of the fast bends) to a barrier: a steel rail by
 default, a low concrete wall along the lake side of the start straight and
 beside the pits (the rest of the land side is a rail), rock where the road is
-cut into the hill, parapets on the bridges, walls in the tunnel. Trees stand
+cut into the hill, parapets on the bridges, the walkways' kerbs in the tunnel. Trees stand
 behind the barrier, never as it.
 
 How the ground is drawn (src/assets/world): the asphalt (road.js) is
@@ -138,7 +138,7 @@ line, m; speeds are the autopilot's at full pace):
 | Lakeside straight | 4686 to 250 | 700 m, level, along the shore (the line 450 m along it); lamps every 30 m on alternating sides; 225 to 279 km/h |
 | Shore bend | 250 to 657 | a banked right of 220 m radius (9 degrees) away from the water, starting to climb; about 200 km/h |
 | Forest esses | 657 to 1409 | right 260 m, left 330 m, right 240 m, climbing at 5 to 6 per cent; 205 to 240 km/h |
-| The tunnel | 1409 to 2006 | a rock cutting, the lit bore (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out; up to 255 km/h |
+| The tunnel | 1409 to 2006 | a rock cutting faced in concrete at its end, the lit box (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out between retaining walls with acoustic screens; up to 255 km/h |
 | The sky road | 2006 to 2582 | on piers: a 576 m left of 300 m radius, banked 10 degrees, the valley 42 m under its middle; about 230 to 257 km/h |
 | The carousel | 2582 to 2915 | a 150 m climb, then 190 degrees right round a spur at 55 m radius, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
 | The crest | 2915 to 3115 | the top (108 m), in the open, the lake far below; the car goes light over it at about 160 km/h |
@@ -391,7 +391,7 @@ with a short `advance` after loading.
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
   65 m with a sharp cut-off rising to the right, high beam about 150 m; LED
   daytime running lamps always on; tail lamps red with a hot core; brake lamps
-  three times brighter; warm tunnel lamps; lit windows in the pit building and the
+  three times brighter; cool white tunnel lamps; lit windows in the pit building and the
   towns. Exposure about 5 stops above day (lighting.js: 22 against 0.68; at 32
   the moonlit land read as dusk and anything facing a head lamp within
   30 m burnt white). Lens ghosts are off at night.
@@ -464,6 +464,71 @@ light, the materials, the vegetation, the composition and the sense of speed:
 no names, logos, HUD artwork or layout, track shapes, liveries or lettering.
 The car itself is checked against four daylight photographs of the owner's
 car (car.md), which also stay out of the repository.
+
+## The tunnel
+
+The owner's own video is the spec (37 s, filmed from the passenger seat of
+his car one autumn evening; it stays out of the repository, as the reference
+frames do). It is read here as measurements and words; nothing of the real
+place (its signs' text, its names, its numbers) is copied. One more frame,
+from a racing game, is the reference for the portal on the forest side only,
+for its light, materials and composition: nothing of its content.
+
+**The approach (the video's first 12 s).** A wide road falling gently into an
+open cutting. Pale, smooth retaining walls of cast concrete about 5 m high
+either side, with irregular panel joints and a cap; on them acoustic screens
+3 to 4 m high: panels of vertical slats in a light gold between steel posts
+about 4 m apart, rails across every half metre, glowing in the low sun, in
+steps that come down towards the portal. A steel sign gantry across the road
+(a two-chord truss with one long diagonal, signal boxes over the lanes, a
+camera box hanging under it), tall lamp posts, small square blue signs on the
+walls, green signal heads at the mouth.
+
+**The portal.** A plain pale grey headwall about 3 m deep over the mouth, a
+parapet band along its top and a two-rail railing on it. The mouth is a dark,
+clean rectangle, wider than the carriageway by the walkways, about 5.5 to
+6.5 m high; inside it the lines of fittings converge as bright dashes, and
+green down arrows hang over the lanes just inside.
+
+**The portal on the forest side (the game's frame).** Lower and wider, of
+weathered grey concrete with dark streaks, a lintel band standing out over
+the mouth with small lamps under it; a sloped concrete revetment leading to
+it on one side; a black and white chevron board beside the mouth; a banner
+board on top; big trees over it and their dappled shade on the road.
+
+**Inside (from 13 s).** A box (cut and cover), not a round bore: about 15 m
+wall to wall and 6.5 m high, with a chamfer about a metre across where wall
+meets ceiling. Pale beige grey walls of cast panels a few metres long; a
+raised walkway at the foot of each wall with a pale kerb face; a flat grey
+ceiling, darker in the middle. Two lines of rectangular LED fittings along
+the ceiling at the foot of the chamfers: in the first 60 m or so pairs of
+bars two to three metres apart, almost a continuous line; further in single
+fittings six to eight metres apart. Lane signals (green arrows) hung across
+every hundred metres or so; pairs of jet fans; a reddish pipe and cable trays
+under the ceiling; small green guidance lights about a metre up the walls
+every dozen metres; tall green-lit emergency doors and green signs every
+60 m; red fire points. The road pale and evenly lit, a solid edge line and
+broken lane lines. The light is neutral to cool white, even and bright: the
+walls brightest low down, the ceiling darker. The exit is a small, white,
+blooming rectangle that grows; the world reappears in it as the eye adapts.
+
+**How it is built** (tunnel.js; the light road.js, lamps.js):
+
+| | the video | the build |
+|---|---|---|
+| section | box about 15 x 6.5 m | 12 m road + 1.5 m to each kerb face, 1 m walkways, walls 17 m apart, ceiling 6.4 m, chamfer 0.9 x 0.7 m |
+| fittings | pairs every 2 to 3 m at the entrance, single every 6 to 8 m | pairs every 2 m over the first 60 m, single every 3 m to 130 m and over the last 36 m, every 6 m between; bars 1.25 x 0.24 m |
+| light | cool white, entrance brighter | lamps every 12 m on each side, 0.9 0.96 1.0, the entrance's 2.4 times as bright over 60 m, easing to the interior's over 70 m; the last 36 m 1.4 times (by day; half of that extra at golden hour, none at night) |
+| walls | pale cast panels | panels 5 m long, a joint along the dado at 1.15 m, grime at the foot |
+| on the walls | green lights, doors, signs, fire points | guidance lights every 12.5 m at 1 m; a door with a lit frame and a sign every 60 m, alternating sides; a fire point between |
+| under the ceiling | lane signals, jet fans, pipe, trays | lane signals at the entrance and every 120 m; jet fans in pairs every 110 m from 70 m in; a pipe and a tray the whole length (not on low) |
+| out of the exit | retaining walls about 5 m, screens 3 to 4 m | walls as high as the cut (5 m: the `cutting` preset), screens 2.4 m at the portal, 0.6 m higher every 26 m up to 4.2 m, for 110 m |
+| into the entrance | (the game's frame) | sloped revetments over the last 75 m, upright at the face and leaning back 0.22 m per metre from 10 m out; a gantry 110 m before the portal |
+
+What still differs from the video: the road keeps its own dark asphalt (the
+video's is pale concrete-grey); there are no lamp posts in the cutting; the
+signs are pictograms of our own and carry no text or numbers; there is no
+traffic.
 
 ## Left out on purpose (for now)
 
