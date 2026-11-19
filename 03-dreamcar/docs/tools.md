@@ -107,6 +107,14 @@ medium takes minutes to draw on software WebGL), `?nodraw`, `?time=`,
 `?mode=split`, `?laps=`, `?ui=0`, `?mute`, `?photo=`, `?debug=`. All of them
 are in [spec.md](spec.md#url-parameters).
 
+To look at the car's reflection probe itself: `?debug=probe` draws the view's
+cube unrolled four times instead of the picture, at roughness 0, 0.3, 0.6 and
+1 (top left, top right, bottom left, bottom right; the horizon across the
+middle of each, +Z in its centre): blocks, seams, a light printed several
+times or a face that does not match its neighbours show there first. Add
+`&photo=...` to place the car where it matters (engine.md, "The reflection
+probe").
+
 ## What has been verified
 
 Only in headless Chromium on software WebGL (SwiftShader), on one Linux
@@ -231,6 +239,19 @@ machine without a GPU, and only what is listed here.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
+
+- **The probe lane's changes** (the reflection probe prefiltered for
+  roughness, eased in, faces by what changes fastest, 128 / 256 / 512, the
+  parallax proxy, no sun disc in it): `?debug=probe` looked at by day on
+  medium (four roughnesses: no blocks, no seams); stills on software WebGL at
+  `medium`, 1280x720, with the photo camera low behind the car, before and
+  after, by day on the grid, in the esses (t = 33) and by night on the grid;
+  draw calls and triangles per pass counted on low and medium (engine.md, "The
+  reflection probe"); the playtest's `window` (a lost and restored context
+  mid-run) and `tiers` sections passed; `node tools/unit.mjs` passed. Not looked
+  at: `high` and dusk stills, the tunnel itself, split screen, the 8-bit
+  fallback (`?ldr`), and anything in motion (the easing was reasoned, not
+  watched).
 
 ## What has not been verified
 

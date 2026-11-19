@@ -417,17 +417,42 @@ targets beyond what `createTarget` would choose.
 | | low | medium | high |
 | --- | --- | --- | --- |
 | cube | 128 (6 levels) | 256 (7) | 512 (8) |
-| faces at speed | 1 every other frame | 1 a frame (2 in the tunnel) | 2 a frame (3 in the tunnel) |
+| faces at speed | 1 every other frame | 1 every other frame (2 in the tunnel) | 2 a frame (3 in the tunnel) |
 | standing still | 1 every other frame | 1 every other frame | 2 a frame |
 | far plane | 260 m | 300 m | 400 m |
 | filter | 8 samples; level 0 and 1 rough level per update | 12; level 0 and 2 | 20; every level |
-| filter draws per update | 12 | 18 | 48 |
+| filter draws per update (tiny: level 1 of a 256 cube is 128 x 128) | 12 | 18 | 48 |
 
 Before this (b1536ef) the probe was one cube with plain 2x2 mips, 64 / 128 /
 256 at speed and a second one of twice the size standing still, the faces in
 fixed order, read by `level = log2(1.65 r² size)`.
 
-MEASUREMENTS_GO_HERE
+**Cost, measured** (`renderer.renderBufferDirect` wrapped in the page and
+labelled by pass, as in spec.md "Quality tiers and budgets"; 960x540, day,
+autopilot from `?seed=1`, 12 frames each at t = 6 (the grid), 33 (the esses)
+and 45 (the sky road); per frame):
+
+| | probe faces: draw calls | triangles | filter draws | whole frame: calls |
+| --- | --- | --- | --- | --- |
+| low, before | 10 to 14 | 34 to 38 k | none (hardware mips) | 132 to 163 |
+| medium, before (a face every other frame) | 15 to 18 | 109 to 126 k | none | 176 to 216 |
+| medium, a face every frame (tried) | 28 to 34 | 216 to 252 k | 18 | 199 to 236 |
+
+A face costs about the same as before (the far plane of 300 m instead of 400
+cuts little: most of a face's 220 to 250 k triangles are drawn at infinity
+or reach it, the mountains 50 k, the massif's stand-in 23 k, the far terrain 18
+k, the terrain's grid 27 to 46 k), so medium keeps its cadence of a face every
+other frame and gains the cube, the filter and the easing for 9 tiny draws a
+frame. The resolution costs fill only: a 256 face is 65 k pixels, a fortieth of
+a phone's screen. Memory: two cubes of half floats with their mips, 2.1 MB at
+128, 8.4 MB at 256, 34 MB at 512 (plus the raw cube's depth).
+
+What the paint reads (car/materials.js as it stands, 256 cube, M = 6): the
+clear coat at roughness max(0.03, footprint): level 0 on flat panels
+(alpha 0.0009 is under level 1's 0.031), up to level 2 or 3 where the body
+curves away; the flake layer of the silver (roughness 0.42) through
+`carSoftProbe`, nine reads at roughness 0.21 (alpha 0.044, level 1.5) round
+the mirror direction; the cap of the metal layer at roughness 1 (level 6).
 
 ## The road's mirror
 

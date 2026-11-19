@@ -443,8 +443,10 @@ export const FX = {
  * the grid: below `stillBelow` m/s, back to moving above `movingAbove`) `stillFaces` each `stillEvery`-th frame.
  * The faces see `far` m (what lies beyond is culled; the sky, the mountains and the massif's stand-in are drawn at
  * infinity and stay). (probe lane, measured in docs/engine.md "The reflection probe": a face costs about half the
- * view's triangles; resolution costs next to nothing beside that, so the cube is twice as large as it was and the
- * faces are cheaper.)
+ * view's triangles, most of them things the far plane does not cut (the mountains, the massif's stand-in, the far
+ * terrain); the resolution and the filter cost next to nothing beside that, so the cube is twice as large as it was
+ * and medium keeps its cadence of a face every other frame: a face a frame there cost 15 more draw calls and 120 k
+ * more triangles a frame.)
  */
 /**
  * (tunnel lane) In the tunnel (the car's sky below `tunnelSky`) the faces see no further than `tunnelFar` m (the box
@@ -455,7 +457,7 @@ export const FX = {
  */
 export const PROBE = {
   low: { size: 128, faces: 1, every: 2, stillFaces: 1, stillEvery: 2, tunnelFaces: 1, far: 260, samples: 8, levels: 1 },
-  medium: { size: 256, faces: 1, every: 1, stillFaces: 1, stillEvery: 2, tunnelFaces: 2, far: 300, samples: 12, levels: 2 },
+  medium: { size: 256, faces: 1, every: 2, stillFaces: 1, stillEvery: 2, tunnelFaces: 2, far: 300, samples: 12, levels: 2 },
   high: { size: 512, faces: 2, every: 1, stillFaces: 2, stillEvery: 1, tunnelFaces: 3, far: 400, samples: 20, levels: 7 },
   fade: 0.05,
   tunnelSky: 0.02,

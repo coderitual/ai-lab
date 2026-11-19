@@ -365,7 +365,7 @@ pass with their sizes. In short:
 | bloom levels | 4 | 5 | 6 |
 | lens (flare source, ghosts, glare, star) | no | yes | yes |
 | ambient occlusion | no | 8 samples, half size | 14 samples |
-| car's probe at speed / standing | 64 / 128 per face, a face every 2nd frame (standing too) | 128 / 256; a face every 2nd frame (2 in the tunnel), standing 2 every 3rd | 256 / 512, 2 faces a frame (3 in the tunnel), standing 3; in the tunnel the faces see 160 m |
+| car's probe (engine.md, "The reflection probe") | 128 per face, prefiltered (8 samples), a face every 2nd frame (standing too), sees 260 m | 256 (12 samples); a face every 2nd frame (2 in the tunnel), standing too, sees 300 m | 512 (20 samples), 2 faces a frame (3 in the tunnel), standing 2, sees 400 m; in the tunnel the faces see 160 m |
 | wet road mirror | none (the six nearest lamps' heads drawn into the water analytically) | 0.35 of the view's height, to 220 m, streaked copy 0.3 of its height | 0.5, to 320 m, streak 0.3 |
 | forest: full / reduced / impostor trees to | 0 / 60 / 650 m | 34 / 95 / 900 m | 50 / 130 / 1200 m |
 | effects: skid quads / soft particles / sparks | 800 / 192 / 48 | 1500 / 320 / 96 | 2000 / 400 / 128 |
