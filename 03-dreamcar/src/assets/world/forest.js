@@ -683,6 +683,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       // (e2) the wood behind the road's rows thinned, so that the low sun comes through between the crowns and lies on
       // the road in patches; under a closed canopy 60 to 90 m deep towards the sun the road was in plain shade
       if (wood === 'pinewood' && schemeRng.next() < 0.85) continue;
+      // (e5) the island inside the bend open to the low sun
+      if (wood === 'stonepine' && beyond < 45 && Math.sign(track.curvature[spot.index] || 1) === side) continue;
       const m = pick(wood);
       const variants = VARIANTS_OF[m[0]];
       t.variant = m[1] >= 0 ? m[1] : variants[schemeRng.int(variants.length)];
@@ -711,6 +713,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     for (const run of schemeRuns) {
       const rows = ROWS_OF[run.wood];
       if (!rows) continue;
+      // the inside of the bend (the side the road turns to over the run's middle)
+      const islandSide = track.curvature[Math.round(track.wrap((run.s0 + run.s1) / 2) / track.ds) % track.count] >= 0 ? 1 : -1;
       const blend = 100;
       for (const side of [1, -1]) {
         rows.forEach((row) => {
@@ -722,6 +726,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
             if (!track.woodAt?.(s, side) && !woodAt(track, noise, s, side)) continue;
             // (e5) sunny glades: no trees where the noise says so
             if (row.glade && noise.fbm(s / 38 + side * 7.3, 5.1, 2) > row.glade) continue;
+            // (e5) the island inside the bend stays open: one thin row, so that the low sun, which stands beyond it from
+            // the frame's camera, lies on the grass, the boulders and the road
+            if (run.wood === 'stonepine' && side === islandSide && (row !== rows[0] || schemeRng.next() < 0.5)) continue;
             const lat = side * (track.edgeAt(s, side) + BARRIER_CLEAR + schemeRng.range(row.off[0], row.off[1]));
             track.pointAt(s, lat, point);
             if (blocked(point.x, point.z, 0, hint)) continue;
@@ -753,6 +760,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
             if (!sch || sch.def.wood !== run.wood) continue;
             for (let out = 14 + schemeRng.range(0, 5); out < 110; out += schemeRng.range(5, 8)) {
               if (schemeRng.next() >= sch.w) continue;
+              // (the island: the wood only far in, and thin)
+              if (side === islandSide && (out < 45 || schemeRng.next() < 0.6)) continue;
               const lat = side * (track.edgeAt(s, side) + out);
               track.pointAt(s, lat, point);
               if (blocked(point.x, point.z, 1, hint)) continue;
