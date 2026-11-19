@@ -75,7 +75,7 @@ const LIT_PANEL = { length: 5.6, height: 1.3, at: 3.3, step: 34, radiance: 2.2 }
 /** Our own panels: a white field with a coloured block (no lettering). */
 const PANEL_COLORS = [[0.1, 0.55, 1.0], [1.0, 0.45, 0.05], [0.1, 0.9, 0.45], [0.95, 0.15, 0.2]];
 /** (day lane) Yellow dashes along the inside edge: length, gap, width, lat from the pavement's edge (m). */
-const DASHES = { length: 1.2, step: 3.6, width: 0.14, inset: 0.45 };
+const DASHES = { length: 1.2, step: 3.6, width: 0.14, inset: 0.45, asBoxes: false };
 /**
  * The luminaires: how far in from the wall (m, on the ceiling at the haunch's foot), their emitter's size across and
  * along, the gap between a pair's two bars, and the zones: pairs of bars every `entrance[1]` m over the first
@@ -444,9 +444,17 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
     {
       levelFrame(track, (t.s0 + t.s1) / 2, frame);
       const inside = frame.curvature > 0 ? 1 : -1;
-      for (let d = 2; d < length - 2; d += DASHES.step) {
+      const dashProf = {};
+      const dashProf0 = {};
+      // (lead) Off for now: as level boxes these stood up to 4 cm over a road that falls and tilts under them
+      // (tools/unit/structures.test.mjs). They belong in the road's own paint (road.js's marks), which follows it.
+      for (let d = 2; DASHES.asBoxes && d < length - 2; d += DASHES.step) {
         const { M } = place(track, t.s0 + d);
-        paint.add(UNIT_BOX, M(inside * (track.halfWidth - DASHES.inset), 0.012, 0, [DASHES.width, 0.01, DASHES.length]), PAINT.yellow);
+        // (lead) on the road's own surface at that distance from the centre line: the pavement falls away from the
+        // crown, and a dash laid at the centre line's height stood 0.25 m over the shoulder
+        const lat = inside * (track.halfWidth - DASHES.inset);
+        const fall = track.profile(t.s0 + d, lat, dashProf).y - track.profile(t.s0 + d, 0, dashProf0).y;
+        paint.add(UNIT_BOX, M(lat, fall + 0.012, 0, [DASHES.width, 0.01, DASHES.length]), PAINT.yellow);
       }
     }
 
