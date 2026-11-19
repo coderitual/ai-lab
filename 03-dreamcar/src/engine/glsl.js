@@ -220,10 +220,16 @@ vec4 fromTarget(vec4 e) { return e; }
  *    with the plain world-space direction from the probe's centre toward what is seen. No component is flipped.
  *    (three.js negates x for cube maps that were loaded from pictures; for a cube render target it does not,
  *    and neither must you.)
- *  - Roughness picks a mip level. The mips are plain 2x2 averages, so level n is the surroundings blurred over
- *    about 2^n texels of level 0, and a GGX highlight of roughness r is about 2.6 r^2 radians across:
- *        level = log2(1.65 * r^2 * size)        clamped to 0 .. log2(size)
- *    where `size` is the cube's edge in texels. Roughness 0 is the sharp picture.
+ *  - Its mips are prefiltered for roughness (GGX, the lobe of a view along the normal). With `size` the cube's edge
+ *    in texels there are M + 1 levels, M = log2(size) - 2 (the last one's faces are 4 texels wide):
+ *        level 0          roughness 0, the sharp picture
+ *        level k >= 1     alpha = roughness^2 = 2^(k - M): level M is roughness 1, each level finer halves alpha
+ *    so the level for a roughness r is
+ *        level = M + log2(r^2)                   for r^2 >= 2^(1 - M)
+ *        level = r^2 / 2^(1 - M)                 below that, between the sharp picture and level 1
+ *    and a level's lobe is always about 6.6 of its own texels across (2.6 alpha radians, a texel being
+ *    (PI / 2) 2^k / size): a read at the roughness of a pixel's footprint is smooth and does not alias. One read is
+ *    the whole glossy reflection: no taps round the mirror direction are needed.
  *  - What comes back is linear light in scene units, as everything that is drawn. The material must carry the
  *    defines of targetDefines(caps), or the 8-bit fallback's encoding is not undone.
  *
@@ -231,7 +237,10 @@ vec4 fromTarget(vec4 e) { return e; }
  */
 export const GLSL_PROBE = /* glsl */ `
 float probeLevel(float roughness, float size) {
-  return clamp(log2(max(1.65 * roughness * roughness * size, 1.0)), 0.0, log2(size));
+  float last = log2(size) - 2.0;
+  float a = roughness * roughness;
+  float first = exp2(1.0 - last);
+  return a < first ? a / first : min(last + log2(a), last);
 }
 vec3 probeSample(samplerCube probe, vec3 direction, float roughness) {
   vec3 e = textureLod(probe, direction, probeLevel(roughness, float(textureSize(probe, 0).x))).rgb;
@@ -243,10 +252,57 @@ vec3 probeSample(samplerCube probe, vec3 direction, float roughness) {
 }
 `;
 
+/** Mip levels of a probe of `size` texels (0 .. M, M = log2(size) - 2): see GLSL_PROBE. */
+export const probeLevelCount = (size) => Math.max(2, Math.round(Math.log2(size)) - 1);
+
 /** JS twin of probeLevel(): the mip level a roughness reads, for a cube of `size` texels. */
 export function probeLevel(roughness, size) {
-  return Math.min(Math.log2(size), Math.max(0, Math.log2(Math.max(1.65 * roughness * roughness * size, 1))));
+  const last = Math.log2(size) - 2;
+  const a = roughness * roughness;
+  const first = 2 ** (1 - last);
+  return a < first ? a / first : Math.min(last + Math.log2(a), last);
 }
+
+/** JS twin of the filter: the roughness a probe's level holds (ReflectionProbe.js). */
+export function probeRoughness(level, size) {
+  const last = Math.log2(size) - 2;
+  return level <= 0 ? 0 : Math.sqrt(2 ** (Math.min(level, last) - last));
+}
+
+/**
+ * A parallax correction for a probe (ReflectionProbe.js `uniforms`, set by `setProxy`): the probe knows directions
+ * only, as if everything were infinitely far. For a point P of a surface and its reflected direction R (world
+ * space), `probeProxyDir` finds where the ray meets the local proxy (the box if there is one, else the ground plane
+ * when the ray goes down) and returns the direction from the probe's centre to that point, faded back to R for hits
+ * between 8 and 20 m away (further things are far enough). Pass the result to probeSample. Declares its uniforms:
+ *
+ *     probeCenter   vec3   where the cube was drawn from (world)
+ *     probePlane    vec4   the ground: n.xyz, d, with n . x + d = 0
+ *     probeBox      mat4   world to the box's own -1..1 cube (the tunnel's bore)
+ *     probeProxy    vec2   x: the plane is in use, y: the box is
+ */
+export const GLSL_PROBE_PROXY = /* glsl */ `
+uniform vec3 probeCenter;
+uniform vec4 probePlane;
+uniform mat4 probeBox;
+uniform vec2 probeProxy;
+vec3 probeProxyDir(vec3 P, vec3 R) {
+  float t = -1.0;
+  if (probeProxy.y > 0.5) {
+    vec3 p = (probeBox * vec4(P, 1.0)).xyz;
+    vec3 r = (probeBox * vec4(R, 0.0)).xyz;
+    vec3 safe = sign(r) * max(abs(r), vec3(1e-5)) + vec3(equal(r, vec3(0.0))) * 1e-5;
+    vec3 exits = max((vec3(1.0) - p) / safe, (vec3(-1.0) - p) / safe);
+    t = min(exits.x, min(exits.y, exits.z));
+  } else if (probeProxy.x > 0.5) {
+    float down = dot(probePlane.xyz, R);
+    if (down < -0.02) t = -(dot(probePlane.xyz, P) + probePlane.w) / down;
+  }
+  if (t <= 0.0) return R;
+  vec3 toHit = normalize(P + R * t - probeCenter);
+  return normalize(mix(toHit, R, smoothstep(8.0, 20.0, t)));
+}
+`;
 
 export const GLSL_COMMON = `${GLSL_HASH}${GLSL_NOISE}${GLSL_COLOR}${GLSL_TONE}${GLSL_TARGET}`;
 

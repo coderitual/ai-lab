@@ -24,10 +24,11 @@ import { createCar } from '../assets/car/index.js';
 import { LAMPS as CAR_LAMPS } from '../assets/car/spec.js';
 import { createWorld } from '../assets/world/index.js';
 import { CANOPY, canopyOpen } from '../assets/world/canopy.js';
+import { BORE } from '../assets/world/tunnel.js';
 import { TIMES } from '../assets/world/lighting.js';
 import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
-import { Input } from '../engine/Input.js';
+import { Input, buzz } from '../engine/Input.js';
 import { ReflectionProbe } from '../engine/ReflectionProbe.js';
 import { TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
@@ -40,7 +41,7 @@ import { Ghost } from './Ghost.js';
 import { Hud } from './Hud.js';
 import { Race, medalOf } from './Race.js';
 import { TEXT } from './text.js';
-import { createTrack } from './track.js';
+import { SURFACE, createTrack } from './track.js';
 import { Vehicle, collideVehicles } from './vehicle/Vehicle.js';
 
 // SEAM for the sound lane: game/Sound.js and engine/Audio.js are wired when they are there (an empty match when not).
@@ -85,12 +86,14 @@ const UNITS_KEY = 'dreamcar.units';
 const MAP_KEY = 'dreamcar.map';
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /**
- * The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual') and steering ('slider' |
- * 'arrows'), and the touch controls' first-run naming.
+ * The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual'), steering (STEERINGS, the
+ * first the default) and holding hand ('right' | 'left'), and the touch controls' first-run naming.
  */
 const ASSISTS_KEY = 'dreamcar.assists';
 const THROTTLE_KEY = 'dreamcar.throttle';
 const STEERING_KEY = 'dreamcar.steering';
+const HAND_KEY = 'dreamcar.hand';
+const STEERINGS = ['pad', 'slider', 'arrows', 'tilt'];
 const ZONES_KEY = 'dreamcar.zones.v1';
 
 /** Read a kept choice (null when there is none or no storage). */
@@ -113,6 +116,14 @@ const HELD = { steer: 0, throttle: 0, brake: 0, handbrake: 1 };
 
 const probeAt = new THREE.Vector3();
 const probeHidden = [];
+const probeMotion = { velocity: null, time: 0 };
+const proxySurface = {};
+const proxyFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
+const proxyNormal = new THREE.Vector3();
+const proxyPoint = new THREE.Vector3();
+const proxyBox = new THREE.Matrix4();
+const proxyCentre = new THREE.Vector3();
+const proxyAxes = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
 const mirrorHidden = [];
 const frameOut = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
 const putAt = new THREE.Vector3();
@@ -152,7 +163,10 @@ export class Game {
     const help = kept(ASSISTS_KEY);
     this.assists = help && ASSISTS.levels[help] ? help : ASSISTS.default;
     this.throttle = kept(THROTTLE_KEY) === 'manual' ? 'manual' : 'auto';
-    this.steering = kept(STEERING_KEY) === 'arrows' ? 'arrows' : 'slider';
+    this.steering = STEERINGS.includes(kept(STEERING_KEY)) ? kept(STEERING_KEY) : STEERINGS[0];
+    this.hand = kept(HAND_KEY) === 'left' ? 'left' : 'right';
+    /** Why tilt is not steering ('' | 'refused' | 'unavailable'): the options say so. */
+    this.tiltNote = '';
     this._zonesSeen = kept(ZONES_KEY) === '1';
     engine.setMaxPixelRatio(TIERS[this.tier].pixelRatio);
     this.rng = createRng(params.seed);
@@ -178,6 +192,20 @@ export class Game {
     this.input = new Input(container);
     this.input.throttle = this.throttle;
     this.input.steering = this.steering;
+    this.input.hand = this.hand;
+    // tilt refused or not there: the pad steers instead, and the options say why
+    this.input.onTiltFail = (why) => {
+      this.tiltNote = why;
+      if (this.steering === 'tilt') {
+        this.steering = this.input.steering = STEERINGS[0];
+        this.input.release();
+      }
+    };
+    // a control taken or let go is drawn pressed at once, not a frame later
+    this.input.onTouchChange = (input) => {
+      if (!input.isTouch || this.phase === 'title') return;
+      this.views.forEach((view, i) => view.hud.setControls(input.controlsOf(i)));
+    };
     this.input.onAction = (name, driver) => this.action(name, driver);
     this.input.onAnyInput = () => {
       this._woke = true;
@@ -353,10 +381,12 @@ export class Game {
     if (!this._map) this._map = this._mapOf();
     for (const v of this.hud.views) v.setMap(this._map, n);
     this.views = this.racers.map((racer, i) => {
-      // (ENGINE lane) what the car's paint mirrors: a cube picture of its surroundings, a face or two a frame
-      // two sizes (PROBE in config.js): the smaller at speed, the larger, redrawn whole, while the car is nearly still
+      // (ENGINE lane) what the car's paint mirrors: a cube picture of its surroundings, a face or two a frame,
+      // prefiltered for roughness (PROBE in config.js)
       const table = PROBE[this.tier] || PROBE.medium;
-      const probe = params.probe ? new ReflectionProbe(engine.renderer, table.size) : null;
+      const probe = params.probe
+        ? new ReflectionProbe(engine.renderer, table.size, { caps: this.caps, far: table.far, samples: table.samples, levelsPerUpdate: table.levels, fade: PROBE.fade })
+        : null;
 
       return {
         racer,
@@ -369,7 +399,7 @@ export class Game {
         exposure: this._exposureFor(racer.vehicle),
         /** 0..1: how much of the showcase's exposure compensation is in (eased in the fixed step). */
         showcase: this.phase === 'title' ? 1 : 0,
-        /** The probe the paint reads now; `still` says which of the two it is. */
+        /** The probe the paint reads; `still`: the car is nearly still, and the probe is kept on its slower cadence. */
         probe,
         probes: probe ? [probe] : [],
         still: false,
@@ -444,6 +474,8 @@ export class Game {
     });
     this.phase = 'countdown';
     this._resets.clear();
+    // tilt: straight ahead is however the device is held at the start
+    this.input.recentre();
     this.effects.reset();
     this.ghost.begin();
     this.world.setStartLights(0);
@@ -532,10 +564,24 @@ export class Game {
       return;
     }
     if (name.startsWith('steering:')) {
-      this.steering = name.slice(9) === 'arrows' ? 'arrows' : 'slider';
+      const want = name.slice(9);
+      this.steering = STEERINGS.includes(want) ? want : STEERINGS[0];
       this.input.steering = this.steering;
       this.input.release();
       keep(STEERING_KEY, this.steering);
+      // (tilt: asked for here, in the choosing click, where Safari allows the asking; refused, the pad steers)
+      if (this.steering === 'tilt') {
+        this.tiltNote = '';
+        this.input.askTilt();
+      }
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
+    if (name.startsWith('hand:')) {
+      this.hand = name.slice(5) === 'left' ? 'left' : 'right';
+      this.input.hand = this.hand;
+      this.input.release();
+      keep(HAND_KEY, this.hand);
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
@@ -593,6 +639,10 @@ export class Game {
         break;
       case 'reset':
         if (this.phase === 'run' && !paused) this._resets.add(d);
+        break;
+      case 'recentre':
+        // tilt: wherever the device is now is straight ahead
+        this.input.recentre();
         break;
       case 'time': {
         // the next time of day in lighting.js's order (read each time: the table may grow)
@@ -1020,9 +1070,11 @@ export class Game {
       }
       car.setLights(racer.lamps);
       // the car's sky: none in the tunnel, less under the woods (the same canopy the road beside it sees)
-      // (and the picture's exposure, which says how bright white paper is where it is: materials.js GLSL_KEY)
+      // (probe lane) `proxy`: the probe's parallax uniforms (ReflectionProbe `uniforms`, GLSL_PROBE_PROXY in engine/glsl.js);
+      // (car lane) and the picture's exposure, which says how bright white paper is where it is (materials.js GLSL_KEY)
       const own = this.views[racer.index];
-      car.setReflections({ cube: own?.probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat), exposure: own?.frame.exposure || own?.exposure });
+      const probe = own?.probe ?? null;
+      car.setReflections({ cube: probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat), proxy: probe?.uniforms ?? null, exposure: own?.frame.exposure || own?.exposure });
       if (car.setBore) this._poseBore(car, obj, vehicle);
 
       obj.updateMatrixWorld();
@@ -1122,6 +1174,8 @@ export class Game {
       assistLevels: Object.keys(ASSISTS.levels),
       throttle: this.throttle,
       steering: this.steering,
+      hand: this.hand,
+      tiltNote: this.tiltNote,
     });
     hud.setFade(1 - this._fadeLevel);
     // the board: on the title and the pause sheet (and in the results), never over the run
@@ -1151,7 +1205,8 @@ export class Game {
         h.setWarn(warn);
         const how = input.source[i] === 'touch' ? TEXT.resetTouch : split ? TEXT.resetSplit(i === 0 ? 'R' : '/') : TEXT.resetKeys;
         h.setOffer(racer.offer, how);
-        const device = input.source[i] === 'touch' && this.throttle === 'manual' ? 'touchManual' : input.source[i];
+        const pad = this.steering === 'pad' || this.steering === 'tilt';
+        const device = input.source[i] !== 'touch' ? input.source[i] : pad ? (this.steering === 'tilt' ? 'touchTilt' : 'touchPad') : this.throttle === 'manual' ? 'touchManual' : 'touch';
         h.setHint(!this._hinted && !c.finished && !racer.offer && !warn ? TEXT.hint[device] || TEXT.hint.keys : '');
       }
       h.setSpeed(v.speed * 3.6);
@@ -1173,7 +1228,16 @@ export class Game {
       const slide = v.slide;
       if (slide) h.setDrift(slide.angle, slide.score, slide.angle >= 12);
       // touch: the steering at the bottom left, the pedals at the bottom right; named on the first touch run
-      if (input.isTouch) h.setControls(input.controlsOf(i));
+      if (input.isTouch) {
+        h.setControls(input.controlsOf(i));
+        // a few seconds into a run the controls step back (45 %) so as not to sit over the picture; a finger on any
+        // of them brings them back
+        h.setControlsDim(!!race && race.clock > HUD.controlsDimAfter && !input.touched(i));
+        // a kerb under a wheel: a short buzz where the device can (render-side: it changes nothing of the run)
+        const kerb = v.wheels.some((w) => w.surface === SURFACE.KERB && w.grounded);
+        if (kerb && !racer._onKerb && racer.driver === racer.player && input.source[i] === 'touch' && this.phase === 'run' && Math.abs(v.speed) > 8) buzz();
+        racer._onKerb = kerb;
+      }
       const naming = input.isTouch && !this._zonesSeen && !!race && race.clock < HUD.zonesFor;
       h.setZoneHint(naming);
       if (input.isTouch && !this._zonesSeen && race && race.clock >= HUD.zonesFor) this._noteZones();
@@ -1211,6 +1275,31 @@ export class Game {
     return this._board.table;
   }
 
+  /**
+   * The local proxy of a view's probe, for the materials' parallax correction (GLSL_PROBE_PROXY): the road's plane
+   * under the car, and in the tunnel the bore as a box along the road (wall to wall, road to ceiling).
+   */
+  _probeProxy(probe, vehicle, inTunnel) {
+    const track = this.track;
+    track.surfaceAt(probeAt.x, probeAt.z, this._proxyHint ?? -1, proxySurface);
+    this._proxyHint = proxySurface.index;
+    proxyNormal.set(proxySurface.nx, proxySurface.ny, proxySurface.nz);
+    proxyPoint.set(probeAt.x, proxySurface.y, probeAt.z);
+    if (!inTunnel) {
+      probe.setProxy(proxyNormal, proxyPoint, null);
+      return;
+    }
+    const f = track.frameAt(vehicle.s, proxyFrame);
+    const left = track.edgeAt(vehicle.s, 1) + BORE.walk;
+    const right = track.edgeAt(vehicle.s, -1) + BORE.walk;
+    proxyCentre.copy(f.pos).addScaledVector(f.left, (left - right) / 2).addScaledVector(f.up, BORE.ceiling / 2);
+    proxyBox
+      .makeBasis(proxyAxes[0].copy(f.tan).multiplyScalar(PROBE.tunnelBox), proxyAxes[1].copy(f.left).multiplyScalar((left + right) / 2), proxyAxes[2].copy(f.up).multiplyScalar(BORE.ceiling / 2))
+      .setPosition(proxyCentre)
+      .invert();
+    probe.setProxy(proxyNormal, proxyPoint, proxyBox);
+  }
+
   /** Draw every view into its rectangle. */
   draw() {
     const table = PROBE[this.tier] || PROBE.medium;
@@ -1226,21 +1315,14 @@ export class Game {
       this.world.prepareView(view.camera, car.object.position, this.beams, mirrorHidden);
       // (ENGINE lane) the car's probe, from the middle of the car, without the car itself; after prepareView, so
       // that the shadows it shows are this view's. In split screen the two take turns. Nearly still (the title's
-      // orbit, the grid): the larger cube, redrawn whole over a few frames; at speed the smaller one, a face or two.
-      if (view.probes.length) {
-        const speed = Math.abs(view.racer.vehicle.speed);
-        const still = view.still ? speed < PROBE.movingAbove : speed < PROBE.stillBelow;
-        if (still !== view.still) {
-          view.still = still;
-          // the larger cube is made the first time it is needed
-          if (still && !view.probes[1]) view.probes[1] = new ReflectionProbe(this.engine.renderer, table.stillSize);
-          view.probe = view.probes[still ? 1 : 0];
-          // the one taken up is refreshed face by face from what it last showed (its very first update draws all six)
-          view.frame.probe = view.probe.texture;
-        }
+      // orbit, the grid) it is redrawn on a slower cadence; at speed the faces that see the roadside go by first.
+      const vehicle = view.racer.vehicle;
+      if (view.probe) {
+        const speed = Math.abs(vehicle.speed);
+        view.still = view.still ? speed < PROBE.movingAbove : speed < PROBE.stillBelow;
       }
       const probeEvery = view.still ? (table.stillEvery ?? 1) : table.every;
-      const inTunnel = view.racer.vehicle.sky < PROBE.tunnelSky;
+      const inTunnel = vehicle.sky < PROBE.tunnelSky;
       const probeFaces = view.still ? table.stillFaces : inTunnel ? (table.tunnelFaces ?? table.faces) : table.faces;
       if (view.probe && this.engine.frame % (probeEvery * n) === i * probeEvery) {
         probeAt.copy(car.box.center).applyMatrix4(car.object.matrixWorld);
@@ -1253,7 +1335,10 @@ export class Game {
         if (this.ghostCar) probeHidden.push(this.ghostCar.object);
         // smoke and sparks in a reflection would smear over the whole car
         probeHidden.push(...this.effects.objects);
-        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces, inTunnel ? PROBE.tunnelFar : undefined);
+        probeMotion.velocity = vehicle.velocity;
+        probeMotion.time = this.engine.renderTime;
+        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces, inTunnel ? PROBE.tunnelFar : undefined, probeMotion);
+        this._probeProxy(view.probe, vehicle, inTunnel);
       }
       this.pipeline.render(this.world.scene, view.camera, view.rect, view.frame);
       view.rig.cut = false;

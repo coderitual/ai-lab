@@ -36,14 +36,15 @@ import * as THREE from 'three';
  *   lens         chromatic aberration and lens ghosts are available (the Look says how much)
  *   aoSamples    ambient occlusion samples per half-size pixel (0: no ambient occlusion whatever the Look says)
  *   aoTurns      how many times the samples' spiral winds round the pixel (no common factor with aoSamples)
- *   probeSize    edge of a reflection probe's cube faces
+ *   probeSize    edge of a reflection probe's cube faces (the game's own cadence and filter: PROBE in game/config.js;
+ *                the viewer reads this)
  *   probeFaces   faces redrawn on a frame that redraws any
  *   probeEvery   redrawn every n-th frame
  */
 export const TIERS = {
-  low: { pixelRatio: 1.5, msaa: 0, blurTaps: 6, blurLength: 0.04, blurInline: true, bloomLevels: 4, lens: false, aoSamples: 0, aoTurns: 0, probeSize: 64, probeFaces: 1, probeEvery: 2 },
-  medium: { pixelRatio: 2, msaa: 4, blurTaps: 12, blurLength: 0.075, blurInline: false, bloomLevels: 5, lens: true, aoSamples: 8, aoTurns: 5, probeSize: 128, probeFaces: 1, probeEvery: 1 },
-  high: { pixelRatio: 2, msaa: 4, blurTaps: 18, blurLength: 0.09, blurInline: false, bloomLevels: 6, lens: true, aoSamples: 14, aoTurns: 9, probeSize: 256, probeFaces: 2, probeEvery: 1 },
+  low: { pixelRatio: 1.5, msaa: 0, blurTaps: 6, blurLength: 0.04, blurInline: true, bloomLevels: 4, lens: false, aoSamples: 0, aoTurns: 0, probeSize: 128, probeFaces: 1, probeEvery: 2 },
+  medium: { pixelRatio: 2, msaa: 4, blurTaps: 12, blurLength: 0.075, blurInline: false, bloomLevels: 5, lens: true, aoSamples: 8, aoTurns: 5, probeSize: 256, probeFaces: 1, probeEvery: 1 },
+  high: { pixelRatio: 2, msaa: 4, blurTaps: 18, blurLength: 0.09, blurInline: false, bloomLevels: 6, lens: true, aoSamples: 14, aoTurns: 9, probeSize: 512, probeFaces: 2, probeEvery: 1 },
 };
 
 /**

@@ -197,7 +197,9 @@ export const TIMES = {
     env: { intensity: 0.6 },
     // the sky itself lays about 0.9 on level ground through the environment map; this is the little that comes
     // back off sunlit land
-    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.13 },
+    // (lead) 0.13 left the shade of a forest road at a tenth of the sunlit road and black in the picture; a real
+    // road in open shade keeps a fifth
+    ambient: { sky: [0.6, 0.72, 1.0], ground: [1.0, 0.86, 0.62], intensity: 0.3 },
     fog: { color: [0.26, 0.35, 0.52], sun: [0.06, 0.04, 0.02], sunLobe: 16, density: 0.0001, heightFalloff: 0.011, air: 0.00006 },
     exposure: 0.68,
     // two and a half stops more inside, where only the lamps and the portals' daylight reach
@@ -205,7 +207,7 @@ export const TIMES = {
     shadeEv: 1.0,
     // (look lane: reference A's glare: a stronger veil, the lens's own glare round the sun and its ghosts)
     // flare: the sun's light as the flare source measures the disc in the frame, so that it glares from just outside too
-    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.14, saturation: 1.18, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.00015, glare: 0.015, ao: 0.8, star: 0.02 },
+    look: { flare: { dir: SUN, light: 1.0, reach: 0.6, sky: 0.3 }, contrast: 1.09, saturation: 1.18, tint: [1.0, 0.99, 0.965], lift: [0.0004, 0.0006, 0.001], vignette: 0.28, chroma: 0.0012, grain: 0.5, bloom: 0.05, ghosts: 0.00015, glare: 0.015, ao: 0.8, star: 0.02 },
     lamps: { street: 0, tunnel: 1, windows: 0, entrance: 1 },
     wetness: 0,
     carLights: 'drl',
