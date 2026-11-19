@@ -401,6 +401,16 @@ every scale.
 - **The scene is one render call.** A second call into the multisampled
   target draws over a resolved, discarded buffer. Anything that must be in the
   picture is in the scene; anything added later is a pass.
+- **Nothing that is not a number may reach the frame.** One pixel that is
+  NaN or infinite is spread by the motion blur, the glow and the AO into a
+  dark block with hard edges, and software WebGL does not show it where a
+  real GPU does. Every pass reads and writes through `fromTarget()` and
+  `toTarget()` (glsl.js), which drop such values by an explicit test; a
+  material with its own fragment shader (the particles, `assets/fx`) must
+  not divide by something that can be zero, must not call `smoothstep` with
+  equal edges, and discards a fragment whose colour or alpha is not a
+  number. Suspected, not confirmed, as the cause of the dark slab in the
+  owner's screenshots from a phone and a desktop GPU.
 - **Nothing may write the scene target after it is drawn.** The AO writes a
   separate full-size target and hands that on; the blur pass's source is set
   every frame (`uColor`), because it is no longer always the scene target.
