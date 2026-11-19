@@ -56,6 +56,9 @@ export const BORE_UNIFORMS = {
   uBoreLineColor: { value: new THREE.Vector3(1, 1, 1) },
   // where the tunnel is (s0, s1) and the share of the interior's length that is lit, and the exit zone's length
   uBoreZone: { value: new THREE.Vector4(0, -1, 0.2, 36) },
+  // (day lane) the continuous light strip along the top of each wall (tunnel.js WALL_STRIP), for the road's long soft
+  // reflections of it: the wall's lat, the strip's height over the road and its half height, its radiance
+  uBoreStrip: { value: new THREE.Vector4(0, 5, 0.12, 0) },
 };
 
 /**

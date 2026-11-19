@@ -73,6 +73,8 @@ export const SEA_LOOK = {
   byTime: {
     day: { sky: 0.78, deep: [0.004, 0.02, 0.058] },
     dusk: { sky: 0.42, deep: [0.0016, 0.0105, 0.0115] },
+    // (day lane) twilight (frame K5): dark, the sky's band a pale gleam only where the water is seen flat, near the far shore
+    twilight: { sky: 0.3, deep: [0.0008, 0.0025, 0.008] },
   },
   /** at night: lamps' streaks, across and along (radians, about), and their share of the head's radiance */
   lamp: { across: 0.012, along: 0.22, gain: 0.06 },
