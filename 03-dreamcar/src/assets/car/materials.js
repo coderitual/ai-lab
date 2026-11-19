@@ -147,6 +147,12 @@ vCarToView = normalMatrix;
  */
 const GLSL_KEY = /* glsl */ `
 uniform float carKey;
+/** What is bright against the moment's white paper loses its colour through a rough layer (amount 0..1). */
+vec3 carTint(vec3 c, float amount) {
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  float keep = 1.0 / (1.0 + 3.0 * max(l / max(carKey, 1e-6) - 0.15, 0.0));
+  return mix(vec3(l), c, mix(1.0, keep, amount));
+}
 vec3 carHoldKey(vec3 c, float k) {
   float cap = k * carKey;
   float peak = max(c.r, max(c.g, c.b));
@@ -318,14 +324,13 @@ const FOOTPRINT = 'sqrt(0.39 * max(length(dFdx(r)), length(dFdy(r))))';
  * with the GGX lobe of each roughness (ReflectionProbe.js), so one read is a smooth bell of them (until round 8 the
  * mips were plain 2x2 averages, and the layer took nine taps in a cone at a finer level to keep the wood's crowns
  * from printing as blocks). The flakes are metal under a lacquer that is not quite clear: what they show is held to
- * 65 % of its colour, and less the brighter it is (a coloured lamp, the green of the start lights at night, tints
- * the panel with its light instead of washing a flank in its colour).
+ * 65 % of its colour (and, as every rough read, less the brighter it is: carTint).
  */
 const GLSL_SOFT_PROBE = /* glsl */ `
 vec3 carSoftProbe(vec3 r, float rough, float foot) {
   vec3 seen = probeSample(carProbe, r, max(rough, foot));
   float l = dot(seen, vec3(0.2126, 0.7152, 0.0722));
-  return mix(vec3(l), seen, 0.65 / (1.0 + max(l / max(carKey, 1e-6) - 0.25, 0.0)));
+  return mix(vec3(l), seen, 0.65);
 }
 `;
 
@@ -384,6 +389,8 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, soft = false, bore = false) =
     vec3 seen = carSane(${soft ? `carSoftProbe(r, material.roughness, ${FOOTPRINT})` : `probeSample(carProbe, r, max(material.roughness, ${FOOTPRINT}))`}, radiance * carSky);
     // and a lamp or the sun is the lights' business (GLSL_KEY): the rougher the layer, the less of it is kept
     seen = carHoldKey(seen, mix(${KEY_CRISP}, ${KEY_ROUGH}, smoothstep(0.08, 0.3, material.roughness)));
+    // and through a rough layer a coloured lamp gives its light, not its colour (GLSL_KEY: carTint)
+    seen = carTint(seen, smoothstep(0.08, 0.3, material.roughness));
     ${bore ? 'seen = carBoreHold(seen);' : ''}
     radiance = mix(radiance * carSky, seen, carProbeOn);
     ${bore ? `radiance += ${(soft ? BORE_SHEEN : BORE_COAT).toFixed(2)} * carBoreLines(vCarPos, carToCar(rBore), 2.0 * material.roughness * material.roughness);` : ''}

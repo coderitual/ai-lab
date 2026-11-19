@@ -162,10 +162,10 @@ layer of metal flake under a clear coat.
   round 8 the mips were plain 2x2 averages, the wood's crowns printed as
   blocky yellow patches through them, and the layer took nine taps in a cone
   at a finer level and capped what it saw at five times the cube's average.
-  What it shows is held to 65 % of its colour, less the brighter it is
-  against the moment's white paper: a coloured lamp (the green start lights
-  at night) tints the panel with its light instead of washing a flank in its
-  colour.
+  What it shows is held to 65 % of its colour, and every rough read (the
+  wheels' too) loses colour the brighter it is against the moment's white
+  paper (`carTint`, GLSL_KEY): a coloured lamp (the green start lights at
+  night) lights the panel instead of washing a flank and the rims green.
 - **Lamps and the sun in the probe** (`GLSL_KEY`, `carKey`): the car takes
   their light from the lights themselves (the sun, the floodlights' pool of
   spots, its own lamps), so what the probe's few coarse texels of a lamp add
