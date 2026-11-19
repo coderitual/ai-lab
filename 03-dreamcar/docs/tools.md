@@ -178,8 +178,11 @@ machine without a GPU, and only what is listed here.
   pull, zero and zero on manual untouched, and its box is in the hud overlap
   checks. In earlier runs the hud check "nothing over the car" failed once
   with the insets stood in for (393x852, solo: the car's box 120 px low; the
-  ghost and the gauge were over it): not reproduced in the last run, still
-  unexplained. `node tools/unit.mjs` passed (the scripted thumb needed no
+  ghost and the gauge were over it): not reproduced in the lane's last run, still
+  unexplained. It failed again in the lead's run of touch, hud, split, options
+  and start on the merged build (468 checks, 467 passed; at s 154 the car's
+  box reached 763 of 852 px down and the gauge and the ghost overlapped it):
+  open. `node tools/unit.mjs` passed (the scripted thumb needed no
   change). Not verified: a real phone, Safari, real thumbs (is 60 % of the
   travel and a 6 px hold right at a real edge? does a second finger anywhere
   feel like a handbrake?), the gauge's eased bars at a real frame rate.
