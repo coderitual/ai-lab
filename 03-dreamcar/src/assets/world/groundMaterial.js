@@ -359,6 +359,8 @@ if ( uVolcano.z > 0.0 ) {
     gAlbedo = mix( gAlbedo, vCol, vOn * ( 1.0 - gWetBand ) );
   }
 }
+// (sea lane, round 4) pale sand and pebbles at the water's edge where the shore is gentle (the owner's env references)
+gAlbedo = mix( gAlbedo, vec3( 0.36, 0.33, 0.27 ) * ( 0.8 + 0.4 * gDet.b ), ( 1.0 - smoothstep( 1.2, 3.5, vGroundPos.y - uSeaBox.w ) ) * ( 1.0 - smoothstep( 0.2, 0.45, gSlope ) ) * step( -1000.0, uSeaBox.w ) * gCoast );
 gAlbedo *= 1.0 - 0.55 * gWetBand;
 diffuseColor.rgb *= gAlbedo;
 // Seen against a low sun a plain rough surface glares (its Fresnel term goes to one at a grazing angle): rock and

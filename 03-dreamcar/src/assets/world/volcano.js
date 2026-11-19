@@ -31,9 +31,11 @@ export const VOLCANO_LOOK = {
  * @param {import('./atmosphere.js').Atmosphere} options.atmosphere
  * @param {import('../../engine/caps.js').Tier} options.tier
  */
-export function createVolcano({ volcano, atmosphere, tier }) {
+export function createVolcano({ volcano, atmosphere, tier, track = null, terrain = null }) {
   const group = new THREE.Group();
   group.name = 'volcano';
+  const falls = track && terrain ? createFalls({ track, terrain, atmosphere }) : null;
+  if (falls) group.add(falls.mesh);
   if (!volcano) return { group, setTime() {}, update() {}, dispose() {}, stats: { triangles: 0 } };
   // the ground's colours on the island (groundMaterial.js reads it)
   SEA_UNIFORMS.uVolcano.value.set(volcano.x, volcano.z, volcano.r, volcano.top);
@@ -113,6 +115,7 @@ totalEmissiveRadiance += uPlumeGlow * 0.04 * pow( 1.0 - vPlumeH, 6.0 );`,
     },
     update(simTime) {
       uniforms.uPlumeTime.value = simTime;
+      if (falls) falls.uniforms.uFallTime.value = simTime;
     },
     stats: { triangles: geometry.index.count / 3 + 20 },
     dispose() {
@@ -120,6 +123,100 @@ totalEmissiveRadiance += uPlumeGlow * 0.04 * pow( 1.0 - vPlumeH, 6.0 );`,
       material.dispose();
       glow.geometry.dispose();
       glowMaterial.dispose();
+      falls?.dispose();
+    },
+  };
+}
+
+/**
+ * (sea lane, round 4: the owner's environment references, "a waterfall or two falling from a cliff into the bay")
+ * Waterfalls off the bay's cliffs: at each place (`piece`, how far along it, the side), a stream comes out from under
+ * the road and falls down the coast's cliff into the bay, `width` m wide, hugging the cliff's face (the terrain's own
+ * profile, `off` m out from it), white water streaming down with the run's clock, and a skirt of spray where it meets
+ * the sea. One mesh, one draw call, for all of them.
+ */
+export const FALLS = { places: [['crest', 0.45, -1], ['plunge', 0.35, -1]], width: 7, off: 0.8, speed: 9 };
+
+function createFalls({ track, terrain, atmosphere }) {
+  const level = terrain.sea?.level ?? -1.8;
+  const pos = [];
+  const uv = [];
+  const index = [];
+  const p = new THREE.Vector3();
+  const q = new THREE.Vector3();
+  const at = (id, f) => {
+    let s0 = 0;
+    for (const seg of track.layout?.segments ?? []) {
+      const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
+      if (seg.id === id) return s0 + len * f;
+      s0 += len;
+    }
+    return null;
+  };
+  for (const [id, f, side] of FALLS.places) {
+    const s = at(id, f);
+    if (s === null) continue;
+    const edge = track.edgeAt(s, side);
+    // down the cliff from just beyond the edge to the water, a row every 2 m out
+    const rows = [];
+    for (let d = 1.5; d < 90; d += 1.5) {
+      track.pointAt(s, side * (edge + d), p);
+      const y = terrain.heightAt(p.x, p.z);
+      rows.push({ d, y });
+      if (y < level) break;
+    }
+    if (rows.length < 4 || rows[rows.length - 1].y > level) continue;
+    const top = rows[0].y;
+    const base = pos.length / 3;
+    rows.forEach((r, k) => {
+      for (const w of [-0.5, 0.5]) {
+        track.pointAt(s + w * FALLS.width, side * (edge + r.d + FALLS.off), q);
+        pos.push(q.x, Math.max(level, r.y) + FALLS.off, q.z);
+        uv.push(w + 0.5, (top - r.y) / FALLS.width);
+      }
+      if (k > 0) {
+        const a = base + (k - 1) * 2;
+        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+    });
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geometry.setAttribute('aFall', new THREE.Float32BufferAttribute(uv, 2));
+  geometry.setIndex(index);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  const uniforms = { uFallTime: { value: 0 } };
+  const material = extend(
+    atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xf2f4f2, roughness: 0.35, transparent: true, depthWrite: false, side: THREE.DoubleSide })),
+    'waterfall',
+    (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec2 aFall;\nvarying vec2 vFall;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFall = aFall;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\nuniform float uFallTime;\nvarying vec2 vFall;\n${GLSL_HASH}\n${GLSL_NOISE}`)
+        .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+// white water streaming down in strands, breaking up as it falls, thick at the middle and ragged at the sides
+vec2 fq = vec2( vFall.x * 9.0, vFall.y * 0.9 - uFallTime * ${(FALLS.speed / FALLS.width).toFixed(3)} );
+float fn = 0.6 * valueNoise( fq * vec2( 1.0, 3.0 ) ) + 0.4 * valueNoise( fq * vec2( 2.3, 7.0 ) + 4.1 );
+float fSide = smoothstep( 0.0, 0.25, vFall.x ) * smoothstep( 1.0, 0.75, vFall.x );
+diffuseColor.a *= fSide * smoothstep( 0.25, 0.65, fn + 0.25 * fSide );`,
+        );
+    },
+  );
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'waterfalls';
+  mesh.renderOrder = 6;
+  return {
+    mesh,
+    uniforms,
+    dispose() {
+      geometry.dispose();
+      material.dispose();
     },
   };
 }

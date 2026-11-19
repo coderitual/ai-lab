@@ -170,7 +170,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   const sea = createSea({ caps, tier, atmosphere, sea: terrain.sea, far: viewFar, glints: road.glints });
   lap('sea');
   // (sea lane, round 3) the volcano's plume and the glow in its crater (its island is the terrain's)
-  const volcano = createVolcano({ volcano: terrain.volcano, atmosphere, tier });
+  const volcano = createVolcano({ volcano: terrain.volcano, atmosphere, tier, track, terrain });
   // (the trees' alpha becomes coverage where the scene target is multisampled: the pipeline's rule, caps.js)
   const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
   // no tree where the pit building, the stand and the towns stand (startPlan.js), nor where the caller says
