@@ -491,6 +491,20 @@ amplitudes only, a smoothstep bump round one place (`BOOST`, set by
 same `waveGroup` factor that the sets and lulls use, so the mesh, the normals,
 the Jacobian foam and `sampleWaves` all see one surface.
 
+**The inner sound and the volcano** (round 3). The water inside the loop is
+the same sea plane: the sky road's and the plunge's right sides are coast
+sides (their cliff), and a disc round the island drowns the land-shape field
+and the near ground alike (`sound`, applied after the coast's override in
+the 16 m field, where it also seeds the flood, and in `heightOf` and `land`),
+fading out within 60 to 120 m of any solid edge so that the course's own
+ground and frame D3's bank stay. The island is a height function taken as a
+maximum over everything else (`volcanoAt`), so the cone, its crater and its
+gullies are ground like any other: baked, shaded and drawn by the terrain.
+The plume (volcano.js) is an open tube bent downwind by the square of its
+height in the vertex stage, its alpha broken into wisps by value noise that
+rises with the run's clock; the glow is an additive disc whose radiance is
+set from the time of day's sun strength, never by name.
+
 **Per-piece road markings** (round 2, road.js `PIECE_MARKS`). A scheme per
 piece id, each scheme one channel of a per-metre RGBA texture (`uMarks`,
 sampled at s / length like the edge texture), eased over 6 m at its ends.

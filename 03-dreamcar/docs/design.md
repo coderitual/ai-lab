@@ -570,6 +570,22 @@ comes from behind the camera's left and lights the face.
 - **The sky road over the sea** (round 2): the deck crosses an inlet; the
   ground under its middle is 96 m down (`drop`), under the water, so its
   piers stand in the sea.
+- **The sea on the right and the volcano** (round 3; the owner, after
+  driving it on a phone: "seaside should be on the right side with some
+  island and volcano"). The lap runs clockwise, so the open sea outside the
+  loop is always on the driver's left. The sea now also reaches inside: an
+  inner sound under the sky road (whose valley is the sea's out to near its
+  ends) and round a volcanic island in the loop, so that the first part of
+  the sky road and the plunge have water on the right (`parapetSea`,
+  `coastUp`: the presets they replace with the coast's cliff beyond the edge
+  and nothing growing). The island (terrain.js `VOLCANO`) is a concave cone
+  165 m over the water with a crater 34 m across, some 300 m to the right of
+  the sky road's start and 270 m from the nearest road; round it, out to
+  560 m, the land is drowned except within 60 to 120 m of a solid edge
+  (`VOLCANO.sound`). A thin plume of steam and smoke leans away on the wind
+  from the crater and drifts up with the run's clock; the crater glows
+  warm as the sun weakens (volcano.js). Frame D3's bank beside the ledge is
+  kept within 60 m of its edge; beyond it is now the sound.
 - **The low crossing and the big waves** (round 2; the owner: "after the
   tunnel it would be nice to see some sea side with BIG waves. Maybe some
   river that will be super nice to cross ... we will be very close to it").
