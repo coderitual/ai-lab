@@ -292,6 +292,15 @@ machine without a GPU, and only what is listed here.
   on `high`, in split screen, in motion or with a player driving; the
   playtest (which has no tunnel section) and the soundtest were not run (the
   sound's tunnel reverb reads the Track's sky, which did not move).
+- **The car lane's round 8** (the paint, glass and lamps at night, in the
+  tunnel and by day, with the probe lane's prefiltered probe and its
+  parallax): stills on software WebGL at `medium` 1280x720 by night (grid,
+  forest, coast; chase and two photo cameras), in the tunnel by day (five
+  cameras), at the start by day, before and after, by eye; 393x700 and `low`
+  by night; the viewer's showroom at `high`. `node tools/unit.mjs` passed.
+  Not looked at on `high` in the game, at dusk, in split screen or in motion
+  (the probe's easing and the lines streaming were not seen moving); the
+  playtest was not run.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.

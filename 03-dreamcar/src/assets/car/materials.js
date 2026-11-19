@@ -70,7 +70,6 @@ export function createShared(atlas) {
     carSky: { value: 1 },
     carKey: { value: 1 },
     ...proxyUniforms(),
-    carDebug: { value: 0 }, // DEBUG car8
     // lamps: drl, low, high, tail / brake, reverse, indicator left, indicator right
     carLampsA: { value: new THREE.Vector4() },
     carLampsB: { value: new THREE.Vector4() },
@@ -266,7 +265,6 @@ uniform float carRange;
 uniform samplerCube carProbe;
 uniform float carProbeOn;
 uniform float carSky;
-uniform float carDebug;
 uniform vec4 carLampsA;
 uniform vec4 carLampsB;
 uniform vec4 carLampsC;
@@ -866,9 +864,8 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   }`,
       ],
       ['#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += cEmit;'],
-      ['#include <aomap_fragment>', '#include <aomap_fragment>\n  if (carDebug > 0.5 && carDebug < 1.5) { reflectedLight.directDiffuse *= 0.0; reflectedLight.directSpecular *= 0.0; clearcoatSpecularDirect *= 0.0; }\n  if (carDebug > 1.5 && carDebug < 2.5) { reflectedLight.indirectDiffuse *= 0.0; reflectedLight.indirectSpecular *= 0.0; clearcoatSpecularIndirect *= 0.0; }\n  if (carDebug > 3.5) { reflectedLight.directDiffuse *= 0.0; reflectedLight.directSpecular *= 0.0; reflectedLight.indirectSpecular *= 0.0; clearcoatSpecularDirect *= 0.0; clearcoatSpecularIndirect *= 0.0; }\n  else if (carDebug > 2.5) { reflectedLight.directDiffuse *= 0.0; reflectedLight.directSpecular *= 0.0; reflectedLight.indirectDiffuse *= 0.0; clearcoatSpecularDirect *= 0.0; }'],
       ['#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  material.clearcoat *= cCoat;'],
-      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN, true, true) + '\n#if defined( RE_IndirectDiffuse )\n  if (carDebug > 4.5) iblIrradiance *= 0.0;\n#endif\n'],
+      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN, true, true)],
       [
         '#include <lights_fragment_end>',
         /* glsl */ `#include <lights_fragment_end>

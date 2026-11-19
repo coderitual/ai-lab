@@ -170,7 +170,7 @@ const ASSETS = {
     // its contact shadow lies on the road, and its reflection probe (probe=0: none) is redrawn whole every frame
     world.scene.add(car.shadow);
     car.poseShadow(stand.position, new THREE.Vector3(0, 1, 0), stand.rotation.y, 1);
-    const probe = params.probe ? new ReflectionProbe(engine.renderer, number('probesize', TIERS[carTier].probeSize)) : null;
+    const probe = params.probe ? new ReflectionProbe(engine.renderer, number('probesize', TIERS[carTier].probeSize), { caps }) : null;
     if (probe) car.setReflections({ cube: probe.texture, sky: 1, exposure: time.exposure });
     // mirror=1: the paint as a plain mirror, to read the body's surfaces in the reflections (with stripes=1)
     if (query.get('mirror') === '1') {
@@ -197,7 +197,7 @@ const ASSETS = {
       stand.add(made.car.object);
       // (look lane) as in the game: its reflection probe (probe=0: none), so the paint mirrors the lamps, the town and
       // the wet road round it
-      made.probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[tier].probeSize) : null;
+      made.probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[tier].probeSize, { caps }) : null;
       if (made.probe) made.car.setReflections({ cube: made.probe.texture, sky: 1, exposure: time.exposure });
     }
     if (query.has('card')) {
@@ -493,7 +493,10 @@ engine.onDraw = () => {
     const at = asset.car.box.center.clone().applyMatrix4(stand.matrixWorld);
     // the ground under the car is the probe's parallax plane (GLSL_PROBE_PROXY), as in the game
     asset.probe.setProxy(new THREE.Vector3(0, 1, 0), stand.getWorldPosition(new THREE.Vector3()));
-    asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...world.probeHidden].filter(Boolean), 6);
+    // (in the studio the probe sees the dome alone: the world's stand-ins on the probes' own layer, the sky's
+    // among them, would draw over it)
+    const away = studio ? scenery : world.probeHidden;
+    asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...away].filter(Boolean), 6);
     // the car's paint holds lamps in its probe to a few white papers of the picture (materials.js GLSL_KEY): in the
     // studio its lights are the dome itself, lights nowhere else, so nothing is held there
     asset.car.setReflections({ cube: asset.probe.texture, sky: 1, exposure: studio ? 1e-3 : frame.exposure * 2 ** extraStops, proxy: asset.probe.uniforms });

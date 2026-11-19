@@ -592,6 +592,25 @@ they were (eyebrow, projector domes). The tunnel was not staged (the chase
 camera at `t=33` of this build is outside it). At night the plate lamps light
 the dish round the plate brightly.
 
+### Round eight: shading and light, at night, in the tunnel, by day
+
+Staged at night at the grid, in the forest and on the coast (chase camera
+and two photo cameras, 1280 x 720 and 393 x 700, medium and low), in the
+tunnel by day, at the start by day, and in the viewer's showroom; probed with
+a debug switch that drew one share of the light at a time (direct, indirect,
+the probe's reflection alone).
+
+| what was wrong | why | now |
+| --- | --- | --- |
+| at night the body one even pale grey, no panel turning dark | nearly all of it was the probe: the flake layer's blurred read of lamps that also light the car as spots, and of the floodlit ground | lamps held in rough reads (GLSL_KEY); silver 0.86 / 0.33 / flop 0.22 |
+| green on the flank, the C-pillar and a ring round both rims | the start lamps through the rough layers | the hold and `carTint` |
+| a pale wash with a straight edge across the tail in stills | a face of the probe left from 14 s earlier: stills that `skip` must draw a few frames before the picture (`advance(0.12)`); not a fault in play | |
+| displays shining through the roof and rear screen as white bars | full brightness under the night's exposure | dimmed with the light (6 papers) |
+| plate a glaring white | 0.06 of its colour emitted | 0.035 |
+| tunnel: lines thin and grey, body flat pale | lines filtered to their true share of a wide pixel; coat 2.5 | at least a pixel wide; `BORE_COAT` 5, `BORE_SHEEN` 0.3 |
+| rear screen and rear doors showed the seats in the tunnel | 15 % transmission | 10 % |
+| showroom: the world's sky and forest showed through the dome | the dome wrote no depth; the forest arrived after the viewer gathered its scenery | the dome writes depth, the forest is hidden, the dome redrawn as a showroom |
+
 ## What each tier costs
 
 Re-measured after round six (the arches' flare moves the net's points and
@@ -610,7 +629,11 @@ returned handle, shader compilation not included):
 | high | 185.2k | 31 (27) | ~1000 ms |
 | ghost (not re-measured since round two) | 92.5k | 10 | ~150-190 ms |
 
-Plus one draw call for the contact shadow. The four blur shells are hidden at
+Plus one draw call for the contact shadow. Round 8 added no triangles or
+draw calls; per fragment, the paint's flake layer reads the probe once instead
+of nine times (on every tier), and every probe read adds the parallax
+correction (a ray against a plane or a box) and the hold (a few ALU
+operations): cheaper than round 7 on every tier. The four blur shells are hidden at
 rest and the spokes at speed, so the count on the road is the smaller one.
 The atlas bake is most of the difference between tiers; the wheels are about
 150 ms of every build (their textures are shared by the four corners); the
@@ -646,6 +669,14 @@ Most visible first:
 - **At night the paint is dark** where nothing bright is near: it mirrors
   what the probe sees, and needs the wet road and the town to be the glossy
   car of the owner's night reference.
+- **The showroom** (`studio=1&sun=0&ev=0`) is not yet a product render: with
+  the new probe the dome's strip lights come back in the paint (even as a
+  plain mirror, `stripes=1`) several times dimmer than they are seen
+  directly, so the body reads a flat mid grey. Not found in round 8; the game's
+  own reflections (lamps, the tunnel's lines, the sky) are not affected in the
+  stills.
+- **In the tunnel** the pale walls, box-projected into the flanks, keep the
+  silver pale between the lines; a darker body would need darker walls.
 - **By day in low sun** the silver goes warm in the game's grade; it reads
   silver under a higher sun.
 - **Bloom** round the brake lamps is the frame pipeline's; at night it still

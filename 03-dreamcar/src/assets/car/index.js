@@ -220,7 +220,6 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       half: new THREE.Vector3(DIMS.widthWithMirrors / 2, DIMS.height / 2, DIMS.length / 2),
     },
     paints: Object.keys(PAINTS),
-    _shared: shared, // DEBUG car8
     /** The contact shadow: the game adds it to the scene (it is not part of `object`) and poses it. */
     shadow: shadow ? shadow.mesh : new THREE.Group(),
     poseShadow(point, normal, yaw, strength) {
