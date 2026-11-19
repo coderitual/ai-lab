@@ -362,9 +362,9 @@ bottom (as given, whatever the picture's shape); the HUD is hidden unless
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
-day, t 101 s), `?photo=d3` (the ledge's first bend, day, t 77 s; round 5: 100 and 76.6 before the coast ran low),
+day, t 100.4 s), `?photo=d3` (the ledge's first bend, day, t 76.5 s; 100 and 76.6 before the coast ran low),
 `?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green),
-`?photo=k5` (frame K5, strict spec at dusk: t 89.7 s (round 5: 88.7 before the coast ran low), the end of the sweepback's first piece, a chase camera
+`?photo=k5` (frame K5, strict spec at dusk: t 89.1 s (88.7 before the coast ran low), the end of the sweepback's first piece, a chase camera
 6.2 m back and 2.3 m up, pitched 9 degrees down, lens 50 degrees) and
 `?photo=e1` (frame E1, strict spec for the coast stretch: day, t 64.9 s, the car coming out of the carousel,
 the camera on the crest looking back at it; a `roll` of 7 degrees tilts the horizon as the frame's does); a name

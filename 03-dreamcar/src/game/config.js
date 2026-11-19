@@ -348,13 +348,13 @@ export const CAMERA = {
  * lagoon beside the causeway (not yet staged: the first pose tried, low on the bay side, saw the road and the massif).
  */
 export const PHOTOS = {
-  d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 101, time: 'day' },
-  d3: { back: 7, right: -0.3, up: 1.6, yaw: 12, pitch: -8, fov: 52, t: 77, time: 'day' },
+  d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100.4, time: 'day' },
+  d3: { back: 7, right: -0.3, up: 1.6, yaw: 12, pitch: -8, fov: 52, t: 76.5, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
   // (day lane) frame K5, the owner's strict spec at dusk: the end of the sweepback's first piece, high over the bay
-  k5: { back: 6.2, right: 0, up: 2.3, yaw: 0, pitch: -9, fov: 50, t: 89.7, time: 'dusk' },
+  k5: { back: 6.2, right: 0, up: 2.3, yaw: 0, pitch: -9, fov: 50, t: 89.1, time: 'dusk' },
   e1: { back: -7.5, right: 2.5, up: 2.2, yaw: 160, pitch: -4, fov: 50, roll: 7, t: 64.9, time: 'day' },
-  waves: { back: 4, right: -8, up: 1.8, yaw: 35, pitch: -3, fov: 55, t: 95.4, time: 'day' },
+  waves: { back: 4, right: -8, up: 1.8, yaw: 35, pitch: -3, fov: 55, t: 94.8, time: 'day' },
 };
 
 /**

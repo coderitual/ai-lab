@@ -328,7 +328,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,roll][,hud]` | the staging camera (`roll`: degrees the picture leans clockwise) |
-| `?photo=d1`, `d3`, `d4`, `e1`, `k5`, `waves` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; k5 the end of the sweepback's first piece at dusk, t 89.7 s, frame K5's chase camera; waves the low crossing by day, t 95.4 s; round 5 moved d1 to t 101 and d3 to 77: the coast after the tunnel runs low) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=d1`, `d3`, `d4`, `e1`, `k5`, `waves` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; k5 the end of the sweepback's first piece at dusk, t 89.1 s, frame K5's chase camera; waves the low crossing by day, t 94.8 s; the low coast moved d1 to t 100.4 and d3 to 76.5) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |

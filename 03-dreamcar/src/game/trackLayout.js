@@ -102,6 +102,10 @@ export const SIDES = {
   rockSea: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null, coast: true },
   openSea: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'grass', wood: null, coast: true },
   // (sea lane, round 5) the ledge's insides too: the bay reaches them (frame D3's bank was given up for the bay)
+  // (sea lane, the coast's last round: no wall of rock on the right) where the rock edges were, the same edge and the
+  // same kind (what the cars hit does not move), but on a sea side the rock is only a low wall of rock 1.2 m high, under
+  // the car's roof line (terrain.js COAST.seaRock), the bay beyond it
+  seaWall: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null, coast: true },
   bankSea: { kind: 'wall', edge: [3.5, 5], slope: 0.07, far: 0.12, verge: 'grass', wood: null, coast: true },
   coastUp: { kind: 'rail', edge: [3, 5], slope: 0.05, far: 0.45, verge: 'grass', wood: null, coast: true },
   coastDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.35, verge: 'grass', wood: null, coast: true },
@@ -172,18 +176,18 @@ const SEGMENTS = [
 
   // The sky road: out of the mountain onto piers, a long banked left across an inlet of the sea (sea lane, round 2:
   // the ground under the middle of the deck is 96 m down, under the water: the piers stand in the sea).
-  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: -1, gk: [[0.82, -7.9]], L: 'parapet', R: 'parapetSea', bridge: true, drop: 96 },
+  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: -2, gk: [[0.815, -7.9]], L: 'parapet', R: 'parapetSea', bridge: true, drop: 60 },
 
   // The carousel: a climb along the far side, then a right round the spur, the slow corner of the lap.
   // (sea lane) the coast road: from here to the foot of the plunge the sea lies below on the left, the land cut on the right
-  { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 6, L: 'coastDown', R: 'rockSea' },
-  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'coastRun', R: 'rockSea', runoff: 'L' },
+  { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 5.5, L: 'coastDown', R: 'seaWall' },
+  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'coastRun', R: 'seaWall', runoff: 'L' },
 
   // The crest: up over the top in the open, the sea far below.
-  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 6.5, gk: [[0.2, 6.5]], L: 'coastTop', R: 'openSea' },
+  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: -2, L: 'coastTop', R: 'openSea' },
 
   // The plunge: 8 per cent down into a compression.
-  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: 6.5, L: 'coastDown', R: 'coastUp' },
+  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: 1, L: 'coastDown', R: 'coastUp' },
 
   // The ledge: fast downhill sweepers along the hillside. The first, a left, has the valley open on its inside over
   // a low wall and a wooded bank on its outside (and no kerb on its inside: a white line, the paved margin and
@@ -192,11 +196,11 @@ const SEGMENTS = [
   // the banking tilts the road away from it; at 10 the sun grazed the asphalt at 6 degrees and the bank's tree shade
   // could not be told from the light round it. At 7 the asphalt takes half as much again. (4 and 5 degrees were
   // tried: they put the drift and crest tests of tools/unit.mjs over their limits.)
-  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 7, g: -1, gk: [[0.55, 6.5]], L: 'balcony', R: 'bankSea', runoff: 'R', kerb: false },
-  { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: -7.5, L: 'midRun', R: 'rockSea', runoff: 'L' },
+  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 7, g: 4, L: 'balcony', R: 'bankSea', runoff: 'R', kerb: false },
+  { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: 6.3, L: 'midRun', R: 'seaWall', runoff: 'L' },
 
   // Gully bridge: straight across a gully on piers.
-  { id: 'gully', sec: 'gully', len: 337.0834, ease: 100, g: -8, L: 'parapet', R: 'parapet', bridge: true, drop: 26 },
+  { id: 'gully', sec: 'gully', len: 337.0834, ease: 100, g: -8, gk: [[0.3, 3.5]], L: 'parapet', R: 'parapetSea', bridge: true, drop: 45 },
 
   // The long right: down to the shore and onto the straight.
   { id: 'approach', sec: 'sweepback', len: 100, ease: 60, g: -7.8, L: 'lowDown', R: 'lowUp' },

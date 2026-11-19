@@ -136,7 +136,7 @@ const COAST = {
   ease: 30,
   cut: 6,
   landFar: 0.25,
-  seaRock: 1.4,
+  seaRock: 1.2,
   knoll: { piece: 'carousel', rise: 0, along: 230, across: 44, shift: 0.65 },
 };
 
