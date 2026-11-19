@@ -155,6 +155,23 @@ machine without a GPU, and only what is listed here.
   tools/unit.mjs` passed; drift.test.mjs now has 8 tests (the pad's lap,
   braking while turning, the red-arc and button slides, a clumsy thumb).
   Tilt is checked with synthetic deviceorientation events only.
+- **The pad under the thumb and the pedal gauge** (CONTROLS lane, round 3,
+  2026-11-19): touch, slide, options, hud, start and split against a
+  production build: 481 of 481 (split 27 s, touch 122 s, slide 113 s, hud 178
+  s, options 241 s, start 47 s). The touch section places the pad at five
+  spots and four edge cases in both orientations (centre = landing point or
+  the documented nudge, first input zero, no movement under a 100 px drag,
+  compressed travel reaches full lock or the red, the 6 px hold, a second
+  finger = handbrake, HUD buttons place nothing, both hands, both halves of a
+  split); the gauge reads full on auto, brake with no throttle under the pad's
+  pull, zero and zero on manual untouched, and its box is in the hud overlap
+  checks. In earlier runs the hud check "nothing over the car" failed once
+  with the insets stood in for (393x852, solo: the car's box 120 px low; the
+  ghost and the gauge were over it): not reproduced in the last run, still
+  unexplained. `node tools/unit.mjs` passed (the scripted thumb needed no
+  change). Not verified: a real phone, Safari, real thumbs (is 60 % of the
+  travel and a 6 px hold right at a real edge? does a second finger anywhere
+  feel like a handbrake?), the gauge's eased bars at a real frame rate.
 - **The two-player "water on the track"** (CONTROLS lane, round 2): reproduced
   at night on low in a side-by-side split of an upright phone
   (`?mode=split&time=night&t=14`, view.split wide, 393x852): the second

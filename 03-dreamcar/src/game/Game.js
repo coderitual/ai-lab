@@ -757,6 +757,11 @@ export class Game {
         if (phase === 'countdown') Object.assign(controls, HELD);
       }
       vehicle.step(dt, controls);
+      // the HUD's pedal gauge: what the car got, eased here so the picture only reads it (TC shows as a flicker)
+      const gauge = racer.gauge || (racer.gauge = { t: 0, b: 0 });
+      const k = 1 - Math.exp(-dt / 0.04);
+      gauge.t += (vehicle.throttle - gauge.t) * k;
+      gauge.b += (vehicle.brake - gauge.b) * k;
     }
     if (racers.length > 1) collideVehicles(racers[0].vehicle, racers[1].vehicle);
 
@@ -1153,6 +1158,7 @@ export class Game {
       }
       h.setSpeed(v.speed * 3.6);
       h.setRev(v.rpm, v.gear);
+      if (racer.gauge) h.setGauge(racer.gauge.t, racer.gauge.b, racer.controls.handbrake > 0.5);
       const a = v.assists;
       h.setTells({
         abs: a.abs > 0.1,
