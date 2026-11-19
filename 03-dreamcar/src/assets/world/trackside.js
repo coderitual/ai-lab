@@ -8,10 +8,10 @@
 // nothing stands inside the corridor's solid edges, so every piece is set at
 // or beyond edgeAt(s, side), whatever lat the data carries.
 //
-// Boards: on the start straight one long run of tall hoardings (about 4 m of
-// panel, tops at about 5 m) behind the lake-side wall, broken only by the
-// stand and the gantry's tower, and nothing tall on the land side (the D1
-// frame); low panels on short legs along the bends (D3, D4). Then, from the
+// Boards: on the start straight two groups of tall hoardings (about 4 m of
+// panel, tops at about 5 m) behind the lake-side wall, the Track's two runs
+// there (one by D1's camera, one near the line), and nothing tall on the land
+// side (the D1 frame); low panels on short legs along the bends (D3, D4). Then, from the
 // gantry's s: a short tyre wall with low boards on a low wall behind it just
 // past the pit exit (D4), and distance boards 200, 150, 100 before the first
 // bend, big enough to read from 150 m. The designs
@@ -27,6 +27,8 @@ import { STAND } from './pits.js';
 /** The boards: width, height, height of the foot over the ground, metres beyond the edge, gap between panels. */
 const TALL = { w: 7.6, h: 3.8, foot: 1.0, beyond: 1.4, gap: 0.14 };
 const SMALL = { w: 4.4, h: 1.1, foot: 0.25, beyond: 0.55, gap: 0.35 };
+/** (day lane) The low boards on the inside wall of the ledge's first bend (frame D3). */
+const D3_LOW = { w: 4.0, h: 0.75, foot: 0.25, beyond: 0.55, gap: 0.3 };
 /** The low walls (walls.js): their top over the road at the edge, and where a board on them stands (m beyond the edge). */
 const WALL = { top: 0.93, board: 0.42 };
 /** How far into the ledge (frame D3) its runs carry their own palette, and the palettes (signs.js DESIGN order). */
@@ -36,7 +38,7 @@ const D3_INSIDE = [0, 6, 5, 10];
 /** (sea lane, round 2) On the coast road's sea side (frame E1) the boards are red and white: VARNO, PELLORA, TERNA. */
 const COAST_BOARDS = [0, 6, 10, 6];
 /** The tall run is phased at this many metres before the line (frame D1's camera). */
-const D1_ANCHOR = 175;
+const D1_ANCHOR = 211;
 /** A tyre stack: radius, height (four tyres), spacing along the wall. */
 const TYRE = { r: 0.31, h: 1.0, step: 0.62 };
 /** The distance boards: size, height of the foot over the road. */
@@ -132,11 +134,12 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
     const big = track.sectionAt(run.s0 + len / 2).id === 'straight';
     // the land side of the straight stays open: grass, the barrier, the pits
     if (big && run.side < 0) continue;
-    const T = big ? TALL : SMALL;
-    const n = Math.floor(len / (T.w + T.gap));
-    const pitch = len / n;
     const coast = (run.side > 0 ? track.coastL : track.coastR)?.[Math.round(track.wrap(run.s0 + len / 2) / track.ds) % track.count] === 1;
     const palette = inD3(run) ? (run.inside ? D3_INSIDE : D3_OUTSIDE) : coast ? COAST_BOARDS : null;
+    // (day lane) frame D3's inside wall carries low boards, hardly taller than the wall itself
+    const T = big ? TALL : palette && run.inside ? D3_LOW : SMALL;
+    const n = Math.floor(len / (T.w + T.gap));
+    const pitch = len / n;
     // the tall run's panel index at the anchor
     const k0 = big ? Math.round(track.wrap(tallAnchor - run.s0) / pitch - 0.5) : 0;
     for (let k = 0; k < n; k++) {

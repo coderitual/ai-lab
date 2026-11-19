@@ -269,7 +269,22 @@ the longer the path through the air), the sun's glow (a wide and a tight
 lobe) and its disc thousands of times brighter than the blue, unclamped, so
 the frame's bloom and flare make the glare from real brightness. Two layers
 of cloud lit from the side the light comes from, with grey-blue bases and
-silver rims near the sun; at golden hour, lit from below. By night the same
+silver rims near the sun; at golden hour, lit from below. The cumulus noise is
+pushed up round one place in the sky (lighting.js `clouds.group`, placed
+against the straight's heading like the sun: 30 degrees left of it, 30 up), so
+that D1's group of big heaps over the massif's shoulder is there whatever the
+noise does elsewhere; their rims are cut sharp (a 0.07 wide edge).
+
+At dusk the clear sky is not the zenith-to-horizon gradient but a twilight
+dome (lighting.js `sky.twilight`, sky.js `twiColumn`): two columns of five
+radiances from the horizon up, one under the sun (rose, orange, pale yellow,
+turquoise, deep blue) and one opposite it (the blue-violet shadow of the
+earth, the pink belt, blue), blended round the sky by how far a direction is
+turned towards the sun, with the sun's glow on top. The clouds' light then
+gathers on the sun's side (`clouds.sunward`): undersides lit orange-rose
+near the sun, dark blue-grey elsewhere; and the first stars show only high
+up and away from the sun (`starsAway`). The environment map, the probes and
+any water are drawn from the same dome, so they mirror it. By night the same
 shader draws the moon, airglow and the Milky Way; stars are points a pixel or
 two wide with their brightness spread over the footprint, so they neither
 flicker nor change with the picture's size.
@@ -288,6 +303,31 @@ domain-warped down from each summit and its own baked sun and moon shadows.
 They lie beyond the far plane, so their vertex shader puts them at the back
 of the depth range; drawn first, depth test always passing, still writing
 depth so the sky does not paint over them.
+
+The massif is back-lit, so its faces are in the sky's light and its form is
+carried by its albedo and its rim (day lane): limestone of albedo about 0.19,
+ribs paler than the gullies between them (a ridged field down the face,
+squared), pale fans of scree where the gullies open onto gentler ground near
+the tree line, a few great buttresses 600 to 1000 m apart cut into the face
+(their flanks turn to the sun or away), gullies that fork and end as they run
+down instead of hanging the whole height of the face. The rim: rock seen
+edge-on near the skyline, looking towards the sun, sends light forwards
+(`uRim`, graze cubed times the view's alignment with the sun to the fourth,
+only where the baked sun reaches): a thin bright line along the ridges on the
+sun's side, as in D1. Its skyline: the ridge left of the main peak stays about
+21 degrees high and the shoulder climbs gently out of the frame.
+
+`far.js` also builds **the green hill** of frame D3 (`greenHill` in
+landmarks.js): a wooded ridge 470 m high with three summits beyond the west
+end of the lake, 41 degrees left of the road 1.9 km out from the ledge's
+first bend and lying across the line of sight from there, so that a green
+hill, not the massif's bare rock, stands over the pale hall. It is inside the
+far plane and drawn as an ordinary surface (12 x 40 cells on low, 24 x 96
+otherwise), wood with clumps of lighter crowns and the odd pale outcrop. From
+the start line it stands behind the left shoulder; its end towards the start
+is kept short and low, so that the golden-hour sun (bearing 215, 2 degrees
+up) sets just clear of it (worked out on paper: the ridge stays under the
+horizon there up to 3 degrees right of the sun).
 
 The sun and moon are placed against the straight's heading
 (`lighting.js` `PLACES`, `placeLights`), not on the map: move the straight and
@@ -340,7 +380,7 @@ on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car als
   number instead of a covariance matrix).
 - **The glare lobe.** A second, anisotropic specular lobe stretched along the
   line of sight lays the low sun's glare along the road as a long streak
-  (`ASPHALT_SHEEN`: along 0.45, across 0.06), broken up by the stones. Dry asphalt keeps 0.3 of the standard material's own isotropic lobe, so that the streak is the sheen's; under water or paint it keeps all of it.
+  (`ASPHALT_SHEEN`, road.js `SHEEN`: along 0.12, across 0.15, at 0.28 of a plain dielectric), broken up by the stones. Dry asphalt keeps 0.25 of the standard material's own isotropic lobe, so that the streak is the sheen's; under water or paint it keeps all of it. The sky's sheen (`SKY_SHEEN`, gain 0.42) fills the shade at a glancing angle.
 - **The racing line and the history.** A polished darker band where cars run,
   rubber in the bends and the braking zones; runs of surfacing with joints,
   seams 2 m either side of the middle, patches, sealed cracks, expansion
@@ -366,6 +406,10 @@ on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car als
   lobe about the mirrored view, narrow across the plane of incidence, long in
   it), and on every tier the cars' tail lamps are drawn so too (`TAIL_GLINT`,
   only behind the car), which the mirror cannot show.
+- **The tail lamps' pool** (`TAIL_POOL`, dusk lane): on dry asphalt too,
+  from dusk on, each lit tail lamp lays red light on the road behind its car
+  (falling with the square of the distance, only behind the car, three times
+  as much with the brakes on), as the head lamps lay their pool ahead.
 - **The canopy** (`src/assets/world/canopy.js`): what the woods beside the road
   hide of the sky, defined once from the Track's `woodAt` and multiplied into
   the baked sky share (`aBake.z`) of the road, the kerbs and the verges, and

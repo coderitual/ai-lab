@@ -70,7 +70,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
 | tyre walls | 8 runs, on the outside of the fast bends |
-| trackside boards | 11 runs, both walls of the straight included |
+| trackside boards | 10 runs: the outsides of the run-off bends, and two groups on the straight's lake-side wall (229 to 189 m and 82 to 44 m before the line); none on its land side |
 | distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel |
 | marshal posts | 12 |
 | start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |
@@ -458,6 +458,14 @@ places on the lap were not counted. Triangles hardly moved (low 293 to
 358 k, medium by night 0.97 to 1.30 M): still over the triangle budgets.
 About a quarter of every pass's calls is the car (25 in the scene and in the
 mirror, 14 in the shadow map), which this lane did not touch.
+
+**After the day lane** (same tool and moments, plus the run-up to the line at
+t = 100; the head before the lane in brackets): low by day 133 (133), 140
+(140), 153 (152) at the ledge bend, 145 (141) on the run-up; triangles 292,
+338, 366 and 349 k (297, 340, 367, 353 k: the straight's thinned boards more
+than pay for the green hill and the rows of trees). Medium by night 291
+(291), 266 (267), 278 (278), 257 (244). The ledge bend on low was already
+over 150 before the lane, and the green hill adds one call there.
 
 **Draw calls at the tunnel** (tunnel lane, 2026-11-18, the same counter, the
 last of four frames, from t = 34.5 of the autopilot run: the approach 120 m

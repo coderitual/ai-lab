@@ -225,6 +225,34 @@ machine without a GPU, and only what is listed here.
   ones made); the rails' reflectors were. Not looked at on `high`, in split
   screen at night or in motion; the playtest and the soundtest were not
   run. The page raised no console error in any of these loads.
+- **The day lane's changes** (a bluer day sky and a group of cumulus placed
+  over the massif's shoulder, the massif darker with ribs, scree fans,
+  buttresses and a back-lit rim, its saddle raised; the straight's tall
+  boards in two groups with green rows behind the warm-painted low wall; a
+  darker, more contrasty asphalt with a narrower glare; the D3 preset
+  restaged; the green hill beyond the lake; low boards on the ledge's inside
+  wall; thinner valley mist by day): four rounds of stills on software WebGL
+  at `medium` 1280x720 for d1 and d3 beside the frames, d4 once at the end
+  and the d1 place by night once; compositions found on `low`; draw calls and
+  triangles counted with the picture lane's measure tool at phone shape
+  (low by day, medium by night, t = 0, 33, 79, 100) against the head before
+  the lane; `node tools/unit.mjs` passed. The golden-hour sun's clearance of
+  the green hill was worked out on paper, not seen in a still (the one
+  staged towards it looked into the stand). Not looked at on `high`, in
+  motion, in split screen or in the chase view; the playtest, the soundtest
+  and the docs' screenshots were not run.
+- **The dusk lane's changes** (the twilight dome, dusk clouds lit on the
+  sun's side, first stars, the horizon-coloured haze, the dusk grade, lamps
+  and windows on with halos, the tail lamps' red pool on the road): chase
+  stills on software WebGL at `medium` before and after, 1280x720 and
+  393x700 `--mobile`, at t = 29 to 58 of the autopilot run (the approach,
+  inside the tunnel, its exit and the viaduct after it) and d4, by eye; one
+  round on `low`. The pool's final strength (2) was set after the last
+  still (it was judged at 3, too red on the edge line). The tunnel's own
+  exposure was tried at 3.6 and made no visible difference in the stills, so
+  it stays 6. Not looked at on `high`, at night (the pool is on at night
+  too), in motion, in split screen or over the coming sea; draw calls were
+  not counted (no geometry was added); the playtest was not run.
 - **The tunnel lane's changes** (the box tunnel, its portals and cuttings,
   the lamps' zones and cool white, the road's sheen and the cars' shade in the
   tunnel, the probe's cadence and reach there, no wet mirror under the roof):
