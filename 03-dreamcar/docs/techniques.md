@@ -236,18 +236,23 @@ are a feature atlas (`atlas.js`, `features.js`) drawn on the skin rather than
 separate meshes; what must have depth (lamp units, mirrors, wheels) is
 modelled. The paint is a standard physical material with a clear coat and a
 metallic base with flakes; what it mirrors is the car's reflection probe
-(`src/engine/ReflectionProbe.js`): a cube picture of the surroundings round
-the car, a face or two a frame at speed, a larger cube redrawn whole while the
-car is still (the title, the grid), sizes in `PROBE` per tier. The probes
-leave out what would only cost (the start's dressing, the town; on `low`
-also the rails, the guide posts and the lamps' glow, which are less than a
-texel of its 64-texel faces). A face sees the whole world round the car and
-costs about as many triangles as the view, so on `medium` one face is
-redrawn every other frame at speed and two every third frame standing still
-(`PROBE.every`, `stillEvery`). What is big and far is drawn for the probes by
-a cheaper stand-in on `PROBE_LAYER`, a layer only the probes' cameras have:
-the massif's grid on every other column and row (a quarter of its triangles);
-the full grid sets its draw range to nothing for a probe's camera.
+(`src/engine/ReflectionProbe.js`, in full in engine.md, "The reflection
+probe"): a cube picture of the surroundings round the car, 128 / 256 / 512
+texels a face by tier, one or two faces redrawn a frame (the ones that see
+the roadside go by first), and filtered into a second cube whose mips hold the
+GGX lobe of one roughness each, so that any layer reads its whole glossy
+reflection in one lookup at its own roughness and a lamp in it is a soft
+lobe, not a blotch; each new picture is eased in over a few frames, so a
+refreshed face does not pop. The probes leave out what would only cost (the
+start's dressing, the town; on `low` also the rails, the guide posts and the
+lamps' glow) and see no further than 260 to 400 m. A face sees the whole world
+round the car and costs about half as many triangles as the view; the cube's
+resolution costs next to nothing beside that. What is big and far is drawn for
+the probes by a cheaper stand-in on `PROBE_LAYER`, a layer only the probes'
+cameras have: the massif's grid on every other column and row (a quarter of
+its triangles); the full grid sets its draw range to nothing for a probe's
+camera. The sky dome draws no sun or moon disc for them (the light's own
+highlight is the disc's).
 
 ## The trees
 
@@ -719,11 +724,19 @@ the box its faces see only 160 m (`PROBE.tunnelFar`: what lies beyond is
 culled) and on medium two faces are redrawn every other frame instead of one
 (`tunnelFaces`), so the cube is a tenth of a second old at speed and the lines
 of fittings slide over the roof, the shoulders and the glass with the car.
-The probe stands at the middle of the car and knows directions only: a line 5
-to 6 m overhead is mirrored almost where it should be on the roof and the
-glass, and a little wide on the flanks. A correction for the ceiling's plane in
-the car's materials, as `carGround` corrects for the road's, would put them
-exactly; it has not been made.
+The probe stands at the middle of the car, knows directions only and sees
+the fittings as broad stand-ins a fifth of a second old: in the paint they
+came out as blotches and broken flecks. So the car draws the two lines of
+luminaires itself (car.md, "In the tunnel"): each reflected ray is followed
+from the body's own point to the lines' plane, with the rows of bars and their
+places read from the tunnel (`BORE_UNIFORMS`, `LUMINAIRE`) and the car's place
+in the road's frame handed over by the game each frame (`setBore`); the probe's
+read is held to a few times the lining's radiance under the roof, so the
+fittings in it do not double them, and box-projected onto the walls and the
+ceiling. In the tunnel the probe hands the materials the bore as a box (wall to
+wall, road to ceiling, 30 m each way: `probeBox`, GLSL_PROBE_PROXY), and the
+car's materials read the probe through it (box projection), so the walls and
+the ceiling stand at their true distance in the flanks.
 
 **The portals and the cuttings.** The faces are a rectangle with the mouth
 cut out (ShapeGeometry), a reveal, a lintel standing out, a coping. The

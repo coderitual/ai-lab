@@ -107,6 +107,14 @@ medium takes minutes to draw on software WebGL), `?nodraw`, `?time=`,
 `?mode=split`, `?laps=`, `?ui=0`, `?mute`, `?photo=`, `?debug=`. All of them
 are in [spec.md](spec.md#url-parameters).
 
+To look at the car's reflection probe itself: `?debug=probe` draws the view's
+cube unrolled four times instead of the picture, at roughness 0, 0.3, 0.6 and
+1 (top left, top right, bottom left, bottom right; the horizon across the
+middle of each, +Z in its centre): blocks, seams, a light printed several
+times or a face that does not match its neighbours show there first. Add
+`&photo=...` to place the car where it matters (engine.md, "The reflection
+probe").
+
 ## What has been verified
 
 Only in headless Chromium on software WebGL (SwiftShader), on one Linux
@@ -298,9 +306,31 @@ machine without a GPU, and only what is listed here.
   on `high`, in split screen, in motion or with a player driving; the
   playtest (which has no tunnel section) and the soundtest were not run (the
   sound's tunnel reverb reads the Track's sky, which did not move).
+- **The car lane's round 8** (the paint, glass and lamps at night, in the
+  tunnel and by day, with the probe lane's prefiltered probe and its
+  parallax): stills on software WebGL at `medium` 1280x720 by night (grid,
+  forest, coast; chase and two photo cameras), in the tunnel by day (five
+  cameras), at the start by day, before and after, by eye; 393x700 and `low`
+  by night; the viewer's showroom at `high`. `node tools/unit.mjs` passed.
+  Not looked at on `high` in the game, at dusk, in split screen or in motion
+  (the probe's easing and the lines streaming were not seen moving); the
+  playtest was not run.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
+
+- **The probe lane's changes** (the reflection probe prefiltered for
+  roughness, eased in, faces by what changes fastest, 128 / 256 / 512, the
+  parallax proxy, no sun disc in it): `?debug=probe` looked at by day on
+  medium (four roughnesses: no blocks, no seams); stills on software WebGL at
+  `medium`, 1280x720, with the photo camera low behind the car, before and
+  after, by day on the grid, in the esses (t = 33) and by night on the grid;
+  draw calls and triangles per pass counted on low and medium (engine.md, "The
+  reflection probe"); the playtest's `window` (a lost and restored context
+  mid-run) and `tiers` sections passed; `node tools/unit.mjs` passed. Not looked
+  at: `high` and dusk stills, the tunnel itself, split screen, the 8-bit
+  fallback (`?ldr`), and anything in motion (the easing was reasoned, not
+  watched).
 
 ## What has not been verified
 

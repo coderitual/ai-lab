@@ -170,8 +170,8 @@ const ASSETS = {
     // its contact shadow lies on the road, and its reflection probe (probe=0: none) is redrawn whole every frame
     world.scene.add(car.shadow);
     car.poseShadow(stand.position, new THREE.Vector3(0, 1, 0), stand.rotation.y, 1);
-    const probe = params.probe ? new ReflectionProbe(engine.renderer, number('probesize', TIERS[carTier].probeSize)) : null;
-    if (probe) car.setReflections({ cube: probe.texture, sky: 1 });
+    const probe = params.probe ? new ReflectionProbe(engine.renderer, number('probesize', TIERS[carTier].probeSize), { caps }) : null;
+    if (probe) car.setReflections({ cube: probe.texture, sky: 1, exposure: time.exposure });
     // mirror=1: the paint as a plain mirror, to read the body's surfaces in the reflections (with stripes=1)
     if (query.get('mirror') === '1') {
       car.object.traverse((o) => {
@@ -197,8 +197,8 @@ const ASSETS = {
       stand.add(made.car.object);
       // (look lane) as in the game: its reflection probe (probe=0: none), so the paint mirrors the lamps, the town and
       // the wet road round it
-      made.probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[tier].probeSize) : null;
-      if (made.probe) made.car.setReflections({ cube: made.probe.texture, sky: 1 });
+      made.probe = params.probe ? new ReflectionProbe(engine.renderer, TIERS[tier].probeSize, { caps }) : null;
+      if (made.probe) made.car.setReflections({ cube: made.probe.texture, sky: 1, exposure: time.exposure });
     }
     if (query.has('card')) {
       const towardsLight = new THREE.Vector3().fromArray(time.sun.dir).transformDirection(stand.matrixWorld.clone().invert());
@@ -417,7 +417,15 @@ function placeCamera() {
   camera.updateMatrixWorld();
   if (pinhole && !ortho) placePinhole();
 
+  // (the world's forest and other late parts arrive after the page starts: gather them again)
+  world.scene.traverse((object) => {
+    if ((object.isMesh || object.isPoints || object.isLine || object.isSprite) && !worldMeshes.includes(object) && !inStand(object) && object !== asset.car?.shadow && object.parent !== asset.car?.shadow) {
+      worldMeshes.push(object);
+      scenery.push(object);
+    }
+  });
   for (const object of scenery) object.visible = !ortho && !studio;
+  if (studio && world.forest) world.forest.group.visible = false;
   if (studio) studio.group.visible = !ortho;
   world.scene.background = ortho ? backdrop : null;
   frame.look = ortho ? flatLook : time.look;
@@ -469,6 +477,11 @@ const sunOff = query.get('sun') === '0';
 const extraStops = number('ev', sunOff ? 2 : 0);
 engine.onDraw = () => {
   if (sunOff) world.scene.traverse((o) => { if (o.isDirectionalLight) o.intensity = 0; });
+  // in the studio with the sun off, the dome is the only light (through the car's probe): no sky fill, no sky map
+  if (sunOff && studio) {
+    world.scene.traverse((o) => { if (o.isHemisphereLight || o.isAmbientLight) o.intensity = 0; });
+    world.scene.environment = null;
+  }
   if (Number.isFinite(view.focus)) track.pointAt(view.focus, view.lat, focus);
   else stand.getWorldPosition(focus);
   world.prepareView(camera, focus, beams);
@@ -478,7 +491,15 @@ engine.onDraw = () => {
   }
   if (asset.probe) {
     const at = asset.car.box.center.clone().applyMatrix4(stand.matrixWorld);
-    asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...world.probeHidden].filter(Boolean), 6);
+    // the ground under the car is the probe's parallax plane (GLSL_PROBE_PROXY), as in the game
+    asset.probe.setProxy(new THREE.Vector3(0, 1, 0), stand.getWorldPosition(new THREE.Vector3()));
+    // (in the studio the probe sees the dome alone: the world's stand-ins on the probes' own layer, the sky's
+    // among them, would draw over it)
+    const away = studio ? scenery : world.probeHidden;
+    asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...away].filter(Boolean), 6);
+    // the car's paint holds lamps in its probe to a few white papers of the picture (materials.js GLSL_KEY): in the
+    // studio its lights are the dome itself, lights nowhere else, so nothing is held there
+    asset.car.setReflections({ cube: asset.probe.texture, sky: 1, exposure: studio ? 1e-3 : frame.exposure * 2 ** extraStops, proxy: asset.probe.uniforms });
   }
   const exposure = frame.exposure;
   frame.exposure *= 2 ** extraStops;
