@@ -851,7 +851,7 @@ function buildGantry({ track, terrain, s, paint, glow, low }) {
 
 /**
  * The banner over the entrance: one of the circuit's made-up boards (signs.js), on posts on the headwall's coping.
- * On the low tier its field's colour only, in the painted steel's mesh.
+ * (nearfield lane) The same printed board on every tier, in a steel frame.
  */
 function buildBanner({ track, terrain, s, paint, low }) {
   const { P, M } = place(track, s, -1);
@@ -861,14 +861,22 @@ function buildBanner({ track, terrain, s, paint, low }) {
   const foot = top + 0.6;
   const lat = 2;
   for (const e of [-w / 2 + 1, w / 2 - 1]) paint.add(UNIT_BOX, M(lat + e, (top + foot) / 2 + 0.3, -0.2, [0.12, foot - top + 0.6, 0.12]), PAINT.steel);
-  if (low) {
-    paint.add(UNIT_BOX, M(lat, foot + h / 2, -0.1, [w, h, 0.08]), PAINT.banner);
-    return null;
-  }
+  // (nearfield lane) a board on every tier, not a box of the field's colour on the low one (the owner's phone): a
+  // steel frame round the printed face, a dark back, two braces to the posts
+  const fy = foot + h / 2;
+  for (const [dx, dy, sx, sy] of [
+    [0, h / 2 + 0.06, w + 0.24, 0.12],
+    [0, -h / 2 - 0.06, w + 0.24, 0.12],
+    [-w / 2 - 0.06, 0, 0.12, h + 0.24],
+    [w / 2 + 0.06, 0, 0.12, h + 0.24],
+  ])
+    paint.add(UNIT_BOX, M(lat + dx, fy + dy, -0.1, [sx, sy, 0.14]), PAINT.steel);
+  paint.add(UNIT_BOX, M(lat, fy, -0.17, [w, h, 0.04]), PAINT.housing);
+  for (const e of [-w / 2 + 1, w / 2 - 1]) paint.add(UNIT_BOX, M(lat + e, fy, -0.2, [0.1, h, 0.1]), PAINT.steel);
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
-  paintBoard(canvas.getContext('2d'), [0, 0, 512, 128], DESIGN.arvent);
+  canvas.width = low ? 256 : 512;
+  canvas.height = low ? 64 : 128;
+  paintBoard(canvas.getContext('2d'), [0, 0, canvas.width, canvas.height], DESIGN.arvent);
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = 4;

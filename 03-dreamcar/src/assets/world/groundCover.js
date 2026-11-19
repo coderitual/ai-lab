@@ -481,6 +481,53 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
     }
   }
 
+  // (nearfield lane, round 2) outcrops on the banks: where the land rises beyond the edge (a bank, a hillside over the
+  // road), clusters of big half-buried rocks in groups of three to five, 1.5 to 4 m, so that the banks have
+  // structure and a broken skyline instead of a bald green hump; ochre on the coast, grey inland. Their own stream, so
+  // nothing else moves.
+  {
+    const or = rng.fork('outcrops');
+    for (const side of [1, -1]) {
+      const coastOf = side > 0 ? track.coastL : track.coastR;
+      for (let s = or.range(0, 20); s < track.length; s += or.range(22, 40)) {
+        if (inRanges(s, track.tunnels, 25) || inRanges(s, track.bridges, 10)) continue;
+        const i = Math.round(s / track.ds) % track.count;
+        const edge = track.edgeAt(s, side);
+        const yE = terrain.heightOnTrack(s, side * edge);
+        const rise = terrain.heightOnTrack(s, side * (edge + 25)) - yE;
+        if (rise < 4) continue;
+        const coast = coastOf?.[i] === 1;
+        const centre = edge + or.range(8, 35);
+        const count = 3 + or.int(3);
+        for (let k = 0; k < count; k++) {
+          const ss = s + or.range(-4, 4);
+          const lat = side * (centre + or.range(-4, 4));
+          track.pointAt(ss, lat, point);
+          if (!ownStretch(ss, point.x, point.z)) continue;
+          const size = or.range(1.5, 4) * (k === 0 ? 1 : 0.7);
+          const y = terrain.heightAt(point.x, point.z);
+          const v = or.range(0.8, 1.15);
+          const tint = coast ? [0.3 * v, 0.17 * v, 0.085 * v] : [0.2 * v, 0.195 * v, 0.185 * v];
+          rockItems.push(make(point.x, y - size * 0.3, point.z, or.range(0, Math.PI * 2), [size * or.range(0.9, 1.5), size * or.range(0.7, 1.1), size * or.range(0.8, 1.3)], tint, size * 1.5, or.range(-0.25, 0.25)));
+        }
+        // and a thicket of shrubs round the group (medium and high), some in the autumn colours
+        if (T.bushes) {
+          const accent = ACCENTS[accentAt(s + 11, side, coast)];
+          for (let k = 0; k < 7; k++) {
+            const ss = s + or.range(-9, 9);
+            const lat = side * (centre + or.range(-8, 8));
+            track.pointAt(ss, lat, point);
+            if (!ownStretch(ss, point.x, point.z)) continue;
+            const h = or.range(0.7, 1.6);
+            const v = or.range(0.7, 1.15);
+            const tint = (accent && k % 2 ? accent : GRASS.bush).map((c) => c * v);
+            bushItems.push(make(point.x, terrain.heightAt(point.x, point.z) - 0.1, point.z, or.range(0, Math.PI), [h * 1.6, h, h * 1.6], tint, h));
+          }
+        }
+      }
+    }
+  }
+
   // (forest lane) THE SCHEMES' VERGES AND BOULDERS (trackLayout.js SCHEMES, schemes.js), from their own stream after
   // everything else, so that the rest of the lap is as it was; each fades in and out with the scheme's weight.
   //   verge 'meadow' (frame e2): long grass along the verge, ferns at the wood's edge, patches of yellow flowers

@@ -123,19 +123,20 @@ vec3 concreteColour( vec3 base, vec4 c, vec3 p, vec3 n, float PANEL, float LIFT,
   float top = step( 0.7, n.y );
   float px = max( fwidth( along ) + fwidth( up ), 1.0e-4 );
   float fine = 1.0 - smoothstep( 0.012, 0.05, px );
-  float mid = 1.0 - smoothstep( 0.05, 0.2, px );
+  float mid = 1.0 - smoothstep( 0.1, 0.35, px );
   vec3 col = vec3( 1.0 );
   // panels: each its own shade in three steps, a dark joint with a pale arris beside it
   float panel = PANEL > 0.0 ? floor( along / PANEL ) : 0.0;
   float fu = PANEL > 0.0 ? fract( along / PANEL ) * PANEL : 1.0;
   float ph = concHash( vec2( panel, 17.0 ) );
-  col *= ph < 0.33 ? 0.9 : ph < 0.75 ? 1.0 : 1.08;
+  // (round 2: to read at a phone's size) the panels' shades a clear step apart
+  col *= ph < 0.33 ? 0.84 : ph < 0.75 ? 1.0 : 1.13;
   if ( PANEL > 0.0 ) {
     float dj = min( fu, PANEL - fu );
-    float joint = 1.0 - smoothstep( 0.02, 0.02 + px, dj );
-    float arris = ( 1.0 - smoothstep( 0.05, 0.05 + px, fu - 0.02 ) ) * step( 0.02, fu );
-    col *= 1.0 - 0.55 * joint * mid;
-    col *= 1.0 + 0.18 * arris * mid;
+    float joint = 1.0 - smoothstep( 0.045, 0.045 + px, dj );
+    float arris = ( 1.0 - smoothstep( 0.12, 0.12 + px, fu - 0.045 ) ) * step( 0.045, fu );
+    col *= 1.0 - 0.7 * joint * mid;
+    col *= 1.0 + 0.22 * arris * mid;
   }
   // lifts of the formwork, board marks between them, tie holes in rows
   float fl = fract( up / LIFT ) * LIFT;
@@ -160,7 +161,7 @@ vec3 concreteColour( vec3 base, vec4 c, vec3 p, vec3 n, float PANEL, float LIFT,
     float cap = CAP > 0.0 ? 1.0 - smoothstep( CAP - px, CAP + px, down ) : 0.0;
     float drip = CAP > 0.0 ? ( 1.0 - smoothstep( 0.03, 0.03 + px, abs( down - CAP - 0.04 ) ) ) : 0.0;
     float hang = smoothstep( 0.35, 0.8, streakX ) * ( 1.0 - smoothstep( CAP, CAP + 1.2 + 1.6 * concNoise( vec2( along * 1.7, 9.0 ) ), down ) );
-    col *= ( 1.0 + 0.22 * cap ) * ( 1.0 - 0.5 * drip * mid ) * ( 1.0 - 0.35 * hang * ( 1.0 - cap ) );
+    col *= ( 1.0 + 0.25 * cap ) * ( 1.0 - 0.5 * drip * mid ) * ( 1.0 - 0.5 * hang * ( 1.0 - cap ) );
     // the foot: damp and dark, ragged, with moss in it
     float wet = 1.0 - smoothstep( 0.25, 0.45, up - 0.3 * concNoise( vec2( along * 0.9, 1.0 ) ) );
     col *= 1.0 - 0.38 * wet;
