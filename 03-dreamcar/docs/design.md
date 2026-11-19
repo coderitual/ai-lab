@@ -93,8 +93,10 @@ A second car, in a different paint, is the second player's.
 
 ## The road
 
-A racing circuit, not a public road: 5.14 km, driven clockwise, 108 m between
-the lake shore and the top (110 m above the water). Paved 12 m wide (three
+A racing circuit, not a public road: 5.14 km, driven clockwise, 61 m between
+the lake shore and the top, just out of the tunnel (the top was 108 m, on the
+crest, until the owner had the coast after the tunnel brought down to the bay:
+it now runs 11 to 44 m over the line, out and back). Paved 12 m wide (three
 lanes, `HALF_WIDTH` 6), a 1.2 m strip beyond each edge line that is a red and
 white kerb in the bends and a paved margin elsewhere, then mown grass 3 to 10 m
 wide (widest on the outside of the fast bends) to a barrier: a steel rail by
@@ -150,16 +152,19 @@ line, m; speeds are the autopilot's at full pace):
 | Shore bend | 250 to 657 | a banked right of 220 m radius (9 degrees) away from the water, starting to climb; about 200 km/h |
 | Forest esses | 657 to 1409 | right 260 m, left 330 m, right 240 m, climbing at 5 to 6 per cent; 205 to 240 km/h |
 | The tunnel | 1409 to 2006 | a rock cutting faced in concrete at its end, the lit box (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out between retaining walls with acoustic screens; up to 255 km/h |
-| The sky road | 2006 to 2582 | on piers: a 576 m left of 300 m radius, banked 10 degrees, the valley 42 m under its middle; about 230 to 257 km/h |
-| The carousel | 2582 to 2915 | a 150 m climb, then 190 degrees right round a spur at 55 m radius, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
-| The crest | 2915 to 3115 | the top (108 m), in the open, the sea far below on the left; the car goes light over it at about 160 km/h |
-| The plunge | 3115 to 3394 | 8 per cent down a 400 m right into a compression; to 215 km/h |
-| The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m on the hillside, rock on one side; 216 to 257 km/h |
-| Gully bridge | 3778 to 4115 | 337 m straight on piers, 26 m over the gully, 8 per cent down; to 282 km/h |
+| The sky road | 2006 to 2582 | on piers over the sea: a 576 m left of 300 m radius, banked 10 degrees, down at 8 per cent from 54 m to 11 m over the line, the open sea on the left and the bay inside the loop on the right; about 230 to 260 km/h |
+| The carousel | 2582 to 2915 | the low point by the water (11 m), a 150 m climb, then 190 degrees right at 55 m radius round the head of the lagoon on a causeway, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
+| The crest | 2915 to 3115 | a 200 m straight on a low shelf between the open sea and the bay, the volcano ahead and to the right; about 110 to 165 km/h |
+| The plunge | 3115 to 3394 | a 400 m right, level, 25 m over the line (the name is the old road's); to 200 km/h |
+| The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m, the bay on the right, climbing to 38 m; 203 to 238 km/h |
+| Gully bridge | 3778 to 4115 | 337 m straight on piers over the bay, over a broad top (44 m), then 8 per cent down to its old end height; to 271 km/h |
 | The long right | 4115 to 4686 | 90 degrees at 300 m radius, banked 9 degrees, onto the straight; 234 to 283 km/h |
 
-The autopilot laps in 85.1 s at full pace (217 km/h on average), 92.9 s at
-0.9, 117.1 s at 0.7. Sector lines at 1882 m (just out of the tunnel) and
+The autopilot laps in 85.2 s at full pace, 93.5 s at 0.9, 118.3 s at 0.7
+(85.1, 92.9 and 117.1 before the coast ran low: the lap's heights from the
+tunnel's portal to the gully bridge's end changed, the plan and the length did
+not; the road rejoins its old height and grade at the gully bridge's end, 37.6
+m, so the long right, frame K5's place and the straight are as they were). Sector lines at 1882 m (just out of the tunnel) and
 3420 m (the start of the ledge).
 
 The Track says where everything of a circuit goes, as data the world reads
@@ -362,9 +367,9 @@ bottom (as given, whatever the picture's shape); the HUD is hidden unless
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
-day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 76.6 s),
+day, t 100.4 s), `?photo=d3` (the ledge's first bend, day, t 76.5 s; 100 and 76.6 before the coast ran low),
 `?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green),
-`?photo=k5` (frame K5, strict spec at dusk: t 88.7 s, the end of the sweepback's first piece, a chase camera
+`?photo=k5` (frame K5, strict spec at dusk: t 89.1 s (88.7 before the coast ran low), the end of the sweepback's first piece, a chase camera
 6.2 m back and 2.3 m up, pitched 9 degrees down, lens 50 degrees) and
 `?photo=e1` (frame E1, strict spec for the coast stretch: day, t 64.9 s, the car coming out of the carousel,
 the camera on the crest looking back at it; a `roll` of 7 degrees tilts the horizon as the frame's does); a name
@@ -693,7 +698,15 @@ apron, the rail and the sea are on the right; the boards stand round the
 hairpin's outside. What our course cannot give: the sky road is behind this
 camera (it runs from the climb's foot back south-east to the tunnel), so the
 frame's viaduct is not in our picture; its piers stand in the sea where the
-driver sees them, from the tunnel's cutting, the sky road and the climb. And
+driver sees them, from the tunnel's cutting, the sky road and the climb.
+(Round 3) So that E1 has its bridge, a pale span on the viaduct's own piers
+stood out in the sea off the headland as scenery (viaduct.js `SEA_SPAN`,
+no road on it; round 5 switched it off: with the coast road brought down to
+the bay its deck passed over the road), crossing the water behind the hairpin from E1's camera; the
+camera stands low and close (2.2 m up, 7.5 m ahead of the car); round the
+hairpin three red and white boards stand, not a hoarding (the coast road's
+paler asphalt of round 3 went when the road lane's new asphalt came, which is
+the mid grey the frame asks for everywhere). And
 our day sun is fixed: 16 degrees up, due east (down the start straight); from
 E1's camera, looking a little east of north, it stands about 80 degrees to
 the left and very slightly ahead, so the cut face (facing west) is in its own
@@ -722,9 +735,9 @@ comes from behind the camera's left and lights the face.
   down into the sea (1.6 to 2.6 m down per metre out, rounded at its top, a
   talus at its foot 7 m under the water), so that open water lies some 40
   to 60 m beyond the solid edge and 85 to 110 m below the road. The land
-  side is cut 4 m deep (the coast's rust face) and rises gently beyond it
+  side is cut 6 m deep (the coast's rust face) and rises gently beyond it
   (at most 0.25 per metre), and the spur between the climb and the crest
-  rises as a hill up to about 22 m over the road, along a ridge from 80 to
+  rises as a hill up to about 32 m over the road, along a ridge from 80 to
   230 m down the tongue from the hairpin's centre, set towards the climb.
   It is low round the hairpin itself, on purpose: the day's sun stands on
   that side 16 degrees up, and with an 11 m cut and the rock preset's steep
@@ -735,6 +748,39 @@ comes from behind the camera's left and lights the face.
 - **The sky road over the sea** (round 2): the deck crosses an inlet; the
   ground under its middle is 96 m down (`drop`), under the water, so its
   piers stand in the sea.
+- **The sea on the right and the volcano** (round 3; the owner, after
+  driving it on a phone: "seaside should be on the right side with some
+  island and volcano"). The lap runs clockwise, so the open sea outside the
+  loop is always on the driver's left. The sea now also reaches inside: an
+  inner sound under the sky road (whose valley is the sea's out to near its
+  ends) and round a volcanic island in the loop, so that the first part of
+  the sky road and the plunge have water on the right (`parapetSea`,
+  `coastUp`: the presets they replace with the coast's cliff beyond the edge
+  and nothing growing). The island (terrain.js `VOLCANO`; round 4 moved and
+  reshaped it, below) has a crater; round it the land is drowned except
+  within 60 to 120 m of a solid edge (`VOLCANO.sound`). A thin plume of steam and smoke leans away on the wind
+  from the crater and drifts up with the run's clock; the crater glows
+  warm as the sun weakens (volcano.js). Frame D3's bank beside the ledge is
+  kept within 60 m of its edge; beyond it is now the sound.
+- **The bay inside the loop** (round 4; the owner chose it, and accepted
+  losing the hill inside that part of the lap, frame D3's bank included).
+  (Round 5: the ledge's insides too, `bankSea` and `rockSea`.) Every side from the sky road to the plunge is now a sea side: the sky
+  road's right (`parapetSea`), the climb's and the carousel's insides
+  (`rockSea`: the rock edge stays, as a low wall of rock 1.4 m high over the
+  cliff), the crest's right (`openSea`), the plunge's right (`coastUp`).
+  The tongue between the climb and the crest is a channel of the sea, and
+  the hill that stood on it is gone (`COAST.knoll.rise` 0). The coast's
+  cliff is steeper (2.2 to 3.4 m down per metre out) so that the water lies
+  30 to 40 m beyond a right edge and the channel is water in its middle.
+  The volcano was moved where the chase camera sees it ahead and to the
+  right from the sky road's start and from the crest and the plunge: 195 m
+  right of the ledge's second bend (`VOLCANO`), a steeper cone (190 m, foot
+  150 m, flanks to the power 1.3) of dark basalt, green low down, a pale ash
+  rim (groundMaterial.js reads `uVolcano`), its foot 31 m beyond the nearest
+  solid edge at the least; the plume is wider, thinner and softer, a billow
+  of smoke 420 m tall leaning 320 m downwind. Round it the land is drowned to
+  600 m (`VOLCANO.sound`). Frame K5's place at the start of the long right
+  is untouched.
 - **The low crossing and the big waves** (round 2; the owner: "after the
   tunnel it would be nice to see some sea side with BIG waves. Maybe some
   river that will be super nice to cross ... we will be very close to it").
@@ -751,8 +797,9 @@ comes from behind the camera's left and lights the face.
   outside. The rails are the open steel rails the corridor already had; the
   course is untouched, but nothing grows behind the long right's rails any
   more (`shoreRun`, `shoreUp`: the woods hid the water). Off the outer side the swell runs big (waves.js
-  `BOOST`): its three long waves 2.5 times their height at the middle of a
-  circle of 360 m (up to about 3 to 4 m from crest to trough in the sets);
+  `BOOST`): its three long waves 2.2, 3.4 and 4.2 times their height at the
+  middle of a circle of 360 m (round 3: the shorter ones most, so that they
+  read as steep rollers, about 3 to 5 m from crest to trough in the sets);
   the same factor moves the mesh (medium, high), shades the normals (low)
   and answers `sampleWaves`. It stops short of the straight, whose bay
   frames D1 and D4 look over. `?photo=waves` looks over the lagoon beside

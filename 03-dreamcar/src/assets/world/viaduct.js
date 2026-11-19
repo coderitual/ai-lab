@@ -46,6 +46,16 @@ const SHAFT = { across: 2.3, along: 1.45, taper: 0.82 };
 const CAPITAL = { across: 5.6, along: 2.3, height: 1.7 };
 
 /**
+ * (sea lane, round 3: frame E1) A pale bridge on piers out in the sea off the headland, scenery only (no road on it,
+ * nothing reaches it): frame E1 has one across the water behind the bend, and from E1's camera (the crest, looking
+ * back at the carousel) the sky road is behind. Its line runs from `from` (a piece, how far along it, metres to its
+ * left) to `to`, carried on `beyond` of its length past each; its deck `deck` m over the water, `width` m wide and
+ * `depth` m deep, on the viaduct's own piers every `span` m.
+ */
+// (round 5) none: with the coast road brought down to the bay, a deck 52 m over the water passed over the road
+const SEA_SPAN = { off: true, from: ['carousel', 0.45, 260], to: ['crest', 1, 230], beyond: [0.15, 0.7], deck: 52, width: 9, depth: 2.6, span: 48 };
+
+/**
  * @param {object} options
  * @param {object} options.track
  * @param {object} options.terrain terrain.js (heightAt)
@@ -182,6 +192,52 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
     g.computeVertexNormals();
     return g;
   };
+  // (sea lane, round 3) the sea span (SEA_SPAN): its piers join the viaduct's, its deck is one more mesh
+  const spanParts = [];
+  {
+    const at = (id, f, lat) => {
+      let s0 = 0;
+      for (const seg of track.layout?.segments ?? []) {
+        const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
+        if (seg.id === id) return track.pointAt(s0 + len * f, lat, new THREE.Vector3());
+        s0 += len;
+      }
+      return null;
+    };
+    const a = at(...SEA_SPAN.from);
+    const b = at(...SEA_SPAN.to);
+    const level = terrain.sea?.level ?? -1.8;
+    if (a && b && !SEA_SPAN.off) {
+      const dir = new THREE.Vector3().subVectors(b, a).setY(0);
+      const len = dir.length();
+      dir.normalize();
+      const yaw = Math.atan2(dir.x, dir.z);
+      const start = a.clone().addScaledVector(dir, -SEA_SPAN.beyond[0] * len);
+      const total = len * (1 + SEA_SPAN.beyond[0] + SEA_SPAN.beyond[1]);
+      const n = Math.max(1, Math.round(total / SEA_SPAN.span));
+      const top = level + SEA_SPAN.deck;
+      for (let k = 0; k <= n; k++) {
+        const c = start.clone().addScaledVector(dir, (total * k) / n);
+        const ground = terrain.heightAt(c.x, c.z);
+        // only where it stands in the water (it may not cross the land)
+        if (ground > level - 1) continue;
+        const foot = ground - 1.5;
+        if (k > 0 && k < n) {
+          piers.push(upright(new THREE.Vector3(c.x, foot, c.z), yaw, SHAFT.across, top - SEA_SPAN.depth - CAPITAL.height - foot + 0.05, SHAFT.along));
+          caps.push(upright(new THREE.Vector3(c.x, top - SEA_SPAN.depth - CAPITAL.height, c.z), yaw, CAPITAL.across, CAPITAL.height, CAPITAL.along));
+        }
+        if (k < n) {
+          const mid = c.clone().addScaledVector(dir, total / n / 2).setY(top - SEA_SPAN.depth);
+          spanParts.push(footBox().applyMatrix4(upright(mid, yaw, SEA_SPAN.width, SEA_SPAN.depth, total / n + 0.02)));
+          // its parapets: two low walls along the deck's edges
+          for (const side of [-1, 1]) {
+            const e = mid.clone().addScaledVector(new THREE.Vector3(dir.z, 0, -dir.x), side * (SEA_SPAN.width / 2 - 0.2)).setY(top);
+            spanParts.push(footBox().applyMatrix4(upright(e, yaw, 0.4, 1.0, total / n + 0.02)));
+          }
+        }
+      }
+    }
+  }
   const pier = octagon(0.5 * SHAFT.taper, 0.5, true);
   const capital = octagon(0.5, (0.5 * SHAFT.across * SHAFT.taper) / CAPITAL.across, false);
   // (nearfield lane) concrete.js's finish: lifts, tie holes, the damp foot, streaks from the capital; round the shaft
@@ -197,6 +253,14 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
     row(pier, pierConcrete, piers, { name: 'viaduct-piers' }),
     row(capital, pierConcrete, caps, { name: 'viaduct-pier-caps' }),
   );
+  if (spanParts.length) {
+    // (a plain material: the piers' finish reads the instance matrix, which a merged mesh has not)
+    const deck = new THREE.Mesh(mergeGeometries(spanParts), atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xc9c2b2, roughness: 0.88 })));
+    deck.name = 'sea-span';
+    deck.castShadow = true;
+    deck.receiveShadow = true;
+    group.add(deck);
+  }
 
   return { group, stats: { piers: piers.length, posts: railPosts.length } };
 }

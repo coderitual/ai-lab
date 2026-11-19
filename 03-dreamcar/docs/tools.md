@@ -158,6 +158,7 @@ machine without a GPU, and only what is listed here.
   stills of `e1` at the medium tier (day, golden hour, night) beside the
   owner's frame E1, and in the chase camera every 2 s from the tunnel's exit
   to the end of the plunge on the low tier (1280x720 and 393x700).
+- **The ground** (`tools/unit.mjs`, ground; sea lane): no triangle of the grid or the far land over the road inside the solid edges, low and medium tiers (it failed on 005dc86: 1.99 m at s = 2590 m on low, 0.66 m at s = 3774 m on medium).
 - **The feel** (`tools/unit.mjs`, drift): 8 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
@@ -503,6 +504,12 @@ Read this before believing anything above about a device.
   still each by day, golden hour and night and in the chase camera at
   393x700 on the low tier; `?photo=waves`'s pose was not staged; frame D1
   was checked after the far massif's change at a later moment of the run
-  than its preset (its skyline unchanged).
+  than its preset (its skyline unchanged). Round 5 (the coast run low over
+  the bay): the heights from the tunnel's portal to the gully bridge changed;
+  `node tools/unit.mjs` and `tools/handling.mjs` were run (all passed, after
+  the checks that described the old crest were rewritten for the new top on
+  the ledge); the photo moments after the coast were moved by the Node
+  autopilot's timing (d3, k5, waves, d1 later by 0.4 to 1 s) and not each
+  re-staged.
 - **Accessibility** beyond keyboard reachability of the buttons (screen
   readers, colour blindness, reduced motion) has not been considered.

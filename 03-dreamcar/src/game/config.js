@@ -349,13 +349,13 @@ export const CAMERA = {
  * E2 and E5 (forest lane): the owner's two frames of the forest (design.md, "The reference frames").
  */
 export const PHOTOS = {
-  d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
-  d3: { back: 7, right: -0.3, up: 1.6, yaw: 12, pitch: -8, fov: 52, t: 76.6, time: 'day' },
+  d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100.4, time: 'day' },
+  d3: { back: 7, right: -0.3, up: 1.6, yaw: 12, pitch: -8, fov: 52, t: 76.5, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
   // (day lane) frame K5, the owner's strict spec at twilight: the end of the sweepback's first piece, high over the bay
-  k5: { back: 6.2, right: 0, up: 2.3, yaw: 0, pitch: -9, fov: 50, t: 88.7, time: 'twilight' },
-  e1: { back: -10, right: 2.5, up: 3.8, yaw: 162, pitch: -10, fov: 38, roll: 7, t: 64.9, time: 'day' },
-  waves: { back: 7, right: 3, up: 2.2, yaw: -30, pitch: -4, fov: 55, t: 94.4, time: 'day' },
+  k5: { back: 6.2, right: 0, up: 2.3, yaw: 0, pitch: -9, fov: 50, t: 89.1, time: 'twilight' },
+  e1: { back: -7.5, right: 2.5, up: 2.2, yaw: 160, pitch: -4, fov: 50, roll: 7, t: 64.9, time: 'day' },
+  waves: { back: 4, right: -8, up: 1.8, yaw: 35, pitch: -3, fov: 55, t: 94.8, time: 'day' },
   // (forest lane) e2: the forest road of the rise and the first ess, chase-like from behind and above the car, the
   // low sun crossing from the left; e5: the last ess's exit, on the road ahead of the car, looking back at it coming
   // round the bend among the granite boulders

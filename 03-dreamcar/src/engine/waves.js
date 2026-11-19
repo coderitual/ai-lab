@@ -57,10 +57,12 @@ export const GROUPS = { amp: 0.65, len: 7.5, turn: 65 };
 /**
  * (sea lane, round 2: the owner's "sea side with BIG waves") Where the swell runs big: round a place the caller
  * names (`setBoost`: x, z, radius), the swell's waves (the first SWELLS, not the chop) are `gain` times higher at its
- * middle, easing to their own height from `inner` of the radius out. One factor for the mesh, the normals, the foam
- * and sampleWaves.
+ * middle (`gain` is per swell wave), easing to their own height from `inner` of the radius out. One factor for the
+ * mesh, the normals, the foam and sampleWaves.
  */
-export const BOOST = { gain: 1.5, inner: 0.35 };
+// (round 3) per swell wave, longest first: the shorter swells grow most, so that close to the shore they read as
+// steep rollers (the 63 m wave 4.2 times its height: about 1.1 m, a slope of a tenth) and not as gentle slopes
+export const BOOST = { gain: [1.2, 2.4, 3.2], inner: 0.35 };
 /** How many of WAVES are the swell (foam behind crests looks back over these). */
 export const SWELLS = 3;
 /** Rough crest-to-trough range of the open sea (m), for shading by height. */
@@ -88,11 +90,11 @@ const BUILT = WAVES.map((w, i) => {
 /** A wave's group factor at (x, z) (GROUPS). */
 const groupOf = (w, x, z) => 1 + GROUPS.amp * Math.cos(w.gx * x + w.gz * z + w.gp);
 /** The swell's boost at (x, z) round `place` ({ x, z, r } or null) (BOOST). */
-export function boostAt(x, z, place) {
-  if (!place) return 1;
+export function boostAt(x, z, place, i = 0) {
+  if (!place || i >= SWELLS) return 1;
   const d = Math.hypot(x - place.x, z - place.z) / place.r;
   const t = Math.min(1, Math.max(0, (d - BOOST.inner) / (1 - BOOST.inner)));
-  return 1 + BOOST.gain * (1 - t * t * (3 - 2 * t));
+  return 1 + BOOST.gain[i] * (1 - t * t * (3 - 2 * t));
 }
 
 /**
@@ -125,7 +127,8 @@ export function createWaveField({ count = WAVES.length, segments = 0 } = {}) {
     // the group's wave vector (x, z) and phase, and its depth (GROUPS)
     uWaveG: { value: waves.map((w) => [w.gx, w.gz, w.gp, GROUPS.amp]).flat() },
     // where the swell runs big (x, z, radius; radius 0: nowhere) (BOOST)
-    uWaveBoost: { value: [0, 0, 0, BOOST.gain] },
+    uWaveBoost: { value: [0, 0, 0, 0] },
+    uWaveBoostGain: { value: waves.map((w, i) => (i < SWELLS ? BOOST.gain[i] : 0)) },
     uWaveTime: { value: 0 },
   };
   const glsl = /* glsl */ `
@@ -137,7 +140,8 @@ uniform float uWaveC[WAVE_COUNT];  // how far out it draws in the normals
 uniform vec4 uWaveG[WAVE_COUNT];   // its group: wave vector (x, z), phase, depth
 uniform float uWaveTime;
 
-uniform vec4 uWaveBoost;          // where the swell runs big: x, z, radius, gain (BOOST)
+uniform vec4 uWaveBoost;          // where the swell runs big: x, z, radius (BOOST)
+uniform float uWaveBoostGain[WAVE_COUNT]; // and by how much, per wave
 
 // how high a wave runs at p: its sets and lulls (GROUPS), and the swell's boost (BOOST)
 float waveGroup( int i, vec2 p ) {
@@ -145,7 +149,7 @@ float waveGroup( int i, vec2 p ) {
   float f = 1.0 + g.w * cos( dot( g.xy, p ) + g.z );
   if ( i < SWELL_COUNT && uWaveBoost.z > 0.0 ) {
     float d = length( p - uWaveBoost.xy ) / uWaveBoost.z;
-    f *= 1.0 + uWaveBoost.w * ( 1.0 - smoothstep( ${BOOST.inner.toFixed(2)}, 1.0, d ) );
+    f *= 1.0 + uWaveBoostGain[ i ] * ( 1.0 - smoothstep( ${BOOST.inner.toFixed(2)}, 1.0, d ) );
   }
   return f;
 }
@@ -253,7 +257,7 @@ export function sampleWaves(x, z, t, out, count = SWELLS + 4, place = null) {
     let oz = 0;
     for (let i = 0; i < n; i++) {
       const w = BUILT[i];
-      const c = Math.cos(w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase) * groupOf(w, px, pz) * (i < SWELLS ? boostAt(px, pz, place) : 1);
+      const c = Math.cos(w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase) * groupOf(w, px, pz) * boostAt(px, pz, place, i);
       ox += w.dx * w.hAmp * c;
       oz += w.dz * w.hAmp * c;
     }
@@ -268,7 +272,7 @@ export function sampleWaves(x, z, t, out, count = SWELLS + 4, place = null) {
   for (let i = 0; i < n; i++) {
     const w = BUILT[i];
     const th = w.k * (w.dx * px + w.dz * pz) - w.omega * t + w.phase;
-    const g = groupOf(w, px, pz) * (i < SWELLS ? boostAt(px, pz, place) : 1);
+    const g = groupOf(w, px, pz) * boostAt(px, pz, place, i);
     const s = Math.sin(th) * g;
     const c = Math.cos(th) * g;
     y += w.amp * s;

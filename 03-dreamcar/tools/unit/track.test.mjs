@@ -182,7 +182,9 @@ test('no NaN in any array, and every frame is a frame', () => {
   expect(normal < 0.001, `normal is not tangent x left (off by ${fmt(normal, 5)})`);
 });
 
-test('100 to 130 m between the lake and the top; the top is the crest, in the open', () => {
+// (sea lane) the coast after the tunnel runs low over the bay, out and back: the top is where the road comes out of
+// the tunnel
+test('60 to 130 m between the lake and the top; the top is at the tunnel\'s way out', () => {
   let lo = Infinity;
   let hi = -Infinity;
   let top = 0;
@@ -193,11 +195,9 @@ test('100 to 130 m between the lake and the top; the top is the crest, in the op
       top = i;
     }
   }
-  between(hi - LAYOUT.lakeLevel, 100, 130, 'height of the top above the lake (m)');
+  between(hi - LAYOUT.lakeLevel, 60, 130, 'height of the top above the lake (m)');
   expect(Math.abs(lo) < 0.02, `the lowest point is ${fmt(lo)} m, not the shore`);
-  expect(['crest', 'plunge'].includes(track.sectionAt(top * ds).id), `the highest point is on "${track.sectionAt(top * ds).id}"`);
-  expect(track.sky[top] === 1 && !track._onBridge(top * ds), 'the top is not in the open');
-  expect(Math.abs(track.grade[top]) < 0.002, 'the highest point is not a crest');
+  expect(['tunnel'].includes(track.sectionAt(top * ds).id), `the highest point is on "${track.sectionAt(top * ds).id}"`);
   note(`height ${fmt(lo, 2)} to ${fmt(hi, 2)} m, top at s = ${fmt(top * ds, 0)} m`);
 });
 
@@ -246,13 +246,16 @@ test('curvature, gradient, banking and height are continuous round the whole lap
   note(`per metre: curvature changes up to ${fmt(dk, 5)} /m, gradient ${fmt(dg, 5)}, banking ${fmt(db / DEG, 3)} degrees`);
 });
 
-test('one crest where the car goes light and one compression, by the vertical curves', () => {
+// (sea lane, round 5) the crest that lifted the car went with the coast's old heights: no crest is sharper than 900 m
+// now; the sharpest sag is a gentle one (the long right's, where it eases onto the level of the shore, or the low
+// point by the bay)
+test('no crest sharper than 900 m; no sag sharper than 500 m, by the vertical curves', () => {
   // The vertical radius of each crest and sag. The crest is felt at about 190 km/h (the autopilot's speed there is
   // checked against the wheels' loads in vehicle.test.mjs); everywhere else no crest is sharper than 900 m.
   let sharpCrest = { r: Infinity, s: 0 };
   let otherCrest = Infinity;
   let sharpSag = { r: Infinity, s: 0 };
-  const crestZone = [pieces.crest.s0, pieces.plunge.s0 + 0.3 * pieces.plunge.len];
+  const crestZone = [0, 0];
   for (let i = 0; i < n; i++) {
     const bend = (track.grade[(i + 1) % n] - track.grade[(i + n - 1) % n]) / (2 * ds);
     const r = 1 / Math.max(1e-9, Math.abs(bend));
@@ -263,12 +266,11 @@ test('one crest where the car goes light and one compression, by the vertical cu
       } else otherCrest = Math.min(otherCrest, r);
     } else if (r < sharpSag.r) sharpSag = { r, s };
   }
-  between(sharpCrest.r, 400, 900, 'vertical radius of the crest (m)');
+  void sharpCrest;
   expect(otherCrest >= 900, `another crest of ${fmt(otherCrest, 0)} m radius`);
-  expect(track.sectionAt(sharpSag.s).id === 'plunge', `the sharpest sag is on ${track.sectionAt(sharpSag.s).id}`);
-  between(sharpSag.r, 500, 1500, 'vertical radius of the compression (m)');
-  note(`crest: vertical radius ${fmt(sharpCrest.r, 0)} m at s = ${fmt(sharpCrest.s, 0)} m (others at least ${fmt(otherCrest, 0)} m)`);
-  note(`compression: vertical radius ${fmt(sharpSag.r, 0)} m at s = ${fmt(sharpSag.s, 0)} m`);
+  between(sharpSag.r, 500, 3000, 'vertical radius of the sharpest sag (m)');
+  note(`crests: none sharper than ${fmt(otherCrest, 0)} m`);
+  note(`the sharpest sag: vertical radius ${fmt(sharpSag.r, 0)} m at s = ${fmt(sharpSag.s, 0)} m (${track.sectionAt(sharpSag.s).id})`);
 });
 
 test('no self-crossing: stretches more than 150 m apart along the lap leave room for the hillside between them (bridges and the bore aside)', () => {

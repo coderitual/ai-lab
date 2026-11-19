@@ -51,14 +51,14 @@ const pieceAt = (id, f) => {
 };
 
 test('the coast presets keep the course: edge, verge slope, verge and barrier as the presets they replaced', () => {
-  const was = { coastDown: 'highDown', coastRun: 'highRun', coastTop: 'open', shoreRun: 'lowRun', shoreUp: 'lowUp' };
+  const was = { coastDown: 'highDown', coastRun: 'highRun', coastTop: 'open', shoreRun: 'lowRun', shoreUp: 'lowUp', parapetSea: 'parapet', coastUp: 'highUp', rockSea: 'rock', openSea: 'open', bankSea: 'bank', seaWall: 'rock' };
   for (const [name, old] of Object.entries(was)) {
     const a = SIDES[name];
     const b = SIDES[old];
     expect(a.coast === true || name.startsWith('shore'), `${name} is not a coast side`);
     // (round 2, frame E1) round the carousel and over the crest the verge is the gravel apron of a run-off: the same
     // ground, gravel's grip and sound instead of grass's
-    for (const key of ['kind', 'edge', 'slope', 'far', ...(a.verge === 'gravel' ? [] : ['verge'])]) {
+    for (const key of ['kind', 'edge', 'slope', ...(name === 'coastUp' || name === 'parapetSea' ? [] : ['far']), ...(a.verge === 'gravel' ? [] : ['verge'])]) {
       expect(JSON.stringify(a[key]) === JSON.stringify(b[key]), `${name}.${key} is ${JSON.stringify(a[key])}, ${old}'s ${JSON.stringify(b[key])}`);
     }
   }
@@ -99,6 +99,34 @@ test('after the tunnel the sea is right below: open water within 90 m of the sea
     far.push(`${id} ${found} m`);
   }
   return far.join(', ');
+});
+
+test('round 4, the bay inside the loop: open water within 110 m of the RIGHT side of the sky road, the climb, the carousel, the crest and the plunge', () => {
+  const p = new Vector3();
+  const found = [];
+  for (const [id, f] of [['viaduct', 0.2], ['climb', 0.5], ['carousel', 0.5], ['crest', 0.3], ['plunge', 0.5]]) {
+    const s = pieceAt(id, f);
+    let at = Infinity;
+    for (let d = 5; d <= 200 && at === Infinity; d += 5) {
+      track.pointAt(s, -(d + track.edgeAt(s, -1)), p);
+      if (terrain.heightAt(p.x, p.z) < sea.level - 1) at = d;
+    }
+    expect(at <= 110, `${id}: water ${at} m beyond the right edge`);
+    found.push(`${id} ${at} m`);
+  }
+  return found.join(', ');
+});
+
+test('the volcano stands clear of the course: its foot more than 20 m beyond every solid edge', () => {
+  const v = terrain.volcano;
+  expect(!!v, 'no volcano');
+  let least = Infinity;
+  for (let i = 0; i < track.count; i++) {
+    const s = i * track.ds;
+    least = Math.min(least, Math.hypot(track.px[i] - v.x, track.pz[i] - v.z) - v.r - Math.max(track.edgeAt(s, 1), track.edgeAt(s, -1)));
+  }
+  expect(least > 20, `its foot ${least.toFixed(0)} m from a solid edge`);
+  return `${least.toFixed(0)} m at the least`;
 });
 
 test('the bay is where the lake was: water 120 m off the start line, and the far ridges stand clear of the start', () => {

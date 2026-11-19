@@ -59,6 +59,10 @@ export const SEA_LOOK = {
   // (round 2, frame E1: from the coast road high above, a deep saturated blue; round 1's was near black)
   deep: [0.0028, 0.013, 0.036],
   shallow: [0.012, 0.034, 0.031],
+  /** (round 4: the owner's environment references) clear turquoise water over pale sand, fading with depth at `clearFall` per metre */
+  turquoise: [0.03, 0.2, 0.19],
+  sand: [0.2, 0.34, 0.3],
+  clearFall: 0.11,
   scatter: [0.0, 0.0045, 0.0036],
   foam: [0.62, 0.65, 0.66],
   ripple: 11,
@@ -73,6 +77,8 @@ export const SEA_LOOK = {
   byTime: {
     day: { sky: 0.78, deep: [0.004, 0.02, 0.058] },
     dusk: { sky: 0.42, deep: [0.0016, 0.0105, 0.0115] },
+    // after the sun: the water dark and deep, the afterglow given back a little brighter than golden hour's
+    twilight: { sky: 0.55, deep: [0.0012, 0.006, 0.012] },
   },
   /** at night: lamps' streaks, across and along (radians, about), and their share of the head's radiance */
   lamp: { across: 0.012, along: 0.22, gain: 0.06 },
@@ -86,12 +92,15 @@ export const SEA_LOOK = {
 export const SEA_UNIFORMS = {
   uSeaMap: { value: /** @type {THREE.Texture | null} */ (null) },
   uSeaBox: { value: new THREE.Vector4(0, 0, 1e-6, -1e4) },
+  /** (round 4) the volcano's island, for the ground's colours on it: x, z, its foot's radius, its rim's height (radius 0: none) */
+  uVolcano: { value: new THREE.Vector4(0, 0, 0, 0) },
 };
 
 /** GLSL: reading the sea map. seaMapAt(xz): r depth, g land's distance from the water, b water's from the land, a sea. */
 export const SEA_MAP_GLSL = /* glsl */ `
 uniform sampler2D uSeaMap;
 uniform vec4 uSeaBox;
+uniform vec4 uVolcano;
 vec4 seaMapAt( vec2 p ) {
   return texture2D( uSeaMap, ( p - uSeaBox.xy ) * uSeaBox.z );
 }
@@ -384,6 +393,9 @@ seaFoam = mix( seaFoam, mix( 0.35, 0.75, sWash ) * sMask, smoothstep( 150.0, 900
 // ---- the body: the light that comes back up out of the water, greener and lighter over the shallows
 float sClear = exp( - sDepth * 0.28 );
 vec3 sBody = mix( uSeaDeep, ${v3(SEA_LOOK.shallow)}, sClear );
+// (round 4) clear water over a pale sandy bed: turquoise where it is a few metres deep, paler still at the edge
+sBody = mix( sBody, ${v3(SEA_LOOK.turquoise)}, exp( - sDepth * ${SEA_LOOK.clearFall.toFixed(3)} ) * smoothstep( 0.2, 0.6, sMap.a ) );
+sBody = mix( sBody, ${v3(SEA_LOOK.sand)}, exp( - sDepth * 0.9 ) * smoothstep( 0.2, 0.6, sMap.a ) );
 // a wave's top is thinner: lighter, and lit through when looking towards the sun
 float sTop = smoothstep( -0.2, 0.9, ( vSeaWorld.y - uSeaCentre.y ) / ( ${SEA_HEIGHT.toFixed(3)} * 0.5 * sAmp ) );
 sBody *= 0.85 + 0.35 * sTop;

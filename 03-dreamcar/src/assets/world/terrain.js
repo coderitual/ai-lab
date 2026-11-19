@@ -98,7 +98,7 @@ const SEA = {
  * a cliff straight down into the sea, `steep` m down per m out (it wanders), rounded at its top and with a talus at
  * its foot, `below` m under the water's level; the seabed shelves away beyond it (SEA.shelf, SEA.deep). `ease`: metres
  * over which a side becomes coast. On the land side, the cut face is `cut` m high (the coast's ochre and rust rock)
- * and the hillside beyond it rises at most `landFar` per metre; inside the carousel's hairpin (`knoll.piece`, the
+ * and the hillside beyond it rises at most `landFar` per metre (a rock edge on a sea side is a wall `seaRock` m high); inside the carousel's hairpin (`knoll.piece`, the
  * bend frame E1 looks at) the headland rises `knoll.rise` m over the road beyond the cut, along a ridge down the
  * tongue between its legs (from nothing at the bend's centre to its full height a third of the way along, gone by
  * `knoll.along` m), `knoll.across` m to either side of it, moved `knoll.shift` of the way towards the hairpin's entry
@@ -118,14 +118,29 @@ const SEA = {
  * straight (frames D1 and D4 look over the bay further east). The course is untouched (what lies inside the solid edges is the Track's).
  */
 const CAUSEWAY = { piece: 'back', from: 0.5, to: 0.93, ease: 50, lip: 2.5, steep: 0.6, below: 5, lagoon: 120, floor: 9, surf: { at: 0.75, out: 70, r: 360 } };
+/**
+ * (sea lane, round 3: the owner's "seaside should be on the right side with some island and volcano") THE VOLCANO: an
+ * island cone out in the inner sound to the right of the sky road (`piece`, `at` of the way along it, `out` m to its
+ * right): `h` m over the water at the rim, `r` m to its foot under the water, the flanks concave (`concave`: the power
+ * of the profile), a crater `crater` m across at the rim and `depth` m deep, gullies down its flanks. Scenery only:
+ * its foot stands well beyond every solid edge (unit-tested). volcano.js draws its plume and the glow in its crater.
+ * `sound`: round it, out to `r` m, the land is drowned to `floor` m under the water (so the island stands free of the
+ * massif inside the loop), except within `keep` m of a solid edge, where the road's own ground stays.
+ */
+// (round 4) moved and sharpened: ahead and to the right from the sky road's start and from the crest and the plunge
+// (the bay inside the loop), a steeper cone so that it reads as a volcano against the sea and the sky
+// (the low coast) moved again, further from the gully, whose right it filled: ahead and right from the crest and the
+// plunge, beside the sky road's start
+const VOLCANO = { piece: 'viaduct', at: 0.103, out: -178, h: 175, r: 130, concave: 1.3, crater: 28, depth: 22, sound: { r: 600, floor: 16, keep: [60, 120] } };
 const COAST = {
   lip: [1.5, 4],
-  steep: [1.6, 2.6],
+  steep: [2.2, 3.4],
   below: 7,
   ease: 30,
-  cut: 4,
+  cut: 6,
   landFar: 0.25,
-  knoll: { piece: 'carousel', rise: 22, along: 230, across: 40, shift: 0.8 },
+  seaRock: 1.2,
+  knoll: { piece: 'carousel', rise: 0, along: 230, across: 44, shift: 0.65 },
 };
 
 /**
@@ -145,6 +160,8 @@ const COAST = {
  * @property {{ level: number, extent: { x0: number, x1: number, z0: number, z1: number } }} lake the bay beside the
  *   straight (the lake it was): its surface and the box of its old ellipse (far.js puts the town's lights round it)
  * @property {SeaShape} sea where the sea is (sea.js draws it; far.js keeps the far ridges off it)
+ * @property {{ x: number, z: number, top: number, r: number, crater: number, depth: number } | null} volcano the
+ *   volcano's island in the inner sound (VOLCANO; volcano.js draws its plume)
  * @property {object} stats vertices, triangles, milliseconds
  * @property {() => void} dispose
  *
@@ -260,6 +277,9 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   for (let i = 0; i < n; i++) {
     cliffL[i] = Math.max(cliffL[i], rockL[i] * coastR[i] * COAST.cut);
     cliffR[i] = Math.max(cliffR[i], rockR[i] * coastL[i] * COAST.cut);
+    // (round 4) a rock edge on a sea side is a low wall of rock over the cliff, not a cut face
+    cliffL[i] += (rockL[i] * COAST.seaRock - cliffL[i]) * coastL[i];
+    cliffR[i] += (rockR[i] * COAST.seaRock - cliffR[i]) * coastR[i];
   }
   /** The cliff's foot starts this far beyond the edge, and climbs this far out per metre up. */
   /** Bridges shorter than this (m) span a gully across them rather than a valley along them. */
@@ -285,7 +305,8 @@ const FOOT = 0.8;
       const u = (i * ds - b.s0) / (b.s1 - b.s0);
       const v = Math.max(0, Math.sin(Math.PI * u));
       const notch = gully ? 2.5 * Math.exp(-Math.pow(((u - 0.5) * (b.s1 - b.s0)) / 5, 2)) : 0;
-      ravine[i % n] = Math.max(1.5, drop * Math.pow(v, gully ? 1.4 : 0.6) + notch);
+      // (sea lane, round 3: a long deck's valley is the sea's sound, nearly as deep out to its ends: 0.25, was 0.6)
+      ravine[i % n] = Math.max(1.5, drop * Math.pow(v, gully ? 1.4 : 0.25) + notch);
     }
   }
   /** On a bridge long enough to span a valley along it (the sky road), not a gully across it. */
@@ -375,6 +396,43 @@ const FOOT = 0.8;
     }
     return () => 0;
   })();
+  /** (sea lane, round 3) The volcano's island (VOLCANO): where it stands, and its height at a point (-Infinity off it). */
+  const volcano = (() => {
+    let s0 = 0;
+    for (const seg of track.layout?.segments ?? []) {
+      const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
+      if (seg.id === VOLCANO.piece) {
+        const p = track.pointAt(s0 + len * VOLCANO.at, VOLCANO.out, new THREE.Vector3());
+        return { x: p.x, z: p.z, top: lakeLevel + VOLCANO.h, r: VOLCANO.r, crater: VOLCANO.crater, depth: VOLCANO.depth };
+      }
+      s0 += len;
+    }
+    return null;
+  })();
+  const volcanoAt = (x, z) => {
+    if (!volcano) return -Infinity;
+    const dx = x - volcano.x;
+    const dz = z - volcano.z;
+    const q = Math.hypot(dx, dz);
+    if (q > volcano.r * 1.15) return -Infinity;
+    const a = Math.atan2(dz, dx);
+    // gullies down the flanks and a ragged foot
+    const wob = 1 + 0.08 * (noise.fbm(Math.cos(a) * 3 + 5, Math.sin(a) * 3, 3) - 0.5) + 0.05 * Math.sin(a * 11 + 2 * noise.fbm(q / 40, a, 2));
+    const t = Math.min(1, Math.max(0, (volcano.r * wob - q) / (volcano.r - volcano.crater / 2)));
+    const foot = lakeLevel - 12;
+    let y = foot + (volcano.top - foot) * Math.pow(t, VOLCANO.concave);
+    const rim = volcano.crater / 2;
+    if (q < rim) y = volcano.top - volcano.depth * (1 - (q / rim) ** 2);
+    return y;
+  };
+  /** (sea lane, round 3) The inner sound round the volcano: ground `h`, `d` m beyond the nearest solid edge, drowned. */
+  const sound = (x, z, h, d) => {
+    if (!volcano) return h;
+    const q = Math.hypot(x - volcano.x, z - volcano.z);
+    const S = VOLCANO.sound;
+    const k = (1 - smoothstep(0.7 * S.r, 1.05 * S.r, q)) * smoothstep(S.keep[0], S.keep[1], d);
+    return k > 0 ? h + (Math.min(h, lakeLevel - S.floor) - h) * k : h;
+  };
   /** The valley with the bay and the open sea far from the road. */
   const valley = (x, z) => {
     const h = valleyLand(x, z);
@@ -506,6 +564,11 @@ const FOOT = 0.8;
     // (sea lane, round 2) off the coast road the cliff stays a cliff (after the smoothing, which would make it a slope)
     for (let k = 0; k < macro.length; k++) {
       if (coastCell[k] > 0) macro[k] += (Math.min(macro[k], coastCellY[k]) - macro[k]) * coastCell[k];
+      // (round 3) the inner sound round the volcano
+      const x = minX + (k % mx) * MACRO;
+      const z = minZ + Math.floor(k / mx) * MACRO;
+      macro[k] = sound(x, z, macro[k], macroD[k]);
+      if (macro[k] < lakeLevel - 4 && volcano && Math.hypot(x - volcano.x, z - volcano.z) < VOLCANO.sound.r * 0.8) seaSeed[k] = 1;
     }
   }
   const bilinear = (arr, w, h, x0, z0, cell, x, z) => {
@@ -602,7 +665,7 @@ const FOOT = 0.8;
   /** The small hills on top of the land's shape, and fewer of them on the seabed, so it raises no islets by chance. */
   const detailAt = (x, z) => detail(x, z) * (1 - 0.8 * seaAt(x, z));
   /** The land's shape with its hills: what the ground is far from any road. */
-  const land = (x, z) => keepDry((inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z), x, z);
+  const land = (x, z) => keepDry(Math.max(sound(x, z, (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z), 1e3), volcanoAt(x, z)), x, z);
 
   const phases = { macro: Math.round(performance.now() - started) };
   // the far land's heights, on its own coarse grid (the bake marches over them too)
@@ -750,7 +813,7 @@ const FOOT = 0.8;
     const w = smoothstep(10, 100, d) * reach * (1 - sea) + sea * smoothstep(NEAR_REACH - 40, NEAR_REACH, d);
     if (w <= 0) return near;
     const far = (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z) * smoothstep(15, 150, d);
-    const h = near + (far - near) * w;
+    const h = Math.max(sound(x, z, near + (far - near) * w, d), volcanoAt(x, z));
     return sea > 0.5 ? Math.max(h, stackAt(x, z)) : keepDry(h, x, z);
   }
   const near = (x, z) => (inMacro(x, z) ? bilinear(macroD, mx, mz, minX, minZ, MACRO, x, z) : 1e9) < NEAR_REACH;
@@ -1085,6 +1148,30 @@ const FOOT = 0.8;
     }
   }
   const gridGeometries = [];
+  // (sea lane) A triangle of the grid that reaches over the road. A cell is dropped only where all its corners lie
+  // under the band; a cell with corners both under it and beyond it (where the band stops short: on a deck and at its
+  // abutments, where another stretch is nearer, on the inside of a tight bend) is a plane between ground at the road's
+  // height and ground well above or below it, and across a corridor that plane can stand over the road (the owner's
+  // "dark slab across the lane" at the sky road's end, beside the rock cut). Each triangle with a corner near a
+  // corridor is sampled; one standing over the road anywhere inside the solid edges is left out (the road, the band
+  // and the rock faces cover what it covered). Defined once: `standsOverRoad`, also asked of the far land.
+  const probe = { index: -1, s: 0, lat: 0 };
+  const probeProf = { y: 0, surface: 0 };
+  const SAMPLES = [[1 / 3, 1 / 3], [0.8, 0.1], [0.1, 0.8], [0.1, 0.1], [0.5, 0.5], [0.5, 0], [0, 0.5], [0.45, 0.1], [0.1, 0.45], [0.7, 0.25], [0.25, 0.7]];
+  function standsOverRoad(ax, ay, az, bx, by, bz, cx, cy, cz) {
+    for (const [u, w] of SAMPLES) {
+      const x = ax + (bx - ax) * u + (cx - ax) * w;
+      const z = az + (bz - az) * u + (cz - az) * w;
+      const y = ay + (by - ay) * u + (cy - ay) * w;
+      track.locate(x, z, probe.index, probe);
+      const edge = track.edgeAt(probe.s, probe.lat >= 0 ? 1 : -1);
+      if (Math.abs(probe.lat) > edge) continue;
+      // (the tunnels' bores are cut open in their portals; under a roof the ground stands over the road by design)
+      if (cover[Math.round(wrap(probe.s) / ds) % n] >= 0) continue;
+      if (y > track.profile(probe.s, probe.lat, probeProf).y - 0.05) return true;
+    }
+    return false;
+  }
   /** (sea lane) Ground this far under the water's level is never seen: the waves' troughs do not reach it. */
   const DROWNED = lakeLevel - 2;
   // cells per chunk side: (finish lane) about 400 m on medium as on low (it was 288 m: fifteen pieces of grid in a
@@ -1140,8 +1227,13 @@ const FOOT = 0.8;
           const h10 = gHeight[k00 + 1] < DROWNED;
           const h01 = gHeight[k00 + gw] < DROWNED;
           const h11 = gHeight[k00 + gw + 1] < DROWNED;
-          if (!drop(c00, c01, c10) && !(h00 && h01 && h10)) index.push(v, v + w, v + 1);
-          if (!drop(c10, c01, c11) && !(h10 && h01 && h11)) index.push(v + 1, v + w, v + w + 1);
+          // (sea lane) and none over the road: tested where a corner lies within two cells of a corridor
+          const nearRoad = (q) => gS[q] >= 0 && Math.abs(gLat[q]) < track.edgeAt(gS[q], gLat[q] >= 0 ? 1 : -1) + 2 * cell;
+          const over = (p, q, r) =>
+            (nearRoad(p) || nearRoad(q) || nearRoad(r)) &&
+            standsOverRoad(...[p, q, r].flatMap((m) => [minX + (m % gw) * cell, pos[(((m / gw) | 0) - cj) * w * 3 + ((m % gw) - ci) * 3 + 1], minZ + ((m / gw) | 0) * cell]));
+          if (!drop(c00, c01, c10) && !(h00 && h01 && h10) && !over(k00, k00 + gw, k00 + 1)) index.push(v, v + w, v + 1);
+          if (!drop(c10, c01, c11) && !(h10 && h01 && h11) && !over(k00 + 1, k00 + gw, k00 + gw + 1)) index.push(v + 1, v + w, v + w + 1);
         }
       }
       if (!index.length) continue;
@@ -1340,6 +1432,7 @@ const FOOT = 0.8;
     material,
     lake: { level: lakeLevel, extent: { x0: LAKE.x - LAKE.rx * 1.1, x1: LAKE.x + LAKE.rx * 1.1, z0: LAKE.z - LAKE.rz * 1.1, z1: LAKE.z + LAKE.rz * 1.1 } },
     sea: { level: lakeLevel, at: seaAt, sector: seaSector, map: seaMap, stacks, surf },
+    volcano,
     heightAt,
     heightOnTrack,
     normalAt(x, z, out = normal) {

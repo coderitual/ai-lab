@@ -36,7 +36,7 @@ const WALL = { top: 0.93, board: 0.42 };
 const D3_REACH = 300;
 const D3_OUTSIDE = [0, 10, 6];
 const D3_INSIDE = [0, 6, 5, 10];
-/** (sea lane, round 2) On the coast road's sea side (frame E1) the boards are red and white: VARNO, PELLORA, TERNA. */
+/** (sea lane, round 2) On the coast road's sea side (frame E1) the boards are red and white: VARNO, PELLORA, TERNA; (round 3) three of them. */
 const COAST_BOARDS = [0, 6, 10, 6];
 /** The tall run is phased at this many metres before the line (frame D1's camera). */
 const D1_ANCHOR = 211;
@@ -146,6 +146,8 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
     // the tall run's panel index at the anchor
     const k0 = big ? Math.round(track.wrap(tallAnchor - run.s0) / pitch - 0.5) : 0;
     for (let k = 0; k < n; k++) {
+      // (sea lane, round 3) on the coast road three boards in the middle of the run, not a hoarding (frame E1)
+      if (coast && Math.abs(k - (n - 1) / 2) > 1.01) continue;
       const s = track.wrap(run.s0 + (k + 0.5) * pitch);
       if (nearGantry(s, T.w / 2 + 2.5)) continue;
       if (big && (inStand(s) || byDistanceBoard(s, run.side))) continue;

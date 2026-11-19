@@ -23,12 +23,12 @@ cameras, the HUD's map, the sound) asks the Track.
 | paved width | 12 m (`HALF_WIDTH` 6) |
 | strip beyond each edge | 1.2 m (`SHOULDER`) in the pavement's banked plane: a kerb where the Track puts one, a paved margin elsewhere |
 | verge to the barrier | 1.5 m (tunnel walls, parapets) to 9.95 m (run-off); grass, wandering inside each side's range (`SIDES`), moving at most 0.12 m per metre |
-| height | 0 to 108.2 m above the line, top at s = 3111 m; the sea 1.8 m under the line (`lakeLevel`) |
+| height | 0 to 60.6 m above the line, top at s = 1868 m just out of the tunnel; after it the coast runs low over the bay out and back, 10.9 m over the line at its lowest (s = 2622 m), 23 to 44 m on the way back, rejoining at the gully bridge's end (37.6 m, s = 4115 m); the sea 1.8 m under the line (`lakeLevel`) |
 | gradient | -8.0 to +6.0 per cent |
 | tightest radius | 55 m (the carousel); 11 bends |
 | banking | by rule 9° x tanh(250 m / R), or the piece's own; at most 10° (the sky road) |
-| crest | vertical radius 453 m at s = 3132 m; the compression 1116 m at s = 3333 m; everywhere else at least 1207 m |
-| closest approach of two stretches | 85.6 m apart (63.2 m between barriers, 22.9 m of height): the climb and the crest beside the carousel |
+| crest | none made to lift the car: no crest sharper than 1303 m (the gully bridge's, over 43.5 m at s = 3900 m); the sharpest sag 1593 m at s = 4600 m (the long right) |
+| closest approach of two stretches | 85.6 m apart (63.2 m between barriers, 23.5 m of height): the climb and the crest beside the carousel |
 
 ### Sections
 
@@ -41,13 +41,13 @@ run of `tools/handling.mjs`.
 | `straight` | Lakeside straight | 4686 to 250 (700 m) | finish 340 m, pitIn 110 m, the line, grid 40 m, gridRun 210 m; level | 225 to 279 |
 | `sweep` | Shore bend | 250 to 657 | right R 220 through 80°, banked 9°; 100 m straight climbing to 5 % | 196 to 225 |
 | `esses` | Forest esses | 657 to 1409 | right R 260 55° (bank 8°), left R 330 40° (7°), right R 240 65° (9°); 4 to 5.5 % | 204 to 240 |
-| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens) | 216 to 255 |
-| `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers: left R 300 through 110°, banked 10°, ground 96 m under the middle (under the sea: the piers stand in the water) | 229 to 257 |
-| `carousel` | The carousel | 2582 to 2915 | 150 m climb at 6 %, then right R 55 through 190°, banked 8° | 90 to 229 |
-| `crest` | The crest | 2915 to 3115 | 200 m straight over the top | 108 to 161 |
-| `plunge` | The plunge | 3115 to 3394 | right R 400 through 40°, banked 5°, 8 % down into the compression | 161 to 215 |
-| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 7°; low walls both sides, the valley open inside, a wooded bank outside), right R 350 20° (6°, rock on the inside) | 216 to 257 |
-| `gully` | Gully bridge | 3778 to 4115 (337 m) | straight on piers, ground 26 m under the middle, 8 % down | 257 to 282 |
+| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens), the lap's top just out of the box (60.6 m), then down to 7.9 % | 216 to 260 |
+| `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers over the sea: left R 300 through 110°, banked 10°, down at 7.9 % from 53.7 m to 11.3 m over the line, easing to 2 % down at its end; ground 60 m under the middle (under the sea) | 228 to 261 |
+| `carousel` | The carousel | 2582 to 2915 | the low point by the water (10.9 m), a 150 m climb to 5.5 %, then right R 55 through 190°, banked 8°, 5 % up (13.9 to 23.5 m), water both sides | 90 to 227 |
+| `crest` | The crest | 2915 to 3115 | 200 m straight on a low shelf between the open sea and the bay, 2 % down (23.5 to 26.5 m: no longer the top) | 108 to 166 |
+| `plunge` | The plunge | 3115 to 3394 | right R 400 through 40°, banked 5°, level (26.5 to 25.1 m; the name is the old road's) | 166 to 203 |
+| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 7°, the bay inside), right R 350 20° (6°), climbing to 4 % and 6.3 % (25.1 to 38.0 m) | 203 to 238 |
+| `gully` | Gully bridge | 3778 to 4115 (337 m) | straight on piers over the bay (ground 45 m under the middle), over a broad top (43.5 m) then 8 % down to its old end height, 37.6 m | 238 to 271 |
 | `sweepback` | The long right | 4115 to 4686 | 100 m straight, then right R 300 through 90°, banked 9° | 234 to 283 |
 
 Joints between pieces ease the curvature (and the banking) over 45 to 140 m
@@ -142,26 +142,25 @@ Laps of the real road (flying laps, Node, no drawing):
 
 | driver | lap | notes |
 | --- | --- | --- |
-| autopilot, pace 1.0 | 85.0 s (218 km/h mean) | 0 impacts, stability control 4.3 s a lap |
-| autopilot, pace 0.9 (`?ap`) | 93.1 s | 0 impacts |
-| autopilot, pace 0.7 | 117.4 s | 0 impacts |
-| one thumb (full throttle unless braking) | 84.5 s | 0 impacts |
-| pad (analog) | 85.0 s | 0 impacts |
-| keys | 85.0 s | 0 impacts, stability control 6.8 s a lap |
-| ham-fisted keys (flat out, full keys, slow hands) | 85.4 s | 0 impacts, body 0.14 m beyond the pavement at worst |
+| autopilot, pace 1.0 | 85.2 s (85.0 before the coast ran low) | 0 impacts, stability control 5.1 s a lap |
+| autopilot, pace 0.9 (`?ap`) | 93.5 s | 0 impacts |
+| autopilot, pace 0.7 | 118.3 s | 0 impacts |
+| one thumb (full throttle unless braking) | 84.8 s | 0 impacts |
+| pad (analog) | 85.2 s | 0 impacts |
+| keys | 85.1 s | 0 impacts, stability control 7.7 s a lap |
+| ham-fisted keys (flat out, full keys, slow hands) | 90.6 s | 0 impacts, body 2.42 m beyond the pavement at worst |
 
 The one-thumb pad (`tools/unit/drift.test.mjs`, the scripted person of
 `manoeuvres.humanDriver` with its thumb on the pad, through Input's
 `padControls`: across and down together, 900 px/s, wavering 3 px, 0.15 s
-late): a tidy lap 86.3 s against the scripted keys' 86.3 s (autopilot 85.0
-s), 0 impacts, 9.2 s of braking a lap, 7.8 s of it while turning at 0.3 g or
-more (trailing the brake in); the carousel sideways at Sport, thrown in with
-the handbrake by the steering thumb's red arc: 3.4 s beyond 12° at 15° mean,
-38° at most, no touches (by the HANDBRAKE button: the same 3.4 s, 33° at
-most; both cost 1.4 s on the lap); at the default level the gesture kicks it
-to 22° and the help catches it (+0.6 s). A clumsy thumb (600 px/s, 8 px of
-waver, 0.2 s late) at the default level: 88.1 s, no impacts, no spin, the
-body 1.46 m beyond the pavement at worst.
+late; the low coast's road): a tidy lap 86.4 s against the scripted keys' 86.4 s
+(autopilot 85.2 s), 0 impacts, 9.0 s of braking a lap, 7.5 s of it while
+turning at 0.3 g or more (trailing the brake in); the carousel sideways at
+Sport, thrown in with the handbrake by the steering thumb's red arc: 3.9 s
+beyond 12° at 15° mean, 36° at most (by the HANDBRAKE button the same; both a
+87.8 s lap). A clumsy thumb (600 px/s, 8 px of waver, 0.2 s late) at the
+default level: 88.8 s, no impacts, no spin, the body 1.20 m beyond the
+pavement at worst.
 
 ### Assists
 
@@ -333,7 +332,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,roll][,hud]` | the staging camera (`roll`: degrees the picture leans clockwise) |
-| `?photo=d1`, `d3`, `d4`, `e1`, `k5`, `waves`, `e2`, `e5` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; k5 the end of the sweepback's first piece at dusk, t 88.7 s, frame K5's chase camera; waves the low crossing by day, t 94.4 s; e2 the forest road of the rise and the first ess by day; e5 the last ess among its granite boulders by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=d1`, `d3`, `d4`, `e1`, `k5`, `waves`, `e2`, `e5` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; k5 the end of the sweepback's first piece at dusk, t 89.1 s, frame K5's chase camera; waves the low crossing by day, t 94.8 s; e2 the forest road of the rise and the first ess by day; e5 the last ess among its granite boulders by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -371,9 +370,12 @@ Defined once: the waves in `src/engine/waves.js`, where the water is in
 | --- | --- |
 | level | -1.8 m (`LAYOUT.lakeLevel`), 1.8 m under the start line |
 | coast | outside the loop at bearings from the course's middle outside -115 to 24 degrees (wandering 14 degrees), 55 to 170 m beyond the solid edge; the land's last fall a cliff rising 1.15 per metre; the seabed shelving 0.3 per metre to 45 m; the bay is the old lake's ellipse, 2.2 times as long to the west |
-| the coast road's cliff | on a coast side (eased over 30 m): a lip 1.5 to 4 m wide beyond the solid edge, a cliff 1.6 to 2.6 m down per metre out to a talus 7 m under the water, the seabed beyond (terrain.js `COAST`); open water 10 m beyond the left edge of the sky road (under the deck), 60 to 70 m beyond it on the climb, the carousel, the crest and the plunge; the land side's rock cut 4 m high, its hillside rising at most 0.25 per metre; between the climb and the crest a hill up to 22 m over the road (`COAST.knoll`), a ridge from 80 to 230 m down the tongue from the hairpin's centre, 40 m to either side, set 0.8 of the way towards the climb |
+| the coast road's cliff | on a coast side (eased over 30 m): a lip 1.5 to 4 m wide beyond the solid edge, a cliff 1.6 to 2.6 m down per metre out to a talus 7 m under the water, the seabed beyond (terrain.js `COAST`); open water 10 m beyond the left edge of the sky road (under the deck), 60 to 70 m beyond it on the climb, the carousel, the crest and the plunge; the land side's rock cut 6 m high, its hillside rising at most 0.25 per metre; between the climb and the crest a hill up to 32 m over the road (`COAST.knoll`), a ridge from 80 to 230 m down the tongue from the hairpin's centre, 44 m to either side, set 0.65 of the way towards the climb |
+| the sea span | (round 5: switched off, `SEA_SPAN.off`: with the road brought down its deck passed over the road) scenery: a pale deck 9 m wide, 2.6 m deep, 52 m over the water, on the viaduct's piers every 48 m, on a line from 260 m left of the carousel's middle to 230 m left of the crest's end, carried 15 % of its length on before and 70 % after, standing only where the water is (viaduct.js `SEA_SPAN`) |
+| the bay inside the loop (round 4) | sea sides on the right of the sky road (`parapetSea`), the climb and the carousel (`rockSea`: rock edge, a 1.4 m wall of rock), the crest (`openSea`) and the plunge (`coastUp`); the cliff 2.2 to 3.4 m down per metre out; open water 5 m (the sky road), 30 to 40 m (the others) beyond the right edge (sea.test); the hill on the tongue gone (`knoll.rise` 0); the volcano 195 m right of `ledge2` at 29 %, 190 m over the water, foot 150 m, flanks to the power 1.3, crater 30 m, 24 m deep, its foot 31 m beyond the nearest solid edge; the land drowned round it to 600 m |
+| the sea on the right (round 3) | the sky road's valley under the deck 96 m deep nearly to its ends (its depth along the deck sin^0.25, was ^0.6); the volcano's plume 420 m tall, 16 to 150 m across, leaning 320 m downwind, wisps rising 3 m/s, opacity 0.5; the crater's glow 60 (linear) at full, shown as the sun's strength falls from 5 to 1 (volcano.js `VOLCANO_LOOK`); two draw calls |
 | the low crossing | the long right (`back`, its sides `shoreRun` and `shoreUp`: `lowRun` and `lowUp` with no wood) from 50 to 93 % round it, eased over 50 m: beyond each solid edge a lip 2.5 m wide, then a bank 0.6 m down per metre out to 5 m under the water; inside the bend a lagoon 120 m wide (then 60 m back to the land), 9 m deep at most; the road 2 to 14 m over the water for about 190 m (terrain.js `CAUSEWAY`) |
-| big waves | round a point 70 m left of `back` at 75 % of it, 360 m across: the swell's three waves (not the chop) up to 2.5 times higher, full height within 35 % of the radius (waves.js `BOOST`, `boostAt`) |
+| big waves | round a point 70 m left of `back` at 75 % of it, 360 m across: the swell's three waves (not the chop) up to 2.2, 3.4 and 4.2 times higher (150, 98, 63 m), full height within 35 % of the radius (waves.js `BOOST`, `boostAt`) |
 | sea stacks | 7, 9 to 17 m across, 12 to 34 m high, in the open sea, at least 160 m apart |
 | sea map | 512 x 512 texels over 4.8 km (9.4 m a texel): depth, the land's distance from the water (to 500 m), the water's from the land (to 160 m), the sea's share |
 | waves | 11 trochoids, longest first: a swell of 150, 98 and 63 m (0.6, 0.38, 0.26 m), chop of 34 to 7.9 m, short waves of 5.1 to 1.7 m (normals only); each in sets and lulls, its height times 1 ± 0.65 over a pattern 7.5 wavelengths long (at least 160 m) turned 65° off it (`GROUPS`); crest to trough about 1.9 m; from the north-west; deep-water speeds |

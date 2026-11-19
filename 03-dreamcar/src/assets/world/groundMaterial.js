@@ -329,6 +329,12 @@ if ( uSeaBox.w > -1000.0 ) {
 float gGullyX = texture2D( uLarge, vec2( ( vGroundPos.x - vGroundPos.z ) / 31.0, vGroundPos.y / 260.0 ) ).g;
 float gGully = smoothstep( 0.35, 0.65, gGullyX + 0.25 * ( gDetRock.g - 0.5 ) );
 vec3 gOchre = mix( vec3( 0.2, 0.105, 0.05 ), vec3( 0.3, 0.175, 0.085 ), 0.6 * gBedTone * 0.35 + 0.65 * gGully ) * ( 0.72 + 0.4 * gDetRock.g ) * ( 1.0 - 0.3 * gStreak );
+// (sea lane, the low coast: "rock must be rock") beds a hand or two thick that read from across the bay, pits weathered
+// out of the softer beds, and a dark wet foot over the water
+float gBedLine = smoothstep( 0.35, 0.5, abs( fract( vGroundPos.y / 1.6 + 0.35 * gDet.g ) - 0.5 ) );
+float gPit = smoothstep( 0.62, 0.78, gDetRock.g * 0.6 + gDet2.b * 0.6 ) * smoothstep( 0.3, 0.7, gBedTone );
+gOchre *= ( 0.78 + 0.32 * gBedLine ) * ( 1.0 - 0.5 * gPit );
+gOchre *= mix( 0.45, 1.0, smoothstep( 0.5, 6.0, vGroundPos.y - uSeaBox.w ) );
 gRockCol = mix( gRockCol, mix( gOchre * ( 0.75 + 0.25 * gLarge.g ), gOchre, gCut ), gCoast );
 gScreeCol = mix( gScreeCol, vec3( 0.46, 0.255, 0.14 ) * ( 0.82 + 0.36 * gDet.b ), gCoast );
 // (nearfield lane) the rock near the road in beds and blocks, as rock.js builds its cut faces: a limited palette of
@@ -620,6 +626,22 @@ gAlbedo = mix( gAlbedo, gScreeCol, gScree );
 gAlbedo = mix( gAlbedo, mix( vec3( 0.2, 0.198, 0.19 ), vec3( 0.3, 0.2, 0.12 ), gCoast ) * ( 0.75 + 0.5 * gDetRock.g ), gOutcrop );
 gAlbedo = mix( gAlbedo, gRockCol, gRock );
 gAlbedo = mix( gAlbedo, gSnowCol, gSnow );
+// (sea lane, round 4) the volcano's island: dark basalt, green low down on its flanks, a pale ash rim at the crater
+if ( uVolcano.z > 0.0 ) {
+  float vq = length( vGroundPos.xz - uVolcano.xy ) / uVolcano.z;
+  float vOn = 1.0 - smoothstep( 0.95, 1.1, vq );
+  if ( vOn > 0.0 ) {
+    float vUp = clamp( ( vGroundPos.y - uSeaBox.w ) / max( 1.0, uVolcano.w - uSeaBox.w ), 0.0, 1.0 );
+    vec3 basalt = mix( vec3( 0.03, 0.028, 0.027 ), vec3( 0.06, 0.05, 0.045 ), gDetRock.g ) * ( 0.8 + 0.4 * gLarge.g );
+    vec3 green = mix( vec3( 0.03, 0.048, 0.018 ), vec3( 0.05, 0.065, 0.025 ), gDet.r );
+    vec3 ash = vec3( 0.32, 0.3, 0.27 ) * ( 0.85 + 0.3 * gDet.b );
+    vec3 vCol = mix( green, basalt, smoothstep( 0.08, 0.3, vUp + 0.12 * ( gMid.g - 0.5 ) ) );
+    vCol = mix( vCol, ash, smoothstep( 0.86, 0.96, vUp ) );
+    gAlbedo = mix( gAlbedo, vCol, vOn * ( 1.0 - gWetBand ) );
+  }
+}
+// (sea lane, round 4) pale sand and pebbles at the water's edge where the shore is gentle (the owner's env references)
+gAlbedo = mix( gAlbedo, vec3( 0.36, 0.33, 0.27 ) * ( 0.8 + 0.4 * gDet.b ), ( 1.0 - smoothstep( 1.2, 3.5, vGroundPos.y - uSeaBox.w ) ) * ( 1.0 - smoothstep( 0.2, 0.45, gSlope ) ) * step( -1000.0, uSeaBox.w ) * gCoast );
 gAlbedo *= 1.0 - 0.55 * gWetBand;
 // (nearfield lane, references n1 to n3) under the shallows, pale sand: the water over it reads clear and turquoise
 if ( uSeaBox.w > -1000.0 ) {
