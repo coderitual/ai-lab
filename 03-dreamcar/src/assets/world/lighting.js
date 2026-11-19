@@ -121,6 +121,7 @@
  *   none, as a real tunnel's are dimmed to the interior's level after dark)
  * @property {number} wetness 0..1 how wet the road is (world.wetness defaults to it; ?wet= overrides): the night
  *   is the night after rain, the road a dark mirror with puddles in the wheel tracks and low spots
+ * @property {number} [roadSheen] the share of the sky's sheen the dry asphalt shows (1 if not given; road.js)
  * @property {'drl'|'low'} carLights what a car's automatic lamps do under the open sky (in the tunnel: always low)
  */
 
@@ -146,7 +147,7 @@ export function towards(bearing, elevation) {
  *   dusk   125 degrees left of the heading (out over the lake, behind the driver's left shoulder), 2 up.
  *   moon   8 degrees left of the heading, 17 up, beside the massif's main peak.
  */
-export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 2 }, moon: { left: 8, up: 17 }, twilight: { left: 125, up: -5 }, clouds: { left: 30, up: 30 } };
+export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 2 }, moon: { left: 8, up: 17 }, twilight: { left: 60, up: -5 }, clouds: { left: 30, up: 30 } };
 const SUN = towards(90 - PLACES.day.left, PLACES.day.up);
 /**
  * (day lane) Where the group of cumulus stands (sky.js `group`): over the massif's great shoulder, left of its main
@@ -172,8 +173,9 @@ const MOON = towards(90 + PLACES.moon.left, PLACES.moon.up);
 const DUSK_SUN = towards(90 + PLACES.dusk.left, PLACES.dusk.up);
 
 /**
- * (day lane) TWILIGHT (frame K5 and the owner's twilight references): the same sunset bearing as the golden hour, the
- * sun 5 degrees under the horizon. It lights nothing directly; the sky's dome is oriented by it (the band over the
+ * (day lane) TWILIGHT (frame K5 and the owner's twilight references): the sun 5 degrees under the horizon, 60 degrees
+ * left of the start straight's heading: seen from K5's place (looking south off the gully bridge) the band is brightest
+ * a little right of the road, over the drum tower, as in the frame. It lights nothing directly; the sky's dome is oriented by it (the band over the
  * sunset bearing, the earth's shadow opposite).
  */
 const TWILIGHT_SUN = towards(90 + PLACES.twilight.left, PLACES.twilight.up);
@@ -286,7 +288,8 @@ export const TIMES = {
     // (frame K5: the thin air 3e-5, was 8e-5: the far cones across the sea stand dark against the band, not lost in gold)
     fog: { color: [0.02, 0.022, 0.048], sun: [0.25, 0.1, 0.035], sunLobe: 24, density: 0.00025, heightFalloff: 0.011, air: 0.00003 },
     exposure: 4.2,
-    tunnelExposure: 6,
+    // (day lane: 6 burnt the box's white lining flat; the eye adapted to its lamps sees it as by day)
+    tunnelExposure: 4.5,
     shadeEv: 0.6,
     look: {
       flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 },
@@ -334,9 +337,12 @@ export const TIMES = {
       // orange, pale yellow, turquoise, a deep blue overhead; opposite, the blue-violet shadow of the earth and the
       // pink belt over it
       twilight: {
-        at: [0.035, 0.09, 0.22, 0.55],
-        sun: [[0.075, 0.02, 0.02], [0.095, 0.032, 0.01], [0.07, 0.058, 0.026], [0.016, 0.04, 0.05], [0.0018, 0.006, 0.034]],
-        away: [[0.006, 0.006, 0.016], [0.009, 0.008, 0.02], [0.022, 0.012, 0.022], [0.008, 0.014, 0.04], [0.0018, 0.006, 0.034]],
+        // (round 3: the bands raised, at: 0.035 hid the orange behind the bay's far shore from K5's place)
+        at: [0.075, 0.15, 0.27, 0.6],
+        // (round 3, sampled off K5: top (110, 151, 246), the turquoise-to-pale band (194, 246, 246), orange (225, 226,
+        // 165) and a rose-red line (187, 130, 126) on the horizon: saturated and banded, an ultramarine top)
+        sun: [[0.1, 0.03, 0.028], [0.13, 0.06, 0.018], [0.1, 0.12, 0.08], [0.02, 0.06, 0.11], [0.006, 0.016, 0.09]],
+        away: [[0.006, 0.006, 0.018], [0.01, 0.009, 0.024], [0.026, 0.016, 0.03], [0.012, 0.022, 0.07], [0.006, 0.016, 0.09]],
       },
       ground: [0.004, 0.005, 0.009],
       stars: 2e-6,
@@ -346,12 +352,14 @@ export const TIMES = {
       // all but clear: a few thin streaks, lit rose from below over the sunset, dark elsewhere
       clouds: { cover: 0.05, wisps: 0.15, lit: 0, light: [0.05, 0.02, 0.012], silver: 1.2, sunward: 0.95, shade: [0.003, 0.004, 0.01], drift: [0.0011, 0.0004] },
     },
-    env: { intensity: 1.0 },
+    env: { intensity: 0.75 },
     ambient: { sky: [0.5, 0.65, 1.0], ground: [0.5, 0.4, 0.4], intensity: 0.012 },
     // the haze a deep blue; only a little rose straight under the sunset (the far land stays dark blue against the band)
-    fog: { color: [0.005, 0.0065, 0.016], sun: [0.022, 0.01, 0.007], sunLobe: 12, density: 0.00025, heightFalloff: 0.011, air: 0.00003 },
-    exposure: 9,
-    tunnelExposure: 7,
+    fog: { color: [0.004, 0.007, 0.022], sun: [0.008, 0.006, 0.008], sunLobe: 12, density: 0.00025, heightFalloff: 0.011, air: 0.00004 },
+    // (round 3: 9 and env 1 made the road beside the car (50, 53, 68) against the frame's (20, 15, 30))
+    exposure: 6,
+    // the box's lamps are the day's: an eye adapted to them sees the lining as by day, not burnt white
+    tunnelExposure: 4.5,
     shadeEv: 0.4,
     look: {
       contrast: 1.18,
@@ -372,6 +380,9 @@ export const TIMES = {
       splitBalance: 0.45,
     },
     lamps: { street: 1, tunnel: 1, windows: 1, haze: 0.6, entrance: 0.25 },
+    // (round 3) the dry road near black: a third of the sky's sheen and of its own mirror of the sky (the band's light at a glancing angle painted it
+    // a pale grey-blue, (61, 67, 90) beside the car against the frame's (20, 15, 30))
+    roadSheen: 0.3,
     wetness: 0,
     carLights: 'low',
   },

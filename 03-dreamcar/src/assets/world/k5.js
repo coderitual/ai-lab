@@ -22,7 +22,7 @@ import { GLSL_TARGET, targetDefines } from '../../engine/glsl.js';
 /** Segments round the drum, per tier. */
 const ROUND = { low: 40, medium: 72, high: 96 };
 /** The window: its width and height (m), how far down from the top, its radiance at full (times lamps.windows). */
-const WINDOW = { w: 4.2, h: 1.7, down: 4.2, radiance: [0.55, 0.34, 0.16] };
+const WINDOW = { w: 3.2, h: 1.3, down: 7.5, radiance: [0.22, 0.13, 0.06] };
 /** The far lamps: their radiance at a kilometre (times lamps.street). */
 const LAMP = { radiance: [1.0, 0.62, 0.3], gain: 0.5 };
 
@@ -102,11 +102,19 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
     const a1 = ((k + 1) / n) * Math.PI * 2;
     // dark concrete in vertical ribs, a shade lighter every other panel; a dark band under the walkway
     // (smooth: the wall's normals point straight out from the axis, so the drum shades round, not in facets)
-    const rib = k % 4 === 0 ? [0.026, 0.029, 0.035] : [0.034, 0.038, 0.046];
+    const rib = k % 2 ? [0.04, 0.045, 0.055] : [0.03, 0.033, 0.04];
     const n0 = [Math.sin(a0), 0, Math.cos(a0)];
     const n1 = [Math.sin(a1), 0, Math.cos(a1)];
     const round = [n0, n1, n1, n0];
-    solid.quad(at(a0, T.r, foot), at(a1, T.r, foot), at(a1, T.r, top - 1.4), at(a0, T.r, top - 1.4), rib, round);
+    // vertical ribbed cladding: every other panel stands 0.18 m proud, its sides square to the wall
+    const rr = k % 2 ? T.r + 0.18 : T.r;
+    solid.quad(at(a0, rr, foot), at(a1, rr, foot), at(a1, rr, top - 1.4), at(a0, rr, top - 1.4), rib, round);
+    if (k % 2) {
+      const side0 = [Math.cos(a0), 0, -Math.sin(a0)];
+      const side1 = [-Math.cos(a1), 0, Math.sin(a1)];
+      solid.quad(at(a0, T.r, foot), at(a0, rr, foot), at(a0, rr, top - 1.4), at(a0, T.r, top - 1.4), rib, [side0, side0, side0, side0].map((v) => v.map((c) => -c)));
+      solid.quad(at(a1, rr, foot), at(a1, T.r, foot), at(a1, T.r, top - 1.4), at(a1, rr, top - 1.4), rib, [side1, side1, side1, side1].map((v) => v.map((c) => -c)));
+    }
     solid.quad(at(a0, T.r, top - 1.4), at(a1, T.r, top - 1.4), at(a1, T.r, top), at(a0, T.r, top), [0.022, 0.024, 0.028], round);
     // the walkway round the top, overhanging, and the roof
     const R = T.r + 1.1;
@@ -146,24 +154,26 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
     const ax = [toRoad[0] / l, 0, toRoad[2] / l];
     const pole = [p.x, base + f.h / 2, p.z];
     solid.box(pole, [0.04, 0, 0], [0, f.h / 2, 0], [0, 0, 0.04], [0.08, 0.08, 0.085]);
-    // the sail: a tall blade along the pole, its far edge bowed out, its head curling over; dark olive both sides
-    const H = f.h - 1.1;
-    const y0 = base + 1.1;
-    // a feather: narrow at the foot, widest high up, its head rounded over (frame K5's are about 1.2 by 4 m)
-    const width = (t) => 1.25 * Math.sin(Math.PI * Math.min(1, 0.08 + 0.92 * t)) ** 0.45 * (0.4 + 0.6 * t);
-    const steps = 8;
+    // the sail: a feather (a long teardrop) along the upper two thirds of the pole, bowed out across the road; our own
+    // colours: a yellow band down the pole's side, the rest green (frame K5's are green and yellow, about 1.4 by 4.5 m)
+    const H = f.h - 2.0;
+    const y0 = base + 2.0;
+    const width = (t) => 1.45 * Math.sin(Math.PI * Math.min(1, 0.04 + 0.96 * t)) ** 0.55 * (0.35 + 0.65 * Math.min(1, t / 0.7));
+    const steps = 10;
+    const yellow = [0.42, 0.36, 0.03];
+    const green = [0.05, 0.17, 0.05];
     for (let k = 0; k < steps; k++) {
       const t0 = k / steps;
       const t1 = (k + 1) / steps;
-      const at0 = [p.x, y0 + H * t0, p.z];
-      const at1 = [p.x, y0 + H * t1, p.z];
       const w0 = width(t0);
       const w1 = width(t1);
-      const o0 = [p.x + ax[0] * w0, y0 + H * t0 - 0.25 * w0, p.z + ax[2] * w0];
-      const o1 = [p.x + ax[0] * w1, y0 + H * t1 - 0.25 * w1, p.z + ax[2] * w1];
-      const olive = [0.035, 0.05, 0.03];
-      solid.quad(at0, o0, o1, at1, olive);
-      solid.quad(at0, at1, o1, o0, olive);
+      // a point of the sail: u across it (0 at the pole, 1 at the far edge), at height t; the edge droops a little
+      const pt = (u, t, w) => [p.x + ax[0] * w * u, y0 + H * t - 0.18 * w * u * u, p.z + ax[2] * w * u];
+      for (const [u0, u1, rgb] of [[0, 0.28, yellow], [0.28, 1, green]]) {
+        const a0 = pt(u0, t0, w0), a1 = pt(u0, t1, w1), b0 = pt(u1, t0, w0), b1 = pt(u1, t1, w1);
+        solid.quad(a0, b0, b1, a1, rgb);
+        solid.quad(a0, a1, b1, b0, rgb);
+      }
     }
   }
   {
@@ -207,7 +217,7 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
     for (let k = 0; k < steps; k++) {
       const b0 = a - half + (2 * half * k) / steps;
       const b1 = a - half + (2 * half * (k + 1)) / steps;
-      pane.quad(at(b0, T.r + 0.06, y0), at(b1, T.r + 0.06, y0), at(b1, T.r + 0.06, y1), at(b0, T.r + 0.06, y1), [1, 1, 1]);
+      pane.quad(at(b0, T.r + 0.26, y0), at(b1, T.r + 0.26, y0), at(b1, T.r + 0.26, y1), at(b0, T.r + 0.26, y1), [1, 1, 1]);
     }
   }
   const paneMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, fog: false });

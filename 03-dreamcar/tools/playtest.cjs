@@ -1637,6 +1637,17 @@ const SECTIONS = {
     }
     check('lap and splits identical at 30, 60 and 144 frames a second', laps[30] === laps[60] && laps[144] === laps[60] && laps[60] !== '',
       `30: ${laps[30]} · 60: ${laps[60]} · 144: ${laps[144]}`);
+    // (day lane) a still is the picture the player gets: a page opened at a moment deep in the tunnel shows the
+    // exposure adapted to the tunnel (eased in the fixed step, so fast-forwarding settles it), the same each time
+    const exposures = [];
+    for (let k = 0; k < 2; k++) {
+      const p = await open('?manual&q=low&auto&ap&time=twilight&nodraw&t=40', { w: 240, h: 135 });
+      exposures.push(await p.page.evaluate('[window.__dreamcar.game.views[0].exposure, window.__dreamcar.times.twilight.tunnelExposure, window.__dreamcar.state().drivers[0].s]'));
+      await p.close(`tunnel exposure ${k}`);
+    }
+    const [[e0, inside, s0], [e1]] = exposures;
+    check('?manual&t=40 in the tunnel: the exposure is the adapted one, the same on every load', e0 === e1 && Math.abs(e0 / inside - 1) < 0.1,
+      `${e0.toFixed(3)} and ${e1.toFixed(3)} against the tunnel's ${inside} (s ${Math.round(s0)})`);
   },
 
   /** Each switch of the URL loads and runs without errors. */

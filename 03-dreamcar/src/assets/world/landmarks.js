@@ -28,8 +28,8 @@ export const K5 = {
   view: [128, 238],
   reach: 3000,
   trees: 170,
-  tower: { ahead: 24, beyond: 6, r: 11, h: 18 },
-  flags: [{ ahead: 18, beyond: 2, h: 7 }, { ahead: 55, beyond: 2.5, h: 7 }],
+  tower: { ahead: 24, beyond: 3.5, r: 11, h: 18 },
+  flags: [{ ahead: 14, beyond: 2.5, h: 6.5 }, { ahead: 46, beyond: 3, h: 6.5 }],
   chevron: { ahead: 28, beyond: 0.8 },
   lamps: { count: 16, near: 260, far: 1600, bearings: [150, 235] },
   cones: [

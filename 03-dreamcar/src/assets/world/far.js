@@ -541,7 +541,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     const B0 = K5.view[0] + 10;
     const B1 = K5.view[1] + 15;
     const cols = lowTier ? 90 : 220;
-    const rows = lowTier ? 6 : 10;
+    const rows = lowTier ? 6 : 16;
     const cn = planeNoise(rng.int(1 << 30));
     const crestAt = (b) => {
       let ridge = 260 + 220 * cn.fbm(b * 0.09 + 3, 0.4, 3) + 60 * (cn.ridged(b * 0.4 + 1, 2.2, 3) - 0.5);
@@ -568,14 +568,17 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       for (let j = 0; j <= rows; j++) {
         const t = j / rows; // 0 at the foot (under the horizon), 1 on the crest
         const y = -80 + (c.y + 80) * t ** 0.85;
-        const r = c.dist - (c.y + 80) * 1.6 * (1 - t);
+        // (round 3) ridges and gullies down the flanks: the face stands out or falls back by up to 220 m, most
+        // mid-slope, so that the sky's light picks out ribs; snow lies in the gullies longest
+        const gully = cn.ridged(b * 1.3 + 2, t * 1.6, 3);
+        const r = c.dist - (c.y + 80) * 1.6 * (1 - t) + 220 * (1 - gully) * Math.sin(Math.PI * t);
         const v = (i * (rows + 1) + j) * 3;
         pos[v] = k5.x + sb * r;
         pos[v + 1] = y;
         pos[v + 2] = k5.z + cb * r;
-        // dark rock and scrub; snow on a cone's upper third, ragged
-        const snow = c.cone > 600 ? smoothstep(0.6, 0.72, y / c.cone + 0.08 * (cn.fbm(b * 2.1, t * 3, 2) - 0.5)) : 0;
-        const base = 0.05 + 0.02 * cn.fbm(b * 0.7, t * 2 + 5, 2);
+        // dark rock and scrub, darker at the foot; snow on a cone's upper flanks, reaching further down the gullies
+        const snow = c.cone > 600 ? smoothstep(0.52, 0.64, y / c.cone + 0.12 * (1 - gully) + 0.06 * (cn.fbm(b * 2.1, t * 3, 2) - 0.5)) : 0;
+        const base = (0.03 + 0.03 * t) * (0.8 + 0.4 * gully) + 0.01 * cn.fbm(b * 0.7, t * 2 + 5, 2);
         col[v] = base * 0.9 + (0.74 - base * 0.9) * snow;
         col[v + 1] = base + (0.76 - base) * snow;
         col[v + 2] = base * 1.1 + (0.8 - base * 1.1) * snow;

@@ -280,6 +280,19 @@ machine without a GPU, and only what is listed here.
   staged towards it looked into the stand). Not looked at on `high`, in
   motion, in split screen or in the chase view; the playtest, the soundtest
   and the docs' screenshots were not run.
+- **K5 round 3 and the tunnel's exposure** (twilight's sunset bearing, raised
+  and more saturated bands, exposure 6 and environment 0.75, the dry road's
+  sky sheen and its own sky mirror at 0.3 at twilight (`roadSheen`), the head
+  lamps' pool 0.4, the tower ribbed with a lower window, green and yellow
+  feather flags, ridged snowy cones; the tunnel at dusk and twilight exposed
+  4.5): K5 stills at `medium` 1280x720 and 393x852 sampled against the frame
+  (scratch samp.py), tunnel stills inside and at the exit at dusk and
+  twilight; the playtest's keys, options, results, board (99 checks) and
+  photo, determinism (32 checks) passed, determinism now with a check that
+  `?manual&t=40` in the tunnel shows the adapted exposure on every load;
+  `node tools/unit.mjs` passed. The exposure's easing was already in the
+  fixed step: the white tunnel in earlier stills was the tunnel's own
+  exposure (6 and 7), not an unsettled one.
 - **Twilight, the fourth time of day** (lighting.js `twilight`, K5 at
   twilight, the drum smooth, feather flags, nearer cones, no trees on K5's
   banks): stills on software WebGL at `medium`, K5 at 1280x720 beside the
