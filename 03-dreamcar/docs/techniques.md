@@ -190,6 +190,40 @@ and no foot, cap or decoration. The retaining walls out of the tunnel stand
 back 0.25 m under their cap (a line of shade along the top) with buttress
 ribs as deep as that at every other joint.
 
+**Round 2** (after the owner's "like a game from 98" and references W1, W2,
+W4). Hillsides: the turf's edge onto rock is ragged (fine noise in the slope
+test); a band of bare earth runs along it; rills score steep rock every few
+metres (dark groove, lit rib, a tilt of the normal); grass is drier and paler
+on slopes that face the sun's side and darker on steep shaded ones; terraces
+of worn tracks follow the contours of moderate slopes; the rock's three tones
+stand further apart and its joints are wider, so they read at a phone's size.
+On rising banks beside the road (the land 4 m or more above the edge 25 m
+out) clusters of three to five big half-buried rocks, 1.5 to 4 m (every tier),
+with a thicket of shrubs round them (medium and high), from their own random
+stream (`groundCover.js`, outcrops). The coast's loose stone beside the road
+is W1's orange-ochre fine gravel with damp patches; a beach (low, within a few
+metres of the water's edge) is W4's fine golden sand, almost flat, with tide
+lines, damp patches, tyre tracks, sparse grass at its back and a band towards
+the water wet to a mirror (roughness 0.07) whose inner edge wavers like a
+run-up. Plant carpets grow on banks only, not on flat meadow. The tunnel's
+banner is a printed board in a steel frame on every tier (it was a box of
+one colour on low). Concrete: the panels' shades a clear step apart, joints
+4.5 cm and darker, longer streaks. Low walls: the paint chips in flakes of a
+few centimetres. Rock on the low tier does not swell (its 3 m columns made
+stripes) and does not take the coarse shadow map (it blotched the
+overhangs): the bake shades it.
+
+**Shared roadside pieces** (`roadside.js`, for the lanes that lay out a
+stretch; nothing is placed by this lane). `kerbRailing` (W1): a low concrete
+kerb 0.32 m high and 0.34 m wide with chamfered arrises in the concrete
+finish, square posts every 2 m on base plates, a top rail at 1.05 m and a
+middle rail. `chainFence` (W2, to stand behind a guard rail): posts every 3 m,
+2.4 m high, base plates, a top rail, rust in patches and streaks; the mesh is a
+diamond weave drawn in the shader on one quad per bay and cut out, the wire
+itself while it is a pixel or more, a screen door of its mean coverage further
+off. Each takes runs `{ s0, s1, side, out }` (out: metres beyond the solid
+edge, never inside the corridor) and is two draw calls whatever the runs.
+
 **The low walls** (`walls.js`). A precast safety barrier in section: a
 chamfered foot, a sloped lower face, a near-upright upper face, chamfered
 arrises, a top 0.2 m wide, every corner a crease; on medium and high a groove

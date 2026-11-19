@@ -280,7 +280,8 @@ float gCut = step( 1.5, vMask.y );
 // headlands' sides read as grass over a cut, not as a quarry (frame E1)
 float gNearSea = 0.0;
 if ( uSeaBox.w > -1000.0 ) gNearSea = 1.0 - smoothstep( 160.0, 460.0, seaLandOff( seaMapAt( vGroundPos.xz ) ) );
-float gRock = gCut + ( 1.0 - gCut ) * smoothstep( 0.2 + 0.16 * gNearSea, 0.34 + 0.2 * gNearSea, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
+// (nearfield lane, round 2: + the fine noise) the turf's edge onto rock ragged, not a straight line
+float gRock = gCut + ( 1.0 - gCut ) * smoothstep( 0.2 + 0.16 * gNearSea, 0.34 + 0.2 * gNearSea, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) + 0.14 * ( gDet2.r - 0.5 ) + 0.07 * ( gDet.r - 0.5 ) );
 float gScree = max( min( vMask.y, 1.0 ), smoothstep( 0.68, 0.8, gMid.a ) * smoothstep( 0.12, 0.25, gSlope ) * 0.7 ) * ( 1.0 - gRock );
 // (env lane) scrub: dark clumps of box and juniper on the moderate slopes, between meadow and rock
 float gScrub = smoothstep( 0.06, 0.16, gSlope + ( gMid.b - 0.5 ) * 0.12 ) * smoothstep( 0.35, 0.6, gDet.r * 0.5 + gMid.g * 0.7 ) * ( 1.0 - gRock );
@@ -359,12 +360,13 @@ if ( gRock > 0.01 ) {
   float rPx = max( fwidth( rs ) + fwidth( rt ), 1.0e-4 );
   vec4 re;
   vec4 rb = rockBlock( rs, rt, rside, re );
-  float rFine = 1.0 - smoothstep( 0.04, 0.2, rPx );
+  float rFine = 1.0 - smoothstep( 0.08, 0.35, rPx );
   float rCoarse = 1.0 - smoothstep( 0.3, 0.8, rPx );
   float tone = mix( 0.5, rb.x, rCoarse );
-  vec3 stoneLo = mix( vec3( 0.13, 0.13, 0.125 ), vec3( 0.15, 0.08, 0.04 ), gCoast );
-  vec3 stoneMid = mix( vec3( 0.2, 0.197, 0.188 ), vec3( 0.235, 0.128, 0.062 ), gCoast );
-  vec3 stoneHi = mix( vec3( 0.3, 0.295, 0.28 ), vec3( 0.32, 0.19, 0.095 ), gCoast );
+  // (round 2) the tones further apart, so the blocks read at a phone's size
+  vec3 stoneLo = mix( vec3( 0.11, 0.11, 0.105 ), vec3( 0.12, 0.062, 0.03 ), gCoast );
+  vec3 stoneMid = mix( vec3( 0.2, 0.197, 0.188 ), vec3( 0.225, 0.122, 0.058 ), gCoast );
+  vec3 stoneHi = mix( vec3( 0.32, 0.315, 0.3 ), vec3( 0.35, 0.21, 0.105 ), gCoast );
   // three tones, stepped (a painted look), not a ramp
   vec3 rc = mix( mix( stoneLo, stoneMid, smoothstep( 0.25, 0.32, tone ) ), stoneHi, smoothstep( 0.72, 0.79, tone ) );
   // big patches: iron staining inland, a darker weathered rind on the coast
@@ -382,8 +384,8 @@ if ( gRock > 0.01 ) {
   rc *= ( 1.0 + 0.5 * lip ) * ( 1.0 - 0.45 * under ) * ( 1.0 - 0.25 * foot );
   // the joints between blocks are broken (some run on, some close up), the beds' lines continuous
   float vj = rb.x < 0.55 ? min( re.x, re.y ) : 9.0;
-  float joint = 1.0 - smoothstep( 0.03, 0.03 + rPx, min( vj, min( re.z, re.w ) ) );
-  rc *= 1.0 - 0.6 * joint * rFine;
+  float joint = 1.0 - smoothstep( 0.05, 0.05 + rPx, min( vj, min( re.z, re.w ) ) );
+  rc *= 1.0 - 0.72 * joint * rFine;
   // (owner's references n1, n2) pitted, pocked erosion: hollows a few tens of centimetres across, dense in some
   // patches of the face and none in others, each dark inside under a lit lower lip
   {
@@ -424,11 +426,18 @@ if ( gRock > 0.01 ) {
   rc *= 1.0 - 0.4 * rDamp;
   rc = mix( rc, vec3( 0.045, 0.055, 0.025 ), rDamp * smoothstep( 0.5, 0.7, gDet.r + 0.2 * ( gDet2.g - 0.5 ) ) * 0.7 );
   rc *= 1.0 + 0.22 * gCut * smoothstep( 0.7, 1.0, rFrac ) * ( 1.0 - step( 1.001, rFrac ) );
+  // (round 2) rills: water has scored the face in grooves a few metres apart, wavering down it, dark in their depth
+  float rillU = rs / 3.2 + 0.35 * sin( rt / 5.0 + rs * 0.05 ) + 0.25 * ( gDet2.g - 0.5 );
+  float rillF = fract( rillU ) - 0.5;
+  float rill = ( 1.0 - smoothstep( 0.08, 0.24, abs( rillF ) ) ) * smoothstep( 0.35, 0.55, gMid.b + 0.3 * ( gDet2.r - 0.5 ) ) * rCoarse;
+  // dark in the groove, a lit rib beside it
+  rc *= ( 1.0 - 0.55 * rill ) * ( 1.0 + 0.2 * ( smoothstep( 0.24, 0.3, abs( rillF ) ) - smoothstep( 0.3, 0.42, abs( rillF ) ) ) * rCoarse );
   // the land's own rock (not a cut face) stays at its old, darker tone, and far away it is what it was
   float rNear = gCut + ( 1.0 - gCut ) * ( 1.0 - smoothstep( 140.0, 280.0, gDist ) );
   rc *= mix( 0.62, 1.0, max( gCut, gCoast ) );
   gRockCol = mix( gRockCol, rc, rNear );
   gRockTilt = vec2( ( fract( rb.x * 7.31 ) - 0.5 ) * 0.5, ( fract( rb.x * 3.17 ) - 0.5 ) * 0.35 + 1.1 * lip - 0.7 * foot ) * rCoarse * rNear;
+  gRockTilt.x += sign( rillF ) * 0.7 * rill * rNear;
   // grass and scrub: on the ledges (facets that face up) in ragged tufts, and over the top's lip
   float ledge = gCut * smoothstep( 0.45, 0.7, gN.y ) * smoothstep( 0.3, 0.5, gDet.r + 0.35 * ( gDet2.r - 0.5 ) );
   float overLip = gCut * smoothstep( 0.0, 0.05, rFrac - 1.04 - 0.1 * ( gDet.r - 0.5 ) );
@@ -540,7 +549,8 @@ gForest = max( gForest, gClump );
 float gCarpet = 0.0;
 {
   float nearRoad = vVerge.w < 0.9 ? ( 1.0 - smoothstep( 25.0, 45.0, vVerge.z ) ) * smoothstep( 0.6, 1.4, vVerge.z ) : 0.0;
-  float where = max( nearRoad * ( 1.0 - gRock ), gCut * ( 1.0 - gRock ) );
+  // (round 2) on banks and ledges, not over flat meadow (where they read as spilt paint)
+  float where = max( nearRoad * ( 1.0 - gRock ) * smoothstep( 0.04, 0.1, gSlope ), gCut * ( 1.0 - gRock ) );
   float cluster = smoothstep( 0.6, 0.66, 0.55 * gDet2.r + 0.45 * gMid.a + 0.12 * ( gDet.r - 0.5 ) );
   // broken into tufts and gaps, not a sheet of colour
   gCarpet = where * cluster * ( 1.0 - gForest ) * smoothstep( 0.32, 0.45, gDet.r + 0.3 * ( gDet2.b - 0.5 ) );
@@ -565,34 +575,66 @@ float gCarpet = 0.0;
     gCarpet = max( gCarpet, patchy * coastNear );
   }
 }
-// (nearfield lane, reference m5) the coast's loose stone beside the road and the beaches are sand sculpted by light:
-// swells and ripples in the normal, warm on their windward slopes and cool in their lee; pebbles and tiny scrub with
-// a shadow; darker and wet towards the water, coral-pale in the shallows
+// (nearfield lane, round 2: references W1, W4) on the coast, two grounds that are not grass:
+// - the loose stone beside the coast road (aMask.y) is an orange-ochre fine gravel shoulder (W1), speckled, with
+//   darker damp patches;
+// - a beach (a strip low along the water's edge, the sea map) is fine golden sand, almost flat (W4): the faintest
+//   wind ripples, faint tide lines along its contours, darker damp patches, tyre tracks along the road, sparse grass
+//   at its back, and towards the water a darker band, wet to a mirror (gWetSand: smooth, it reflects the sky), whose
+//   inner edge wavers as the run-up of the waves does. Pale under the shallows (below).
 vec2 gSandTilt = vec2( 0.0 );
 float gSand = 0.0;
+float gWetSand = 0.0;
 if ( gCoast > 0.01 ) {
   float beach = 0.0;
-  // a beach is a strip along the water's edge: low, and within a few metres of the shore (the sea map)
-  if ( uSeaBox.w > -1000.0 ) beach = ( 1.0 - smoothstep( 1.2, 3.0, vGroundPos.y - uSeaBox.w + 1.5 * ( gDet2.r - 0.5 ) ) ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) ) * ( 1.0 - smoothstep( 3.0, 9.0, seaLandOff( seaMapAt( vGroundPos.xz ) ) + 4.0 * ( gDet2.g - 0.5 ) ) );
-  gSand = max( gScree, beach * ( 1.0 - gRock ) ) * gCoast * gNearLand;
+  float above = uSeaBox.w > -1000.0 ? vGroundPos.y - uSeaBox.w : 100.0;
+  if ( uSeaBox.w > -1000.0 ) beach = ( 1.0 - smoothstep( 1.2, 3.0, above + 1.5 * ( gDet2.r - 0.5 ) ) ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) ) * ( 1.0 - smoothstep( 3.0, 9.0, seaLandOff( seaMapAt( vGroundPos.xz ) ) + 4.0 * ( gDet2.g - 0.5 ) ) );
+  beach *= ( 1.0 - gRock ) * gNearLand;
+  float shoulder = gScree * gNearLand;
+  gSand = max( shoulder, beach ) * gCoast;
   if ( gSand > 0.01 ) {
     float px = fwidth( vGroundPos.x ) + fwidth( vGroundPos.z );
-    float lit = mix( 1.0, sandRelief( vGroundPos, px, gSandTilt ), gFade );
-    vec3 sand = mix( vec3( 0.5, 0.36, 0.2 ), vec3( 0.56, 0.5, 0.4 ), beach ) * lit * ( 0.92 + 0.16 * gDet2.g );
-    // wet towards the water
-    float wet = uSeaBox.w > -1000.0 ? 1.0 - smoothstep( 0.2, 1.0, vGroundPos.y - uSeaBox.w ) : 0.0;
-    sand *= 1.0 - 0.4 * wet;
-    // pebbles, and tufts of scrub with a shadow on their lee side
-    float pebble = smoothstep( 0.8, 0.86, gDet.b );
-    sand = mix( sand, mix( vec3( 0.12, 0.11, 0.1 ), vec3( 0.36, 0.34, 0.3 ), smoothstep( 0.86, 0.95, gDet.b ) ), pebble * 0.85 );
-    float scrub = smoothstep( 0.86, 0.89, gDet2.r ) * ( 1.0 - gScree * 0.8 );
-    float shade = smoothstep( 0.7, 0.78, texture2D( uDetail, ( vGroundPos.xz + vec2( 0.35, 0.25 ) ) / ${(DETAIL_SCALE * 0.37).toFixed(2)} ).r ) * ( 1.0 - scrub );
-    sand *= 1.0 - 0.3 * shade * gFade;
-    sand = mix( sand, vec3( 0.06, 0.07, 0.03 ), scrub );
-    gScreeCol = mix( gScreeCol, sand, gSand );
-    gGrass = mix( gGrass, sand, beach * ( 1.0 - gScree ) * gCoast * gNearLand );
-    gSandTilt *= gSand * ( 1.0 - scrub ) * ( 1.0 - pebble );
+    // the shoulder's fine gravel
+    float damp = smoothstep( 0.6, 0.7, gMid.a * 0.6 + gDet2.g * 0.4 );
+    vec3 gravel = vec3( 0.5, 0.21, 0.075 ) * ( 0.82 + 0.3 * gDet.b ) * ( 1.0 - 0.28 * damp );
+    gravel = mix( gravel, vec3( 0.3, 0.2, 0.15 ), smoothstep( 0.86, 0.92, gDet.b ) * 0.6 );
+    gScreeCol = mix( gScreeCol, gravel, shoulder * gCoast );
+    // the beach's sand
+    float lit = mix( 1.0, sandRelief( vGroundPos, px, gSandTilt ), 0.25 * gFade );
+    gSandTilt *= 0.25;
+    vec3 sand = vec3( 0.55, 0.4, 0.22 ) * lit * ( 0.94 + 0.12 * gDet2.g );
+    float tide = 1.0 - smoothstep( 0.0, 0.04 + px, abs( fract( above / 0.32 + 0.6 * ( gDet2.r - 0.5 ) ) - 0.5 ) * 0.32 - 0.14 );
+    sand *= 1.0 - 0.1 * tide * gFade * ( 1.0 - smoothstep( 0.8, 1.6, above ) );
+    sand *= 1.0 - 0.18 * smoothstep( 0.62, 0.7, gMid.b * 0.6 + gDet2.b * 0.4 );
+    if ( vVerge.w < 0.9 ) {
+      float lane = abs( abs( vVerge.x - 9.0 - 3.0 * sin( vVerge.y / 41.0 ) ) - 0.8 );
+      sand *= 1.0 - 0.14 * ( 1.0 - smoothstep( 0.1, 0.1 + px, lane ) ) * gFade;
+    }
+    // sparse grass at the beach's back
+    float grassy = smoothstep( 1.1, 1.8, above ) * smoothstep( 0.62, 0.7, gDet2.r + 0.2 * gMid.r );
+    sand = mix( sand, gGrass * 1.1, grassy );
+    // the wet band: its inner edge wavers with the run-up
+    float runUp = 0.45 + 0.25 * sin( dot( vGroundPos.xz, vec2( 0.11, 0.07 ) ) ) + 0.15 * ( gDet2.g - 0.5 );
+    float wet = 1.0 - smoothstep( runUp - 0.05, runUp + 0.12, above );
+    sand *= 1.0 - 0.42 * wet;
+    gWetSand = wet * beach * gCoast * ( 1.0 - grassy );
+    gGrass = mix( gGrass, sand, beach * ( 1.0 - gScree ) * gCoast );
+    gSandTilt *= beach * gCoast * ( 1.0 - wet );
   }
+}
+// (nearfield lane, round 2) hillsides with structure: a band of bare earth where turf breaks onto rock; the grass
+// drier and paler on slopes that face the sun's side, darker and fuller on the steep shaded ones; on moderate slopes
+// terraces of worn tracks along the contours
+{
+  float lipBand = smoothstep( 0.02, 0.25, gRock ) * ( 1.0 - smoothstep( 0.35, 0.7, gRock ) ) * ( 1.0 - gCut ) * gNearLand;
+  gGrass = mix( gGrass, mix( vec3( 0.1, 0.075, 0.05 ), vec3( 0.2, 0.11, 0.05 ), gCoast ) * ( 0.8 + 0.4 * gDet.b ), lipBand * 0.85 );
+  float hz = length( gN.xz );
+  float sunny = hz > 0.05 ? smoothstep( -0.2, 0.6, dot( gN.xz / hz, vec2( 0.6, -0.8 ) ) ) * smoothstep( 0.05, 0.2, gSlope ) : 0.0;
+  gGrass = mix( gGrass, ${v3(GRASS.straw)} * ( 0.8 + 0.4 * gDet.r ), 0.35 * sunny * gNearLand * ( 1.0 - gVerge ) );
+  gGrass *= 1.0 - 0.2 * smoothstep( 0.12, 0.3, gSlope ) * ( 1.0 - sunny );
+  float terr = smoothstep( 0.1, 0.16, gSlope ) * ( 1.0 - smoothstep( 0.3, 0.38, gSlope ) ) * gNearLand * ( 1.0 - gVerge );
+  float tf = fract( vGroundPos.y / 1.7 + 0.5 * gDet2.r + 0.8 * gMid.b );
+  gGrass *= 1.0 + terr * ( 0.12 * smoothstep( 0.72, 0.84, tf ) - 0.16 * smoothstep( 0.86, 1.0, tf ) );
 }
 // (nearfield lane) near the road the turf has fine, crisp structure: tufts a little darker and fuller, and grey rock
 // breaking through on the steeper banks in outcrops a few metres across, with a dark rim
@@ -608,7 +650,7 @@ float gOutcrop = 0.0;
 }
 vec3 gAlbedo = gGrass;
 // blades let some light through, the mown verge most (bare earth none)
-groundGrass = ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * ( 1.0 - gVergeEarth ) * ( 1.0 - gCarpet );
+groundGrass = ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * ( 1.0 - gVergeEarth ) * ( 1.0 - gCarpet ) * ( 1.0 - gSand );
 // (render lane, finish lane) the light through the blades is the grass's own green (GRASS.through), about twice
 // what the blades reflect: against the low sun the verge is brighter, as autumn grass, not a neon glow
 groundThrough = ${v3(GRASS.through)} * ( 0.6 + 0.4 * gVerge ) * groundGrass * gFade;
@@ -632,6 +674,9 @@ diffuseColor.rgb *= gAlbedo;
 groundSheen = 1.0 - 0.85 * max( groundGrass, gForest * ( 1.0 - gRock ) ) - 0.5 * gVergeEarth;
 groundRoughness = mix( mix( 1.0, 0.92, gScree ), gRockRough, gRock );
 groundRoughness = mix( groundRoughness, 0.55, gSnow );
+// (round 2) the beach wet to a mirror
+groundRoughness = mix( groundRoughness, 0.07, gWetSand );
+groundSheen = mix( groundSheen, 1.0, gWetSand );
 `;
 
 const GROUND_NORMAL = /* glsl */ `
