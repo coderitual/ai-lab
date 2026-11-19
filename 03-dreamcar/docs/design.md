@@ -214,8 +214,13 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   arrows, Space the handbrake. Pad: triggers, left stick, A or RB the
   handbrake. Touch: the owner plays on an iPhone held upright in one hand,
   and asked for controls that are "one-hand friendly and super smooth and
-  precise". So the default is one thumb on a fixed analog pad at the bottom
-  corner of the holding hand's side (Hand: Right or Left), within the
+  precise". So the default is one thumb on an analog pad that appears under the thumb
+  (round 3: the owner plays with either hand and asked that "the pad
+  should also adjust to where the user starts to touch"; he had rejected a
+  stick whose base moved while the finger moved, so the centre is set at
+  touch-down and never moves until the thumb lifts). At rest it is a faint ghost at the bottom
+  corner of the holding hand's side (Hand: Right or Left: it only places the
+  ghost and the handbrake button), within the
   thumb's natural arc: drawn like a finished game's stick (a dark glass disc
   with a light rim, its centre and full lock marked, an amber brake arc
   along its foot that fills as the brake is pressed, a red arc below it).
@@ -224,9 +229,11 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   pulled on into the red arc it yanks the handbrake, like a lever, and the
   knob clicks into the arc: brake, flick into a slide and steer through it
   with one thumb. A round HANDBRAKE button stands in the other bottom corner
-  for a second thumb. The pad's centre never moves, so a thumb landing off
-  it steers at once and the knob springs back when it lifts; nothing else on
-  the screen drives the car. Options: the slider (a track with a marked
+  for a second thumb; a second finger anywhere is the handbrake too. The pad's centre is where
+  the thumb landed and never moves, so the first input is zero and the knob
+  springs back when it lifts; near an edge the travel is compressed (to
+  60 % at the least) and then the centre is nudged inward with a 6 px hold
+  at zero, so there is never a jump. Options: the slider (a track with a marked
   centre) or two arrows, each with the pedals (BRAKE, DRIFT, and GAS on
   manual); tilt (the phone rolled like a wheel, the pad still braking;
   untested on a real phone). Throttle manual makes the pad's up the

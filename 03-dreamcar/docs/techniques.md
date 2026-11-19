@@ -141,8 +141,17 @@ slip (counter-steer 0.75 rad per rad). A stick or a thumb is trusted and only
 given the same lock.
 
 On a touch screen the default is a one-thumb pad (`src/engine/Input.js`):
-a fixed disc whose centre never moves, so the thumb's offset from it is an
-absolute position, not a gesture. `padControls(dx, dy, scale, manual,
+a disc whose centre is set where the thumb lands (`_land`) and never moves
+until it lifts, so the thumb's offset from it is an absolute position, not a
+gesture, and zero at touch-down. Short of room at an edge the offset is
+stretched back (`dx / f`, `f` the compressed share of the travel, at least
+0.6) before it reaches `padControls`; under 0.6 the centre is nudged inward by
+the missing travel and the input held at zero for 6 px of movement from the
+landing point. The disc is drawn inside the safe area (the knob stays on
+the centre). The Hud keeps two discs: the live one under the thumb, and a ghost
+at the layout's home place; the 0.4 s before the ghost returns is a CSS
+transition delay, so no clock is read. A second finger in the zone is the
+handbrake pedal; the pad keeps the pointer that placed it. `padControls(dx, dy, scale, manual,
 tripped)` turns that offset into everything the car needs, and is pure, so the
 scripted thumb of the Node tests drives through the very same function:
 across over 70 px is the steering; down, the first quarter of 56 px lifts
