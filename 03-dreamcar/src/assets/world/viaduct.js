@@ -166,8 +166,8 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
   railParts.push(...baked(post, railPosts));
   block.dispose();
   post.dispose();
-  if (spanParts.length) {
-    const deck = new THREE.Mesh(mergeGeometries(spanParts), concrete);
+  if (deckParts.length) {
+    const deck = new THREE.Mesh(mergeGeometries(deckParts), concrete);
     deck.name = 'viaduct-deck';
     deck.castShadow = deck.receiveShadow = true;
     const rails = new THREE.Mesh(mergeGeometries(railParts), steel);
