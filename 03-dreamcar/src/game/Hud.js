@@ -849,6 +849,9 @@ export class Hud {
     this.steeringNote = cell('div', 'optnote', o);
     this.optHand = choiceRow(o, TEXT.hand, ['right', 'left'], [TEXT.right, TEXT.left], (v) => this.act(`hand:${v}`));
     this.optThrottle = choiceRow(o, TEXT.throttle, ['auto', 'manual'], [TEXT.auto, TEXT.manual], (v) => this.act(`throttle:${v}`));
+    // the paint, each driver's (the second's row shows in split screen); one button per paint, made in setState
+    this.optPaint = [choiceRow(o, TEXT.paint, [], [], () => {}), choiceRow(o, TEXT.paint2, [], [], () => {})];
+    for (const row of this.optPaint) row.group.classList.add('wrap');
     this.optUnits = choiceRow(o, TEXT.units, ['kmh', 'mph'], [TEXT.kmh, TEXT.mph], (v) => this.act(`units:${v}`));
     this.optMap = choiceRow(o, TEXT.map, ['on', 'off'], [TEXT.shown, TEXT.hidden], (v) => this.act(`map:${v}`));
     this.closeButton = button(make('div', 'buttons', o), TEXT.done, () => this.closeOptions(), 'primary');
@@ -971,7 +974,7 @@ export class Hud {
    */
   setState(s) {
     const times = s.times || [s.time];
-    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.assists}|${s.throttle}|${s.steering}|${s.hand}|${s.tiltNote}|${this.optionsOpen}`;
+    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.assists}|${(s.paint || []).join(',')}|${s.throttle}|${s.steering}|${s.hand}|${s.tiltNote}|${this.optionsOpen}`;
     this._s = s;
     if (key === this._state) return;
     const [wasPhase, wasPaused] = this._state.split('|');
@@ -1013,6 +1016,16 @@ export class Hud {
       this.optAssists.cells.set(id, new Cell(b));
     }
     pick(this.optAssists, s.assists);
+    this.optPaint.forEach((row, driver) => {
+      for (const id of s.paints || []) {
+        if (row.cells.has(id)) continue;
+        const b = button(row.group, TEXT.paintName(id), () => this.act(`paint:${driver}:${id}`), 'toggle');
+        b.dataset.value = id;
+        row.cells.set(id, new Cell(b));
+      }
+      pick(row, (s.paint || [])[driver]);
+    });
+    this.optPaint[1].row.hidden = s.mode !== 'split';
     pick(this.optThrottle, s.throttle);
     this.optThrottle.row.hidden = !touch;
     pick(this.optSteering, s.steering);

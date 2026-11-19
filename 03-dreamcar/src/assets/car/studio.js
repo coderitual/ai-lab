@@ -49,8 +49,10 @@ export function createStudio({ stripes = false, exposure = 1 } = {}) {
     c = vec3(0.015, 0.016, 0.018);
     c += vec3(0.1, 0.1, 0.11) * smoothstep(-1.0, 1.0, el) * (1.0 - smoothstep(2.0, 6.0, el));
     float sideways = 1.0 - smoothstep(0.5, 0.7, abs(d.z) / max(length(d.xz), 1e-4));
-    float strips = smoothstep(7.0, 8.0, el) * (1.0 - smoothstep(12.0, 13.0, el)) + smoothstep(30.0, 31.0, el) * (1.0 - smoothstep(35.0, 36.0, el));
-    c += vec3(2.4, 2.4, 2.35) * strips * sideways;
+    // (broad: a flank leans in by 10 to 25 degrees, so it mirrors 10 to 50 degrees up from a camera at eye height;
+    // thin strips at 8 and 30 degrees fell between and the body read flat grey)
+    float strips = smoothstep(4.0, 7.0, el) * (1.0 - smoothstep(18.0, 22.0, el)) + 0.7 * smoothstep(27.0, 30.0, el) * (1.0 - smoothstep(42.0, 46.0, el));
+    c += vec3(2.0, 2.0, 1.96) * strips * sideways;
     // the soft box overhead: 9 m long, 3 m wide, 6 m up, lying along the car
     if (d.y > 0.05) {
       vec2 at = d.xz * (6.0 / d.y);

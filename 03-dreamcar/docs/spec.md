@@ -303,8 +303,11 @@ Sport, Off: `ASSISTS` in config.js, applied at once to every car and to every
 car made later), Steering (Pad, Slider, Arrows or Tilt; under it what the
 choice does, or why tilt is not steering), Resting hand (Right or Left: where the pad's ghost and the HANDBRAKE button sit; with the pad
 or tilt) and Throttle (auto or manual), shown on touch screens; Recentre tilt
-on the pause sheet while tilt steers; units
-(km/h, mph), the map shown or hidden.
+on the pause sheet while tilt steers; the paint (Silver, Black, White, Blue,
+Red, Matte grey, Graphite, Night race: `PAINTS` and `PAINT_ORDER` in
+assets/car/materials.js; applied at once, nothing rebuilt; a second row for
+the second player in split screen; the ghost follows the first driver's);
+units (km/h, mph), the map shown or hidden.
 
 ## URL parameters
 
@@ -319,7 +322,7 @@ Read once by `src/engine/params.js`.
 | `?q=low\|medium\|high` | the quality tier (wins over the stored choice) |
 | `?dpr=` | the device pixel ratio |
 | `?plate=`, `?plate2=` | the number plates (capitals, digits, spaces, hyphens; 9 at most) |
-| `?paint=` | the first car's paint: silver (default), graphite (the second car's), blue, red, white, black |
+| `?paint=` | the first car's paint, over the kept choice and not kept: silver (default), black, white, blue, red, matte, graphite (the second car's default), night (the night-race livery) |
 | `?wet=0..1` | the road's wetness instead of the time of day's |
 | `?mute` | no sound |
 | `?ui=0` | no HUD |
@@ -517,6 +520,7 @@ stereo picture. Sound starts on the first touch or key (the browsers' rule).
 | `dreamcar.units` | km/h or mph |
 | `dreamcar.map` | the map on or off |
 | `dreamcar.assists` | the driving help: full, sport or off |
+| `dreamcar.paint`, `dreamcar.paint2` | each driver's paint (a key of `PAINTS`) |
 | `dreamcar.throttle` | the touch throttle: auto or manual |
 | `dreamcar.steering` | the touch steering: pad, slider, arrows or tilt |
 | `dreamcar.hand` | the hand that holds the phone (where the pad's ghost rests): right or left |

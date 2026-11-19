@@ -1416,6 +1416,20 @@ const SECTIONS = {
     await clickText(p, 'Hidden', '.options');
     await p.advance(0.1);
     check('the map can be hidden (kept under dreamcar.map)', (await p.page.evaluate(`localStorage.getItem('dreamcar.map')`)) === 'off');
+    // the paint: one button per paint, the first driver's row only (the second's is for split screen), kept under
+    // dreamcar.paint and on the car at once
+    const paintRow = (i) => `[...document.querySelectorAll('.hud .options .optrow')].filter((r) => r.querySelector('.segment.wrap'))[${i}]`;
+    const paints = await p.page.evaluate(`[...${paintRow(0)}.querySelectorAll('button')].map((b) => b.dataset.value)`);
+    check('Paint offers silver, black, white, blue, red, matte and the night livery', ['silver', 'black', 'white', 'blue', 'red', 'matte', 'night'].every((v) => paints.includes(v)), paints.join());
+    check('with nothing chosen the paint is silver', await p.page.evaluate(`${paintRow(0)}.querySelector('button[data-value="silver"]').classList.contains('on') && window.__dreamcar.game.racers[0].car.paint === 'silver'`));
+    check('solo, the second player\'s paint is not offered', await p.page.evaluate(`!!${paintRow(1)}.closest('[hidden]') || ${paintRow(1)}.hidden`));
+    await p.page.evaluate(`${paintRow(0)}.querySelector('button[data-value="night"]').click()`);
+    await p.advance(0.1);
+    check('Night race is kept under dreamcar.paint and is on the car', (await p.page.evaluate(`localStorage.getItem('dreamcar.paint')`)) === 'night'
+      && (await p.page.evaluate('window.__dreamcar.game.racers[0].car.paint')) === 'night');
+    await p.page.evaluate(`${paintRow(0)}.querySelector('button[data-value="silver"]').click()`);
+    await p.advance(0.1);
+    check('and back to silver', (await p.page.evaluate('window.__dreamcar.game.racers[0].car.paint')) === 'silver');
     // sound
     if (await visible(p, '.hud .options .optrow:nth-of-type(3)')) {
       await clickText(p, 'Off', '.options');
@@ -1655,6 +1669,15 @@ const SECTIONS = {
         check('?mute: the sound is muted', audio && audio.muted !== false, JSON.stringify(audio));
       }
       await p.close(`?${q}`);
+    }
+    // ?paint=: the first driver's car in that paint, not kept; an unknown name is the kept (or default) paint
+    {
+      const p = await open('?manual&q=low&time=night&paint=night', { w: 320, h: 180 });
+      check('?paint=night: the car in the night livery, not kept', (await p.page.evaluate('window.__dreamcar.game.racers[0].car.paint')) === 'night'
+        && (await p.page.evaluate(`localStorage.getItem('dreamcar.paint')`)) === null);
+      await p.go('?manual&q=low&time=day&paint=nonsense');
+      check('?paint=nonsense: silver', (await p.page.evaluate('window.__dreamcar.game.racers[0].car.paint')) === 'silver');
+      await p.close('?paint=');
     }
   },
 

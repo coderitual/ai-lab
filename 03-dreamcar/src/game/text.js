@@ -75,6 +75,8 @@ export const TEXT = {
   pads: { steer: 'Steer', brake: 'Brake', drift: 'Drift', gas: 'Gas', pad: 'Steer · brake · drift' },
   gauge: { throttle: 'Throttle applied', brake: 'Brake applied', hand: 'Handbrake' },
   drivingHelp: 'Driving help',
+  paint: 'Paint',
+  paint2: 'Paint, player 2',
   throttle: 'Throttle',
   steering: 'Steering',
   slider: 'Slider',
@@ -97,6 +99,10 @@ export const TEXT = {
   auto: 'Auto',
   manual: 'Manual',
   bestSlide: 'Best slide',
+  /** A paint's name (PAINTS in assets/car/materials.js; any other is shown capitalised). */
+  paintName: (id) =>
+    ({ silver: 'Silver', black: 'Black', white: 'White', blue: 'Blue', red: 'Red', matte: 'Matte grey', graphite: 'Graphite', night: 'Night race' })[id] ||
+    id.charAt(0).toUpperCase() + id.slice(1),
   /** A driving-help level's name (ASSISTS.levels in config.js; any other id is shown capitalised). */
   assistName: (id) => ({ full: 'Full', sport: 'Sport', off: 'Off' })[id] || id.charAt(0).toUpperCase() + id.slice(1),
 
