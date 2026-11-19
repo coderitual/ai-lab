@@ -24,6 +24,7 @@ import { createCar } from '../assets/car/index.js';
 import { LAMPS as CAR_LAMPS } from '../assets/car/spec.js';
 import { createWorld } from '../assets/world/index.js';
 import { CANOPY, canopyOpen } from '../assets/world/canopy.js';
+import { BORE } from '../assets/world/tunnel.js';
 import { TIMES } from '../assets/world/lighting.js';
 import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
@@ -115,12 +116,27 @@ const HELD = { steer: 0, throttle: 0, brake: 0, handbrake: 1 };
 
 const probeAt = new THREE.Vector3();
 const probeHidden = [];
+const probeMotion = { velocity: null, time: 0 };
+const proxySurface = {};
+const proxyFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
+const proxyNormal = new THREE.Vector3();
+const proxyPoint = new THREE.Vector3();
+const proxyBox = new THREE.Matrix4();
+const proxyCentre = new THREE.Vector3();
+const proxyAxes = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
 const mirrorHidden = [];
 const frameOut = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
 const putAt = new THREE.Vector3();
 const shadowPoint = new THREE.Vector3();
 const shadowNormal = new THREE.Vector3();
 const surface = {};
+/** For the car's tunnel uniforms (CarModel.setBore): the road's frame at the car, and its axes in car space. */
+const boreFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
+const boreAhead = new THREE.Vector3();
+const boreFlat = new THREE.Vector3();
+const boreUp = new THREE.Vector3();
+const boreTo = new THREE.Vector3();
+const boreInverse = new THREE.Quaternion();
 const lookRead = { steer: 0, throttle: 0, brake: 0, handbrake: 0, analog: false, lookBack: false };
 
 export class Game {
@@ -365,10 +381,12 @@ export class Game {
     if (!this._map) this._map = this._mapOf();
     for (const v of this.hud.views) v.setMap(this._map, n);
     this.views = this.racers.map((racer, i) => {
-      // (ENGINE lane) what the car's paint mirrors: a cube picture of its surroundings, a face or two a frame
-      // two sizes (PROBE in config.js): the smaller at speed, the larger, redrawn whole, while the car is nearly still
+      // (ENGINE lane) what the car's paint mirrors: a cube picture of its surroundings, a face or two a frame,
+      // prefiltered for roughness (PROBE in config.js)
       const table = PROBE[this.tier] || PROBE.medium;
-      const probe = params.probe ? new ReflectionProbe(engine.renderer, table.size) : null;
+      const probe = params.probe
+        ? new ReflectionProbe(engine.renderer, table.size, { caps: this.caps, far: table.far, samples: table.samples, levelsPerUpdate: table.levels, fade: PROBE.fade })
+        : null;
 
       return {
         racer,
@@ -381,7 +399,7 @@ export class Game {
         exposure: this._exposureFor(racer.vehicle),
         /** 0..1: how much of the showcase's exposure compensation is in (eased in the fixed step). */
         showcase: this.phase === 'title' ? 1 : 0,
-        /** The probe the paint reads now; `still` says which of the two it is. */
+        /** The probe the paint reads; `still`: the car is nearly still, and the probe is kept on its slower cadence. */
         probe,
         probes: probe ? [probe] : [],
         still: false,
@@ -757,6 +775,11 @@ export class Game {
         if (phase === 'countdown') Object.assign(controls, HELD);
       }
       vehicle.step(dt, controls);
+      // the HUD's pedal gauge: what the car got, eased here so the picture only reads it (TC shows as a flicker)
+      const gauge = racer.gauge || (racer.gauge = { t: 0, b: 0 });
+      const k = 1 - Math.exp(-dt / 0.04);
+      gauge.t += (vehicle.throttle - gauge.t) * k;
+      gauge.b += (vehicle.brake - gauge.b) * k;
     }
     if (racers.length > 1) collideVehicles(racers[0].vehicle, racers[1].vehicle);
 
@@ -979,6 +1002,41 @@ export class Game {
     return map;
   }
 
+  /**
+   * The car's place in the tunnel's frame, for the paint's lines of luminaires (CarModel.setBore): its origin as
+   * drawn, in the road's level frame at its s (along, across, and height over the centre line's grade), that frame
+   * in car space, and how far it is under the roof (the Track's sky, which eases over the portals).
+   */
+  _poseBore(car, obj, vehicle) {
+    const track = this.track;
+    let near = false;
+    for (const t of track.tunnels) if (track.delta(t.s0 - PROBE.boreNear, vehicle.s) >= 0 && track.delta(vehicle.s, t.s1 + PROBE.boreNear) >= 0) near = true;
+    track.frameAt(vehicle.s, boreFrame);
+    boreAhead.set(boreFrame.tan.x, 0, boreFrame.tan.z).normalize();
+    boreFlat.set(boreFrame.left.x, 0, boreFrame.left.z).normalize();
+    const grade = boreFrame.tan.y / Math.max(Math.hypot(boreFrame.tan.x, boreFrame.tan.z), 1e-6);
+    boreTo.subVectors(obj.position, boreFrame.pos);
+    const along = boreTo.dot(boreAhead);
+    const lat = boreTo.dot(boreFlat);
+    const h = boreTo.y - grade * along;
+    boreInverse.copy(obj.quaternion).invert();
+    boreAhead.applyQuaternion(boreInverse);
+    boreFlat.applyQuaternion(boreInverse);
+    boreUp.set(0, 1, 0).applyQuaternion(boreInverse);
+    car.setBore({
+      lat,
+      h,
+      s: vehicle.s + along,
+      under: near ? clamp01(1 - vehicle.sky) : 0,
+      ahead: boreAhead,
+      flat: boreFlat,
+      up: boreUp,
+      grade,
+      speed: vehicle.speed,
+      near,
+    });
+  }
+
   // -------------------------------------------------------------- a frame
 
   /**
@@ -1017,7 +1075,12 @@ export class Game {
       }
       car.setLights(racer.lamps);
       // the car's sky: none in the tunnel, less under the woods (the same canopy the road beside it sees)
-      car.setReflections({ cube: this.views[racer.index]?.probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat) });
+      // (probe lane) `proxy`: the probe's parallax uniforms (ReflectionProbe `uniforms`, GLSL_PROBE_PROXY in engine/glsl.js);
+      // (car lane) and the picture's exposure, which says how bright white paper is where it is (materials.js GLSL_KEY)
+      const own = this.views[racer.index];
+      const probe = own?.probe ?? null;
+      car.setReflections({ cube: probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat), proxy: probe?.uniforms ?? null, exposure: own?.frame.exposure || own?.exposure });
+      if (car.setBore) this._poseBore(car, obj, vehicle);
 
       obj.updateMatrixWorld();
       sharp.prevMatrix.copy(sharp.matrix);
@@ -1153,6 +1216,7 @@ export class Game {
       }
       h.setSpeed(v.speed * 3.6);
       h.setRev(v.rpm, v.gear);
+      if (racer.gauge) h.setGauge(racer.gauge.t, racer.gauge.b, racer.controls.handbrake > 0.5);
       const a = v.assists;
       h.setTells({
         abs: a.abs > 0.1,
@@ -1217,6 +1281,31 @@ export class Game {
     return this._board.table;
   }
 
+  /**
+   * The local proxy of a view's probe, for the materials' parallax correction (GLSL_PROBE_PROXY): the road's plane
+   * under the car, and in the tunnel the bore as a box along the road (wall to wall, road to ceiling).
+   */
+  _probeProxy(probe, vehicle, inTunnel) {
+    const track = this.track;
+    track.surfaceAt(probeAt.x, probeAt.z, this._proxyHint ?? -1, proxySurface);
+    this._proxyHint = proxySurface.index;
+    proxyNormal.set(proxySurface.nx, proxySurface.ny, proxySurface.nz);
+    proxyPoint.set(probeAt.x, proxySurface.y, probeAt.z);
+    if (!inTunnel) {
+      probe.setProxy(proxyNormal, proxyPoint, null);
+      return;
+    }
+    const f = track.frameAt(vehicle.s, proxyFrame);
+    const left = track.edgeAt(vehicle.s, 1) + BORE.walk;
+    const right = track.edgeAt(vehicle.s, -1) + BORE.walk;
+    proxyCentre.copy(f.pos).addScaledVector(f.left, (left - right) / 2).addScaledVector(f.up, BORE.ceiling / 2);
+    proxyBox
+      .makeBasis(proxyAxes[0].copy(f.tan).multiplyScalar(PROBE.tunnelBox), proxyAxes[1].copy(f.left).multiplyScalar((left + right) / 2), proxyAxes[2].copy(f.up).multiplyScalar(BORE.ceiling / 2))
+      .setPosition(proxyCentre)
+      .invert();
+    probe.setProxy(proxyNormal, proxyPoint, proxyBox);
+  }
+
   /** Draw every view into its rectangle. */
   draw() {
     const table = PROBE[this.tier] || PROBE.medium;
@@ -1232,21 +1321,14 @@ export class Game {
       this.world.prepareView(view.camera, car.object.position, this.beams, mirrorHidden);
       // (ENGINE lane) the car's probe, from the middle of the car, without the car itself; after prepareView, so
       // that the shadows it shows are this view's. In split screen the two take turns. Nearly still (the title's
-      // orbit, the grid): the larger cube, redrawn whole over a few frames; at speed the smaller one, a face or two.
-      if (view.probes.length) {
-        const speed = Math.abs(view.racer.vehicle.speed);
-        const still = view.still ? speed < PROBE.movingAbove : speed < PROBE.stillBelow;
-        if (still !== view.still) {
-          view.still = still;
-          // the larger cube is made the first time it is needed
-          if (still && !view.probes[1]) view.probes[1] = new ReflectionProbe(this.engine.renderer, table.stillSize);
-          view.probe = view.probes[still ? 1 : 0];
-          // the one taken up is refreshed face by face from what it last showed (its very first update draws all six)
-          view.frame.probe = view.probe.texture;
-        }
+      // orbit, the grid) it is redrawn on a slower cadence; at speed the faces that see the roadside go by first.
+      const vehicle = view.racer.vehicle;
+      if (view.probe) {
+        const speed = Math.abs(vehicle.speed);
+        view.still = view.still ? speed < PROBE.movingAbove : speed < PROBE.stillBelow;
       }
       const probeEvery = view.still ? (table.stillEvery ?? 1) : table.every;
-      const inTunnel = view.racer.vehicle.sky < PROBE.tunnelSky;
+      const inTunnel = vehicle.sky < PROBE.tunnelSky;
       const probeFaces = view.still ? table.stillFaces : inTunnel ? (table.tunnelFaces ?? table.faces) : table.faces;
       if (view.probe && this.engine.frame % (probeEvery * n) === i * probeEvery) {
         probeAt.copy(car.box.center).applyMatrix4(car.object.matrixWorld);
@@ -1259,7 +1341,10 @@ export class Game {
         if (this.ghostCar) probeHidden.push(this.ghostCar.object);
         // smoke and sparks in a reflection would smear over the whole car
         probeHidden.push(...this.effects.objects);
-        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces, inTunnel ? PROBE.tunnelFar : undefined);
+        probeMotion.velocity = vehicle.velocity;
+        probeMotion.time = this.engine.renderTime;
+        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces, inTunnel ? PROBE.tunnelFar : undefined, probeMotion);
+        this._probeProxy(view.probe, vehicle, inTunnel);
       }
       this.pipeline.render(this.world.scene, view.camera, view.rect, view.frame);
       view.rig.cut = false;

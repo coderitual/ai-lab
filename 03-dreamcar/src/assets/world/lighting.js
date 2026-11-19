@@ -79,6 +79,14 @@
  * @property {Rgb} sky.clouds.shade radiance of a cloud's body where the sun does not reach
  * @property {[number, number]} sky.clouds.drift how fast they move, in sky widths per second (x, z): a few
  *   thousandths at most, or the environment map made at start-up shows clouds that have left
+ * @property {number} [sky.clouds.sunward] 0..1: how much the clouds' light gathers on the sun's side (dusk: only the
+ *   clouds near the sun catch it, the rest stand dark)
+ * @property {{ at: number[], sun: Rgb[], away: Rgb[] }} [sky.twilight] the dusk dome as two columns of five
+ *   radiances, under the sun and opposite it (sky.js); when given, zenith, horizon, falloff, phase and band are not read
+ * @property {boolean} [sky.starsAway] only the first stars, high and opposite the sun
+ * @property {{ dir: number[], size: number, amount: number }} [sky.clouds.group] a group of heaps the noise is pushed
+ *   towards round one direction (`dir`, unit, towards it): `size` its radius on the cloud sheet (1 is about 25 degrees
+ *   of sky at 25 degrees up), `amount` how much it adds to the noise there (0.4: a sure cloud)
  *
  * @property {object} env the environment map made from the sky
  * @property {number} env.intensity 1: surfaces are lit by the sky exactly as it is drawn
@@ -136,8 +144,14 @@ export function towards(bearing, elevation) {
  *   dusk   125 degrees left of the heading (out over the lake, behind the driver's left shoulder), 2 up.
  *   moon   8 degrees left of the heading, 17 up, beside the massif's main peak.
  */
-export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 2 }, moon: { left: 8, up: 17 } };
+export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 2 }, moon: { left: 8, up: 17 }, clouds: { left: 30, up: 30 } };
 const SUN = towards(90 - PLACES.day.left, PLACES.day.up);
+/**
+ * (day lane) Where the group of cumulus stands (sky.js `group`): over the massif's great shoulder, left of its main
+ * peak, as in D1, where a few big heaps with crisp white tops and soft grey bases sit some 18 to 32 degrees up between
+ * 18 and 42 degrees left of the road. The rest of the sky keeps the noise's few scattered clouds.
+ */
+const CLOUD_GROUP = towards(90 + PLACES.clouds.left, PLACES.clouds.up);
 
 /**
  * (sky lane) The moon: low, ahead and a little left of the start straight, beside the massif, so that the massif stands
@@ -165,6 +179,7 @@ export function placeLights(heading) {
   SUN.splice(0, 3, ...towards(heading + PLACES.day.left, PLACES.day.up));
   DUSK_SUN.splice(0, 3, ...towards(heading + PLACES.dusk.left, PLACES.dusk.up));
   MOON.splice(0, 3, ...towards(heading + PLACES.moon.left, PLACES.moon.up));
+  CLOUD_GROUP.splice(0, 3, ...towards(heading + PLACES.clouds.left, PLACES.clouds.up));
 }
 
 /** @type {{ day: TimeOfDay, dusk: TimeOfDay, night: TimeOfDay }} */
@@ -175,20 +190,24 @@ export const TIMES = {
     name: 'day',
     sun: { dir: SUN, color: [1.0, 0.86, 0.68], intensity: 7.5 },
     sky: {
-      zenith: [0.22, 0.38, 0.78],
-      horizon: [0.55, 0.66, 0.8],
+      // (day lane) bluer, as D1's sky is between its clouds: (100, 142, 192) high on the left, (152, 180, 228) to the
+      // right of the sun, (195, 212, 240) in the haze round it; the drawn sky was (141, 159, 190), (139, 162, 193), (178, 190, 210)
+      zenith: [0.15, 0.33, 0.86],
+      horizon: [0.5, 0.65, 0.92],
       falloff: 0.15,
       phase: 0.4,
       // (look lane: the aureole, `tight`, was 7: now a white-hot halo about four times the disc's radius, which is
       // what the bloom and the glare of the frame spread over the top of the picture)
-      glow: { color: [1.0, 0.9, 0.74], wide: [0.3, 0.8], tight: [40, 0.988] },
+      glow: { color: [1.0, 0.92, 0.8], wide: [0.42, 0.8], tight: [40, 0.988] },
       disc: { size: 0.4, radiance: 3000, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
       // grass, rock and forest of albedo 0.11 under the 3.1 the sun and sky lay on them
       ground: [0.105, 0.112, 0.09],
       stars: 0,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      clouds: { cover: 0.45, wisps: 0.35, lit: 0.26, silver: 1.6, shade: [0.24, 0.29, 0.4], drift: [0.0011, 0.0004] },
+      // (day lane) D1's cumulus: crisp white tops (the frame clips them), soft grey bases, a group of big heaps
+      // over the massif's shoulder and a few small ones by the sun; the rest of the sky clear
+      clouds: { cover: 0.36, wisps: 0.2, lit: 0.3, silver: 1.6, shade: [0.3, 0.34, 0.42], drift: [0.0011, 0.0004], group: { dir: CLOUD_GROUP, size: 0.55, amount: 0.42 } },
     },
     // (look lane, day: 0.72, so that shade sits nearly three stops under sun as in reference A)
     // (round three) the drawn sky was raised to the frames' brightness; its light on the scene is kept where it was
@@ -228,42 +247,60 @@ export const TIMES = {
       horizon: [0.17, 0.11, 0.06],
       falloff: 0.2,
       phase: 0.3,
-      glow: { color: [1.0, 0.58, 0.26], wide: [0.55, 0.55], tight: [18, 0.985] },
+      // (day lane, frame K5) a tight, weak wide glow: 35 degrees from the sun the dome's own bands show, not a gold wash
+      glow: { color: [1.0, 0.58, 0.26], wide: [0.12, 0.82], tight: [18, 0.985] },
       disc: { size: 0.45, radiance: 600, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
-      // the gold belt low all round, deeper under the sun (sky.js: radiance at the horizon, height)
-      band: { color: [0.15, 0.085, 0.036], height: 0.16 },
-      ground: [0.036, 0.027, 0.018],
-      stars: 0,
+      // (dusk lane, the owner's twilight references) the whole dome, not one tint (sky.js twiColumn): under the sun
+      // a rose and orange horizon rising through gold and pale yellow into turquoise and deep blue overhead; opposite
+      // it the blue-violet shadow of the earth low down with the pink belt over it, then blue. Five radiances per
+      // column at the heights `at` (sine of the elevation of the 2nd to 5th; the 1st is the horizon), blended round
+      // the sky by how far a direction is turned towards the sun. (zenith/horizon/falloff/phase are not read.)
+      twilight: {
+        at: [0.035, 0.09, 0.22, 0.55],
+        sun: [[0.2, 0.055, 0.04], [0.23, 0.095, 0.025], [0.16, 0.135, 0.055], [0.045, 0.1, 0.11], [0.008, 0.022, 0.085]],
+        away: [[0.018, 0.017, 0.045], [0.032, 0.025, 0.052], [0.08, 0.042, 0.062], [0.034, 0.046, 0.11], [0.008, 0.022, 0.085]],
+      },
+      ground: [0.016, 0.015, 0.022],
+      // the first stars, high and opposite the sun (sky.js uStarAway)
+      stars: 1.2e-6,
+      starsAway: true,
       milkyWay: 0,
       airglow: [0, 0, 0],
-      clouds: { cover: 0.45, wisps: 0.4, lit: 0.09, silver: 1.6, shade: [0.032, 0.024, 0.024], drift: [0.0011, 0.0004] },
+      // long thin streaks lit orange-rose from below on the sun's side, dark blue-grey elsewhere (`sunward`)
+      clouds: { cover: 0.28, wisps: 0.75, lit: 0.09, silver: 1.6, sunward: 0.9, shade: [0.012, 0.014, 0.028], drift: [0.0011, 0.0004], group: { dir: CLOUD_GROUP, size: 0.42, amount: 0.15 } },
     },
     env: { intensity: 0.6 },
     ambient: { sky: [0.95, 0.78, 0.6], ground: [1.0, 0.62, 0.34], intensity: 0.014 },
-    fog: { color: [0.1, 0.068, 0.042], sun: [0.4, 0.19, 0.06], sunLobe: 6, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
+    // (dusk lane) the haze is the horizon's: blue-violet away from the sun (the far land stands in layered blue
+    // silhouettes), gold and rose towards it
+    // (frame K5: the thin air 3e-5, was 8e-5: the far cones across the sea stand dark against the band, not lost in gold)
+    fog: { color: [0.02, 0.022, 0.048], sun: [0.25, 0.1, 0.035], sunLobe: 24, density: 0.00025, heightFalloff: 0.011, air: 0.00003 },
     exposure: 4.2,
     tunnelExposure: 6,
     shadeEv: 0.6,
     look: {
       flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 },
-      contrast: 1.2,
-      saturation: 1.16,
-      tint: [1.05, 1.0, 0.9],
+      // (dusk lane) richer and deeper; a whiter balance and cool shade (the twilight references' blue silhouettes;
+      // D4's shade on the asphalt is a neutral grey too), the gold kept in the highlights
+      contrast: 1.24,
+      saturation: 1.22,
+      tint: [1.03, 1.0, 0.94],
       lift: [0.0004, 0.00025, 0.0001],
       vignette: 0.3,
       chroma: 0.001,
       grain: 0.6,
-      bloom: 0.09,
+      bloom: 0.11,
       ghosts: 0.0002,
       glare: 0.03,
       ao: 1.0,
       star: 0.015,
-      halo: 0.05,
-      splitShadows: [1.06, 0.98, 0.9],
+      // (dusk lane) the lamps, on against a lit sky, glow with halos as at night
+      halo: 0.1,
+      splitShadows: [0.97, 0.99, 1.05],
       splitHighlights: [1.05, 1.0, 0.88],
       splitBalance: 0.45,
     },
-    lamps: { street: 1, tunnel: 1, windows: 0.7, entrance: 0.5 },
+    lamps: { street: 1, tunnel: 1, windows: 1, haze: 0.35, entrance: 0.5 },
     wetness: 0,
     carLights: 'low',
   },
@@ -287,7 +324,7 @@ export const TIMES = {
       stars: 1.5e-6,
       milkyWay: 0.0005,
       airglow: [0.0003, 0.00055, 0.0004],
-      clouds: { cover: 0.3, wisps: 0.25, lit: 0.12, silver: 2.2, shade: [0.0003, 0.00042, 0.0008], drift: [0.0011, 0.0004] },
+      clouds: { cover: 0.3, wisps: 0.25, lit: 0.12, silver: 2.2, shade: [0.0003, 0.00042, 0.0008], drift: [0.0011, 0.0004], group: { dir: CLOUD_GROUP, size: 0.42, amount: 0.3 } },
     },
     env: { intensity: 1 },
     // the night sky lays only about a tenth of the moon's light on the ground; this keeps the moon's shadows

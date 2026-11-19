@@ -23,7 +23,8 @@
 //  - the GRID: square cells (5 m on the high tier) over the whole course, cut
 //    into chunks the renderer can cull. Cells the band covers are dropped;
 //    the band's neighbours are pulled a little under it.
-//  - the FAR land: 100 m cells out to the mountains on the horizon.
+//  - the FAR land: 100 m cells out to the mountains on the horizon, with a hole
+//    where the grid is whose rim is the grid's border.
 //
 // Under the tunnel's portals the grid is cut open (the bore and its face come
 // with the tunnel); over the bore the ground stands above its crown; under the
@@ -1218,19 +1219,29 @@ const FOOT = 0.8;
     const pos = new Float32Array(m * m * 3);
     const bake = new Float32Array(m * m * 4);
     const mask = new Float32Array(m * m * 2);
+    // (lead) The far land has a hole where the grid is, and its rim is the grid's border exactly. It used to run on
+    // under the grid, sunk 150 m in the middle but at its own height (less 1.5 m) for two cells in from the border: where
+    // the road stood within those two cells of the border, in a cutting lower than the land, a far triangle 100 to 140 m
+    // across lay over the road, seen only from above: a dark slab over the car in a tall picture (owner's screenshots at
+    // the esses). Now the lattice's lines nearest the border are moved onto it (their heights read there from the same
+    // lattice the grid's border eases onto, so the two edges are the same line), and no triangle is made inside them.
+    const snap = (lo, hi, origin) => {
+      const a = Math.max(1, Math.min(m - 3, Math.round((lo - origin) / FAR_CELL)));
+      const b = Math.max(a + 1, Math.min(m - 2, Math.round((hi - origin) / FAR_CELL)));
+      return [a, b];
+    };
+    const [holeI0, holeI1] = snap(minX, gridX1, x0);
+    const [holeJ0, holeJ1] = snap(minZ, gridZ1, z0);
+    const lineX = (i) => (i === holeI0 ? minX : i === holeI1 ? gridX1 : x0 + i * FAR_CELL);
+    const lineZ = (j) => (j === holeJ0 ? minZ : j === holeJ1 ? gridZ1 : z0 + j * FAR_CELL);
     for (let j = 0; j < m; j++) {
       for (let i = 0; i < m; i++) {
         const v = j * m + i;
-        const x = x0 + i * FAR_CELL;
-        const z = z0 + j * FAR_CELL;
-        // inside the grid it lies well under it, out of sight, so the two never fight
-        // (the far vertices next to the grid's border stay at their height, a little under the grid's edge, which
-        // eases onto them, so the far land's triangles that reach under the grid never open a trench at its border)
-        const under = x > minX + 2 * FAR_CELL && x < maxX - 2 * FAR_CELL && z > minZ + 2 * FAR_CELL && z < maxZ - 2 * FAR_CELL;
-        const overlap = x > minX && x < maxX && z > minZ && z < maxZ;
+        const x = lineX(i);
+        const z = lineZ(j);
+        const moved = i === holeI0 || i === holeI1 || j === holeJ0 || j === holeJ1;
         pos[v * 3] = x;
-        // (well under: the tunnel runs 45 m below the ground over it, and must not see the far land from inside)
-        pos[v * 3 + 1] = under ? heights[v] - 150 : overlap ? heights[v] - 1.5 : heights[v];
+        pos[v * 3 + 1] = moved ? bilinear(heights, m, m, x0, z0, FAR_CELL, x, z) : heights[v];
         pos[v * 3 + 2] = z;
         const h0 = heights[v] + 2;
         bake[v * 4] = marchSun(x, z, h0, dirs[0], 4000);
@@ -1256,6 +1267,8 @@ const FOOT = 0.8;
     for (let j = 0; j < m - 1; j++) {
       for (let i = 0; i < m - 1; i++) {
         const v = j * m + i;
+        // the hole the grid fills
+        if (i >= holeI0 && i < holeI1 && j >= holeJ0 && j < holeJ1) continue;
         if (dry(v) || dry(v + m) || dry(v + 1)) index.push(v, v + m, v + 1);
         if (dry(v + 1) || dry(v + m) || dry(v + m + 1)) index.push(v + 1, v + m, v + m + 1);
       }

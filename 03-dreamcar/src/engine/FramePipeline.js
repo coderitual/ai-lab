@@ -851,10 +851,14 @@ void main() {
     // (no ambient occlusion on this tier: all open)
     c = uExposure > 0.0 ? srgbToLinear(clamp(colourAt(p), 0.0, 1.0)) : vec3(1.0);
   } else {
-    // the probe unrolled: the horizon across the middle, +Z in the centre, +X a quarter to the left of it, up at the top
-    float lon = (0.5 - vUv.x) * 6.2831853;
-    float lat = (vUv.y - 0.5) * 3.1415927;
-    c = toneCurve(probeSample(uProbe, vec3(sin(lon) * cos(lat), sin(lat), cos(lon) * cos(lat)), 0.0) * uExposure, 1.0);
+    // the probe unrolled four times, at roughness 0 (top left), 0.3 (top right), 0.6 (bottom left) and 1: in each
+    // the horizon across the middle, +Z in the centre, +X a quarter to the left of it, up at the top
+    vec2 q = fract(vUv * 2.0);
+    int quarter = (vUv.x < 0.5 ? 0 : 1) + (vUv.y < 0.5 ? 2 : 0);
+    float rough = quarter == 0 ? 0.0 : quarter == 1 ? 0.3 : quarter == 2 ? 0.6 : 1.0;
+    float lon = (0.5 - q.x) * 6.2831853;
+    float lat = (q.y - 0.5) * 3.1415927;
+    c = toneCurve(probeSample(uProbe, vec3(sin(lon) * cos(lat), sin(lat), cos(lon) * cos(lat)), rough) * uExposure, 1.0);
   }
   outColor = vec4(linearToSrgb(c) + dither(), 1.0);
 }

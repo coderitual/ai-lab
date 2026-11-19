@@ -38,6 +38,7 @@ import { createGroundMaterial } from './groundMaterial.js';
 import { createSea } from './sea.js';
 import { createVolcano } from './volcano.js';
 import { createFar } from './far.js';
+import { createK5 } from './k5.js';
 import { CASTER_LAYER, createForest } from './forest.js';
 import { createGroundCover } from './groundCover.js';
 import { selectBake } from './shading.js';
@@ -99,7 +100,9 @@ const SMALL = new Map([
  *   `focus` (the view's car) and asks for it to be drawn again, sets the fog for this camera, shuts the sky's light
  *   out where the car is in the tunnel and draws the wet road's mirror, leaving out `hidden` as well (what lies on
  *   the road and would hide the cars' own reflections: their contact shadows, smoke, spray). A view drawn without
- *   it has last view's shadows.
+ *   it has last view's shadows. The trees that cast into the map are chosen by the map's box (forest.js), never by
+ *   where the car stands, so two views of the same place shade it alike.
+ * @property {import('./sun.js').ShadowBox} shadowBox the shadow map's box as prepareView last placed it (for tests)
  * @property {(n: number) => void} setStartLights the gantry's countdown lamps, 0..5 lit
  * @property {THREE.Object3D[]} probeHidden what to hide while a reflection probe is drawn
  * @property {number} wetness 0..1 road wetness: the time of day's (lighting.js), unless ?wet= or a setter overrides it
@@ -182,6 +185,10 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   const far = createFar({ track, terrain, caps, tier, rng: rng.fork('far'), atmosphere });
   far.setPixelRatio(renderer.getPixelRatio());
   lap('far');
+  // (day lane) the scenery of frame K5's place: the drum tower, the flags, the chevron, the far lamps
+  const k5 = createK5({ track, terrain, caps, tier, rng: rng.fork('k5'), atmosphere });
+  k5.setPixelRatio(renderer.getPixelRatio());
+  lap('k5');
   const structures = createStructures({ track, terrain, caps, tier, atmosphere, rng: rng.fork('structures'), glints: road.glints });
   lap('structures');
   const studs = createStuds({ track, caps });
@@ -204,7 +211,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   }
   const smallReach = SMALL_REACH[tier] ?? SMALL_REACH.medium;
   const eye = new THREE.Vector3();
-  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, sea.mesh, volcano.group, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, sea.mesh, volcano.group, forest.group, cover.group, far.group, k5.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -263,8 +270,10 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
     terrain,
     /** The trees (forest.js): where they stand (woodAt, turnedAt), single trees for the viewer (specimen). */
     forest,
+    /** The sun's shadow map's box as the last prepareView placed it (sun.js), for tests. */
+    shadowBox: sun.box,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, sea: sea.stats, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
+    stats: { ms, sea: sea.stats, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, k5: k5.stats, cover: cover.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -291,6 +300,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       scene.environmentIntensity = time.env.intensity;
       forest.setTime(time);
       far.setTime(time);
+      k5.setTime(time);
       sea.setTime(time);
       volcano.setTime(time);
       structures.setTime(time);
@@ -313,7 +323,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       for (const p of small) p.object.visible = p.sphere.center.distanceTo(eye) - p.sphere.radius < smallReach * p.reach;
       sun.prepareView(camera, focus);
       sea.prepareView(camera);
-      forest.prepareView(camera, focus);
+      forest.prepareView(camera, focus, sun.box);
       cover.prepareView(camera);
       road.setBeams(beams);
       structures.prepareView(camera, focus, beams);
@@ -382,6 +392,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       sky.dispose();
       forest.dispose();
       far.dispose();
+      k5.dispose();
       cover.dispose();
       terrain.dispose();
       road.dispose();

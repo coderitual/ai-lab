@@ -656,6 +656,12 @@ function clipRanges(track, list) {
   return merged.sort((p, q) => p.s0 - q.s0);
 }
 
+/** (day lane) The two groups of boards on the straight's lake side, as metres from the line (negative: before it). */
+const STRAIGHT_BOARDS = [
+  [-229, -189],
+  [-82, -44],
+];
+
 /**
  * Kerbs, and the dressing of a circuit: where it goes, as data (nothing here is drawn). Kerbs are part of the
  * course (profile() and surfaceAt() return them); everything else stands at or beyond the barrier.
@@ -699,9 +705,10 @@ function layCircuit(track, plan) {
   /** Distance from the centre line to stand something `inset` m in front of the barrier on one side at s. */
   const front = (s, side, inset) => side * (track.edgeAt(s, side) - inset);
   track.tyreWalls = clipRanges(track, tyres).map((t) => ({ ...t, lat: front(t.s0, t.side, 0.9), depth: 1.2 }));
-  // boards: on the outside of the run-off bends, and along the low walls of the straight
-  const straight = track.sections[0];
-  for (const side of [1, -1]) boards.push({ s0: straight.s0 + 40, s1: straight.s1 + track.length - 30, side });
+  // boards: on the outside of the run-off bends, and on the straight's lake-side wall in two groups (frame D1: one
+  // cluster of tall boards by the run-up's camera, a second far down towards the line; between them the low wall
+  // with the trees and the shore behind it). The land side of the straight has none.
+  for (const [a, b] of STRAIGHT_BOARDS) boards.push({ s0: track.wrap(a), s1: track.wrap(b), side: 1 });
   track.boards = clipRanges(track, boards).map((b) => ({ ...b, lat: front(b.s0, b.side, 0.25), height: 1.1 }));
   // distance boards before the slow corner: the tightest piece of the lap, on the outside of its approach
   let slow = 0;

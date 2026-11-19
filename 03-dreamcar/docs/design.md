@@ -125,7 +125,8 @@ lamps (retro.js), as the road's lines do. Barriers: two
 stacked W-beams on posts (one beam where trackside panels stand behind it;
 set back behind tyre walls; a reflector painted on the upper beam over every
 fourth post, which blazes in the head lamps at night), low concrete walls 0.93 m high on the straight
-(walls.js, precast blocks painted white and teal), cut faces of bedded
+(walls.js, precast blocks: on the lake side of the straight a warm grey and a
+burnt orange by turns, white along the pits, a deep bottle green elsewhere), cut faces of bedded
 limestone where the edge is rock. Viaduct piers are slender eight-sided
 shafts under flared capitals; the short bridge spans a V-shaped gully across
 it with a stream's notch. Gradients up to 8 per cent; banking by rule
@@ -171,9 +172,11 @@ count, the upper two green for four seconds after lights out. On the land side
 behind the wall a catch fence, a pit lane and a two-storey pit building
 (garages, a glazed floor lit at dusk and at night, a roof terrace under a
 canopy carrying the name); on the lake side a covered stand. Along the lake
-side of the straight one run of tall hoardings (3.8 m panels, tops near 5 m),
-broken only by the stand and the gantry's tower; the land side stays open
-(grass, the barrier, the pits). Past the pit exit a short tyre wall with low
+side of the straight two groups of tall hoardings (3.8 m panels, tops near 5 m):
+five by the run-up's camera (frame D1) and four more 45 to 80 m before the
+line; between them the low wall is open, with hazel along it and loose rows
+of round green broadleaves 8 to 15 m tall behind it (forest.js). The land side
+stays open (grass, the barrier, the pits). Past the pit exit a short tyre wall with low
 boards on a low wall behind it. At the far end of the straight a footbridge
 carrying boards, a marshal's tower, and on the outside of the first bend a
 small stand and distance boards 200, 150 and 100. Low boards along the bends,
@@ -214,8 +217,13 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   arrows, Space the handbrake. Pad: triggers, left stick, A or RB the
   handbrake. Touch: the owner plays on an iPhone held upright in one hand,
   and asked for controls that are "one-hand friendly and super smooth and
-  precise". So the default is one thumb on a fixed analog pad at the bottom
-  corner of the holding hand's side (Hand: Right or Left), within the
+  precise". So the default is one thumb on an analog pad that appears under the thumb
+  (round 3: the owner plays with either hand and asked that "the pad
+  should also adjust to where the user starts to touch"; he had rejected a
+  stick whose base moved while the finger moved, so the centre is set at
+  touch-down and never moves until the thumb lifts). At rest it is a faint ghost at the bottom
+  corner of the holding hand's side (Hand: Right or Left: it only places the
+  ghost and the handbrake button), within the
   thumb's natural arc: drawn like a finished game's stick (a dark glass disc
   with a light rim, its centre and full lock marked, an amber brake arc
   along its foot that fills as the brake is pressed, a red arc below it).
@@ -224,9 +232,11 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   pulled on into the red arc it yanks the handbrake, like a lever, and the
   knob clicks into the arc: brake, flick into a slide and steer through it
   with one thumb. A round HANDBRAKE button stands in the other bottom corner
-  for a second thumb. The pad's centre never moves, so a thumb landing off
-  it steers at once and the knob springs back when it lifts; nothing else on
-  the screen drives the car. Options: the slider (a track with a marked
+  for a second thumb; a second finger anywhere is the handbrake too. The pad's centre is where
+  the thumb landed and never moves, so the first input is zero and the knob
+  springs back when it lifts; near an edge the travel is compressed (to
+  60 % at the least) and then the centre is nudged inward with a 6 px hold
+  at zero, so there is never a jump. Options: the slider (a track with a marked
   centre) or two arrows, each with the pedals (BRAKE, DRIFT, and GAS on
   manual); tilt (the phone rolled like a wheel, the pad still braking;
   untested on a real phone). Throttle manual makes the pad's up the
@@ -342,8 +352,10 @@ bottom (as given, whatever the picture's shape); the HUD is hidden unless
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
-day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 78.8 s),
-`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green) and
+day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 76.6 s),
+`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green),
+`?photo=k5` (frame K5, strict spec at dusk: t 88.7 s, the end of the sweepback's first piece, a chase camera
+6.2 m back and 2.3 m up, pitched 9 degrees down, lens 50 degrees) and
 `?photo=e1` (frame E1, strict spec for the coast stretch: day, t 64.9 s, the car coming out of the carousel,
 the camera on the crest looking back at it; a `roll` of 7 degrees tilts the horizon as the frame's does); a name
 brings its own moment of the autopilot's run and its time of day unless the
@@ -364,8 +376,10 @@ with a short `advance` after loading.
   straight down the road (lighting.js `PLACES`, turned to the Track's heading
   by `placeLights`): the chase view drives into it, its glare lies along the
   asphalt, shadows fall straight back and a little left. A deep blue sky, pale
-  and bright at the horizon, with small lit cumulus (grey-blue bases, silver
-  rims near the sun); a compact sun with a soft aureole; dry asphalt. The
+  and bright at the horizon (zenith 0.15, 0.33, 0.86; horizon 0.5, 0.65,
+  0.92), with lit cumulus: a group of big heaps with crisp white tops and
+  soft grey bases over the massif's shoulder, left of its main peak, and a few
+  small ones elsewhere (grey-blue bases, silver rims near the sun); a compact sun with a soft aureole; dry asphalt. The
   drawn sky is as bright as the frames' (pale blue, paling to the horizon);
   its light on the scene is set apart (`env.intensity` 0.6, fill 0.13), so
   that the shade stays open but deep: sunlit level ground about 2.1 from the
@@ -391,15 +405,22 @@ with a short `advance` after loading.
   straight. Its orange light crosses the straight almost level, so whatever
   stands on the lake side throws shadows 25 to 30 m long over the grid while
   the trees, the gantry and the buildings on the land side, and the massif,
-  stand in red-orange light. Golden, never violet (render lane, after the
-  owner's "small shading problems" and D4 beside our still): the sky is a gold
-  haze low down paling into a clear light blue overhead, the haze the far
-  land fades into is gold-brown, the sky's fill is warm, and the grade warms
-  the white balance (tint 1.05, 1.0, 0.9) with rust in the shadows and gold in
-  the highlights (split toning); clouds lit from below that the paint
-  mirrors; the fill is low (env 0.6, exposure 4.2, contrast 1.2), so the lit crowns and the
-  lamps carry the picture and the shade stays deep and warm. Dry. Lamps and
-  windows are on.
+  stand in red-orange light. The sky is a whole twilight dome (dusk lane,
+  after the owner's "in the dusk lighting the tunnel and after the tunnel
+  looks dull and bad" and his twilight references): under the sun a rose and
+  orange horizon rising through gold and pale yellow into turquoise and a
+  deep blue overhead; opposite it the blue-violet shadow of the earth low
+  down with a pink belt over it; long thin clouds lit orange-rose from below
+  near the sun and dark blue-grey elsewhere; the first stars high up opposite
+  the sun. The haze is the horizon's: gold and rose towards the sun,
+  blue-violet away from it, so the far land stands in layered blue
+  silhouettes. The grade is rich and deep (contrast 1.24, saturation 1.22,
+  exposure 4.2), a whiter balance (tint 1.03, 1.0, 0.94) with cool shade and
+  gold highlights (split toning). Dry. The lamps and windows are on and glow
+  with halos against the lit sky (`halo` 0.1, a faint cone in the air); the
+  cars run on low beam, their head lamps pooling on the road ahead and their
+  tail lamps laying a red pool on the asphalt behind them (road.js
+  `TAIL_POOL`).
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
@@ -474,7 +495,39 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   winding in an S round a cut hill on a headland high above an open sea; the
   whole frame is described under "The sea".
 
-Day answers to D1, D3, E1 and A; golden hour to D4 and D2; the wet night to two
+- **The twilight references** (four more frames of racing games, sent with
+  "in the dusk lighting the tunnel and after the tunnel looks dull and bad";
+  their light, sky, colour and mood only): after sunset, a sky from deep blue
+  overhead through turquoise and pale yellow to a band of orange and rose on
+  the horizon over dark blue mountains and a pale gleam of water, a dark road
+  whose white lines catch the sky, tail lamps glowing red with their light
+  pooled on the asphalt, small warm lamps far off; blue hour over cool
+  blue-violet land under a pale sky with long dark clouds, a lit board
+  glowing; a low sun breaking under heavy cloud into a blinding glare that a
+  wet road mirrors; the last warm side light with long shadows across the
+  road and a lit snowy mountain against a clear pale sky.
+
+- **K5**, one of those twilight frames made strict spec for one place ("treat
+  it as spec of one of the place on the track; beside the car everything is
+  spec"): after sunset, a chase camera low behind the car on a wide dark road
+  high over the water, curving gently right. The sky deep blue overhead
+  through pale turquoise and yellow to an orange-rose band on the horizon,
+  clear. Across the left and the middle a pale sheet of water with a bright
+  gleam, dark blue mountains beyond it with a few snow-capped cones. On the
+  left a guard rail, low scrub, small warm lamps far off, a yellow chevron
+  board and two tall dark feather flags on poles; on the right a guard rail
+  curving with the road and a big dark round tower with a railing round its
+  top and one warm lit window. The road dark, its white lines catching the
+  sky, the tail lamps' red glow on the asphalt behind the car. Our place is
+  the end of the sweepback's first piece, where the road comes off the gully
+  bridge high over the bay, due south, and begins its long right turn down to
+  the shore (`?photo=k5`; landmarks.js `K5`): the bay and the open sea to the
+  west lie ahead and to the left, the golden-hour sun stands 35 degrees to the
+  right behind the tower, the far cones (far.js) stand across the sea, and the
+  tower, the flags, the chevron and the lamps are k5.js's. Our flags are plain;
+  the tower is our own.
+
+Day answers to D1, D3, E1 and A; golden hour to D4, D2 and the twilight references (K5 strictly); the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
 light, the materials, the vegetation, the composition and the sense of speed:

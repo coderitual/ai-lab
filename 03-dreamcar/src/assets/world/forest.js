@@ -405,8 +405,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   // THE START (D4): beyond the pit exit, where the Track says the land side is wooded and the wood has turned, a wall
   // of turned maples: 14 to 20 m tall close behind the barrier, crowns touching, and each row behind taller than the
   // one before it, so that from the grid the wall closes the picture and no sky stands over it; a small dark fir or
-  // two in its front. Nowhere else on the straight: the lake side and the paddock before the line stay open, so that
-  // the massif shows (D1). (The straight is the Track's section `straight`.)
+  // two in its front. Elsewhere on the straight only the loose green rows between the lake side's two groups of boards
+  // (below): the paddock before the line stays open, so that the massif shows (D1). (The straight is the Track's section `straight`.)
   const straight = track.sections?.find((x) => x.id === 'straight');
   if (straight) {
     const span = (track.delta(straight.s0, straight.s1) + track.length) % track.length;
@@ -469,7 +469,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   // D1: at the near end of the lake side's run of boards along the straight, one or two tall dark trees behind the
   // first board (the only trees on that side)
   if (straight) {
-    const run = (track.boards ?? []).filter((b) => b.side > 0 && track.delta(straight.s0, b.s0) >= 0 && track.delta(straight.s0, b.s0) < 200).sort((a, b) => track.delta(straight.s0, a.s0) - track.delta(straight.s0, b.s0))[0];
+    const onLake = (track.boards ?? []).filter((b) => b.side > 0 && track.delta(straight.s0, b.s0) >= 0 && track.delta(straight.s0, b.s0) < 600).sort((a, b) => track.delta(straight.s0, a.s0) - track.delta(straight.s0, b.s0));
+    const run = onLake[0];
     if (run) {
       for (let k = 0; k < 2; k++) {
         const s = (run.s0 + track.length + k * 7 - 4) % track.length;
@@ -478,6 +479,23 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         if (y < lakeLevel + 0.3 || keepOut(point.x, point.z) || !free(point.x, point.z, 2)) continue;
         addTree(point.x, y - 0.15, point.z, SPECIES.indexOf(k ? 'fir' : 'spruce'), { road: true, turned: 0, inside: 0.1, young: 1.1 });
       }
+    }
+    // (day lane) between that group of boards and the next, behind the low wall: D1's sunlit green middle distance,
+    // shrubs along the wall and round broadleaves of 8 to 13 m in loose rows, the shore showing between them
+    const next = onLake[1];
+    if (run && next) {
+      const s0 = run.s1 + 4;
+      const span = track.delta(s0, next.s0) - 4;
+      const SHORE = [
+        { off: [0.5, 3], step: [3.5, 6.5], r: 2, height: [2.5, 4.5], detail: 0.8, inside: 0.2 },
+        { off: [5, 11], step: [7, 12], r: 3.4, height: [8, 13], detail: 0.9, inside: 0.4 },
+        { off: [14, 24], step: [9, 15], r: 3.8, height: [10, 15], detail: 0.6, inside: 0.5 },
+      ];
+      plantRows(s0, span, 1, SHORE, () => true, (r) => {
+        const roll = plantRng.next();
+        if (r === 0) return roll < 0.75 ? HAZEL : HORNBEAM;
+        return roll < 0.45 ? LIME : roll < 0.8 ? HORNBEAM : roll < 0.93 ? MAPLE : BIRCH;
+      }, () => 0);
     }
   }
 
@@ -811,9 +829,22 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const projView = new THREE.Matrix4();
   const sphere = new THREE.Sphere();
   const eye = new THREE.Vector3();
-  // trees cast round the car: the shade on the road ahead and beside it is what is seen (the shadow square reaches
-  // further, but what falls there is mostly the forest's own floor)
+  // Without the sun's box (no shadow map): trees cast round the car, as far as the square reaches.
+  // (split-bug lane) With it, every tree whose crown is inside the map's box casts, wherever it stands. Chosen by
+  // distance from the car instead, the trees 50 to 100 m towards a 17 degree moon or sun, whose shadows lie across
+  // the road at the car, were left out: the wet road there lay in full moonlight, a pale sheet broken by the
+  // shadows of the nearer trees, and which trees were left out moved with the car, so the two halves of a split
+  // screen a few metres apart showed one road dark and the other a sheet of water.
   const shadowR = Math.min(shadow.reach * 1.1, CAST_REACH);
+  /** Whether a sphere (centre c, radius r) is inside the sun's shadow box. @param {import('./sun.js').ShadowBox} b */
+  const inBox = (b, c, r) => {
+    const x = c.x * b.right.x + c.y * b.right.y + c.z * b.right.z - b.x;
+    if (Math.abs(x) > b.halfX + r) return false;
+    const y = c.x * b.up.x + c.y * b.up.y + c.z * b.up.z - b.y;
+    if (Math.abs(y) > b.halfY + r) return false;
+    const z = c.x * b.dir.x + c.y * b.dir.y + c.z * b.dir.z - b.z;
+    return z < b.towards + r && z > -b.away - r;
+  };
   const counts = { full: 0, reduced: 0, impostors: 0, casters: 0, triangles: 0, casterTriangles: 0 };
   const fullTris = models.map((m) => m.triangles[0]);
   const reducedTris = models.map((m) => m.triangles[1]);
@@ -849,7 +880,12 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     }
   }
 
-  function prepareView(camera, focus) {
+  /**
+   * @param {THREE.Camera} camera
+   * @param {THREE.Vector3} focus the view's car
+   * @param {import('./sun.js').ShadowBox} [box] the sun's shadow box, already placed for this view
+   */
+  function prepareView(camera, focus, box = null) {
     viewCamera = camera;
     camera.updateMatrixWorld();
     projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -866,7 +902,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       if (cellStart[k] === cellStart[k + 1]) continue;
       const cs = cellSphere[k];
       const dEye = flat ? 0 : cs.center.distanceTo(eye) - cs.radius;
-      const caster = casterMeshes.length > 0 && Math.hypot(cs.center.x - focus.x, cs.center.z - focus.z) - cs.radius < shadowR;
+      const caster = casterMeshes.length > 0 && (box?.on ? inBox(box, cs.center, cs.radius) : Math.hypot(cs.center.x - focus.x, cs.center.z - focus.z) - cs.radius < shadowR);
       const seenCell = dEye < T.far && frustum.intersectsSphere(cs);
       if (!caster && !seenCell) continue;
       for (let j = cellStart[k]; j < cellStart[k + 1]; j++) {
@@ -874,7 +910,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         const v = trees[i].variant;
         sphere.center.set(spheres[i * 4], spheres[i * 4 + 1], spheres[i * 4 + 2]);
         sphere.radius = spheres[i * 4 + 3];
-        if (caster && Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR) write(casterMeshes[0], i, 1);
+        if (caster && (box?.on ? inBox(box, sphere.center, sphere.radius) : Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR)) write(casterMeshes[0], i, 1);
         if (!seenCell || !frustum.intersectsSphere(sphere)) continue;
         // (small things, the undergrowth and young trees, go to the simpler levels sooner)
         // the floor under it

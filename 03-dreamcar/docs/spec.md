@@ -69,8 +69,8 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; the walkways' kerb faces in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
 | structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
-| tyre walls | 8 runs, on the outside of the fast bends |
-| trackside boards | 11 runs, both walls of the straight included |
+| tyre walls | 8 runs, on the outside of the fast bends, painted white and red by blocks of five stacks |
+| trackside boards | 10 runs: the outsides of the run-off bends, and two groups on the straight's lake-side wall (229 to 189 m and 82 to 44 m before the line); none on its land side |
 | distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel |
 | marshal posts | 12 |
 | start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |
@@ -210,9 +210,9 @@ key lock at speed do not spin the car.
 
 | | keyboard (solo) | split screen | gamepad (standard mapping) | touch |
 | --- | --- | --- | --- | --- |
-| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | Steering Pad (default): the thumb's offset down from the pad's fixed centre: at or above the centre full power (Throttle auto, the default: with no thumb on the pad the car drives on too), the first 25 % of 56 px down lifts the throttle, the rest brakes, fully at 56 px; Throttle manual: up is the throttle (full at 56 px), the centre coasts, down brakes. Slider and Arrows: the pedals. Throttle auto: the car drives by itself and lifts while BRAKE or DRIFT is held; manual: only while GAS is held (88 px, in the corner). BRAKE: 80 px, in the corner on auto, left of GAS on manual (where that would shorten the slider below 70 px, as on an upright phone, BRAKE stands up and to the left of GAS, clear of it). Braking held at a standstill reverses |
-| steer | A D or ← → | A D and ← → | left stick | Pad (default): a fixed round pad (radius 0.21 × the view's shorter side, 50 to 80 px: 160 px across on a phone) on the side of the holding hand (Hand: Right, the default, or Left); its centre radius + 25 px (scaled with the pad) from that side and 150 px above the bottom on an upright phone (0.176 × the view's height, 150 at most, the radius + 22 at least). A thumb anywhere in its zone (that half of the view, its lower 45 %, and round the pad) takes the knob; the steering is its offset across from the fixed centre over 70 px, linear, clamped to full lock, no dead step. Tilt: the device rolled like a wheel, ±30° from how it was held at the start (or at Recentre on the pause sheet) is full lock, upright or on its side (deviceorientation, asked for in the option's click and on the first touch; refused or absent, the pad steers and the options say so); the pad still brakes. Slider: a fixed track at the bottom left; the steering is the thumb's distance from its centre over the half travel (56 + 0.05 × the view's width px, 48 to 92 px). Arrows: two 76 px buttons, held as the A and D keys are. For the pad, tilt and the slider the curve and smoothing are the hands' (`HANDS.thumb`: power 1.15 standing, 1.45 at 216 km/h and above; a critically damped follow, two lags of 22 ms standing to 50 ms at speed). A second thumb on the steering is ignored |
-| handbrake | Space | Space, right Shift | A or RB | Pad: pulled on down past 74 px (scaled) into the red arc at the pad's foot, let go above 62 px; and the round HANDBRAKE button (68 px) in the other bottom corner (above the pad where the view is too narrow), held. Slider and arrows: DRIFT (68 px), above the corner pedal (beside the pedals on a view lower than 330 px or narrower than 300 px), held. A short buzz (`navigator.vibrate(8)`, where there is one: not on iOS) when it is pulled and when a wheel strikes a kerb |
+| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | Steering Pad (default): the thumb's offset down from the pad's centre (where the thumb landed, fixed until it lifts): at or above the centre full power (Throttle auto, the default: with no thumb on the pad the car drives on too), the first 25 % of 56 px down lifts the throttle, the rest brakes, fully at 56 px; Throttle manual: up is the throttle (full at 56 px), the centre coasts, down brakes. Slider and Arrows: the pedals. Throttle auto: the car drives by itself and lifts while BRAKE or DRIFT is held; manual: only while GAS is held (88 px, in the corner). BRAKE: 80 px, in the corner on auto, left of GAS on manual (where that would shorten the slider below 70 px, as on an upright phone, BRAKE stands up and to the left of GAS, clear of it). Braking held at a standstill reverses |
+| steer | A D or ← → | A D and ← → | left stick | Pad (default): a round pad (radius 0.21 × the view's shorter side, 50 to 80 px: 160 px across on a phone) that appears under the thumb. At rest it is a faint ghost (30 % opacity) at its home place, on the side of the holding hand (Hand: Right, the default, or Left; it decides only where the ghost and the HANDBRAKE button sit, both hands work everywhere): its centre radius + 25 px (scaled with the pad) from that side and 150 px above the bottom on an upright phone (0.176 × the view's height, 150 at most, the radius + 22 at least). A thumb landing anywhere in the view (in a split screen, in the half) that is not a HUD button or the HANDBRAKE button puts the pad's centre exactly at that point (an 80 ms scale-in); the centre stays there, fixed, until that thumb lifts (no trailing, no rebasing), so the first input is always zero; the steering is the offset across from the centre over 70 px, linear, clamped to full lock, no dead step. Room at the edges: the travel needed is 70 px (scaled) to the left and to the right edge of the safe area and 74 px (the handbrake's red) to its bottom edge; with less room than that the pad is still drawn at the thumb and that direction's travel is compressed to the room there is, but never under 60 % of the normal; with less room than 60 % of it the centre is nudged inward by what is missing (the disc is also drawn inside the safe area where it can) and the input is held at zero until the thumb has moved 6 px from where it landed. Let go, the knob springs back, the live pad stays 0.4 s and fades (0.2 s) while the ghost returns at the home place; the next touch places it afresh. Tilt: the device rolled like a wheel, ±30° from how it was held at the start (or at Recentre on the pause sheet) is full lock, upright or on its side (deviceorientation, asked for in the option's click and on the first touch; refused or absent, the pad steers and the options say so); the pad still brakes. Slider: a fixed track at the bottom left; the steering is the thumb's distance from its centre over the half travel (56 + 0.05 × the view's width px, 48 to 92 px). Arrows: two 76 px buttons, held as the A and D keys are. For the pad, tilt and the slider the curve and smoothing are the hands' (`HANDS.thumb`: power 1.15 standing, 1.45 at 216 km/h and above; a critically damped follow, two lags of 22 ms standing to 50 ms at speed). A second finger is the handbrake (below); it never takes the pad |
+| handbrake | Space | Space, right Shift | A or RB | Pad: pulled on down past 74 px (scaled) into the red arc at the pad's foot, let go above 62 px; a second finger anywhere else in the view (not on a HUD button) while the pad's thumb is down, for as long as it is held (power lifts as for the button); and the round HANDBRAKE button (68 px) in the other bottom corner (above the pad where the view is too narrow), held, which stays as the visible target and works with or without a thumb on the pad. Slider and arrows: DRIFT (68 px), above the corner pedal (beside the pedals on a view lower than 330 px or narrower than 300 px), held. A short buzz (`navigator.vibrate(8)`, where there is one: not on iOS) when it is pulled and when a wheel strikes a kerb |
 | camera | C | C, `.` | Y | button |
 | look back | B (held) | B, `,` | X | |
 | put back | R | R, `/` | B | button |
@@ -224,7 +224,7 @@ key lock at speed do not spin the car.
 | start, menus | Enter, Tab | | A, d-pad | tap |
 
 Each driver reads whichever of their devices was used last. The touch
-controls are fixed and always drawn (`TOUCH` and `layoutOf` in
+controls are drawn from `layoutOf` (the pad's home place, the ghost's; a placed pad stands where `controlsOf(i).placed` says) (`TOUCH` and `layoutOf` in
 `src/engine/Input.js`; the HUD draws them from the same layout, so a finger
 finds what it sees): 18 px from the edges inside the safe area (the notch and
 the home bar), 12 px apart; the pad's knob 60 px (scaled with the pad), the
@@ -232,8 +232,8 @@ slider's 52 px, resting on that bottom margin. Each control keeps the finger tha
 lifts (sliding off a pedal keeps it; pulled past the pad's rim the knob stops
 at the rim, or clicks into the red arc while the handbrake is pulled; let go,
 it springs back to the centre in 0.16 s); a cancelled pointer, the window losing
-focus, a hidden tab or a turned device lets every control go. A touch
-anywhere else does nothing to the car; the HUD's own buttons keep working. On
+focus, a hidden tab or a turned device lets every control go. With the slider, arrows or pedals a touch
+anywhere else does nothing to the car; with the pad a touch anywhere places it. The HUD's own buttons (camera, lights, reset, pause) keep working and never place it. On
 a view too narrow for the steering and the pedals side by side (half of an
 upright phone) the pedals stand above the steering, in one column. On a tablet in split
 screen each half of the screen is one driver's, with its own controls laid
@@ -244,7 +244,7 @@ controls step back to 45 % opacity while no finger is on any of them. On the
 first run on a touch screen the controls are outlined and the steering named
 (the pad: STEER · BRAKE · DRIFT; the slider: STEER; the pedals carry their
 words always) for the first 3 s of the race clock, then never again
-(`dreamcar.zones.v1`); the first-run hint for the pad reads "Slide to steer,
+(`dreamcar.zones.v1`); the first-run hint for the pad reads "Touch anywhere, slide to steer,
 pull back to brake, pull to the red to drift". Every button can be reached by Tab and Enter, or a
 pad's d-pad and A; the pedals and arrows are at least 64 px, the four small
 buttons 44 px.
@@ -284,6 +284,7 @@ unit per view:
   gear, the ABS / TC / ESC lamps (touch screens: see below);
 - bottom left: a small map (can be hidden; touch screens: see below);
 - just above the speed, only while the car slides 12° or more: the slide's angle and its running score (`vehicle.slide`; `Hud.setDrift`), fading out a second after the slide ends; the best slide of the run is on the results;
+- beside the speed (on the cluster's open side: left of it, or right of it where the cluster is anchored at the left, as with the pad in the right hand, a low view and a tall one; absolute, so no layout moves for it): the pedal gauge (`Hud.setGauge`), for every device and in both halves of a split: two slim vertical bars, 1 unit wide and 7 tall (8 x 56 px at 8 px a unit, scaled with the HUD), the brake at the left (amber, red above 60 %) and the throttle at the right (green), both filling upward with what the car got (`vehicle.throttle` and `vehicle.brake`, after the pad's mapping, the auto throttle, the lift, the traction control and the limiter, so traction control shows as a flicker downward), eased in the fixed step by a 40 ms lag (`Game.update`; the picture only reads it), ticks at 50 % and 100 %, and a small dot between them that lights red while the handbrake is on; each bar is a `role="meter"` with an aria-label and `aria-valuenow` in per cent; no words;
 - touch screens, the pad: the bottom corners are the thumbs' (the pad on the holding hand's side, the HANDBRAKE button on the other) and nothing else stands there. The speed above the HANDBRAKE button at 0.86 of its size (the slide readout above it), the map above the pad, both mirrored for the left hand; a narrow half of a split screen has no map; on an upright view the pad's top stays below 75 % of the height, under the car's tail (133 px up on a 393x852 phone rather than 150); a view lower than 330 px (a stacked half) or narrower than 300 px (half an upright phone): the speed at the top, as for the pedals. Placed by `--sticktop`, `--stickside`, `--handtop`, `--handside` from the layout (`Hud.setControls`);
 - touch screens, the slider and the arrows: the steering left, the pedals right, and nothing else in those corners. A wide view: the speed just left of the pedals (110 px from the right on auto; on manual 108 px from the right and 110 px up, above BRAKE and left of DRIFT), the map 112 px up, above the steering; a narrow wide view (a side-by-side half on a phone): the speed 206 px up, above the pedals; a view lower than 330 px (a stacked half): the speed at the top beside the lap; an upright view: the speed 112 px up at the left, drawn at 0.86 of its size, the map above it; a view narrower than 300 px (half an upright phone): the speed under the lap, no map, DRIFT beside BRAKE;
 - touch screens: four small buttons together (camera, high beam, put back,
@@ -299,7 +300,7 @@ On the title and the pause sheet: quality (auto, low, medium, high; applied
 by reloading the page), sound on or off, time of day, driving help (Full,
 Sport, Off: `ASSISTS` in config.js, applied at once to every car and to every
 car made later), Steering (Pad, Slider, Arrows or Tilt; under it what the
-choice does, or why tilt is not steering), Hand (Right or Left; with the pad
+choice does, or why tilt is not steering), Resting hand (Right or Left: where the pad's ghost and the HANDBRAKE button sit; with the pad
 or tilt) and Throttle (auto or manual), shown on touch screens; Recentre tilt
 on the pause sheet while tilt steers; units
 (km/h, mph), the map shown or hidden.
@@ -327,7 +328,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,roll][,hud]` | the staging camera (`roll`: degrees the picture leans clockwise) |
-| `?photo=d1`, `d3`, `d4`, `e1`, `waves` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; waves the low crossing by day, t 94.4 s) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=d1`, `d3`, `d4`, `e1`, `k5`, `waves` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; k5 the end of the sweepback's first piece at dusk, t 88.7 s, frame K5's chase camera; waves the low crossing by day, t 94.4 s) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -394,7 +395,7 @@ pass with their sizes. In short:
 | bloom levels | 4 | 5 | 6 |
 | lens (flare source, ghosts, glare, star) | no | yes | yes |
 | ambient occlusion | no | 8 samples, half size | 14 samples |
-| car's probe at speed / standing | 64 / 128 per face, a face every 2nd frame (standing too) | 128 / 256; a face every 2nd frame (2 in the tunnel), standing 2 every 3rd | 256 / 512, 2 faces a frame (3 in the tunnel), standing 3; in the tunnel the faces see 160 m |
+| car's probe (engine.md, "The reflection probe") | 128 per face, prefiltered (8 samples), a face every 2nd frame (standing too), sees 260 m | 256 (12 samples); a face every 2nd frame (2 in the tunnel), standing too, sees 300 m | 512 (20 samples), 2 faces a frame (3 in the tunnel), standing 2, sees 400 m; in the tunnel the faces see 160 m |
 | wet road mirror | none (the six nearest lamps' heads drawn into the water analytically) | 0.35 of the view's height, to 220 m, streaked copy 0.3 of its height | 0.5, to 320 m, streak 0.3 |
 | forest: full / reduced / impostor trees to | 0 / 60 / 650 m | 34 / 95 / 900 m | 50 / 130 / 1200 m |
 | effects: skid quads / soft particles / sparks | 800 / 192 / 48 | 1500 / 320 / 96 | 2000 / 400 / 128 |
@@ -461,6 +462,14 @@ places on the lap were not counted. Triangles hardly moved (low 293 to
 About a quarter of every pass's calls is the car (25 in the scene and in the
 mirror, 14 in the shadow map), which this lane did not touch.
 
+**After the day lane** (same tool and moments, plus the run-up to the line at
+t = 100; the head before the lane in brackets): low by day 133 (133), 140
+(140), 153 (152) at the ledge bend, 145 (141) on the run-up; triangles 292,
+338, 366 and 349 k (297, 340, 367, 353 k: the straight's thinned boards more
+than pay for the green hill and the rows of trees). Medium by night 291
+(291), 266 (267), 278 (278), 257 (244). The ledge bend on low was already
+over 150 before the lane, and the green hill adds one call there.
+
 **Draw calls at the tunnel** (tunnel lane, 2026-11-18, the same counter, the
 last of four frames, from t = 34.5 of the autopilot run: the approach 120 m
 before the entrance, near the entrance, deep inside, at the exit), before and
@@ -511,7 +520,7 @@ stereo picture. Sound starts on the first touch or key (the browsers' rule).
 | `dreamcar.assists` | the driving help: full, sport or off |
 | `dreamcar.throttle` | the touch throttle: auto or manual |
 | `dreamcar.steering` | the touch steering: pad, slider, arrows or tilt |
-| `dreamcar.hand` | the hand that holds the phone (the pad's side): right or left |
+| `dreamcar.hand` | the hand that holds the phone (where the pad's ghost rests): right or left |
 | `dreamcar.zones.v1` | the touch controls have been named once |
 | `dreamcar.muted` | sound off |
 | `dreamcar.hinted.v1` | the first-run hint has been shown |

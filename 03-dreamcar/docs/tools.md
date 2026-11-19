@@ -107,6 +107,14 @@ medium takes minutes to draw on software WebGL), `?nodraw`, `?time=`,
 `?mode=split`, `?laps=`, `?ui=0`, `?mute`, `?photo=`, `?debug=`. All of them
 are in [spec.md](spec.md#url-parameters).
 
+To look at the car's reflection probe itself: `?debug=probe` draws the view's
+cube unrolled four times instead of the picture, at roughness 0, 0.3, 0.6 and
+1 (top left, top right, bottom left, bottom right; the horizon across the
+middle of each, +Z in its centre): blocks, seams, a light printed several
+times or a face that does not match its neighbours show there first. Add
+`&photo=...` to place the car where it matters (engine.md, "The reflection
+probe").
+
 ## What has been verified
 
 Only in headless Chromium on software WebGL (SwiftShader), on one Linux
@@ -166,17 +174,48 @@ machine without a GPU, and only what is listed here.
   tools/unit.mjs` passed; drift.test.mjs now has 8 tests (the pad's lap,
   braking while turning, the red-arc and button slides, a clumsy thumb).
   Tilt is checked with synthetic deviceorientation events only.
-- **The two-player "water on the track"** (CONTROLS lane, round 2): reproduced
-  at night on low in a side-by-side split of an upright phone
-  (`?mode=split&time=night&t=14`, view.split wide, 393x852): the second
-  half's road reads as a sheet of water, the first half's beside it does not.
-  It does not depend on the order the halves are drawn in, on the wet road's
-  mirror (low has none; at medium night the mirror is drawn once per view
-  with that view's camera), on the cars' head lamp beams, or on which car's
-  half it is: drawn from the second camera's place, the first half shows it
-  too. So it follows where the camera stands, by a few metres; the likeliest
-  cause is the per-eye choice of lit lamps at night (lamps.js, the world's
-  lane), not fixed here (src/assets/ is another lane's).
+- **The pad under the thumb and the pedal gauge** (CONTROLS lane, round 3,
+  2026-11-19): touch, slide, options, hud, start and split against a
+  production build: 481 of 481 (split 27 s, touch 122 s, slide 113 s, hud 178
+  s, options 241 s, start 47 s). The touch section places the pad at five
+  spots and four edge cases in both orientations (centre = landing point or
+  the documented nudge, first input zero, no movement under a 100 px drag,
+  compressed travel reaches full lock or the red, the 6 px hold, a second
+  finger = handbrake, HUD buttons place nothing, both hands, both halves of a
+  split); the gauge reads full on auto, brake with no throttle under the pad's
+  pull, zero and zero on manual untouched, and its box is in the hud overlap
+  checks. In earlier runs the hud check "nothing over the car" failed once
+  with the insets stood in for (393x852, solo: the car's box 120 px low; the
+  ghost and the gauge were over it): not reproduced in the lane's last run, still
+  unexplained. It failed again in the lead's run of touch, hud, split, options
+  and start on the merged build (468 checks, 467 passed; at s 154 the car's
+  box reached 763 of 852 px down and the gauge and the ghost overlapped it):
+  open. `node tools/unit.mjs` passed (the scripted thumb needed no
+  change). Not verified: a real phone, Safari, real thumbs (is 60 % of the
+  travel and a 6 px hold right at a real edge? does a second finger anywhere
+  feel like a handbrake?), the gauge's eased bars at a real frame rate.
+- **The two-player "water on the track"** (CONTROLS lane found it, SPLIT-BUG
+  lane fixed it, 2026-11-19): at night in a side-by-side split of an upright
+  phone (`?manual&q=low&auto&mode=split&time=night&t=14`, view.split wide,
+  393x852) the second half's road was a pale sheet in the moonlight broken by
+  dark "puddles" (the shadows of the nearer trees), the first half's beside
+  it dark. The cause was not the lamps: the trees that cast into the moon's
+  shadow map were chosen by distance from the view's car (50 m on low), and
+  a 17 degree moon throws a crown's shadow 70 to 100 m, so the trees that
+  shade the road at the car were left out depending on where the car stood;
+  two cars a few metres apart got different sets (139 and 136 casters, now
+  573 and 566, chosen by the map's own box: forest.js `inBox`). The same
+  patch of road measured in the two halves: 104 against 126 grey levels
+  before, 95 against 89 after. The playtest's `split` section now checks it
+  at night on 393x852 (the same patch from both halves within 1.5x, cars
+  abreast and 9 m apart at three places: 1.26x to 1.43x after the fix, the halves' camera angles differ), that each view's draw uses what
+  its own prepareView set (lamp shares, glints, shadow box, mirror, casters),
+  that the lamp shares are uploaded anew for each view, that the shadow map
+  is drawn once per view by its own draw, and that the casting trees do not
+  depend on where the car stands. Looked at on low only, side by side only;
+  medium (its mirror), stacked halves, dusk and day not looked at (the fix
+  is not split-specific: solo pictures change where the left-out trees
+  shaded the road).
 - **The sound** (`tools/soundtest.cjs`): 62 of 62 checks (audio lane). The
   squeal "stands out at the limit" passes at exactly its 12 dB threshold.
 - **The pictures**: the stills in `docs/images/` and the lanes' comparison
@@ -225,6 +264,44 @@ machine without a GPU, and only what is listed here.
   ones made); the rails' reflectors were. Not looked at on `high`, in split
   screen at night or in motion; the playtest and the soundtest were not
   run. The page raised no console error in any of these loads.
+- **The day lane's changes** (a bluer day sky and a group of cumulus placed
+  over the massif's shoulder, the massif darker with ribs, scree fans,
+  buttresses and a back-lit rim, its saddle raised; the straight's tall
+  boards in two groups with green rows behind the warm-painted low wall; a
+  darker, more contrasty asphalt with a narrower glare; the D3 preset
+  restaged; the green hill beyond the lake; low boards on the ledge's inside
+  wall; thinner valley mist by day): four rounds of stills on software WebGL
+  at `medium` 1280x720 for d1 and d3 beside the frames, d4 once at the end
+  and the d1 place by night once; compositions found on `low`; draw calls and
+  triangles counted with the picture lane's measure tool at phone shape
+  (low by day, medium by night, t = 0, 33, 79, 100) against the head before
+  the lane; `node tools/unit.mjs` passed. The golden-hour sun's clearance of
+  the green hill was worked out on paper, not seen in a still (the one
+  staged towards it looked into the stand). Not looked at on `high`, in
+  motion, in split screen or in the chase view; the playtest, the soundtest
+  and the docs' screenshots were not run.
+- **Frame K5's place** (k5.js, landmarks.js `K5`, the far cones, the
+  massif's west end lowered beyond D1's left edge, the D3 green hill removed,
+  the pale hall kept out of K5's view, the dusk haze and glow tightened):
+  stills on software WebGL, four rounds on `low` and two at `medium`
+  1280x720 at `?photo=k5` beside the frame, the same place by day and by
+  night, a 393x852 `--mobile` chase still there, and d1, d3, d4 once at
+  `medium` afterwards; `node tools/unit.mjs` passed. The chevron was turned
+  to point into the bend after the last still. Not looked at on `high`, in
+  motion or in split screen; draw calls at K5: 142 medium dusk (121 at phone
+  shape), 158 by day, 183 at night.
+- **The dusk lane's changes** (the twilight dome, dusk clouds lit on the
+  sun's side, first stars, the horizon-coloured haze, the dusk grade, lamps
+  and windows on with halos, the tail lamps' red pool on the road): chase
+  stills on software WebGL at `medium` before and after, 1280x720 and
+  393x700 `--mobile`, at t = 29 to 58 of the autopilot run (the approach,
+  inside the tunnel, its exit and the viaduct after it) and d4, by eye; one
+  round on `low`. The pool's final strength (2) was set after the last
+  still (it was judged at 3, too red on the edge line). The tunnel's own
+  exposure was tried at 3.6 and made no visible difference in the stills, so
+  it stays 6. Not looked at on `high`, at night (the pool is on at night
+  too), in motion, in split screen or over the coming sea; draw calls were
+  not counted (no geometry was added); the playtest was not run.
 - **The tunnel lane's changes** (the box tunnel, its portals and cuttings,
   the lamps' zones and cool white, the road's sheen and the cars' shade in the
   tunnel, the probe's cadence and reach there, no wet mirror under the roof):
@@ -239,9 +316,31 @@ machine without a GPU, and only what is listed here.
   on `high`, in split screen, in motion or with a player driving; the
   playtest (which has no tunnel section) and the soundtest were not run (the
   sound's tunnel reverb reads the Track's sky, which did not move).
+- **The car lane's round 8** (the paint, glass and lamps at night, in the
+  tunnel and by day, with the probe lane's prefiltered probe and its
+  parallax): stills on software WebGL at `medium` 1280x720 by night (grid,
+  forest, coast; chase and two photo cameras), in the tunnel by day (five
+  cameras), at the start by day, before and after, by eye; 393x700 and `low`
+  by night; the viewer's showroom at `high`. `node tools/unit.mjs` passed.
+  Not looked at on `high` in the game, at dusk, in split screen or in motion
+  (the probe's easing and the lines streaming were not seen moving); the
+  playtest was not run.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
+
+- **The probe lane's changes** (the reflection probe prefiltered for
+  roughness, eased in, faces by what changes fastest, 128 / 256 / 512, the
+  parallax proxy, no sun disc in it): `?debug=probe` looked at by day on
+  medium (four roughnesses: no blocks, no seams); stills on software WebGL at
+  `medium`, 1280x720, with the photo camera low behind the car, before and
+  after, by day on the grid, in the esses (t = 33) and by night on the grid;
+  draw calls and triangles per pass counted on low and medium (engine.md, "The
+  reflection probe"); the playtest's `window` (a lost and restored context
+  mid-run) and `tiers` sections passed; `node tools/unit.mjs` passed. Not looked
+  at: `high` and dusk stills, the tunnel itself, split screen, the 8-bit
+  fallback (`?ldr`), and anything in motion (the easing was reasoned, not
+  watched).
 
 ## What has not been verified
 
