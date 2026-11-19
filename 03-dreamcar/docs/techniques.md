@@ -786,6 +786,18 @@ furniture and the forest lane's signs, chevrons and kerbstones with stand-ins fo
 vertex on the course, and fails if any lies inside the solid edge on its side (the bar did, 0.58 m, before this); it
 checks every lamp's foot the same way.
 
+**No structure over the road** (sea lane). A bridge's abutment is a block under each end of the deck. Its top was set
+level, 0.3 m under the road's centre line at the deck's end. But the road falls away to its edges (crown, bank and
+drains): past the deck's ends the shoulder lies up to 0.6 m under the centre. So three of the four abutments' tops
+stood over the shoulder inside the edges: 0.33 m at the sea viaduct's start, 0.32 m at its end (the owner's pale
+plate on the left shoulder at lap 0:49) and 0.27 m at the gully bridge's start. The top is now 0.3 m under the lowest
+of the road over the block's own footprint. The expansion joints' plates were laid as eight straight chords across the
+road and stood up to 5 cm over its crown; they now follow `track.profile()` in 32 steps, 12 mm over it.
+`tools/unit/structures.test.mjs` samples every triangle of the viaducts' and tunnels' meshes, as built for low and
+medium (the tunnels on low only: the medium tier's banner needs a canvas), at points no more than 0.5 m apart. It
+fails if any point inside the solid edges stands more than 25 mm over the road, leaving out what hangs more than 4 m
+over it and the daylight's veil in a tunnel's mouth.
+
 **Per-piece road markings** (round 2, road.js `PIECE_MARKS`). A scheme per
 piece id, each scheme one channel of a per-metre RGBA texture (`uMarks`,
 sampled at s / length like the edge texture), eased over 6 m at its ends.
