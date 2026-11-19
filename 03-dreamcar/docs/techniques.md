@@ -435,13 +435,40 @@ on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car als
 - **The glare lobe.** A second, anisotropic specular lobe stretched along the
   line of sight lays the low sun's glare along the road as a long streak
   (`ASPHALT_SHEEN`, road.js `SHEEN`: along 0.12, across 0.15, at 0.28 of a plain dielectric), broken up by the stones. Dry asphalt keeps 0.25 of the standard material's own isotropic lobe, so that the streak is the sheen's; under water or paint it keeps all of it. The sky's sheen (`SKY_SHEEN`, gain 0.42) fills the shade at a glancing angle.
+- **The tone** (road.js `ASPHALT`, road lane, fitted to frames E2 and E5):
+  albedo from 0.11 on the newest surfacing (binder over everything) to
+  0.22 a generation old (the binder weathered grey, the stones' tops bare), a
+  shade warm, the single stones of the old standing apart by 1.05 times their
+  tone about its mean. Sunlit it reads a pale to mid grey, in the woods' shade
+  a cooler grey that keeps its stones; wet, its pores full, it keeps 0.25 of
+  that (`damp`), so the wet night's road stays dark. The dry road's diffuse
+  light from the sky and the fill loses half its colour (`shadeGrey` 0.5):
+  in a wood's shade it is lit by the sunlit ground and crowns about it as well
+  as by the blue sky, and E2's shade is a cool grey, not blue.
+- **Wear** (road.js `WEAR`): each lane's two wheel paths (0.85 m either side
+  of the lane's middle) darker by up to 16 % and smoother, the outer metre
+  lighter, and faint streaks along the road: the large field stretched about
+  three hundred times along it, which changes the tone by 14 % and thins the
+  paint where the wheels cross it.
+- **Grit** (road.js `GRIT`): small dark stones on a grid of 11 cm cells, one
+  per cell at most, odds of 0.05 off the line rising by 0.2 towards each
+  edge, none on the wheel paths or the racing line. A pixel that spans many
+  cells shows their average darkening instead of single dots, so the grit
+  cannot sparkle or crawl; up close each stone stands 3 mm proud.
 - **The racing line and the history.** A polished darker band where cars run,
   rubber in the bends and the braking zones; runs of surfacing with joints,
-  seams 2 m either side of the middle, patches, sealed cracks, expansion
-  joints on the decks, tyre marks before the carousel: single things placed
-  by rule along the Track and drawn exactly.
-- **Paint:** a solid white line inside each edge, the start line and the
-  grid's boxes, a few millimetres proud, worn where tyres cross it.
+  seams 2 m either side of the middle, patches (about one per 300 m, more on
+  old runs), cracks sealed with tar (about one per 90 m), expansion joints on
+  the decks, tyre marks before the carousel: single things placed by rule
+  along the Track (roadHistory.js, its own `rng` forks) and drawn exactly.
+- **Paint** (road.js `PAINT`): a solid white line inside each edge, the start
+  line and the grid's boxes, and where a piece carries one a double yellow
+  centre line; a few millimetres proud, its edges following the stones it was
+  sprayed over by a centimetre or two up close, worn where tyres cross it
+  (flecked through along the wheel paths, thinner, the asphalt's grey
+  showing) and cut away where the road was patched.
+- **The edge:** a thin band of dust and grit along the pavement's own edge
+  (`ASPHALT.rim`), then the margin's older, dustier asphalt.
 - **Wetness** (one shared uniform, the time of day's `wetness` or `?wet=`):
   water fills the gaps between stones first (the height channel says which),
   puddles stand in the wheel tracks and low spots, the road under the
