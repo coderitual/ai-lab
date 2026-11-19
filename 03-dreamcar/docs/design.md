@@ -429,16 +429,19 @@ with a short `advance` after loading.
   tail lamps laying a red pool on the asphalt behind them (road.js
   `TAIL_POOL`).
 - **Twilight** (frame K5, strict, and the twilight references): the sun 5°
-  under the horizon at the golden hour's bearing; no direct light and no sun
-  shadows, only the sky's (the environment map, strength 1, and a faint blue
-  fill), so the land is dark blue and what faces the sunset catches its band
+  under the horizon, 60° left of the start straight's heading (from K5's
+  place the band is brightest a little right of the road, over the tower);
+  no direct light and no sun shadows, only the sky's (the environment map,
+  strength 0.75, and a faint blue fill), so the land is dark blue and what faces the sunset catches its band
   as a warm rim. The dome deep blue overhead through turquoise and pale
   yellow to an orange-rose band over the sunset, the earth's shadow and its
   pink belt opposite, all but clear, the first stars high up. The water
   mirrors the band as a pale gleam. Street lamps, floodlights and windows on
   (cones in the air at 0.6 of the night's), the cars on low beam with the red
-  pool behind them, the road dry and dark. Exposure 9 (between golden hour's
-  4.2 and night's 22), contrast 1.18, saturation 1.15.
+  pool behind them, the road dry and dark (it shows 0.3 of its sky sheen,
+  `roadSheen`). Exposure 6 (between golden hour's
+  4.2 and night's 22), contrast 1.18, saturation 1.15; in the tunnel 4.5, as
+  at golden hour (its lamps are the day's).
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about

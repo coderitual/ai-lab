@@ -355,6 +355,8 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     uGlintPos: { value: Array.from({ length: GLINTS }, () => new THREE.Vector4()) },
     uGlintColor: { value: Array.from({ length: GLINTS }, () => new THREE.Vector3()) },
     ...WET_UNIFORMS,
+    // (day lane) the time of day's share of the sky's sheen (lighting.js roadSheen: twilight's road is near black)
+    uSkySheenShare: { value: 1 },
     ...BORE_UNIFORMS,
     ...(mirror ? mirror.uniforms : {}),
   };
@@ -423,6 +425,10 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     /** 0..1 */
     setWetness(w) {
       WET_UNIFORMS.uWet.value = w;
+    },
+    /** @param {number} share how much of the sky's sheen the asphalt shows at this time of day (lighting.js roadSheen) */
+    setSkySheen(share) {
+      uniforms.uSkySheenShare.value = share;
     },
     /** @param {import('./index.js').Beam[]} beams */
     setBeams(beams) {
@@ -702,7 +708,7 @@ const ASPHALT_SKY = /* glsl */ `
   vec3 skyOwn = reflectedLight.indirectSpecular;
   skyOwn = mix( skyOwn, vec3( dot( skyOwn, vec3( 0.2126, 0.7152, 0.0722 ) ) ), ${SKY_SHEEN.grey.toFixed(2)} * ( 1.0 - roadWater ) );
   skyLow = mix( skyLow, vec3( dot( skyLow, vec3( 0.2126, 0.7152, 0.0722 ) ) ), ${SKY_SHEEN.grey.toFixed(2)} );
-  reflectedLight.indirectSpecular = skyOwn + skyLow * ( roadSkySheen * pow( 1.0 - skyNoV, ${SKY_SHEEN.power.toFixed(1)} ) );
+  reflectedLight.indirectSpecular = skyOwn * uSkySheenShare + skyLow * ( roadSkySheen * pow( 1.0 - skyNoV, ${SKY_SHEEN.power.toFixed(1)} ) );
 }
 #endif
 // (road lane) the dry road's diffuse light from the sky and the fill, a part of its colour lost (ASPHALT.shadeGrey)
@@ -722,6 +728,7 @@ uniform float uLength;
 uniform vec4 uGrid[${GRID_SLOTS}];
 uniform float uHalf;
 uniform float uWet;
+uniform float uSkySheenShare;
 uniform vec3 uBoreGlow;
 uniform vec4 uBoreLines;
 uniform vec3 uBoreLineColor;
@@ -1082,7 +1089,7 @@ roadSheenGain = ${SHEEN.gain.toFixed(2)} * ( 1.0 - roadWater ) * ( 1.0 - 0.6 * r
 roadSheenGain *= mix( 1.0, 0.3 + 1.4 * smoothstep( 0.35, 0.75, rAgg.g ), rNear );
 roadIsoKeep = mix( ${SHEEN.keep.toFixed(2)}, 1.0, max( roadWater, roadPaint * 0.5 ) );
 // the sky's sheen: the dry road's (standing water shows the mirror or the environment map itself)
-roadSkySheen = ${SKY_SHEEN.gain.toFixed(2)} * ( 1.0 - roadWater ) * ( 1.0 - 0.5 * roadGravel );
+roadSkySheen = ${SKY_SHEEN.gain.toFixed(2)} * uSkySheenShare * ( 1.0 - roadWater ) * ( 1.0 - 0.5 * roadGravel );
 roadSkySheen *= mix( 1.0, 0.4 + 1.2 * smoothstep( 0.35, 0.75, rAgg.g ), rNear );
 // the stones' tilts that a pixel averages away come back as roughness (see roadTextures.js)
 float rRoughDry = pow( clamp( rAlpha2 + rVariance * roadTiltGain * roadTiltGain, 0.0004, 1.0 ), 0.25 );
@@ -1152,7 +1159,8 @@ const ASPHALT_BEADS = /* glsl */ `
     float back = exp( -pow( acos( clamp( dot( l, toEye ), -1.0, 1.0 ) ), 2.0 ) / 0.09 );
     pool += e * back;
   }
-  totalEmissiveRadiance += vRoadWorld.w * pool * diffuseColor.rgb * ( 0.6 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
+  // (day lane: 0.6 painted the road white round the car from the chase camera at twilight; 0.4)
+  totalEmissiveRadiance += vRoadWorld.w * pool * diffuseColor.rgb * ( 0.4 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
 
   // (dusk lane) the tail lamps' red pool on the road behind each car (TAIL_POOL), from dusk on
   float redPool = 0.0;
