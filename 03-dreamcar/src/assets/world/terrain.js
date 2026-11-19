@@ -1148,6 +1148,30 @@ const FOOT = 0.8;
     }
   }
   const gridGeometries = [];
+  // (sea lane) A triangle of the grid that reaches over the road. A cell is dropped only where all its corners lie
+  // under the band; a cell with corners both under it and beyond it (where the band stops short: on a deck and at its
+  // abutments, where another stretch is nearer, on the inside of a tight bend) is a plane between ground at the road's
+  // height and ground well above or below it, and across a corridor that plane can stand over the road (the owner's
+  // "dark slab across the lane" at the sky road's end, beside the rock cut). Each triangle with a corner near a
+  // corridor is sampled; one standing over the road anywhere inside the solid edges is left out (the road, the band
+  // and the rock faces cover what it covered). Defined once: `standsOverRoad`, also asked of the far land.
+  const probe = { index: -1, s: 0, lat: 0 };
+  const probeProf = { y: 0, surface: 0 };
+  const SAMPLES = [[1 / 3, 1 / 3], [0.8, 0.1], [0.1, 0.8], [0.1, 0.1], [0.5, 0.5], [0.5, 0], [0, 0.5], [0.45, 0.1], [0.1, 0.45], [0.7, 0.25], [0.25, 0.7]];
+  function standsOverRoad(ax, ay, az, bx, by, bz, cx, cy, cz) {
+    for (const [u, w] of SAMPLES) {
+      const x = ax + (bx - ax) * u + (cx - ax) * w;
+      const z = az + (bz - az) * u + (cz - az) * w;
+      const y = ay + (by - ay) * u + (cy - ay) * w;
+      track.locate(x, z, probe.index, probe);
+      const edge = track.edgeAt(probe.s, probe.lat >= 0 ? 1 : -1);
+      if (Math.abs(probe.lat) > edge) continue;
+      // (the tunnels' bores are cut open in their portals; under a roof the ground stands over the road by design)
+      if (cover[Math.round(wrap(probe.s) / ds) % n] >= 0) continue;
+      if (y > track.profile(probe.s, probe.lat, probeProf).y - 0.05) return true;
+    }
+    return false;
+  }
   /** (sea lane) Ground this far under the water's level is never seen: the waves' troughs do not reach it. */
   const DROWNED = lakeLevel - 2;
   // cells per chunk side: (finish lane) about 400 m on medium as on low (it was 288 m: fifteen pieces of grid in a
@@ -1203,8 +1227,13 @@ const FOOT = 0.8;
           const h10 = gHeight[k00 + 1] < DROWNED;
           const h01 = gHeight[k00 + gw] < DROWNED;
           const h11 = gHeight[k00 + gw + 1] < DROWNED;
-          if (!drop(c00, c01, c10) && !(h00 && h01 && h10)) index.push(v, v + w, v + 1);
-          if (!drop(c10, c01, c11) && !(h10 && h01 && h11)) index.push(v + 1, v + w, v + w + 1);
+          // (sea lane) and none over the road: tested where a corner lies within two cells of a corridor
+          const nearRoad = (q) => gS[q] >= 0 && Math.abs(gLat[q]) < track.edgeAt(gS[q], gLat[q] >= 0 ? 1 : -1) + 2 * cell;
+          const over = (p, q, r) =>
+            (nearRoad(p) || nearRoad(q) || nearRoad(r)) &&
+            standsOverRoad(...[p, q, r].flatMap((m) => [minX + (m % gw) * cell, pos[(((m / gw) | 0) - cj) * w * 3 + ((m % gw) - ci) * 3 + 1], minZ + ((m / gw) | 0) * cell]));
+          if (!drop(c00, c01, c10) && !(h00 && h01 && h10) && !over(k00, k00 + gw, k00 + 1)) index.push(v, v + w, v + 1);
+          if (!drop(c10, c01, c11) && !(h10 && h01 && h11) && !over(k00 + 1, k00 + gw, k00 + gw + 1)) index.push(v + 1, v + w, v + w + 1);
         }
       }
       if (!index.length) continue;
