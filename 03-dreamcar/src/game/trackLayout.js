@@ -44,7 +44,8 @@ export const VIADUCT = { parapetOffset: 1.5, drop: 32 };
  * wanders slowly inside the range); `slope`: rise per metre of the verge on the way there; `far`: rise per metre
  * of the hillside beyond it (where another stretch of the road is close, the builder works the real slope out
  * from the two roads instead); `verge`: what the verge is made of; `wood`: what grows beyond the barrier
- * ('broadleaf', 'conifer', 'mixed' or null).
+ * ('broadleaf', 'conifer', 'mixed' or null); `coast`: the sea side of the coast road (gravel beyond the barrier, white
+ * posts: scenery only).
  */
 export const SIDES = {
   // the lakeside straight: a low concrete wall each side; the water beyond the left one, the town beyond the right
@@ -74,11 +75,6 @@ export const SIDES = {
   // a hillside steeper than the sun put the whole bend in its shade. On a gentle one the sun comes in UNDER the
   // bank's crowns and through them, and lies on the road in patches (frame D3's dappled light).
   bank: { kind: 'wall', edge: [3.5, 5], slope: 0.07, far: 0.12, verge: 'grass', wood: 'broadleaf' },
-  // (forest lane) frame e5's grass island: inside the carousel, where the spur was cut as rock, a low knoll of grass,
-  // flowers, granite boulders and pines behind a low concrete edge; no rail. To the cars it is the rock edge it was
-  // (kind, distance and verge as `rock`: the course drives exactly as before); the world draws no cut face or cliff
-  // where the piece's scheme says `curb`, but a low concrete kerbstone at the edge and the knoll behind it.
-  island: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 0.22, verge: 'grass', wood: 'conifer' },
   // the road cut into the hill: a narrow verge, then the rock face
   rock: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null },
   // (tunnel lane) the cutting out of the tunnel: a lower cut (the terrain's cliff is 2 + 5 far m: 5 m), faced in
@@ -88,6 +84,19 @@ export const SIDES = {
   wallUp: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: 0.7, verge: 'asphalt', wood: null },
   wallDown: { kind: 'wall', edge: [TUNNEL.wallOffset, TUNNEL.wallOffset], slope: 0, far: -0.45, verge: 'asphalt', wood: null },
   parapet: { kind: 'parapet', edge: [VIADUCT.parapetOffset, VIADUCT.parapetOffset], slope: 0, far: -2.5, verge: 'asphalt', wood: null },
+  // (sea lane) the sea side of the coast road after the sky road (`coast`): a steel rail on white posts with ochre
+  // gravel beyond it and nothing growing that would hide the sea. The corridor is the preset's it replaces (edge,
+  // slope, verge, kind, far: highDown, highRun, open), so the course and what the cars hit are exactly as they were.
+  // (sea lane, round 2) the long right down to the shore, whose second half is the low crossing (terrain.js CAUSEWAY):
+  // the presets it had (lowRun, lowUp) with nothing growing behind the rails, so the water shows on both sides
+  shoreRun: { kind: 'rail', edge: [8, 10], slope: -0.02, far: -0.2, verge: 'grass', wood: null },
+  shoreUp: { kind: 'rail', edge: [3, 5], slope: 0.04, far: 0.3, verge: 'grass', wood: null },
+  coastDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.35, verge: 'grass', wood: null, coast: true },
+  // (sea lane, round 2: frame E1) round the carousel and over the crest the verge is a broad apron of ochre gravel
+  // (run-off: the grip and the sound of gravel) out to the rail; beyond the rail terrain.js puts a lip of dry grass and
+  // the cliff straight down into the sea. No tyre wall on a coast side's run-off (track.js): the rail on white posts.
+  coastRun: { kind: 'rail', edge: [7, 10], slope: -0.02, far: -0.3, verge: 'gravel', wood: null, coast: true },
+  coastTop: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'gravel', wood: null, coast: true },
 };
 
 /**
@@ -111,7 +120,7 @@ export const SIDES = {
  *   curb     the solid edges on its pieces (rail or rock to the cars) are drawn as low concrete kerbstones this high
  *            (m): no rail, no cut face or cliff, no tyre walls, boards or marshal posts there
  * The two schemes answer the owner's frames e2 (a forest road in low side sun: the rise and the first ess) and e5 (a
- * mountain bend round an island of granite boulders: the carousel), design.md "The reference frames".
+ * mountain bend among granite boulders: the last ess), design.md "The reference frames".
  */
 export const SCHEMES = {
   pinewood: { lines: 'double-yellow', gap: 0.16, asphalt: 0.9, cracks: 0.6, strip: 0.32, kerb: [[0.4, 0.39, 0.37], [0.52, 0.51, 0.49]], wood: 'pinewood', verge: 'meadow', boulders: 'mossy', sign: 0, curb: 0.2, blend: 90 },
@@ -171,26 +180,29 @@ const SEGMENTS = [
   // Forest esses: long bends climbing through the wood, the last one turning the road along the hillside.
   { id: 'ess1', sec: 'esses', r: -260, deg: 55, ease: 100, bank: 8, g: 5.5, L: 'midRun', R: 'midUp', runoff: 'L', scheme: 'pinewood' },
   { id: 'ess2', sec: 'esses', r: 330, deg: 40, ease: 120, bank: 7, g: 5, L: 'highUp', R: 'highRun', runoff: 'R' },
-  { id: 'ess3', sec: 'esses', r: -240, deg: 65, ease: 120, bank: 9, g: 4, L: 'highRun', R: 'highUp', runoff: 'L' },
+  // (forest lane) the last ess, the tightest forest bend, is frame E5's mountain bend among granite boulders (the
+  // carousel, the one bend that folds back, is the sea lane's coast frame E1)
+  { id: 'ess3', sec: 'esses', r: -240, deg: 65, ease: 120, bank: 9, g: 4, L: 'highRun', R: 'highUp', runoff: 'L', scheme: 'granite' },
 
   // The tunnel: a rock cutting, then the bore through the spur, bending gently right.
   { id: 'cutting', sec: 'tunnel', len: 70, ease: 70, g: 3.5, L: 'rock', R: 'rock' },
   { id: 'tunnel', sec: 'tunnel', r: -1000, deg: 20, ease: 60, g: 3, L: 'wallDown', R: 'wallUp', tunnel: true },
   { id: 'mouth', sec: 'tunnel', len: 177.7441, ease: 50, g: 3.5, L: 'cutting', R: 'cutting' },
 
-  // The sky road: out of the mountain onto piers, a long banked left across the valley.
-  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapet', bridge: true, drop: 42 },
+  // The sky road: out of the mountain onto piers, a long banked left across an inlet of the sea (sea lane, round 2:
+  // the ground under the middle of the deck is 96 m down, under the water: the piers stand in the sea).
+  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapet', bridge: true, drop: 96 },
 
   // The carousel: a climb along the far side, then a right round the spur, the slow corner of the lap.
-  { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 6, L: 'highDown', R: 'rock' },
-  // (forest lane) frame e5's bend: the road folds back round a grass island of granite and pines (it was a rock face)
-  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'highRun', R: 'island', runoff: 'L', scheme: 'granite' },
+  // (sea lane) the coast road: from here to the foot of the plunge the sea lies below on the left, the land cut on the right
+  { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 6, L: 'coastDown', R: 'rock' },
+  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'coastRun', R: 'rock', runoff: 'L' },
 
-  // The crest: up over the top in the open, the lake far below.
-  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'open', R: 'open' },
+  // The crest: up over the top in the open, the sea far below.
+  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'coastTop', R: 'open' },
 
   // The plunge: 8 per cent down into a compression.
-  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'highDown', R: 'highUp' },
+  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'coastDown', R: 'highUp' },
 
   // The ledge: fast downhill sweepers along the hillside. The first, a left, has the valley open on its inside over
   // a low wall and a wooded bank on its outside (and no kerb on its inside: a white line, the paved margin and
@@ -207,7 +219,7 @@ const SEGMENTS = [
 
   // The long right: down to the shore and onto the straight.
   { id: 'approach', sec: 'sweepback', len: 100, ease: 60, g: -7.8, L: 'lowDown', R: 'lowUp' },
-  { id: 'back', sec: 'sweepback', r: -300, deg: 90, ease: 140, bank: 9, g: 0, gk: [[0.78, -6.5]], L: 'lowRun', R: 'lowUp', runoff: 'L' },
+  { id: 'back', sec: 'sweepback', r: -300, deg: 90, ease: 140, bank: 9, g: 0, gk: [[0.78, -6.5]], L: 'shoreRun', R: 'shoreUp', runoff: 'L' },
 
   { id: 'finish', sec: 'straight', len: 340, ease: 140, g: 0, L: 'shore', R: 'paddock' },
   { id: 'pitIn', sec: 'straight', len: 110, g: 0, L: 'shore', R: 'town' },
@@ -241,13 +253,14 @@ export const LAYOUT = {
    * (night lane) The rest of the lap is lit too, more sparsely: a circuit's floodlights on tall poles at the solid
    * edge, `spacing` metres apart, everywhere outside the tunnels and the straight's own lamps (lamps keep `clear`
    * metres from a portal): on the inside of every bend tighter than `inside` metres, alternating sides elsewhere.
-   * None stand on the pieces in `skip`: the ledge's first bend is frame D3's place, the carousel frame E5's (forest
-   * lane), which have no poles.
+   * None stand on the pieces in `skip`: the ledge's first bend is frame D3's place, which has no poles; (sea lane,
+   * round 2) the carousel and the crest are frame E1's, which has none either. (forest lane) The last
+   * ess is frame E5's, which has none.
    * (finish lane) Where the edge is a rail or the trees, a pole stands `setback` metres behind it, so that it is never
    * between the chase camera and the car, and `height` m high; one due at a rock face goes to the other side if that is
    * a rail or the trees; at a rock face, a wall or a parapet it stands at the edge.
    */
-  lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1', 'carousel'] },
+  lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1', 'carousel', 'crest', 'ess3'] },
   /**
    * (tunnel lane) The tunnel's lamp rows: the light of the lines of fittings along the haunches (tunnel.js draws the
    * fittings), `drop` under the ceiling and `inset` in from the kerb's face (over the shoulder: from there the light
@@ -258,7 +271,7 @@ export const LAYOUT = {
   tunnelLamps: { spacing: 12, drop: 0.3, inset: 0.9, entrance: [60, 2.4], transition: 70, exit: [36, 1.4] },
   /** Kerbs: on the inside of every bend tighter than `inside` metres from entry to exit, and on the outside at the exit of every bend tighter than `outside`. */
   kerbs: { inside: 800, outside: 500, exit: 0.4, width: SHOULDER },
-  /** The lake's surface (the straight runs along its shore at y = 0). */
+  /** The sea's surface (the straight runs along the shore of its bay at y = 0; terrain.js says where the sea is). */
   lakeLevel: -1.8,
 };
 

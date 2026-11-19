@@ -29,9 +29,9 @@ and nothing is fetched at run time.
 
 | | keyboard | gamepad | touch |
 | --- | --- | --- | --- |
-| drive, brake | W, S (or ↑, ↓) | right, left trigger | the car drives itself (or GAS, with Throttle: Manual); BRAKE, bottom right |
-| steer | A, D (or ←, →) | left stick | the slider at the bottom left: its centre is fixed (or two arrows, in the options) |
-| handbrake | Space | A | DRIFT, above BRAKE |
+| drive, brake | W, S (or ↑, ↓) | right, left trigger | the car drives itself; pull the pad's thumb down to lift, further to brake (Throttle: Manual: push it up to drive) |
+| steer | A, D (or ←, →) | left stick | touch anywhere with one thumb, in either hand: the pad appears there (Hand only decides where its faint ghost rests), its centre fixed until you lift, across steers (or a slider, arrows or tilt, in the options) |
+| handbrake | Space | A | pull the pad's thumb on into the red arc, a second finger anywhere, or HANDBRAKE in the other corner |
 | camera | C | Y | button |
 | look back | B | X | |
 | put back on the road | R | B | button |

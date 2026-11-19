@@ -31,10 +31,10 @@ const TIER = {
 };
 
 /**
- * (forest lane) Frame E5's boulders, in its places along the granite scheme's own pieces (the carousel), as seen from
+ * (forest lane) Frame E5's boulders, in its places along the granite scheme's own pieces (the last ess), as seen from
  * the `e5` camera: [share of the way along, 'in' (the island) or 'out', metres from the solid edge to the boulder's
- * near side, size (m), shape, lift (m: one stacked on others)]. The near-left pair on the island by the exit, a rock
- * in the island's middle, and the outcrop of van-sized blocks on the outside round the apex.
+ * near side, size (m), shape, lift (m: one stacked on others)]. The near-left pair on the inside by the exit, a rock
+ * further in, and the outcrop of van-sized blocks on the outside round the apex.
  */
 const E5_ROCKS = [
   [0.87, 'in', 0.2, 5.0, 'round', 0],

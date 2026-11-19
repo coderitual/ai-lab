@@ -124,7 +124,18 @@ machine without a GPU, and only what is listed here.
   keyboard driver (scripted drivers, in Node). Run for this document:
   passed.
 - **The rules** (`tools/unit.mjs`, race): 82 checks, passed.
-- **The feel** (`tools/unit.mjs`, drift): 7 tests, passed (2026-11-18).
+- **The sea** (`tools/unit.mjs`, sea; sea lane, 2026-11-18, round 2): the
+  coast presets keep the edges and slopes of the presets they replaced (the
+  carousel's and the crest's verge is now gravel); no water within 2 m
+  beyond any solid edge off the decks (1.5 m over the water at the lowest),
+  and every deck at least 39 m over it; open water within 90 m of the sea
+  side of the sky road (10 m: under its deck), the climb, the carousel,
+  the crest and the plunge (60 to 70 m: the cliff); the bay off the start
+  line; the sea map; the waves deterministic. Round 2's look was judged in
+  stills of `e1` at the medium tier (day, golden hour, night) beside the
+  owner's frame E1, and in the chase camera every 2 s from the tunnel's exit
+  to the end of the plunge on the low tier (1280x720 and 393x700).
+- **The feel** (`tools/unit.mjs`, drift): 8 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
   Of the six failures, five came from the HUD overlap layout and one from a
@@ -144,6 +155,48 @@ machine without a GPU, and only what is listed here.
   before: intermittent, the banner and the car's top are a few px apart on
   a landscape phone. `node tools/unit.mjs` passed (the scripted thumb now
   drives a linear slider, `HUMAN.thumb` range 76 px).
+- **The one-thumb pad** (CONTROLS lane, round 2, 2026-11-18): touch, slide,
+  options, start and split against a production build: 201 of 201 (touch
+  130, slide 13, options 39, start 10, split 9); hud re-run after the last
+  layout change: 100 of 100 (the pad in either hand, solo and both splits,
+  auto and manual, and the slider with its pedals on manual in both splits).
+  In an earlier hud run the pad overlapped the car once on 393x852 with the
+  insets stood in for: the car's box was drawn 120 px lower than at the same
+  place in every other run (intermittent, not explained). `node
+  tools/unit.mjs` passed; drift.test.mjs now has 8 tests (the pad's lap,
+  braking while turning, the red-arc and button slides, a clumsy thumb).
+  Tilt is checked with synthetic deviceorientation events only.
+- **The pad under the thumb and the pedal gauge** (CONTROLS lane, round 3,
+  2026-11-19): touch, slide, options, hud, start and split against a
+  production build: 481 of 481 (split 27 s, touch 122 s, slide 113 s, hud 178
+  s, options 241 s, start 47 s). The touch section places the pad at five
+  spots and four edge cases in both orientations (centre = landing point or
+  the documented nudge, first input zero, no movement under a 100 px drag,
+  compressed travel reaches full lock or the red, the 6 px hold, a second
+  finger = handbrake, HUD buttons place nothing, both hands, both halves of a
+  split); the gauge reads full on auto, brake with no throttle under the pad's
+  pull, zero and zero on manual untouched, and its box is in the hud overlap
+  checks. In earlier runs the hud check "nothing over the car" failed once
+  with the insets stood in for (393x852, solo: the car's box 120 px low; the
+  ghost and the gauge were over it): not reproduced in the lane's last run, still
+  unexplained. It failed again in the lead's run of touch, hud, split, options
+  and start on the merged build (468 checks, 467 passed; at s 154 the car's
+  box reached 763 of 852 px down and the gauge and the ghost overlapped it):
+  open. `node tools/unit.mjs` passed (the scripted thumb needed no
+  change). Not verified: a real phone, Safari, real thumbs (is 60 % of the
+  travel and a 6 px hold right at a real edge? does a second finger anywhere
+  feel like a handbrake?), the gauge's eased bars at a real frame rate.
+- **The two-player "water on the track"** (CONTROLS lane, round 2): reproduced
+  at night on low in a side-by-side split of an upright phone
+  (`?mode=split&time=night&t=14`, view.split wide, 393x852): the second
+  half's road reads as a sheet of water, the first half's beside it does not.
+  It does not depend on the order the halves are drawn in, on the wet road's
+  mirror (low has none; at medium night the mirror is drawn once per view
+  with that view's camera), on the cars' head lamp beams, or on which car's
+  half it is: drawn from the second camera's place, the first half shows it
+  too. So it follows where the camera stands, by a few metres; the likeliest
+  cause is the per-eye choice of lit lamps at night (lamps.js, the world's
+  lane), not fixed here (src/assets/ is another lane's).
 - **The sound** (`tools/soundtest.cjs`): 62 of 62 checks (audio lane). The
   squeal "stands out at the limit" passes at exactly its 12 dB threshold.
 - **The pictures**: the stills in `docs/images/` and the lanes' comparison
@@ -192,6 +245,34 @@ machine without a GPU, and only what is listed here.
   ones made); the rails' reflectors were. Not looked at on `high`, in split
   screen at night or in motion; the playtest and the soundtest were not
   run. The page raised no console error in any of these loads.
+- **The day lane's changes** (a bluer day sky and a group of cumulus placed
+  over the massif's shoulder, the massif darker with ribs, scree fans,
+  buttresses and a back-lit rim, its saddle raised; the straight's tall
+  boards in two groups with green rows behind the warm-painted low wall; a
+  darker, more contrasty asphalt with a narrower glare; the D3 preset
+  restaged; the green hill beyond the lake; low boards on the ledge's inside
+  wall; thinner valley mist by day): four rounds of stills on software WebGL
+  at `medium` 1280x720 for d1 and d3 beside the frames, d4 once at the end
+  and the d1 place by night once; compositions found on `low`; draw calls and
+  triangles counted with the picture lane's measure tool at phone shape
+  (low by day, medium by night, t = 0, 33, 79, 100) against the head before
+  the lane; `node tools/unit.mjs` passed. The golden-hour sun's clearance of
+  the green hill was worked out on paper, not seen in a still (the one
+  staged towards it looked into the stand). Not looked at on `high`, in
+  motion, in split screen or in the chase view; the playtest, the soundtest
+  and the docs' screenshots were not run.
+- **The dusk lane's changes** (the twilight dome, dusk clouds lit on the
+  sun's side, first stars, the horizon-coloured haze, the dusk grade, lamps
+  and windows on with halos, the tail lamps' red pool on the road): chase
+  stills on software WebGL at `medium` before and after, 1280x720 and
+  393x700 `--mobile`, at t = 29 to 58 of the autopilot run (the approach,
+  inside the tunnel, its exit and the viaduct after it) and d4, by eye; one
+  round on `low`. The pool's final strength (2) was set after the last
+  still (it was judged at 3, too red on the edge line). The tunnel's own
+  exposure was tried at 3.6 and made no visible difference in the stills, so
+  it stays 6. Not looked at on `high`, at night (the pool is on at night
+  too), in motion, in split screen or over the coming sea; draw calls were
+  not counted (no geometry was added); the playtest was not run.
 - **The tunnel lane's changes** (the box tunnel, its portals and cuttings,
   the lamps' zones and cool white, the road's sheen and the cars' shade in the
   tunnel, the probe's cadence and reach there, no wet mirror under the roof):
@@ -219,13 +300,17 @@ Read this before believing anything above about a device.
   (tier `medium`, before the fixed touch controls): they show that it ran and
   how it looked then, nothing about frame rates, heat or the current build.
   Touch has only been simulated by Playwright on phone-sized viewports, with
-  synthetic pointer events: no real thumb has used the slider or the pedals,
+  synthetic pointer events: no real thumb has used the pad, the slider or the
+  pedals (the pad's size, place, travels, red-arc threshold and the thumb's
+  22 to 50 ms follow were tuned by the scripted thumb in Node and by eye on
+  stills), tilt has only been fed synthetic deviceorientation events (it is
+  untested on a real phone, its iOS permission prompt has never been met, and
+  the option's hint says so), `navigator.vibrate` has never buzzed anything
+  (iOS has none: the guard keeps it quiet there),
   iOS Safari's own gestures (the bottom toolbar, the home bar swipe, edge
   swipes for back) have not been met, and the safe-area insets were stood in
-  for by setting the HUD's variables. The slider's travel, the pedals' sizes
-  and the thumb's curve are untuned by hand. Two players on half an upright
-  phone with the throttle on manual stacks the pedals into the picture; that
-  combination is not in the HUD check. Whether `medium` or `low` is fast
+  for by setting the HUD's variables. The controls' sizes and the thumb's
+  curve are untuned by a real hand. Whether `medium` or `low` is fast
   enough on any phone, whether a phone overheats, whether the buttons are
   where a thumb is, and whether the capability probe's guesses for Apple,
   Adreno and Mali GPUs are right are all unknown.
@@ -274,5 +359,17 @@ Read this before believing anything above about a device.
   the board and ghost storage after many laps, and the time-of-day fade
   repeated many times are untested.
 - **Wet grip.** The wet road at night is a look; the tyres do not notice it.
+- **The sea** (sea lane): the waves' motion was only seen in stills (no
+  frame sequence was watched for shimmer or swimming of the disc that
+  follows the eye); the high tier's sea, split screen over the sea, the
+  surf from close by (no camera stood on a shore) were not looked at; the
+  sea's cost on a real GPU is unknown. The coast road after round 2 was
+  judged at the medium tier in `e1` only and at the low tier in the chase
+  camera only (the high tier there, and the bonnet and far cameras, were not
+  looked at). The low crossing and its big swell were seen in one medium
+  still each by day, golden hour and night and in the chase camera at
+  393x700 on the low tier; `?photo=waves`'s pose was not staged; frame D1
+  was checked after the far massif's change at a later moment of the run
+  than its preset (its skyline unchanged).
 - **Accessibility** beyond keyboard reachability of the buttons (screen
   readers, colour blindness, reduced motion) has not been considered.

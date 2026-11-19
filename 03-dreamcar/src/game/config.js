@@ -68,6 +68,8 @@ export const HUD = {
   zonesFor: 3,
   /** The first-time hint shows until the car has covered this much road in a run (m). */
   hintDistance: 25,
+  /** The touch controls step back to 45 % (hud.css) after this much of the race clock (s), unless a finger is on one. */
+  controlsDimAfter: 4,
 };
 
 /**
@@ -127,11 +129,13 @@ export const HANDS = {
   /** A stick: the power added to its curve (finer near the centre), its smoothing (s), and `counter` as for keys. */
   pad: { expo: [0, 0.5], lag: [0.02, 0.09], counter: 0.6 },
   /**
-   * A thumb on the touch slider: the same. The slider reads the thumb's distance from its fixed centre linearly;
+   * A thumb on the touch pad or slider: the same. Both read the thumb's distance from their fixed centre linearly;
    * the whole curve is here: a little finer than linear at a standstill, much finer at speed, so that a few px of
-   * thumb is a small correction on the straight and the end of the travel is still full lock.
+   * thumb is a small correction on the straight and the end of the travel is still full lock. `order` 2: the
+   * smoothing is a critically damped follow (two lags of `lag` s in a row: about 2 × lag to most of the way);
+   * `pedalLag`: the pad's throttle and brake are smoothed by that much (s).
    */
-  thumb: { expo: [0.15, 0.45], lag: [0.03, 0.1], counter: 0.5 },
+  thumb: { expo: [0.15, 0.45], lag: [0.022, 0.05], order: 2, counter: 0.5, pedalLag: 0.03 },
 };
 
 /** Each driver's car and keys: the first is the owner's silver one. `bias`: the autopilot's lane in split screen. */
@@ -336,18 +340,24 @@ export const CAMERA = {
  * from the start of a run at RULES.autopilotPace; `time`, the time of day), used when the address does not give
  * them. D1: the run-up to the line, low behind and right of the car, yawed left; D3: the ledge's first bend, low
  * behind and left, looking down it; D4: the grid at golden hour just after the lights go out (the lamps show green), low on the lake side behind
- * the car, looking forward and right at the land side with the gantry's lamps in the picture. E2 and E5 (forest
- * lane): the owner's two frames of the forest (design.md, "The reference frames").
+ * the car, looking forward and right at the land side with the gantry's lamps in the picture. E1 (sea lane, round 2:
+ * the owner's coast road frame, strict spec): the car coming out of the carousel, the camera on the crest 10 m ahead of
+ * it and a little up, looking back north at it with the horizon tilted 7 degrees (`roll`): the cut spur on the left,
+ * the hairpin, the gravel apron, the rail on white posts and the boards on the right, the open sea beyond. Waves (sea
+ * lane, round 2): the low crossing on the long right, behind and right of the car, looking ahead and out over the
+ * lagoon beside the causeway (not yet staged: the first pose tried, low on the bay side, saw the road and the massif).
+ * E2 and E5 (forest lane): the owner's two frames of the forest (design.md, "The reference frames").
  */
 export const PHOTOS = {
   d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
-  d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
+  d3: { back: 7, right: -0.3, up: 1.6, yaw: 12, pitch: -8, fov: 52, t: 76.6, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
+  e1: { back: -10, right: 2.5, up: 3.8, yaw: 162, pitch: -10, fov: 38, roll: 7, t: 64.9, time: 'day' },
+  waves: { back: 7, right: 3, up: 2.2, yaw: -30, pitch: -4, fov: 55, t: 94.4, time: 'day' },
   // (forest lane) e2: the forest road of the rise and the first ess, chase-like from behind and above the car, the
-  // low sun crossing from the left; e5: the carousel's exit, on its outside ahead of the car, looking back at it
-  // coming round the grass island of granite and pines
-  e2: { back: 6.2, right: 0.3, up: 2.0, yaw: 0, pitch: -5, fov: 50, t: 22.2, time: 'day' },
-  e5: { back: -19.9, right: -3.7, up: 3.38, yaw: 198.5, pitch: -4.8, fov: 40, t: 63.8, time: 'day' },
+  // low sun crossing from the left; e5: the last ess's exit, on the road ahead of the car, looking back at it coming
+  // round the bend among the granite boulders
+  e5: { back: -19.3, right: -3.5, up: 2.95, yaw: 199.4, pitch: -4.5, fov: 40, t: 34.2, time: 'day' },
 };
 
 /**

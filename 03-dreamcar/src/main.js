@@ -4,6 +4,7 @@
 // URL parameters are described in engine/params.js.
 
 import { TIMES } from './assets/world/lighting.js';
+import { TOUCH } from './engine/Input.js';
 import { parseParams } from './engine/params.js';
 import { Game } from './game/Game.js';
 import * as config from './game/config.js';
@@ -66,6 +67,8 @@ try {
      * own top left in the page), for tests.
      */
     touchLayout: (i = 0) => game.input.layoutOf(i),
+    /** Input's TOUCH: the touch controls' numbers. */
+    touch: TOUCH,
     /** Change a number of the light or of the run by its path, and show the result. */
     set(path, value) {
       const keys = String(path).split('.');
@@ -78,12 +81,12 @@ try {
     },
   };
 
-  // ?photo=back,right,up,yaw,pitch,fov[,hud]: the staging camera from the first frame (see photo above)
+  // ?photo=back,right,up,yaw,pitch,fov[,roll][,hud]: the staging camera from the first frame (see photo above)
   const photo = query.get('photo');
   if (named) game.setPhoto(named);
   else if (photo) {
     const n = photo.split(',').map(parseFloat);
-    const keys = ['back', 'right', 'up', 'yaw', 'pitch', 'fov'];
+    const keys = ['back', 'right', 'up', 'yaw', 'pitch', 'fov', 'roll'];
     const o = {};
     keys.forEach((k, i) => Number.isFinite(n[i]) && (o[k] = n[i]));
     if (/,hud$/.test(photo)) o.hud = true;

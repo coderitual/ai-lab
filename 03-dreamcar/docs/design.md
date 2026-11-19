@@ -128,7 +128,8 @@ lamps (retro.js), as the road's lines do. Barriers: two
 stacked W-beams on posts (one beam where trackside panels stand behind it;
 set back behind tyre walls; a reflector painted on the upper beam over every
 fourth post, which blazes in the head lamps at night), low concrete walls 0.93 m high on the straight
-(walls.js, precast blocks painted white and teal), cut faces of bedded
+(walls.js, precast blocks: on the lake side of the straight a warm grey and a
+burnt orange by turns, white along the pits, a deep bottle green elsewhere), cut faces of bedded
 limestone where the edge is rock. Viaduct piers are slender eight-sided
 shafts under flared capitals; the short bridge spans a V-shaped gully across
 it with a stream's notch. Gradients up to 8 per cent; banking by rule
@@ -144,7 +145,7 @@ line, m; speeds are the autopilot's at full pace):
 | The tunnel | 1409 to 2006 | a rock cutting faced in concrete at its end, the lit box (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out between retaining walls with acoustic screens; up to 255 km/h |
 | The sky road | 2006 to 2582 | on piers: a 576 m left of 300 m radius, banked 10 degrees, the valley 42 m under its middle; about 230 to 257 km/h |
 | The carousel | 2582 to 2915 | a 150 m climb, then 190 degrees right round a spur at 55 m radius, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
-| The crest | 2915 to 3115 | the top (108 m), in the open, the lake far below; the car goes light over it at about 160 km/h |
+| The crest | 2915 to 3115 | the top (108 m), in the open, the sea far below on the left; the car goes light over it at about 160 km/h |
 | The plunge | 3115 to 3394 | 8 per cent down a 400 m right into a compression; to 215 km/h |
 | The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m on the hillside, rock on one side; 216 to 257 km/h |
 | Gully bridge | 3778 to 4115 | 337 m straight on piers, 26 m over the gully, 8 per cent down; to 282 km/h |
@@ -174,9 +175,11 @@ count, the upper two green for four seconds after lights out. On the land side
 behind the wall a catch fence, a pit lane and a two-storey pit building
 (garages, a glazed floor lit at dusk and at night, a roof terrace under a
 canopy carrying the name); on the lake side a covered stand. Along the lake
-side of the straight one run of tall hoardings (3.8 m panels, tops near 5 m),
-broken only by the stand and the gantry's tower; the land side stays open
-(grass, the barrier, the pits). Past the pit exit a short tyre wall with low
+side of the straight two groups of tall hoardings (3.8 m panels, tops near 5 m):
+five by the run-up's camera (frame D1) and four more 45 to 80 m before the
+line; between them the low wall is open, with hazel along it and loose rows
+of round green broadleaves 8 to 15 m tall behind it (forest.js). The land side
+stays open (grass, the barrier, the pits). Past the pit exit a short tyre wall with low
 boards on a low wall behind it. At the far end of the straight a footbridge
 carrying boards, a marshal's tower, and on the outside of the first bend a
 small stand and distance boards 200, 150 and 100. Low boards along the bends,
@@ -207,27 +210,46 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   the address wins; auto is what the capability probe chose), sound, time of
   day, speed in km/h or mph (`dreamcar.units`), the map shown or hidden
   (`dreamcar.map`), the driving help (Full, Sport, Off; `dreamcar.assists`,
-  applied to every car at once), and on touch screens the steering (slider
-  or arrows; `dreamcar.steering`) and the throttle (auto or manual;
+  applied to every car at once), and on touch screens the steering (pad,
+  slider, arrows or tilt; `dreamcar.steering`), the holding hand (right or
+  left; `dreamcar.hand`) and the throttle (auto or manual;
   `dreamcar.throttle`). Keys reach every button by Tab and Enter, a
   pad by its d-pad and A; touch targets are at least 44 px (the driving
   buttons 64 px and more).
 - **Controls, each device as if it were the only one.** Keys: W A S D or the
   arrows, Space the handbrake. Pad: triggers, left stick, A or RB the
-  handbrake. Touch (a phone upright or on its side, one thumb each side):
-  fixed controls that never move. At the bottom left a steering slider: a
-  track with its centre marked; the steering is how far the thumb is from
-  that centre, so a thumb landing off it steers at once and the knob springs
-  back when it lifts (or, as an option, two arrow buttons that steer as keys
-  do). At the bottom right the pedals: BRAKE, DRIFT (the handbrake) above
-  it, and with the throttle on manual GAS in the corner. Power does not
-  depend on touching the steering: on auto (the default) the car drives by
-  itself from the green light and lifts only while BRAKE or DRIFT is held; on
-  manual only GAS drives. Nothing else on the screen drives the car. The
-  controls are outlined and named on the first touch run. In split screen
-  each half has all of it, laid out for the half. (This replaced a floating
-  stick whose centre followed the thumb, with the power on only while the
-  steering was touched: the owner, on an upright iPhone, found both wrong.)
+  handbrake. Touch: the owner plays on an iPhone held upright in one hand,
+  and asked for controls that are "one-hand friendly and super smooth and
+  precise". So the default is one thumb on an analog pad that appears under the thumb
+  (round 3: the owner plays with either hand and asked that "the pad
+  should also adjust to where the user starts to touch"; he had rejected a
+  stick whose base moved while the finger moved, so the centre is set at
+  touch-down and never moves until the thumb lifts). At rest it is a faint ghost at the bottom
+  corner of the holding hand's side (Hand: Right or Left: it only places the
+  ghost and the handbrake button), within the
+  thumb's natural arc: drawn like a finished game's stick (a dark glass disc
+  with a light rim, its centre and full lock marked, an amber brake arc
+  along its foot that fills as the brake is pressed, a red arc below it).
+  Across is the steering; the car drives itself, and pulling the thumb down
+  first lifts and then brakes, so one thumb can trail the brake into a bend;
+  pulled on into the red arc it yanks the handbrake, like a lever, and the
+  knob clicks into the arc: brake, flick into a slide and steer through it
+  with one thumb. A round HANDBRAKE button stands in the other bottom corner
+  for a second thumb; a second finger anywhere is the handbrake too. The pad's centre is where
+  the thumb landed and never moves, so the first input is zero and the knob
+  springs back when it lifts; near an edge the travel is compressed (to
+  60 % at the least) and then the centre is nudged inward with a 6 px hold
+  at zero, so there is never a jump. Options: the slider (a track with a marked
+  centre) or two arrows, each with the pedals (BRAKE, DRIFT, and GAS on
+  manual); tilt (the phone rolled like a wheel, the pad still braking;
+  untested on a real phone). Throttle manual makes the pad's up the
+  throttle. The controls are outlined and named on the first touch run, drawn
+  pressed with a glow the moment a finger lands, and step back to 45 % a few
+  seconds into a run so as not to sit over the picture. In split screen
+  each half has all of it, laid out for the half. (Round 1 of the controls
+  had the slider and pedals as the default; before that a floating stick
+  whose centre followed the thumb, with the power on only while the steering
+  was touched: the owner found both wrong.)
 - **A slide is seen and counted.** While the car slides beyond 12° its angle
   and a running score show just above the speed, fading a second after; the
   best slide of the run is on the results. The chase camera keeps nearer the
@@ -328,13 +350,15 @@ its car's origin in the car's own level frame, turned `yaw` degrees left of
 the car's heading and `pitch` degrees up, with a lens of `fov` degrees top to
 bottom (as given, whatever the picture's shape); the HUD is hidden unless
 `hud: true` is given; `photo(null)` ends it. The same in the address:
-`?photo=back,right,up,yaw,pitch,fov` (add `,hud` to keep the HUD), so that
+`?photo=back,right,up,yaw,pitch,fov[,roll]` (`roll`: degrees the picture leans clockwise; add `,hud` to keep the HUD), so that
 `node tools/shot.cjs --url "…?manual&auto&ap&t=20&photo=4.5,2.2,0.9,22,1,46"`
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
-day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 78.8 s) and
-`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green); a name
+day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 76.6 s),
+`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green) and
+`?photo=e1` (frame E1, strict spec for the coast stretch: day, t 64.9 s, the car coming out of the carousel,
+the camera on the crest looking back at it; a `roll` of 7 degrees tilts the horizon as the frame's does); a name
 brings its own moment of the autopilot's run and its time of day unless the
 address gives `t` or `time`, and also works on the handle
 (`__dreamcar.photo('d1')`). The camera moves with the car, so the engine's
@@ -353,8 +377,10 @@ with a short `advance` after loading.
   straight down the road (lighting.js `PLACES`, turned to the Track's heading
   by `placeLights`): the chase view drives into it, its glare lies along the
   asphalt, shadows fall straight back and a little left. A deep blue sky, pale
-  and bright at the horizon, with small lit cumulus (grey-blue bases, silver
-  rims near the sun); a compact sun with a soft aureole; dry asphalt. The
+  and bright at the horizon (zenith 0.15, 0.33, 0.86; horizon 0.5, 0.65,
+  0.92), with lit cumulus: a group of big heaps with crisp white tops and
+  soft grey bases over the massif's shoulder, left of its main peak, and a few
+  small ones elsewhere (grey-blue bases, silver rims near the sun); a compact sun with a soft aureole; dry asphalt. The
   drawn sky is as bright as the frames' (pale blue, paling to the horizon);
   its light on the scene is set apart (`env.intensity` 0.6, fill 0.13), so
   that the shade stays open but deep: sunlit level ground about 2.1 from the
@@ -380,15 +406,22 @@ with a short `advance` after loading.
   straight. Its orange light crosses the straight almost level, so whatever
   stands on the lake side throws shadows 25 to 30 m long over the grid while
   the trees, the gantry and the buildings on the land side, and the massif,
-  stand in red-orange light. Golden, never violet (render lane, after the
-  owner's "small shading problems" and D4 beside our still): the sky is a gold
-  haze low down paling into a clear light blue overhead, the haze the far
-  land fades into is gold-brown, the sky's fill is warm, and the grade warms
-  the white balance (tint 1.05, 1.0, 0.9) with rust in the shadows and gold in
-  the highlights (split toning); clouds lit from below that the paint
-  mirrors; the fill is low (env 0.6, exposure 4.2, contrast 1.2), so the lit crowns and the
-  lamps carry the picture and the shade stays deep and warm. Dry. Lamps and
-  windows are on.
+  stand in red-orange light. The sky is a whole twilight dome (dusk lane,
+  after the owner's "in the dusk lighting the tunnel and after the tunnel
+  looks dull and bad" and his twilight references): under the sun a rose and
+  orange horizon rising through gold and pale yellow into turquoise and a
+  deep blue overhead; opposite it the blue-violet shadow of the earth low
+  down with a pink belt over it; long thin clouds lit orange-rose from below
+  near the sun and dark blue-grey elsewhere; the first stars high up opposite
+  the sun. The haze is the horizon's: gold and rose towards the sun,
+  blue-violet away from it, so the far land stands in layered blue
+  silhouettes. The grade is rich and deep (contrast 1.24, saturation 1.22,
+  exposure 4.2), a whiter balance (tint 1.03, 1.0, 0.94) with cool shade and
+  gold highlights (split toning). Dry. The lamps and windows are on and glow
+  with halos against the lit sky (`halo` 0.1, a faint cone in the air); the
+  cars run on low beam, their head lamps pooling on the road ahead and their
+  tail lamps laying a red pool on the asphalt behind them (road.js
+  `TAIL_POOL`).
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
@@ -462,6 +495,9 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   in low warm light, with rust in their shade and dark trunks below; a gantry
   over the road carrying columns of round start lamps; boards, a tyre wall, a
   low concrete wall; the asphalt in shade, the car's tail lamps lit.
+- **E1** (sea lane; strict spec for the coast stretch, preset `e1`): a road
+  winding in an S round a cut hill on a headland high above an open sea; the
+  whole frame is described under "The sea".
 
 - **E2** (the owner's "another spec reference"), from a console racing game,
   by day: a straight road through a wood of tall conifers with long bare
@@ -489,14 +525,171 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   the bend; a yellow diamond warning sign (ours is a plain bend arrow of our
   own drawing); more road beyond through the trees.
 
-Day answers to D1, D3 and A, and its two forest stretches to E2 and E5;
-golden hour to D4 and D2; the wet night to two
+- **The twilight references** (four more frames of racing games, sent with
+  "in the dusk lighting the tunnel and after the tunnel looks dull and bad";
+  their light, sky, colour and mood only): after sunset, a sky from deep blue
+  overhead through turquoise and pale yellow to a band of orange and rose on
+  the horizon over dark blue mountains and a pale gleam of water, a dark road
+  whose white lines catch the sky, tail lamps glowing red with their light
+  pooled on the asphalt, small warm lamps far off; blue hour over cool
+  blue-violet land under a pale sky with long dark clouds, a lit board
+  glowing; a low sun breaking under heavy cloud into a blinding glare that a
+  wet road mirrors; the last warm side light with long shadows across the
+  road and a lit snowy mountain against a clear pale sky.
+
+Day answers to D1, D3, E1 and A, and its two forest stretches to E2 and E5; golden hour to D4, D2 and the twilight references; the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
 light, the materials, the vegetation, the composition and the sense of speed:
 no names, logos, HUD artwork or layout, track shapes, liveries or lettering.
 The car itself is checked against four daylight photographs of the owner's
 car (car.md), which also stay out of the repository.
+
+## The sea
+
+(sea lane) After the tunnel the road comes out onto the coast. The owner:
+"after the tunnel there is a nice part of the track where we can have a
+sea; the sea and its shader are built in the repo, in the 01 project". His
+reference for the look (kept out of the repository, like the others; called
+E1 here): a road winding along a headland high above an open sea, deep blue
+water with a long soft swell, a bright band towards the horizon and haze
+into a clear sky; an ochre and rust cut slope with grass on top on the land
+side, ochre gravel run-off and a steel rail on white posts on the sea side;
+a viaduct on tall piers standing in front of the water; sun-bleached warm
+light. Only its light, colour, materials and composition are taken.
+
+**E1 is strict spec for the coast stretch** (the owner, round 2: "This is
+strict spec"; and "give a sea view after the tunnel"): a still from the
+comparison camera `e1` must read as the same picture except for the car.
+Nothing of the game's content is copied (no names, logos, board lettering,
+track shape). The frame, read carefully: the camera looks back along a road
+that winds in an S round a hill on a headland high above the sea; open sea
+fills the right half and the upper middle to a straight hazy horizon about
+60 % up, tilted a few degrees, with clear pale-blue sky deepening upwards and
+no land behind the water; on the left a steep hill cut for the road, a
+rust and ochre face 10 to 15 m high with erosion gullies, dark at its foot,
+dry olive grass and scrub above; dark asphalt with a double yellow centre
+line and white edge lines, a low concrete kerb strip on the inside of the
+bend; on the outside a broad apron of ochre gravel, then a steel rail on
+white posts, a lip of dry grass and then the sea far below; red and white
+boards at the next bend; a pale viaduct on tall slender piers standing in
+the sea; a low warm sun from the left behind the camera, the hill's shadow
+over the left of the road.
+
+**Where E1 is on our course** (`?photo=e1`): the carousel, the slow right
+hairpin round a spur at the head of the headland, is the bend nearest the
+frame's S; the camera stands on the crest just past its exit, looking back
+north at the car coming out of it on the inside lane. The hill on the left
+is the spur inside the hairpin (`COAST.knoll`), cut for the road; the
+apron, the rail and the sea are on the right; the boards stand round the
+hairpin's outside. What our course cannot give: the sky road is behind this
+camera (it runs from the climb's foot back south-east to the tunnel), so the
+frame's viaduct is not in our picture; its piers stand in the sea where the
+driver sees them, from the tunnel's cutting, the sky road and the climb. And
+our day sun is fixed: 16 degrees up, due east (down the start straight); from
+E1's camera, looking a little east of north, it stands about 80 degrees to
+the left and very slightly ahead, so the cut face (facing west) is in its own
+shade and the spur's shadow lies across the near road, where the frame's sun
+comes from behind the camera's left and lights the face.
+
+- **Where the coast runs** (`SEA` in terrain.js). The course stands on a
+  headland. Seen from the middle of the course, everything outside the loop
+  at a bearing outside the mainland's (-115° to 50°, 0° being the start
+  straight's heading) is sea to the horizon: north of the tunnel's spur, round
+  the sky road and the headland of the carousel and the crest, down the west
+  side. The mainland with the massif and the far ridges stays east, behind
+  the start straight, so frame D1 is untouched. The lake beside the straight
+  is a bay of the same sea, as it was to the east and opening to the open
+  water in the south-west. (Round 2: the mainland's sector ends at 24°, not
+  50°, so that from the climb no far shore stands across the inlet; D1's view
+  lies between -70° and -2°.) Away from the coast road the land falls to the
+  water 55 to 170 m beyond the solid edge, the last of it as a cliff (rise
+  1.15 per metre) of ochre rock with a dark wet band at its foot; the seabed
+  shelves away at 0.3 per metre to 45 m. Seven sea stacks stand 30 to 120 m
+  off the open coast. No far shore: the far ridges stand aside where the sea
+  is (far.js), so the sky road and the crest look over water, haze and sky.
+- **The coast road's cliff** (round 2, `COAST` in terrain.js). On the sea
+  side of the coast road the land does not slope away to a shore far off:
+  beyond the rail a lip of dry grass 1.5 to 4 m wide, then a cliff straight
+  down into the sea (1.6 to 2.6 m down per metre out, rounded at its top, a
+  talus at its foot 7 m under the water), so that open water lies some 40
+  to 60 m beyond the solid edge and 85 to 110 m below the road. The land
+  side is cut 4 m deep (the coast's rust face) and rises gently beyond it
+  (at most 0.25 per metre), and the spur between the climb and the crest
+  rises as a hill up to about 22 m over the road, along a ridge from 80 to
+  230 m down the tongue from the hairpin's centre, set towards the climb.
+  It is low round the hairpin itself, on purpose: the day's sun stands on
+  that side 16 degrees up, and with an 11 m cut and the rock preset's steep
+  hillside (round 2's first tries) the whole of E1's road and apron lay in
+  its shade; now the shade covers the inside of the road at the bend's
+  exit, as the frame's does. Nothing grows tall either side of the coast
+  road: dry olive grass and scrub.
+- **The sky road over the sea** (round 2): the deck crosses an inlet; the
+  ground under its middle is 96 m down (`drop`), under the water, so its
+  piers stand in the sea.
+- **The low crossing and the big waves** (round 2; the owner: "after the
+  tunnel it would be nice to see some sea side with BIG waves. Maybe some
+  river that will be super nice to cross ... we will be very close to it").
+  Between the tunnel and the gully the road is 60 to 108 m up and already
+  climbs and falls at 7.5 to 8 per cent: no piece can come down to the water
+  there without breaking the course's limits (the gradient, the top on the
+  crest 100 to 130 m over the lake). The first place after the tunnel where
+  the road comes down to the sea is the long right before the straight
+  (`back`), from half way round it to near its end: 170 m with the road 2
+  to 14 m over the water. There the land either side falls away (terrain.js
+  `CAUSEWAY`): the road runs on a causeway, a lip of 2.5 m beyond each rail
+  and a rubble bank into the water, across the mouth of a lagoon on the
+  inside of the bend (120 m wide, 9 m deep at most) with the bay on the
+  outside. The rails are the open steel rails the corridor already had; the
+  course is untouched, but nothing grows behind the long right's rails any
+  more (`shoreRun`, `shoreUp`: the woods hid the water). Off the outer side the swell runs big (waves.js
+  `BOOST`): its three long waves 2.5 times their height at the middle of a
+  circle of 360 m (up to about 3 to 4 m from crest to trough in the sets);
+  the same factor moves the mesh (medium, high), shades the normals (low)
+  and answers `sampleWaves`. It stops short of the straight, whose bay
+  frames D1 and D4 look over. `?photo=waves` looks over the lagoon beside
+  the causeway. Not yet what the owner asked for: in the first stills the
+  water is close on the lagoon side and glitters, but the boosted swell does
+  not read as rollers from the road (150 m waves 3 m high are gentle slopes
+  at that range); spray against the bank, breakers that curl over and a
+  finer inner mesh near the eye are not built.
+- **The coast road** (`coastDown`, `coastRun`, `coastTop` in trackLayout.js:
+  the climb, the carousel, the crest and the plunge): on the sea side the
+  steel rail stands on white posts and nothing grows that would hide the
+  water; round the carousel and over the crest the verge inside the rail is
+  a broad apron of ochre gravel (round 2: `verge: 'gravel'`, the grip and
+  sound of gravel; no tyre wall on a coast side's run-off), elsewhere grass;
+  on the land side the cut rock of the climb and the carousel is the coast's
+  rust and ochre in faint beds scored by gullies, dry grass on top. The
+  corridor's edges and slopes are exactly the presets' it replaced. The road
+  from the sky road to the plunge has a double yellow centre line
+  (`PIECE_MARKS` in road.js) and its kerbs are bare concrete (kerbs.js); no
+  floodlight poles stand round the carousel and over the crest
+  (`lapLamps.skip`). Within a few hundred metres of the sea all rock
+  is that warm stone and all loose stone ochre grit (groundMaterial.js reads
+  the sea map); inland it stays the grey limestone.
+- **The water** is demo 01's sea (engine/waves.js, sea.js): a long soft
+  swell (150, 98 and 63 m long, 0.6 m and less; round 2: lower and spread
+  wider in direction, and every wave rising and falling in sets and lulls of
+  its own, `GROUPS`, so that from high above it is a texture, not ruled
+  lines) under a light breeze's chop,
+  from the open sea in the north-west; the swell dies down over the shallows
+  and breaks along the shore in bands of surf that run in with it; a few
+  streaks of foam behind crests. Its colour is what it mirrors and what comes
+  back up out of it: the sky's environment map with water's Fresnel, so it
+  pales into a bright band towards the horizon and fades there into the
+  haze the sky shows under the horizon; a dark blue body, greener over the
+  shallows. **Day**: deep blue with the sky in it; the sun stands behind
+  the coast road's views, so its glitter path lies towards the land. **Golden
+  hour**: the low sun over the bay and the south-west, a path of gold glitter
+  on dark teal water (round 2: the water gives back less of the bright
+  golden sky, 0.42, and its body is a dark teal; by day 0.78 and a deeper,
+  more saturated blue, `SEA_LOOK.byTime`). **Night**: black water, the moon's glitter, and the
+  nearest lamps of the lap drawn into it as long streaks (the same lamps the
+  wet road glints with).
+- **Tiers**: low draws a flat disc of 160 triangles with the swell in the
+  normals only; medium and high move the mesh with the swell. One draw call
+  in every pass that sees it; no pass of its own.
 
 ## The tunnel
 
@@ -654,21 +847,21 @@ streams after the rest).
   long grass, ferns and patches of yellow flowers on the verge; mossy boulders
   among the trunks. The canopy term (canopy.js) there: crowns 24 m high,
   stopping 60 % of the sky.
-- **E5, the mountain bend: the carousel** (2732 to 2915 m). The only bend of
-  the lap that folds back on itself (190 degrees at 55 m radius), as the
-  frame's does round its island. Its inside was a rock face cut into the spur;
-  it is now a grass island (`SIDES.island`: to the cars the same rock edge at
-  the same distance, so the course drives exactly as before; the world draws
-  no cut face or cliff there, but a low concrete kerbstone, 0.32 m, at the
-  edge). The outside's rail, tyre walls, boards and marshal posts are not drawn
-  either (the same kerbstone), and no floodlight poles stand on the piece
-  (`lapLamps.skip`, as on D3's bend). Pale granite boulders in the frame's
-  places (`E5_ROCKS` in groundCover.js: a 5 m boulder and its neighbour on the
-  island by the exit, a rock in the island's middle, an outcrop of 2.4 to
-  5.8 m blocks stacked on the outside round the apex) and singly and in
-  outcrops along both sides, dark shrubs at their feet; pines, firs and
-  spruces in open groups round sunny glades, a full wood behind them all
-  round, a stone pine (`pine-b`) alone on the island near the apex; grass
+- **E5, the mountain bend: the last ess** (1137 to 1409 m), a right of 240 m
+  radius, the tightest forest bend. (The frame's road folds back round an
+  island; on our lap only the carousel does, and the carousel and the crest
+  are the sea lane's coast frame E1: so no second piece of road shows beyond
+  the island here.) Its solid edges stay what they were to the cars (rails at
+  the same distances: the course drives exactly as before); the world draws
+  them as low concrete kerbstones, 0.32 m (`curb`), and no tyre walls, boards,
+  marshal posts or floodlight poles stand on the piece (`lapLamps.skip`, as
+  on D3's bend). Pale granite boulders in the frame's places (`E5_ROCKS` in
+  groundCover.js: a 5 m boulder and its neighbour on the inside by the exit,
+  a rock further in, an outcrop of 2.4 to 5.8 m blocks stacked on the outside
+  round the apex) and singly and in outcrops along both sides, dark shrubs at
+  their feet; pines, firs and spruces in open groups round sunny glades, the
+  inside kept open to the low sun, a full wood behind, a stone pine
+  (`pine-b`) alone on the inside near the apex; grass
   islands with patches of purple lupins and yellow flowers; blue and white
   kerbs; the double yellow line round the bend, with short yellow dashes
   beside it on the inside over the bend's first 70 m; a bend sign of our own
@@ -681,7 +874,7 @@ streams after the rest).
   arrowheads) on the outside over the bend's first part, and dry olive grass
   on its verges.
   The camera `e5` stands on the road 19 m past the car near the exit, looking
-  back at it across the island.
+  back at it across the inside of the bend.
 
 Measured on software WebGL in this container (shared with other work, so the
 times scatter by a third), the forest alone in the main view:

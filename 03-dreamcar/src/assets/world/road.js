@@ -73,8 +73,18 @@ import { schemeTable } from './schemes.js';
 
 /** The edge line: its width (m), its outer edge on the pavement's edge. */
 const EDGE_LINE = 0.28;
-/** (forest lane) The double yellow centre line of a scheme's pieces: each line's width (m), and its paint (linear). */
-const CENTRE_LINE = { width: 0.12, yellow: [0.52, 0.33, 0.035] };
+/**
+ * (sea lane, round 2) Per-piece road markings beyond the white edge lines, by piece id (trackLayout.js): a scheme
+ * names what each piece adds. 'coast': a double yellow centre line (two lines `yellow.width` m wide, `yellow.gap` m
+ * apart), the coast road after the tunnel as in frame E1. Each scheme is one channel of the marks texture (uMarks:
+ * r coast; g, b, a free for other schemes), eased over `MARK_EASE` m at the ends of its pieces.
+ */
+const PIECE_MARKS = { viaduct: 'coast', climb: 'coast', carousel: 'coast', crest: 'coast', plunge: 'coast' };
+const MARK_CHANNEL = { coast: 0 };
+const MARK_EASE = 6;
+const YELLOW = { width: 0.12, gap: 0.12, color: [0.62, 0.43, 0.08] };
+/** (forest lane) The double yellow centre line of a scheme's pieces (schemes.js): each line's width (m); the coast's paint. */
+const CENTRE_LINE = { width: YELLOW.width, yellow: YELLOW.color };
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /**
@@ -89,7 +99,9 @@ const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
  * road the streak leaves dark asphalt on both sides. `grain`: how much of each stone's own tilt the lobe follows
  * (the rest sees the road's plane: one streak under the sun, broken up by the stones, not scattered into sparks).
  */
-const SHEEN = { along: 0.12, across: 0.18, gain: 0.25, grain: 0.5, keep: 0.25 };
+// (day lane) narrower across (0.15, was 0.18) and a little stronger (0.28, was 0.25): D1's glare is a narrower,
+// brighter path to the sun over darker asphalt
+const SHEEN = { along: 0.12, across: 0.15, gain: 0.28, grain: 0.5, keep: 0.25 };
 /**
  * The sky in the road (ASPHALT_SKY): seen at a glancing angle asphalt mirrors the low sky ahead as a soft broad
  * sheen (frames D3 and D4: it is what fills the shade). `gain` of the sky's own radiance at the horizon of the
@@ -100,7 +112,9 @@ const SHEEN = { along: 0.12, across: 0.18, gain: 0.25, grain: 0.5, keep: 0.25 };
  * cool at golden hour, never the sky's blue or rose); never more than `cap` (the sun's aureole is in that map: its
  * glare is the sun's own lobe's business).
  */
-const SKY_SHEEN = { gain: 0.5, power: 4, blur: 0.36, lift: 0.12, grey: 0.9, cap: 1.2 };
+// (day lane: gain 0.42, was 0.5: the middle distance of D1's road, 30 to 60 m out, was 25 to 35 levels paler than
+// the frame's)
+const SKY_SHEEN = { gain: 0.42, power: 4, blur: 0.36, lift: 0.12, grey: 0.9, cap: 1.2 };
 /** Head lamp brightness (THROW in assets/car/index.js: candela-like units at the beam's peak, per lamp). */
 const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;
@@ -121,6 +135,13 @@ const GLINT = { across: 0.006, along: 0.12, gain: 0.12 };
  * lamps themselves too small to streak: seen from under the road they are thin bars edge on.
  */
 const TAIL_GLINT = { across: 0.05, along: 0.3, radiance: 1.6, brake: 3, gain: 0.6, color: [1.0, 0.03, 0.015] };
+/**
+ * (dusk lane) The tail lamps' red light pooled on dry asphalt behind the car (the owner's twilight reference): what
+ * each lamp lays on the road, per unit of its TAIL_GLINT radiance, falling with the square of the distance, only
+ * behind the car, softened within about `soft` m (m^2 added to the squared distance: the lamp is not a point, and the
+ * road right under the bumper must not burn); `color` its red after the asphalt has taken it. Brake lamps triple it, as they do the glint.
+ */
+const TAIL_POOL = { power: 0.7, soft: 2.5, color: [1.0, 0.05, 0.025] };
 /**
  * (tunnel lane) Under the tunnel's roof the dry asphalt mirrors, softly (TUNNEL_SHEEN): the two lines of luminaires
  * (shading.js BORE_UNIFORMS: where they are and how bright), blurred `blur[0]` m across plus `blur[1]` m for every
@@ -266,6 +287,27 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
   schemeTexture.magFilter = schemeTexture.minFilter = THREE.NearestFilter;
   schemeTexture.wrapS = THREE.RepeatWrapping;
   schemeTexture.needsUpdate = true;
+  // ---- (sea lane, round 2) the per-piece markings (PIECE_MARKS), per metre: one channel per scheme
+  const marks = new Uint8Array(n * 4);
+  {
+    let s0 = 0;
+    for (const seg of track.layout?.segments ?? []) {
+      const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
+      const channel = MARK_CHANNEL[PIECE_MARKS[seg.id]];
+      if (channel !== undefined) {
+        for (let d = -MARK_EASE; d <= len + MARK_EASE; d += ds) {
+          const i = Math.round(track.wrap(s0 + d) / ds) % n;
+          const v = Math.min(1, Math.max(0, Math.min(d + MARK_EASE, len + MARK_EASE - d) / MARK_EASE));
+          marks[i * 4 + channel] = Math.max(marks[i * 4 + channel], byte(v));
+        }
+      }
+      s0 += len;
+    }
+  }
+  const marksTexture = new THREE.DataTexture(marks, n, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
+  marksTexture.magFilter = marksTexture.minFilter = THREE.LinearFilter;
+  marksTexture.wrapS = THREE.RepeatWrapping;
+  marksTexture.needsUpdate = true;
 
   const textures = roadTextures({ caps, tier });
 
@@ -285,6 +327,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     uBig: { value: textures.big },
     uEdge: { value: edgeTexture },
     uScheme: { value: schemeTexture },
+    uMarks: { value: marksTexture },
     uFeat: { value: history.texture },
     uLength: { value: track.length },
     uGrid: { value: slots },
@@ -391,6 +434,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     dispose() {
       for (const g of geometries) g.dispose();
       edgeTexture.dispose();
+      marksTexture.dispose();
       history.dispose();
       material.dispose();
     },
@@ -658,6 +702,7 @@ uniform sampler2D uAggN;
 uniform sampler2D uBig;
 uniform sampler2D uEdge;
 uniform sampler2D uScheme;
+uniform sampler2D uMarks;
 uniform highp sampler2D uFeat;
 uniform float uLength;
 uniform vec4 uGrid[${GRID_SLOTS}];
@@ -867,8 +912,9 @@ rAge = mix( rAge, max( rAge, 0.92 ), rScheme.g );
 float rWorn = mix( 0.3, 1.0, rAge );
 // new: binder over everything, black. Old: the binder weathered grey and worn off the stones' tops.
 // (night lane, frame D3: the sunlit road is a warm light grey; the stones are a warm limestone under the binder)
-vec3 rCol = mix( vec3( 0.03, 0.029, 0.028 ), vec3( 0.084, 0.078, 0.069 ), rAge );
-rCol *= 1.0 + ( rAgg.r - 0.5 ) * mix( 0.45, 1.5, rAge );
+// (day lane) the old surfacing a shade darker (0.084 was a pale sheet in D1) and its stones more contrasty
+vec3 rCol = mix( vec3( 0.03, 0.029, 0.028 ), vec3( 0.077, 0.072, 0.064 ), rAge );
+rCol *= 1.0 + ( rAgg.r - 0.5 ) * mix( 0.5, 1.75, rAge );
 rCol *= ( 0.86 + 0.28 * rBig.r ) * ( 0.92 + 0.16 * rBig2.r ) * ( 0.92 + 0.16 * rMottle );
 rCol *= 1.0 - 0.2 * rTracks * rWorn;
 rCol *= 1.0 + 0.1 * rCrown * rWorn;
@@ -902,8 +948,13 @@ rYellow += abs( rDashSide ) * roadCover( rLat * rDashSide - ( CENTRE_HALF_GAP + 
 rMarks += rYellow;
 // worn: thin where the tyres run, gone in places, broken by the stones up close, newer where the road is
 float rWear = 0.55 + 0.25 * rBig.b + 0.2 * rMottle - 0.3 * rRubber + 0.2 * ( rAgg.g - 0.5 ) * rNear + 0.2 * ( 1.0 - rAge );
+// (sea lane, round 2) the per-piece markings (PIECE_MARKS): the coast road's double yellow centre line
+float rCoastLine = textureLod( uMarks, vec2( rS / uLength, 0.5 ), 0.0 ).r * roadCover( rA - ${(YELLOW.gap / 2 + YELLOW.width / 2).toFixed(3)}, ${(YELLOW.width / 2).toFixed(3)}, aaL );
+rYellow += rCoastLine;
+rMarks += rCoastLine;
 roadPaint = clamp( rMarks, 0.0, 1.0 ) * rOnRoad * smoothstep( 0.14, 0.38, rWear ) * ( 1.0 - ftErase );
-rCol = mix( rCol, mix( vec3( 0.68, 0.68, 0.655 ), vec3( ${CENTRE_LINE.yellow.map((v) => v.toFixed(3)).join(', ')} ), clamp( rYellow, 0.0, 1.0 ) ) * ( 0.88 + 0.16 * rAgg.r ) * ( 0.88 + 0.12 * rBig.r ), roadPaint );
+vec3 rPaintCol = mix( vec3( 0.68, 0.68, 0.655 ), vec3( ${YELLOW.color.map((c) => c.toFixed(3)).join(', ')} ), clamp( rYellow, 0.0, 1.0 ) );
+rCol = mix( rCol, rPaintCol * ( 0.88 + 0.16 * rAgg.r ) * ( 0.88 + 0.12 * rBig.r ), roadPaint );
 rAlpha2 = mix( rAlpha2, 0.085, roadPaint );
 roadTiltGain *= 1.0 - 0.65 * roadPaint;
 
@@ -1075,5 +1126,19 @@ const ASPHALT_BEADS = /* glsl */ `
     pool += e * back;
   }
   totalEmissiveRadiance += vRoadWorld.w * pool * diffuseColor.rgb * ( 0.6 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
+
+  // (dusk lane) the tail lamps' red pool on the road behind each car (TAIL_POOL), from dusk on
+  float redPool = 0.0;
+  for ( int i = 0; i < ${BEAMS}; i ++ ) {
+    if ( uTailPower[ i ] <= 0.0 ) continue;
+    for ( int k = 0; k < 2; k ++ ) {
+      vec3 l = uTailPos[ i * 2 + k ] - vRoadWorld.xyz;
+      float d = max( length( l ), 0.3 );
+      l /= d;
+      float behind = smoothstep( -0.1, 0.5, dot( -l, -uBeamDir[ i ] ) );
+      redPool += uTailPower[ i ] * behind * max( l.y, 0.0 ) / ( d * d + ${TAIL_POOL.soft.toFixed(2)} );
+    }
+  }
+  totalEmissiveRadiance += vRoadWorld.w * ${TAIL_POOL.power.toFixed(2)} * redPool * diffuseColor.rgb * RECIPROCAL_PI * ( 1.0 - 0.85 * roadPuddle ) * vec3( ${TAIL_POOL.color.map((c) => c.toFixed(3)).join(', ')} );
 }
 `;

@@ -492,16 +492,32 @@ const SECTIONS = {
 
   /**
    * Touch on phone-sized windows, upright and on its side: the fixed controls (Input's layoutOf, read from the page).
-   * The slider's centre never moves: a thumb landing off it steers at once by that much, dragging does not move it,
-   * and lifting recentres the knob. On auto the car drives with nothing touched and BRAKE lifts; on manual only GAS
-   * drives. Several fingers at once, each control keeping its finger; nothing outside the controls drives; the
-   * arrows; split screen on a tablet-sized window.
+   * The default, the one-thumb pad: it appears under the thumb (a ghost at the home place at rest), its centre
+   * never moves while the thumb is down; across is the steering, down lifts and then brakes, on into the red arc
+   * pulls the handbrake (with hysteresis); a second finger anywhere, and the HANDBRAKE button, are the handbrake;
+   * held at a standstill it reverses; Hand left moves the ghost and the button; manual makes up the throttle.
+   * Placement is tried at seven places, edges included (compressed travel, the nudge and the hold). A control is drawn pressed at once;
+   * the controls step back after a few seconds. Then the slider with its pedals, the arrows, tilt (synthetic
+   * deviceorientation events; refused, the pad steers), and split screen on a tablet-sized window.
    */
   async touch() {
     const raw = (p, i = 0) => p.page.evaluate((i) => {
       const s = window.__dreamcar.game.input.touch[i].steer;
       return s ? s.value : null;
     }, i);
+    /** What the hands give the car this moment (Input.read for driver i). */
+    const hands = (p, i = 0) => p.page.evaluate((i) => {
+      const g = window.__dreamcar.game;
+      const o = g.input.read({}, 'all', i);
+      return { steer: o.steer, throttle: o.throttle, brake: o.brake, handbrake: o.handbrake };
+    }, i);
+    /** The placed pad of zone i (px from the zone's top left) while a thumb is on it. */
+    const padAt = (p, i = 0) => p.page.evaluate((i) => {
+      const st = window.__dreamcar.game.input.touch[i].steer;
+      return st ? [st.cx, st.cy, st.hold, st.fl, st.fr, st.fd] : null;
+    }, i);
+    /** The pedal gauge's readings [brake, handbrake, throttle] in per cent, of view i. */
+    const gauge = (p, i = 0) => p.page.evaluate((i) => [...document.querySelectorAll('.hud .view')[i].querySelectorAll('.gauge .bar')].map((b) => +b.getAttribute('aria-valuenow')), i);
     const hand = (p, i = 0) => p.page.evaluate((i) => window.__dreamcar.game.racers[i].controls.handbrake, i);
     /** The centre (client px) of the first shown element matching `sel` in view `vi`. */
     const centreOf = (p, sel, vi = 0) => p.page.evaluate(([sel, vi]) => {
@@ -510,136 +526,358 @@ const SECTIONS = {
       const r = e.getBoundingClientRect();
       return [r.left + r.width / 2, r.top + r.height / 2, r.width];
     }, [sel, vi]);
+    const near = (a, b, e = 0.02) => Math.abs(a - b) <= e;
+    const near2 = (a, b) => Math.abs(a - b) <= 1.5;
+    // (the sensors granted, as Safari does once its prompt is answered yes; whether this Chromium has the prompt or not)
+    const grant = () => {
+      if (window.DeviceOrientationEvent) window.DeviceOrientationEvent.requestPermission = () => Promise.resolve('granted');
+    };
     for (const [w, h] of [[393, 852], [852, 393]]) {
-      const p = await open('?manual&q=low&auto&time=day', { w, h, mobile: true, gpu: false });
+      const p = await open('?manual&q=low&auto&time=day', { w, h, mobile: true, gpu: false, init: grant });
       const at = (L, b) => [L.x0 + b.x, L.y0 + b.y];
       let L = await p.page.evaluate(() => window.__dreamcar.touchLayout(0));
-      const cx = L.x0 + L.slider.cx;
-      const cy = L.y0 + L.slider.cy;
-      const half = L.slider.half;
-      check(`${w}x${h}: the slider's travel suits a thumb (${half.toFixed(0)} px either side), the pedals at least 64 px`,
-        half >= 56 && half <= 92 && [L.brake, L.drift].every((b) => 2 * b.r >= 64));
+      check(`${w}x${h}: the default steering is the one-thumb pad, bottom right, ${Math.round(2 * (L.pad ? L.pad.r : 0))} px across`, L.steering === 'pad' && !!L.pad
+        && L.pad.cx > w / 2 && 2 * L.pad.r >= 140 && 2 * L.pad.r <= 170 && !L.brake && !L.gas);
+      const P = await p.page.evaluate(() => window.__dreamcar.touch);
+      const { cx: px0, cy: py0, s } = L.pad;
+      const cx = L.x0 + px0;
+      const cy = L.y0 + py0;
+      if (w < h) check(`${w}x${h}: the pad's centre ${Math.round(w - cx)} px from the side, ${Math.round(h - cy)} px up (about 105 and 150, under the car)`, Math.abs(w - cx - 105) <= 4 && h - cy >= 125 && h - cy <= 155 && cy - L.pad.r >= h * 0.75 - 1);
+      check(`${w}x${h}: the HANDBRAKE button in the other bottom corner, at least 64 px`, L.drift.x < w / 2 && 2 * L.drift.r >= 64 && L.drift.y > h * 0.7);
       await toGo(p);
-      check(`${w}x${h}: the controls are named on the first touch run`, await visible(p, '.hud .view .controls.naming .slider .name'));
+      check(`${w}x${h}: the controls are named on the first touch run`, await visible(p, '.hud .view .controls.naming .stick .name'));
+      const hint = await p.page.evaluate(`(document.querySelector('.hud .view .hint') || {}).textContent || ''`);
+      check(`${w}x${h}: the first-run hint says how the pad works`, /touch anywhere/i.test(hint) && /pull back to brake/i.test(hint) && /red/i.test(hint), hint);
       await p.advance(2);
       let d = await p.d0();
       check(`${w}x${h}: on auto the car drives from the green light with nothing touched`, d.input === 'touch' && d.throttle > 0.5 && d.kmh > 10, `${d.input} ${d.kmh} km/h`);
-      const mid = await centreOf(p, '.slider .mid');
-      check(`${w}x${h}: the slider's centre mark is drawn where Input measures from`, !!mid && Math.abs(mid[0] - cx) < 2 && Math.abs(mid[1] - cy) < 2, mid && `${mid[0]} vs ${cx}`);
-      // a thumb landing off the centre steers at once by that much
-      await pointer(p, 'pointerdown', 1, cx + half * 0.5, cy + 10);
+      let gz = await gauge(p);
+      check(`${w}x${h}: the pedal gauge shows the throttle full while the car drives itself on auto (brake ${gz[0]}, throttle ${gz[2]})`, gz[2] >= 90 && gz[0] === 0 && gz[1] === 0, gz.join('/'));
+      const gbox = await p.page.evaluate(() => { const r = document.querySelector('.hud .view .gauge .bar').getBoundingClientRect(); const t = document.querySelector('.hud .view .gauge .bar.throttle').getBoundingClientRect(); return [r.width, r.height, t.width]; });
+      check(`${w}x${h}: the gauge's bars are slim and tall (${gbox[0].toFixed(1)} x ${gbox[1].toFixed(0)} px)`, gbox[0] >= 4 && gbox[0] <= 12 && gbox[1] >= 30 && gbox[1] <= 80);
+      const mid = await centreOf(p, '.stick.ghost');
+      check(`${w}x${h}: the resting ghost is drawn where Input measures the home place from`, !!mid && Math.abs(mid[0] - cx) < 1.5 && Math.abs(mid[1] - cy) < 1.5, mid && `${mid[0]},${mid[1]} vs ${cx},${cy}`);
+      // a thumb landing off the centre steers at once by that much; above the centre is full power
+      const lock = P.pad.steer * s;
+      const bra = P.pad.brake * s;
+      await pointer(p, 'pointerdown', 1, cx, cy);
+      check(`${w}x${h}: the pad is drawn held at once (before the next frame)`, await p.page.evaluate(`!!document.querySelector('.hud .view .stick.held')`));
       await p.steps(1 / 60, 60);
-      let v = await raw(p);
-      check(`${w}x${h}: a thumb landing half way right steers half right at once`, v !== null && Math.abs(v - 0.5) < 0.02, `steer ${v}`);
+      let c = await hands(p);
+      check(`${w}x${h}: a thumb landing on the centre asks for nothing: straight, full power`, c.steer === 0 && c.throttle === 1 && c.brake === 0 && c.handbrake === 0, JSON.stringify(c));
+      await pointer(p, 'pointermove', 1, cx + lock * 0.5, cy - 10);
+      c = await hands(p);
+      check(`${w}x${h}: half way right steers half right, full power above the centre`, near(c.steer, 0.5) && c.throttle === 1 && c.brake === 0, JSON.stringify(c));
       await p.advance(0.3);
       d = await p.d0();
       check(`${w}x${h}: and the car steers right`, d.steer > 0.03, `steer ${d.steer}`);
-      let knob = await centreOf(p, '.slider .knob');
-      check(`${w}x${h}: the knob is drawn under the thumb`, !!knob && Math.abs(knob[0] - (cx + half * 0.5)) < 3, knob && `${knob[0]} vs ${cx + half * 0.5}`);
-      // dragging far past the end and back: the centre has not moved
-      await pointer(p, 'pointermove', 1, cx + half * 3, cy);
-      await p.steps(1 / 60, 60);
+      let knob = await centreOf(p, '.stick .knob');
+      check(`${w}x${h}: the knob is drawn under the thumb`, !!knob && Math.abs(knob[0] - (cx + lock * 0.5)) < 3 && Math.abs(knob[1] - (cy - 10)) < 3, knob && `${knob[0]},${knob[1]}`);
+      await pointer(p, 'pointermove', 1, cx + lock * 3, cy);
       check(`${w}x${h}: past the end is full lock and no more`, (await raw(p)) === 1);
-      await pointer(p, 'pointermove', 1, cx - half * 0.3, cy - 30);
-      await p.steps(1 / 60, 60);
-      v = await raw(p);
-      check(`${w}x${h}: after a drag the centre is where it was (back to 0.3 left of it reads -0.3)`, Math.abs(v + 0.3) < 0.02, `steer ${v}`);
-      await pointer(p, 'pointermove', 1, cx, cy);
-      await p.steps(1 / 60, 60);
-      check(`${w}x${h}: on the centre mark the steering is straight`, Math.abs(await raw(p)) < 0.01);
-      // a second thumb on the steering is ignored
-      await pointer(p, 'pointerdown', 3, cx - half * 0.8, cy);
-      await p.steps(1 / 60, 60);
-      check(`${w}x${h}: a second thumb on the steering is ignored`, Math.abs(await raw(p)) < 0.01);
-      await pointer(p, 'pointerup', 3, cx - half * 0.8, cy);
-      // BRAKE with the steering thumb still down; the finger slides off it and keeps it
-      await pointer(p, 'pointermove', 1, cx + half * 0.4, cy);
-      const brake = at(L, L.brake);
-      await pointer(p, 'pointerdown', 2, brake[0], brake[1]);
+      await pointer(p, 'pointermove', 1, cx - lock * 0.3, cy - 30);
+      check(`${w}x${h}: after a drag the centre is where it was (0.3 left of it reads -0.3)`, near(await raw(p), -0.3), `steer ${await raw(p)}`);
+      await pointer(p, 'pointermove', 1, cx + 1, cy);
+      check(`${w}x${h}: no dead step at the centre (1 px is a little steering)`, (await raw(p)) > 0 && (await raw(p)) < 0.03);
+      // down: the first quarter lifts, the rest brakes
+      await pointer(p, 'pointermove', 1, cx, cy + bra * P.pad.lift * 0.5);
+      c = await hands(p);
+      check(`${w}x${h}: pulled down an eighth: half the throttle, no brake (lift)`, near(c.throttle, 0.5) && c.brake === 0, JSON.stringify(c));
+      await pointer(p, 'pointermove', 1, cx, cy + bra * (P.pad.lift + (1 - P.pad.lift) * 0.5));
+      c = await hands(p);
+      check(`${w}x${h}: further: no throttle, half the brake`, c.throttle === 0 && near(c.brake, 0.5), JSON.stringify(c));
       await p.advance(0.3);
       d = await p.d0();
-      check(`${w}x${h}: BRAKE brakes and the power lifts, the steering thumb still steering`, d.brake > 0.5 && d.throttle < 0.1 && Math.abs((await raw(p)) - 0.4) < 0.02,
-        `brake ${d.brake} throttle ${d.throttle}`);
-      check(`${w}x${h}: BRAKE and the knob are drawn pressed`, await p.page.evaluate(`!!document.querySelector('.hud .view .pedal.brake.held') && !!document.querySelector('.hud .view .slider.held')`));
-      await pointer(p, 'pointermove', 2, w / 2, h / 2);
-      await p.steps(0.1, 60);
-      check(`${w}x${h}: a finger sliding off BRAKE keeps it until it lifts`, (await p.d0()).brake > 0.5);
-      await pointer(p, 'pointerup', 2, w / 2, h / 2);
-      await p.advance(0.3);
-      d = await p.d0();
-      check(`${w}x${h}: BRAKE let go: the power is back`, d.brake < 0.05 && d.throttle > 0.5, `brake ${d.brake} throttle ${d.throttle}`);
-      // anywhere outside the controls does nothing
-      const s0 = await raw(p);
+      check(`${w}x${h}: and the car brakes`, d.brake > 0.3 && d.throttle < 0.1, `brake ${d.brake}`);
+      gz = await gauge(p);
+      check(`${w}x${h}: the gauge shows the brake above zero and the throttle zero (${gz[0]}/${gz[2]})`, gz[0] > 0 && gz[2] === 0, gz.join('/'));
+      await pointer(p, 'pointermove', 1, cx, cy + bra);
+      c = await hands(p);
+      check(`${w}x${h}: ${Math.round(bra)} px down: the full brake, no handbrake`, c.brake === 1 && c.handbrake === 0, JSON.stringify(c));
+      // the handbrake: on beyond the trip, with hysteresis
+      await pointer(p, 'pointermove', 1, cx + lock * 0.4, cy + (P.pad.trip - 3) * s);
+      check(`${w}x${h}: just short of the red arc: still the brake`, (await hands(p)).handbrake === 0);
+      await pointer(p, 'pointermove', 1, cx + lock * 0.4, cy + (P.pad.trip + 4) * s);
+      c = await hands(p);
+      check(`${w}x${h}: into the red arc: the handbrake, the steering still read, no brake, no power`, c.handbrake === 1 && c.brake === 0 && c.throttle === 0 && near(c.steer, 0.4), JSON.stringify(c));
+      check(`${w}x${h}: the knob clicks into the red arc`, await p.page.evaluate(`!!document.querySelector('.hud .view .stick.tripped')`));
+      await p.advance(0.2);
+      check(`${w}x${h}: and the car's handbrake is pulled`, (await hand(p)) > 0.5);
+      await pointer(p, 'pointermove', 1, cx, cy + (P.pad.untrip + 3) * s);
+      check(`${w}x${h}: back up a little: still held (hysteresis)`, (await hands(p)).handbrake === 1);
+      await pointer(p, 'pointermove', 1, cx, cy + (P.pad.untrip - 3) * s);
+      c = await hands(p);
+      check(`${w}x${h}: back above ${P.pad.untrip} px: let go, the brake again`, c.handbrake === 0 && c.brake === 1, JSON.stringify(c));
+      // a second finger anywhere else is the handbrake while it is held; the pad keeps its own finger and its place
+      await pointer(p, 'pointermove', 1, cx + lock * 0.4, cy - 20);
+      const idBefore = () => p.page.evaluate(() => window.__dreamcar.game.input.touch[0].steer.id);
+      await pointer(p, 'pointerdown', 3, cx - lock * 0.8, cy);
+      c = await hands(p);
+      check(`${w}x${h}: a second finger on the pad's own disc is the handbrake, and the pad still steers`, c.handbrake === 1 && near(c.steer, 0.4) && (await idBefore()) === 1, JSON.stringify(c));
+      await pointer(p, 'pointerup', 3, 0, 0);
       await pointer(p, 'pointerdown', 6, w * 0.7, h * 0.3);
-      await pointer(p, 'pointerdown', 7, w * 0.25, h * 0.2);
-      await p.advance(0.3);
-      d = await p.d0();
-      check(`${w}x${h}: touches outside the controls do nothing to the car`, d.brake < 0.05 && d.throttle > 0.5 && (await raw(p)) === s0, `brake ${d.brake} throttle ${d.throttle}`);
+      await pointer(p, 'pointermove', 6, w * 0.2, h * 0.2);
+      c = await hands(p);
+      check(`${w}x${h}: a second finger far away is the handbrake (no power) and does not move or steal the pad`, c.handbrake === 1 && c.throttle === 0 && near(c.steer, 0.4) && (await idBefore()) === 1 && near((await padAt(p))[0], px0, 0.01) && near((await padAt(p))[1], py0, 0.01), JSON.stringify(c));
       await pointer(p, 'pointerup', 6, 0, 0);
-      await pointer(p, 'pointerup', 7, 0, 0);
-      // DRIFT
-      const drift = at(L, L.drift);
-      await pointer(p, 'pointerdown', 4, drift[0], drift[1]);
+      c = await hands(p);
+      check(`${w}x${h}: lifting it lets the handbrake go; the pad's finger kept the pad`, c.handbrake === 0 && c.throttle === 1 && near(c.steer, 0.4), JSON.stringify(c));
+      // the HANDBRAKE button, for the other thumb
+      const hb = at(L, L.drift);
+      await pointer(p, 'pointerdown', 4, hb[0], hb[1]);
+      check(`${w}x${h}: HANDBRAKE is drawn pressed at once`, await p.page.evaluate(`!!document.querySelector('.hud .view .pedal.drift.held')`));
       await p.advance(0.2);
       d = await p.d0();
-      const hb = await hand(p);
-      check(`${w}x${h}: DRIFT pulls the handbrake, does not brake, and the power lifts`, hb > 0.5 && d.brake < 0.05 && d.throttle < 0.1, `hand ${hb} brake ${d.brake} throttle ${d.throttle}`);
-      check(`${w}x${h}: DRIFT is drawn pressed`, await p.page.evaluate(`!!document.querySelector('.hud .view .pedal.drift.held')`));
-      await pointer(p, 'pointerup', 4, drift[0], drift[1]);
-      // release: the knob springs back to the centre
-      await pointer(p, 'pointerup', 1, cx + half * 0.4, cy);
+      check(`${w}x${h}: HANDBRAKE pulls the handbrake, does not brake, and the power lifts; the pad still steers`, (await hand(p)) > 0.5 && d.brake < 0.05 && d.throttle < 0.1 && near(await raw(p), 0.4), `brake ${d.brake} throttle ${d.throttle}`);
+      await pointer(p, 'pointerup', 4, 0, 0);
+      // let go: the knob springs back, the car straightens and drives on
+      await pointer(p, 'pointerup', 1, 0, 0);
       await p.advance(0.5);
-      knob = await centreOf(p, '.slider .knob');
+      const tf = await p.page.evaluate(`document.querySelector('.hud .view .stick .knob').style.transform`);
       d = await p.d0();
-      check(`${w}x${h}: let go, the knob is back at the centre and the car straightens`, (await raw(p)) === null && Math.abs(knob[0] - cx) < 1.5 && Math.abs(d.steer) < 0.05,
-        `knob ${knob[0]} vs ${cx}, steer ${d.steer}`);
-      // a cancelled pointer, a lost tab, a turned device: nothing sticks
-      await pointer(p, 'pointerdown', 8, brake[0], brake[1]);
-      await pointer(p, 'pointercancel', 8, brake[0], brake[1]);
-      await p.steps(0.1, 60);
-      check(`${w}x${h}: a cancelled pointer lets BRAKE go`, (await p.d0()).brake < 0.05);
+      c = await hands(p);
+      check(`${w}x${h}: let go, the knob goes back to the centre, the steering straight and full power`, (await raw(p)) === null && /translate\(0(\.0)?px, 0(\.0)?px\)/.test(tf) && c.steer === 0 && c.throttle === 1,
+        `${tf}, ${JSON.stringify(c)}`);
+      // the pad appears under the thumb: at rest a faint ghost at the home place; a thumb landing anywhere else (not on
+      // a HUD button) puts the pad's centre exactly there; it never moves while the thumb moves; the first input is zero
+      await p.page.waitForTimeout(900);
+      const ghost = await p.page.evaluate(() => {
+        const v = document.querySelector('.hud .view');
+        const g = v.querySelector('.stick.ghost');
+        const l = v.querySelector('.stick:not(.ghost)');
+        const r = g.getBoundingClientRect();
+        return { go: parseFloat(getComputedStyle(g).opacity), lv: getComputedStyle(l).visibility, c: [r.left + r.width / 2, r.top + r.height / 2] };
+      });
+      check(`${w}x${h}: at rest the pad is a faint ghost at the home place (opacity ${ghost.go.toFixed(2)}), no live pad`, ghost.go > 0.15 && ghost.go < 0.5 && ghost.lv === 'hidden' && Math.abs(ghost.c[0] - cx) < 1.5 && Math.abs(ghost.c[1] - cy) < 1.5, JSON.stringify(ghost));
+      const sideOf = (x) => (x > w / 2 ? -1 : 1); // the way with room
+      const lockPx = lock;
+      const spots = [
+        ['left low', w * 0.2, h * 0.78],
+        ['right low', w * 0.8, h * 0.78],
+        ['centre', w * 0.5, h * 0.5],
+        ['left high', w * 0.2, h * 0.22],
+        ['right high', w * 0.8, h * 0.18],
+      ];
+      let was = null;
+      for (const [name, x, y] of spots) {
+        await pointer(p, 'pointerdown', 1, x, y);
+        const pa = await padAt(p);
+        const c0 = await hands(p);
+        check(`${w}x${h}: thumb down ${name}: the pad's centre is the landing point`, !!pa && near2(pa[0], x) && near2(pa[1], y) && pa[2] === false, JSON.stringify(pa));
+        check(`${w}x${h}: ${name}: the first input is exactly zero (straight, no brake, no handbrake)`, c0.steer === 0 && c0.brake === 0 && c0.handbrake === 0 && c0.throttle === 1, JSON.stringify(c0));
+        if (was) check(`${w}x${h}: ${name}: a new touch puts it afresh (not where the last one was)`, Math.abs(pa[0] - was[0]) + Math.abs(pa[1] - was[1]) > 20);
+        was = pa;
+        await p.page.waitForTimeout(150);
+        const dr = await centreOf(p, '.stick:not(.ghost)');
+        check(`${w}x${h}: ${name}: and it is drawn there (held, ${dr ? Math.round(dr[2]) : 0} px across)`, !!dr && Math.abs(dr[0] - x) < 1.5 && Math.abs(dr[1] - y) < 1.5 && (await p.page.evaluate(`!!document.querySelector('.hud .view .stick.held')`)));
+        const sd = sideOf(x);
+        await pointer(p, 'pointermove', 1, x + sd * lockPx * 0.5, y);
+        c = await hands(p);
+        check(`${w}x${h}: ${name}: half the lock across reads ${sd * 0.5}`, near(c.steer, sd * 0.5), JSON.stringify(c));
+        const room = h - y;
+        await pointer(p, 'pointermove', 1, x, y + Math.min(bra * 0.5, room));
+        c = await hands(p);
+        check(`${w}x${h}: ${name}: down half the brake travel brakes ${(Math.min(bra * 0.5, room) / bra).toFixed(2)} of the way`, near(c.brake, Math.max(0, (Math.min(bra * 0.5, room) / bra - P.pad.lift) / (1 - P.pad.lift)), 0.03), JSON.stringify(c));
+        await pointer(p, 'pointermove', 1, x + sd * 100, y - 60);
+        const pb = await padAt(p);
+        const dr2 = await centreOf(p, '.stick:not(.ghost)');
+        check(`${w}x${h}: ${name}: dragged 100 px the centre has not moved (no trailing, no rebasing)`, near2(pb[0], x) && near2(pb[1], y) && !!dr2 && Math.abs(dr2[0] - x) < 1.5 && Math.abs(dr2[1] - y) < 1.5, JSON.stringify(pb));
+        check(`${w}x${h}: ${name}: and 100 px across is full lock`, Math.abs((await hands(p)).steer) === 1);
+        await pointer(p, 'pointerup', 1, 0, 0);
+        c = await hands(p);
+        check(`${w}x${h}: ${name}: lifted: straight on, no brake`, c.steer === 0 && c.brake === 0 && c.handbrake === 0);
+      }
+      // (the ghost is back at the home place after 0.4 s, the live pad gone)
+      await p.page.waitForTimeout(1000);
+      const gh2 = await p.page.evaluate(() => {
+        const v = document.querySelector('.hud .view');
+        return [parseFloat(getComputedStyle(v.querySelector('.stick.ghost')).opacity), getComputedStyle(v.querySelector('.stick:not(.ghost)')).visibility];
+      });
+      check(`${w}x${h}: after the thumb lifts the pad fades back to its ghost`, gh2[0] > 0.15 && gh2[0] < 0.5 && gh2[1] === 'hidden', JSON.stringify(gh2));
+      // room at the edges: compressed travel (never under 60 %), else the centre is nudged inward by what is missing
+      // and the input held at zero until the thumb has moved 6 px from where it landed
+      const needSide = P.pad.steer * s;
+      const needDown = P.pad.trip * s;
+      const edges = [
+        ['near the bottom edge', w * 0.5, h - 20, 'down', 20],
+        ['a little short of room below', w * 0.5, h - 60, 'down', 60],
+        ['near the left edge', 25, h * 0.5, 'left', 25],
+        ['near the right edge', w - 25, h * 0.5, 'right', 25],
+        ['a little short of room at the left', 50, h * 0.5, 'left', 50],
+      ];
+      for (const [name, x, y, dir, roomPx] of edges) {
+        await pointer(p, 'pointerdown', 1, x, y);
+        const pa = await padAt(p);
+        const need = dir === 'down' ? needDown : needSide;
+        const nudge = Math.max(0, 0.6 * need - roomPx);
+        const ex = dir === 'left' ? x + nudge : dir === 'right' ? x - nudge : x;
+        const ey = dir === 'down' ? y - nudge : y;
+        const c0 = await hands(p);
+        check(`${w}x${h}: ${name}: ${nudge > 0 ? `centre nudged inward by ${nudge.toFixed(1)} px and the input held` : 'centre at the landing point, travel compressed'}`,
+          !!pa && near2(pa[0], ex) && near2(pa[1], ey) && pa[2] === (nudge > 0), JSON.stringify(pa));
+        check(`${w}x${h}: ${name}: first input zero`, c0.steer === 0 && c0.brake === 0 && c0.handbrake === 0 && c0.throttle === 1, JSON.stringify(c0));
+        const fac = dir === 'down' ? pa[5] : dir === 'left' ? pa[3] : pa[4];
+        check(`${w}x${h}: ${name}: the travel is ${fac.toFixed(2)} of the normal, not under 0.6`, fac >= 0.6 - 1e-9 && fac <= 1 && near(fac, Math.max(0.6, Math.min(1, roomPx / need)), 0.01), `${fac}`);
+        const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+        const dy = dir === 'down' ? 1 : 0;
+        if (nudge > 0) {
+          await pointer(p, 'pointermove', 1, x + dx * 4, y + dy * 4);
+          c = await hands(p);
+          check(`${w}x${h}: ${name}: 4 px in: still held at zero`, c.steer === 0 && c.brake === 0 && c.handbrake === 0 && c.throttle === 1, JSON.stringify(c));
+          await pointer(p, 'pointermove', 1, x + dx * 7, y + dy * 7);
+          c = await hands(p);
+          check(`${w}x${h}: ${name}: 7 px in: the hold is over and the thumb reads`, (await padAt(p))[2] === false && (dir === 'down' ? c.brake > 0 || c.handbrake === 1 : Math.abs(c.steer) > 0), JSON.stringify(c));
+        }
+        // all the room there is reaches the full travel (the lock, or the handbrake's red)
+        await pointer(p, 'pointermove', 1, x + dx * (roomPx + 0.5), y + dy * (roomPx + 0.5));
+        c = await hands(p);
+        check(`${w}x${h}: ${name}: the whole room there is reaches ${dir === 'down' ? 'the handbrake' : 'full lock'}`, dir === 'down' ? c.handbrake === 1 : Math.abs(c.steer) >= 0.999, JSON.stringify(c));
+        // the disc is drawn inside the safe area
+        await p.page.waitForTimeout(150);
+        const base = await p.page.evaluate(() => {
+          const r = document.querySelector('.hud .view .stick:not(.ghost) .base').getBoundingClientRect();
+          return [r.left, r.top, r.right, r.bottom];
+        });
+        check(`${w}x${h}: ${name}: the disc is drawn inside the screen`, base[0] >= -1 && base[1] >= -1 && base[2] <= w + 1 && base[3] <= h + 1, base.map(Math.round).join(','));
+        await pointer(p, 'pointerup', 1, 0, 0);
+      }
+      // the HUD's own buttons do not place the pad
+      {
+        const b = await p.page.evaluate(() => {
+          const e = document.querySelector('.hud .view .touchcol button');
+          const r = e.getBoundingClientRect();
+          return [r.left + r.width / 2, r.top + r.height / 2];
+        });
+        const camBefore = (await p.d0()).camera;
+        await p.page.touchscreen.tap(b[0], b[1]);
+        await p.advance(0.1);
+        const st = await p.page.evaluate(() => { const z = window.__dreamcar.game.input.touch[0]; return [!!z.steer, z.pedals.size]; });
+        check(`${w}x${h}: a tap on a HUD button (camera) works and places no pad`, !st[0] && st[1] === 0 && (await p.d0()).camera !== camBefore && !(await p.page.evaluate(`!!document.querySelector('.hud .view .stick.held')`)), JSON.stringify(st));
+        await p.page.evaluate((b) => {
+          const e = document.querySelector('.hud .view .touchcol button');
+          e.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 8, pointerType: 'touch', clientX: b[0], clientY: b[1], bubbles: true, cancelable: true }));
+        }, b);
+        const st2 = await p.page.evaluate(() => { const z = window.__dreamcar.game.input.touch[0]; return [!!z.steer, z.pedals.size]; });
+        check(`${w}x${h}: a pointer pressed on a HUD button does not place the pad either`, !st2[0] && st2[1] === 0, JSON.stringify(st2));
+        await p.page.evaluate(() => document.querySelector('.hud .view .touchcol button').dispatchEvent(new PointerEvent('pointerup', { pointerId: 8, pointerType: 'touch', bubbles: true })));
+      }
+      // the handbrake button when no thumb is on the pad does not place it either, and a thumb landing after it does
+      {
+        const hb2 = at(L, L.drift);
+        await pointer(p, 'pointerdown', 4, hb2[0], hb2[1]);
+        let st = await padAt(p);
+        check(`${w}x${h}: the HANDBRAKE button first: it pulls the handbrake and places no pad`, st === null && (await hands(p)).handbrake === 1);
+        await pointer(p, 'pointerdown', 1, w * 0.6, h * 0.5);
+        st = await padAt(p);
+        check(`${w}x${h}: then a thumb elsewhere places the pad and steers from zero`, !!st && near2(st[0], w * 0.6) && (await hands(p)).steer === 0 && (await hands(p)).handbrake === 1);
+        await pointer(p, 'pointerup', 4, 0, 0);
+        await pointer(p, 'pointerup', 1, 0, 0);
+      }
+      // a cancelled pointer, a lost focus, a turned device: nothing sticks
       for (const [label, fire] of [
+        ['a cancelled pointer', null],
         ['the window losing focus', `window.dispatchEvent(new Event('blur'))`],
         ['the device turned', `window.dispatchEvent(new Event('orientationchange'))`],
       ]) {
-        await pointer(p, 'pointerdown', 9, cx + half * 0.6, cy);
-        await pointer(p, 'pointerdown', 10, brake[0], brake[1]);
-        await p.page.evaluate(fire);
-        await p.advance(0.2);
-        d = await p.d0();
-        check(`${w}x${h}: ${label} lets every control go`, (await raw(p)) === null && d.brake < 0.05, `brake ${d.brake}`);
-        // (the fingers lifting afterwards are no trouble)
+        await pointer(p, 'pointerdown', 9, cx + lock * 0.6, cy + bra);
+        if (fire) await p.page.evaluate(fire);
+        else await pointer(p, 'pointercancel', 9, 0, 0);
+        c = await hands(p);
+        check(`${w}x${h}: ${label} lets the pad go`, (await raw(p)) === null && c.brake === 0 && c.steer === 0);
         await pointer(p, 'pointerup', 9, 0, 0);
-        await pointer(p, 'pointerup', 10, 0, 0);
       }
-      // manual: GAS appears at the corner and is the only power
+      // the controls step back a few seconds into the run, and come back under a finger
+      await p.advance(2.5);
+      check(`${w}x${h}: the controls' names go after the first seconds, for good`, !(await visible(p, '.hud .view .controls.naming'))
+        && (await p.page.evaluate(`localStorage.getItem('dreamcar.zones.v1')`)) === '1');
+      const dim = () => p.page.evaluate(`document.querySelector('.hud .view .controls').classList.contains('dim')`);
+      check(`${w}x${h}: a few seconds in, untouched, the controls step back`, await dim());
+      await pointer(p, 'pointerdown', 1, cx, cy);
+      await p.advance(1 / 30);
+      check(`${w}x${h}: a thumb on the pad brings them back`, !(await dim()));
+      // held down at a standstill: reverse
+      await pointer(p, 'pointermove', 1, cx, cy + bra);
+      await p.skip(12);
+      d = await p.d0();
+      check(`${w}x${h}: the pad held down at a standstill reverses`, d.kmh < -1 || d.gear < 0, `${d.kmh} km/h, gear ${d.gear}`);
+      await pointer(p, 'pointerup', 1, 0, 0);
+      // manual: up is the throttle, the centre coasts, down brakes
       await p.page.evaluate(`window.__dreamcar.game.action('throttle:manual')`);
-      await p.advance(0.3);
+      check(`${w}x${h}: Throttle manual (kept under dreamcar.throttle): nothing touched is no power`, (await p.page.evaluate(`localStorage.getItem('dreamcar.throttle')`)) === 'manual' && (await hands(p)).throttle === 0);
+      await p.advance(0.4);
+      gz = await gauge(p);
+      check(`${w}x${h}: manual with nothing pressed: the gauge reads zero and zero`, gz[0] === 0 && gz[2] === 0, gz.join('/'));
+      await pointer(p, 'pointerdown', 1, cx, cy);
+      await pointer(p, 'pointermove', 1, cx + lock * 0.2, cy - bra * 0.5);
+      c = await hands(p);
+      check(`${w}x${h}: manual: half way up is half the throttle`, near(c.throttle, 0.5) && c.brake === 0, JSON.stringify(c));
+      await pointer(p, 'pointermove', 1, cx, cy);
+      c = await hands(p);
+      check(`${w}x${h}: manual: at the centre it coasts`, c.throttle === 0 && c.brake === 0, JSON.stringify(c));
+      await pointer(p, 'pointermove', 1, cx, cy + bra * 0.5);
+      c = await hands(p);
+      check(`${w}x${h}: manual: half way down is half the brake`, c.throttle === 0 && near(c.brake, 0.5), JSON.stringify(c));
+      await pointer(p, 'pointerup', 1, 0, 0);
+      await p.page.evaluate(`window.__dreamcar.game.action('throttle:auto')`);
+      // the left hand: everything mirrored
+      await p.page.evaluate(`window.__dreamcar.game.action('hand:left')`);
+      await p.advance(1 / 30);
+      const R = await p.page.evaluate(() => window.__dreamcar.touchLayout(0));
+      check(`${w}x${h}: Hand left (kept under dreamcar.hand) mirrors the pad and the HANDBRAKE button`, (await p.page.evaluate(`localStorage.getItem('dreamcar.hand')`)) === 'left'
+        && Math.abs(R.pad.cx - (w - px0)) < 1 && R.pad.cy === py0 && Math.abs(R.drift.x - (w - L.drift.x)) < 1 && R.drift.y === L.drift.y);
+      const sm = await centreOf(p, '.stick.ghost');
+      check(`${w}x${h}: and draws it there`, !!sm && Math.abs(sm[0] - R.x0 - R.pad.cx) < 1.5);
+      await pointer(p, 'pointerdown', 1, R.x0 + R.pad.cx, R.y0 + R.pad.cy);
+      await pointer(p, 'pointermove', 1, R.x0 + R.pad.cx - lock * 0.5, R.y0 + R.pad.cy);
+      check(`${w}x${h}: a thumb on the left pad steers (half left)`, near(await raw(p), -0.5));
+      await pointer(p, 'pointerup', 1, 0, 0);
+      // (Hand only moves the ghost and the button: with the left hand a thumb lands on the right side as well)
+      await pointer(p, 'pointerdown', 1, w * 0.8, h * 0.75);
+      const rp = await padAt(p);
+      check(`${w}x${h}: Hand left: a thumb landing on the right side places the pad there too`, !!rp && near2(rp[0], w * 0.8) && near2(rp[1], h * 0.75) && (await hands(p)).steer === 0);
+      await pointer(p, 'pointerup', 1, 0, 0);
+      await pointer(p, 'pointerdown', 4, R.x0 + R.drift.x, R.y0 + R.drift.y);
+      check(`${w}x${h}: the HANDBRAKE button on the right`, (await hands(p)).handbrake === 1);
+      await pointer(p, 'pointerup', 4, 0, 0);
+      await p.page.evaluate(`window.__dreamcar.game.action('hand:right')`);
+      // the slider with its pedals
+      await p.page.evaluate(`window.__dreamcar.game.action('steering:slider')`);
+      await p.advance(1 / 30);
       L = await p.page.evaluate(() => window.__dreamcar.touchLayout(0));
-      check(`${w}x${h}: Throttle manual shows GAS (kept under dreamcar.throttle)`, (await visible(p, '.hud .view .pedal.gas'))
-        && (await p.page.evaluate(`localStorage.getItem('dreamcar.throttle')`)) === 'manual' && 2 * L.gas.r >= 64 && L.gas.r >= L.brake.r && L.brake.x < L.gas.x);
-      check(`${w}x${h}: on manual nothing touched is no power`, (await p.d0()).throttle < 0.05);
-      await pointer(p, 'pointerdown', 1, cx + half * 0.3, cy);
-      await p.advance(0.3);
-      check(`${w}x${h}: on manual the steering alone is no power`, (await p.d0()).throttle < 0.05);
+      const sx = L.x0 + L.slider.cx;
+      const sy = L.y0 + L.slider.cy;
+      const half = L.slider.half;
+      check(`${w}x${h}: Steering slider: a slider (${half.toFixed(0)} px either side) and the pedals, no pad`, !!L.slider && !L.pad && half >= 56 && half <= 92 && (await visible(p, '.hud .view .slider')) && !(await visible(p, '.hud .view .stick'))
+        && [L.brake, L.drift].every((b) => 2 * b.r >= 64));
+      const smid = await centreOf(p, '.slider .mid');
+      check(`${w}x${h}: the slider's centre mark is drawn where Input measures from`, !!smid && Math.abs(smid[0] - sx) < 2 && Math.abs(smid[1] - sy) < 2);
+      await pointer(p, 'pointerdown', 1, sx + half * 0.5, sy + 10);
+      check(`${w}x${h}: slider: a thumb landing half way right steers half right at once`, near(await raw(p), 0.5));
+      const brake = at(L, L.brake);
+      await pointer(p, 'pointerdown', 2, brake[0], brake[1]);
+      c = await hands(p);
+      check(`${w}x${h}: slider: BRAKE brakes and the power lifts, the steering thumb still steering`, c.brake === 1 && c.throttle === 0 && near(c.steer, 0.5), JSON.stringify(c));
+      await pointer(p, 'pointermove', 2, w / 2, h / 2);
+      check(`${w}x${h}: slider: a finger sliding off BRAKE keeps it until it lifts`, (await hands(p)).brake === 1);
+      await pointer(p, 'pointerup', 2, 0, 0);
+      const drift = at(L, L.drift);
+      await pointer(p, 'pointerdown', 4, drift[0], drift[1]);
+      check(`${w}x${h}: slider: DRIFT pulls the handbrake`, (await hands(p)).handbrake === 1);
+      await pointer(p, 'pointerup', 4, 0, 0);
+      await pointer(p, 'pointerup', 1, 0, 0);
+      await p.page.evaluate(`window.__dreamcar.game.action('throttle:manual')`);
+      await p.advance(1 / 30);
+      L = await p.page.evaluate(() => window.__dreamcar.touchLayout(0));
       const gas = at(L, L.gas);
       await pointer(p, 'pointerdown', 5, gas[0], gas[1]);
-      await p.advance(0.3);
-      // (the pedal as the hands give it: what reaches the wheels may be less, the traction control's share)
-      const pedal = await p.page.evaluate('window.__dreamcar.game.racers[0].controls.throttle');
-      check(`${w}x${h}: GAS drives, the steering thumb still steering`, pedal > 0.9 && Math.abs((await raw(p)) - 0.3) < 0.02, `pedal ${pedal}, applied ${(await p.d0()).throttle}`);
-      const brake2 = at(L, L.brake);
-      await pointer(p, 'pointerdown', 2, brake2[0], brake2[1]);
-      await p.advance(0.2);
-      d = await p.d0();
-      check(`${w}x${h}: GAS, BRAKE and the steering at once: three fingers, three controls`, d.brake > 0.5 && (await p.page.evaluate('window.__dreamcar.game.input.controlsOf(0).held.gas')), `brake ${d.brake}`);
-      for (const id of [1, 2, 5]) await pointer(p, 'pointerup', id, 0, 0);
+      check(`${w}x${h}: slider, manual: GAS drives`, (await visible(p, '.hud .view .pedal.gas')) && (await hands(p)).throttle === 1);
+      await pointer(p, 'pointerup', 5, 0, 0);
       await p.page.evaluate(`window.__dreamcar.game.action('throttle:auto')`);
       // the arrows
       await p.page.evaluate(`window.__dreamcar.game.action('steering:arrows')`);
       await p.advance(0.1);
       L = await p.page.evaluate(() => window.__dreamcar.touchLayout(0));
-      check(`${w}x${h}: Steering arrows shows two arrows, no slider (kept under dreamcar.steering)`, (await visible(p, '.hud .view .arrow.right')) && !(await visible(p, '.hud .view .slider'))
+      check(`${w}x${h}: Steering arrows shows two arrows (kept under dreamcar.steering)`, (await visible(p, '.hud .view .arrow.right')) && !(await visible(p, '.hud .view .slider'))
         && (await p.page.evaluate(`localStorage.getItem('dreamcar.steering')`)) === 'arrows' && 2 * L.arrows.left.r >= 64);
       const right = at(L, L.arrows.right);
       await pointer(p, 'pointerdown', 1, right[0], right[1]);
@@ -648,23 +886,39 @@ const SECTIONS = {
       await p.advance(0.4);
       d = await p.d0();
       check(`${w}x${h}: the right arrow steers right, wound on like a key`, (await raw(p)) === 1 && d.steer > 0.03 && early < d.steer, `${early} then ${d.steer}`);
-      const left = at(L, L.arrows.left);
-      await pointer(p, 'pointermove', 1, left[0], left[1]);
-      await p.advance(0.4);
-      check(`${w}x${h}: the thumb rocked onto the left arrow steers left`, (await p.d0()).steer < -0.03);
       await pointer(p, 'pointerup', 1, 0, 0);
-      await p.page.evaluate(`window.__dreamcar.game.action('steering:slider')`);
-      await p.advance(3.5);
-      check(`${w}x${h}: the controls' names go after the first seconds, for good`, !(await visible(p, '.hud .view .controls.naming'))
-        && (await p.page.evaluate(`localStorage.getItem('dreamcar.zones.v1')`)) === '1');
-      // BRAKE held at a standstill reverses
+      // tilt: synthetic deviceorientation events (a device rolled by `roll` degrees, its screen tipped back 20)
+      await p.page.evaluate(`window.__dreamcar.game.action('steering:tilt')`);
+      await p.advance(1 / 30);
+      const tilt = (roll) => p.page.evaluate((roll) => {
+        const r = Math.PI / 180;
+        const a = (screen.orientation && screen.orientation.angle) || 0;
+        const c = Math.cos(20 * r);
+        const sx = -Math.sin(roll * r) * c;
+        const sy = Math.cos(roll * r) * c;
+        const ux = sx * Math.cos(a * r) + sy * Math.sin(a * r);
+        const uy = -sx * Math.sin(a * r) + sy * Math.cos(a * r);
+        const uz = Math.sin(20 * r);
+        window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: Math.asin(uy) / r, gamma: Math.atan2(-ux, uz) / r, absolute: false }));
+      }, roll);
+      await p.advance(1 / 30);
       L = await p.page.evaluate(() => window.__dreamcar.touchLayout(0));
-      const brake3 = at(L, L.brake);
-      await pointer(p, 'pointerdown', 2, brake3[0], brake3[1]);
-      await p.skip(12);
-      d = await p.d0();
-      check(`${w}x${h}: BRAKE held at a standstill reverses`, d.kmh < -1 || d.gear < 0, `${d.kmh} km/h, gear ${d.gear}`);
-      await pointer(p, 'pointerup', 2, 0, 0);
+      check(`${w}x${h}: Steering tilt: the pad is drawn for the speed, the option names it untested on a real phone`, !!L.pad && (await p.page.evaluate(`window.__dreamcar.game.input.tilt.state`)) === 'granted'
+        && /untested/i.test(await p.page.evaluate(`document.querySelector('.hud .options .optnote:not([hidden])') ? [...document.querySelectorAll('.hud .options .optnote')].map((e) => e.textContent).join(' ') : ''`)));
+      await tilt(8);
+      await p.page.evaluate(`window.__dreamcar.game.action('recentre')`);
+      check(`${w}x${h}: tilt: recentred, held still is straight ahead`, near((await hands(p)).steer, 0, 0.01));
+      await tilt(8 + 15);
+      check(`${w}x${h}: tilt: rolled 15 degrees right is half the lock`, near((await hands(p)).steer, 0.5), `${(await hands(p)).steer}`);
+      await tilt(8 - 45);
+      check(`${w}x${h}: tilt: 45 left is full lock left, no more`, (await hands(p)).steer === -1);
+      await tilt(8 + 6);
+      await pointer(p, 'pointerdown', 1, cx, cy);
+      await pointer(p, 'pointermove', 1, cx + lock, cy + bra);
+      c = await hands(p);
+      check(`${w}x${h}: tilt: the pad's thumb brakes, the tilt still steers`, c.brake === 1 && near(c.steer, 0.2), JSON.stringify(c));
+      await pointer(p, 'pointerup', 1, 0, 0);
+      await p.page.evaluate(`window.__dreamcar.game.action('steering:pad')`);
       const cam = (await p.d0()).camera;
       const tapped = await p.page.evaluate(() => {
         const b = document.querySelector('.hud .view .touchcol .icon');
@@ -676,33 +930,70 @@ const SECTIONS = {
       check(`${w}x${h}: the first touch button (${tapped}) works`, tapped && (await p.d0()).camera !== cam);
       await p.close(`touch ${w}x${h}`);
     }
-    // split, side by side on a tablet: each half has its own fixed controls, scaled to it
+    // tilt refused (Safari's permission prompt answered no): the pad steers and the options say why
+    {
+      const init = () => {
+        window.DeviceOrientationEvent.requestPermission = () => Promise.resolve('denied');
+      };
+      const p = await open('?manual&q=low&time=day', { w: 393, h: 852, mobile: true, gpu: false, init });
+      await clickText(p, 'Options');
+      await clickText(p, 'Tilt', '.options');
+      await p.advance(0.1);
+      const st = await p.page.evaluate(`[window.__dreamcar.game.steering, [...document.querySelectorAll('.hud .options .optnote')].map((e) => e.textContent).join(' | ')]`);
+      check('tilt refused: the pad steers, and the options say so', st[0] === 'pad' && /not allowed/i.test(st[1]), st.join(' / '));
+      await p.close('tilt refused');
+    }
+    // split, side by side on a tablet: each half has its own fixed pad, scaled to it
     const W = 1180;
     const H = 820;
     const p = await open('?manual&q=low&auto&mode=split&time=day', { w: W, h: H, mobile: true, gpu: false });
     await p.page.evaluate(() => window.__dreamcar.set('view.split', 'wide'));
     await p.page.evaluate(() => window.__dreamcar.game.layout());
     const Ls = await p.page.evaluate(() => [window.__dreamcar.touchLayout(0), window.__dreamcar.touchLayout(1)]);
-    check('split touch: each half has its own controls inside it', Ls[1].x0 >= W / 2 - 1 && Ls[0].x0 + Ls[0].brake.x + Ls[0].brake.r <= W / 2 && Ls[1].x0 + Ls[1].slider.cx - Ls[1].slider.half > W / 2,
-      Ls.map((L) => `${L.x0}+${L.slider.cx}`).join(' / '));
+    check('split touch: each half has its own pad and HANDBRAKE inside it', Ls[1].x0 >= W / 2 - 1 && Ls[0].x0 + Ls[0].pad.cx + Ls[0].pad.r <= W / 2 && Ls[1].x0 + Ls[1].drift.x - Ls[1].drift.r > W / 2,
+      Ls.map((L) => `${L.x0}+${L.pad.cx}`).join(' / '));
     await toGo(p);
     await p.advance(1.5);
-    const sx = Ls.map((L) => L.x0 + L.slider.cx);
-    const sy = Ls.map((L) => L.y0 + L.slider.cy);
-    await pointer(p, 'pointerdown', 1, sx[0] + Ls[0].slider.half * 0.6, sy[0]);
-    await pointer(p, 'pointerdown', 2, sx[1] - Ls[1].slider.half * 0.6, sy[1]);
+    const lk = Ls.map((L) => L.pad.r * 70 / 80);
+    await pointer(p, 'pointerdown', 1, Ls[0].x0 + Ls[0].pad.cx, Ls[0].y0 + Ls[0].pad.cy);
+    await pointer(p, 'pointerdown', 2, Ls[1].x0 + Ls[1].pad.cx, Ls[1].y0 + Ls[1].pad.cy);
+    await pointer(p, 'pointermove', 1, Ls[0].x0 + Ls[0].pad.cx + lk[0] * 0.6, Ls[0].y0 + Ls[0].pad.cy);
+    await pointer(p, 'pointermove', 2, Ls[1].x0 + Ls[1].pad.cx - lk[1] * 0.6, Ls[1].y0 + Ls[1].pad.cy);
     await p.advance(0.3);
     let s = await p.state();
     check('split touch: both cars drive by themselves', s.drivers.every((d) => d.input === 'touch' && d.kmh > 5), s.drivers.map((d) => `${d.input} ${d.kmh}`).join(' / '));
     check('split touch: each thumb steers its own car', s.drivers[0].steer > 0.03 && s.drivers[1].steer < -0.03, s.drivers.map((d) => d.steer).join(' / '));
     await pointer(p, 'pointerdown', 3, Ls[1].x0 + Ls[1].drift.x, Ls[1].y0 + Ls[1].drift.y);
-    await pointer(p, 'pointerdown', 4, Ls[0].x0 + Ls[0].brake.x, Ls[0].y0 + Ls[0].brake.y);
     await p.advance(0.2);
-    const hands = await p.page.evaluate('window.__dreamcar.game.racers.map((r) => r.controls.handbrake)');
-    s = await p.state();
-    check('split touch: the right half\'s DRIFT is car two\'s, the left half\'s BRAKE car one\'s', hands[1] > 0.5 && hands[0] < 0.5 && s.drivers[0].brake > 0.5 && s.drivers[1].brake < 0.05,
-      `hand ${hands.join('/')} brake ${s.drivers.map((d) => d.brake).join('/')}`);
-    for (const id of [1, 2, 3, 4]) await pointer(p, 'pointerup', id, 0, 0);
+    const hbs = await p.page.evaluate('window.__dreamcar.game.racers.map((r) => r.controls.handbrake)');
+    check('split touch: the right half\'s HANDBRAKE is car two\'s', hbs[1] > 0.5 && hbs[0] < 0.5, `hand ${hbs.join('/')}`);
+    for (const id of [1, 2, 3]) await pointer(p, 'pointerup', id, 0, 0);
+    // a thumb landing anywhere in a half puts that half's pad there, inside that half (clamped to it at the edges); a
+    // second finger in a half is that half's handbrake
+    const half = (i) => p.page.evaluate((i) => {
+      const st = window.__dreamcar.game.input.touch[i].steer;
+      return st ? { cx: st.cx, cy: st.cy, ox: st.ox, hold: st.hold, fl: st.fl, fr: st.fr } : null;
+    }, i);
+    const Lh = Ls.map((L, i) => [L.x0 + 90, L.y0 + 120, i]);
+    // (left half, 90 px in: 90 px of room at the half's own edge; right half likewise from its own edge)
+    await pointer(p, 'pointerdown', 1, Lh[0][0], Lh[0][1]);
+    await pointer(p, 'pointerdown', 2, Lh[1][0], Lh[1][1]);
+    let h0 = await half(0);
+    let h1 = await half(1);
+    check('split touch: a thumb landing high in each half puts that half\'s pad exactly there', !!h0 && !!h1 && near2(h0.cx, 90) && near2(h0.cy, 120) && near2(h1.cx, 90) && near2(h1.cy, 120), JSON.stringify([h0, h1]));
+    let hh = await p.page.evaluate(() => [0, 1].map((i) => window.__dreamcar.game.input.read({}, 'all', i)).map((o) => [o.steer, o.throttle, o.brake, o.handbrake]));
+    check('split touch: and both start at zero', hh.every((o) => o[0] === 0 && o[1] === 1 && o[2] === 0 && o[3] === 0), JSON.stringify(hh));
+    await pointer(p, 'pointerdown', 4, Ls[0].x0 + 200, Ls[0].y0 + 300);
+    hh = await p.page.evaluate(() => [0, 1].map((i) => window.__dreamcar.game.input.read({}, 'all', i)).map((o) => [o.steer, o.throttle, o.brake, o.handbrake]));
+    check('split touch: a second finger in the left half is the left car\'s handbrake only', hh[0][3] === 1 && hh[1][3] === 0, JSON.stringify(hh));
+    for (const id of [1, 2, 4]) await pointer(p, 'pointerup', id, 0, 0);
+    // a thumb at the right half's own left edge (the half's edge is the room, not the screen's), and at the left half's right edge
+    await pointer(p, 'pointerdown', 1, Ls[1].x0 + 6, Ls[1].y0 + 200);
+    await pointer(p, 'pointerdown', 2, Ls[0].x0 + Ls[0].w - 6, Ls[0].y0 + 200);
+    h1 = await half(1);
+    h0 = await half(0);
+    check('split touch: near a half\'s own edge the pad is nudged inside that half (and held at zero)', !!h1 && !!h0 && h1.cx >= 0.6 * 70 * Ls[1].pad.s - 6 + 5.9 && h0.cx <= Ls[0].w - 0.6 * 70 * Ls[0].pad.s + 6 - 5.9 && h1.hold && h0.hold, JSON.stringify([h0, h1]));
+    for (const id of [1, 2]) await pointer(p, 'pointerup', id, 0, 0);
     await p.close('split touch');
   },
 
@@ -741,23 +1032,39 @@ const SECTIONS = {
     await p.page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
     check('the driving help survives a reload', (await p.page.evaluate('window.__dreamcar.game.racers[0].vehicle.level.name')) === 'Sport');
     await p.close('slide');
-    // on a phone at the default help: the car drives itself, the slider held over and a tap of DRIFT
-    const q = await open('?manual&q=low&auto&time=day', { w: 852, h: 393, mobile: true, gpu: false });
-    const L = await q.page.evaluate(() => window.__dreamcar.touchLayout(0));
-    await toGo(q);
-    await q.skip(4);
-    const kmh = (await q.d0()).kmh;
-    await pointer(q, 'pointerdown', 1, L.x0 + L.slider.cx + L.slider.half, L.y0 + L.slider.cy);
-    most = 0;
-    for (let k = 0; k < 30; k++) {
-      if (k === 2) await pointer(q, 'pointerdown', 2, L.x0 + L.drift.x, L.y0 + L.drift.y);
-      if (k === 8) await pointer(q, 'pointerup', 2, 0, 0);
-      await q.advance(1 / 15, 30);
-      most = Math.max(most, await q.page.evaluate('window.__dreamcar.game.racers[0].vehicle.slide.angle'));
+    // on a phone at the default help: the car drives itself; one thumb on the pad, hard over and pulled down into the
+    // red arc for a moment (the handbrake), then up again; and the same with the HANDBRAKE button under the other thumb
+    for (const how of ['the pad\'s red arc', 'the HANDBRAKE button']) {
+      const q = await open('?manual&q=low&auto&time=day', { w: 393, h: 852, mobile: true, gpu: false });
+      const L = await q.page.evaluate(() => window.__dreamcar.touchLayout(0));
+      const T = await q.page.evaluate(() => window.__dreamcar.touch);
+      const cx = L.x0 + L.pad.cx;
+      const cy = L.y0 + L.pad.cy;
+      const s = L.pad.s;
+      await toGo(q);
+      await q.skip(4);
+      const kmh = (await q.d0()).kmh;
+      await pointer(q, 'pointerdown', 1, cx, cy);
+      await pointer(q, 'pointermove', 1, cx + T.pad.steer * s, cy - 10);
+      let most = 0;
+      let pulled = 0;
+      for (let k = 0; k < 30; k++) {
+        if (k === 2) {
+          if (how.includes('arc')) await pointer(q, 'pointermove', 1, cx + T.pad.steer * s, cy + (T.pad.trip + 6) * s);
+          else await pointer(q, 'pointerdown', 2, L.x0 + L.drift.x, L.y0 + L.drift.y);
+        }
+        if (k === 8) {
+          if (how.includes('arc')) await pointer(q, 'pointermove', 1, cx + T.pad.steer * s, cy - 10);
+          else await pointer(q, 'pointerup', 2, 0, 0);
+        }
+        await q.advance(1 / 15, 30);
+        pulled = Math.max(pulled, await q.page.evaluate('window.__dreamcar.game.racers[0].controls.handbrake'));
+        most = Math.max(most, await q.page.evaluate('window.__dreamcar.game.racers[0].vehicle.slide.angle'));
+      }
+      await pointer(q, 'pointerup', 1, 0, 0);
+      check(`on a phone (Full help), one thumb hard over and ${how}: the handbrake pulled and the car slides past 12 degrees`, pulled > 0.5 && most >= 12, `${most.toFixed(1)} degrees at most from ${kmh} km/h`);
+      await q.close(`touch slide, ${how}`);
     }
-    await pointer(q, 'pointerup', 1, 0, 0);
-    check('on a phone (Full help): power by itself, the slider over and a tap of DRIFT slide the car past 12 degrees', most >= 12, `${most.toFixed(1)} degrees at most from ${kmh} km/h`);
-    await q.close('touch slide');
   },
 
   /** Resizing and rotating mid-run; a lost and restored WebGL context mid-run. */
@@ -821,13 +1128,19 @@ const SECTIONS = {
           else st.removeProperty(`--${k}`);
         }
       }, insets || null);
-      // (on touch, solo once more with the throttle on manual: GAS in the corner, BRAKE beside it)
-      for (const layout of insets ? ['solo'] : mobile ? ['solo', 'wide', 'tall', 'manual'] : ['solo', 'wide', 'tall']) {
+      // (on touch: the pad in the right hand and in the left, solo and in both splits, on auto and on manual; and
+      // the slider with its pedals on manual, solo and in both splits: GAS in the corner, BRAKE beside it)
+      const touchLayouts = ['solo', 'wide', 'tall', 'manual', 'left', 'left-wide', 'left-tall-manual', 'slider-manual', 'slider-wide-manual', 'slider-tall-manual'];
+      for (const layout of insets ? ['solo', 'left'] : mobile ? touchLayouts : ['solo', 'wide', 'tall']) {
         await p.page.evaluate((layout) => {
           const g = window.__dreamcar.game;
-          g.action(layout === 'manual' ? 'throttle:manual' : 'throttle:auto');
-          const mode = layout === 'solo' || layout === 'manual' ? 'solo' : 'split';
-          if (mode === 'split') window.__dreamcar.set('view.split', layout);
+          const parts = layout.split('-');
+          g.action(parts.includes('manual') ? 'throttle:manual' : 'throttle:auto');
+          g.action(parts.includes('slider') ? 'steering:slider' : 'steering:pad');
+          g.action(parts.includes('left') ? 'hand:left' : 'hand:right');
+          const split = parts.find((x) => x === 'wide' || x === 'tall');
+          const mode = split ? 'split' : 'solo';
+          if (mode === 'split') window.__dreamcar.set('view.split', split);
           if (g.mode !== mode) {
             g.leave();
             g.setup(mode);
@@ -900,9 +1213,9 @@ const SECTIONS = {
                     if (!what.startsWith('slider') && (q.width < 64 || q.height < 64)) tiny.push(`${what} ${Math.round(q.width)}x${Math.round(q.height)}`);
                     if (q.left < safe.left - 0.5 || q.right > safe.right + 0.5 || q.bottom > safe.bottom + 0.5) out.push(`view ${vi}: ${what} outside the safe area`);
                     // and a finger finds it where it is drawn
-                    const key = what.startsWith('slider') ? 'slider' : what.startsWith('arrow') ? null : what.split(' ')[1];
+                    const key = what.startsWith('slider') ? 'slider' : what.startsWith('stick') ? 'pad' : what.startsWith('arrow') ? null : what.split(' ')[1];
                     if (key && L[key]) {
-                      const c = key === 'slider' ? [L.slider.cx, L.slider.cy] : [L[key].x, L[key].y];
+                      const c = key === 'slider' ? [L.slider.cx, L.slider.cy] : key === 'pad' ? [L.pad.cx, L.pad.cy] : [L[key].x, L[key].y];
                       if (Math.abs(q.left + q.width / 2 - L.x0 - c[0]) > 1 || Math.abs(q.top + q.height / 2 - L.y0 - c[1]) > 1) out.push(`view ${vi}: ${what} drawn off where Input finds it`);
                     }
                   }
@@ -918,12 +1231,16 @@ const SECTIONS = {
                   continue;
                 }
                 boxes.push({ name, r: e.getBoundingClientRect() });
+                // the pedal gauge stands beside the speed: its own box, clear of everything else
+                const gz = name === 'cluster' && e.querySelector('.gauge');
+                if (gz && shown(gz)) boxes.push({ name: 'gauge', r: gz.getBoundingClientRect() });
               }
               const over = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
               for (const b of boxes) {
                 // the banner and the gap are moments over the sky, never over the car
-                if (over(b.r, car)) out.push(`view ${vi}: ${b.name} over the car`);
-                if (b.r.left < vr.left - 1 || b.r.right > vr.right + 1 || b.r.top < vr.top - 1 || b.r.bottom > vr.bottom + 1) out.push(`view ${vi}: ${b.name} outside its view`);
+                const rr = (q) => `${Math.round(q.left - vr.left)},${Math.round(q.top - vr.top)}-${Math.round(q.right - vr.left)},${Math.round(q.bottom - vr.top)}`;
+                if (over(b.r, car)) out.push(`view ${vi}: ${b.name} over the car (${rr(b.r)} against ${rr(car)})`);
+                if (b.r.left < vr.left - 1 || b.r.right > vr.right + 1 || b.r.top < vr.top - 1 || b.r.bottom > vr.bottom + 1) out.push(`view ${vi}: ${b.name} outside its view (${rr(b.r)} in ${Math.round(vr.width)}x${Math.round(vr.height)}, ${views[vi].className})`);
               }
               for (let i = 0; i < boxes.length; i++)
                 for (let j = i + 1; j < boxes.length; j++)
@@ -1032,26 +1349,33 @@ const SECTIONS = {
     await p.page.waitForFunction('window.__ready === true', null, { timeout: 300000 });
     check('Auto again: the tier the probe chooses', (await p.page.evaluate('window.__dreamcar.stats().tier')) === tier0);
     await p.close('options');
-    // on a touch screen: Steering (slider / arrows) and Throttle (auto / manual), kept on the device
+    // on a touch screen: Steering (pad / slider / arrows / tilt), Hand (right / left) and Throttle (auto / manual), kept on the device
     const t = await open('?manual&q=low&time=day', { w: 393, h: 852, mobile: true, gpu: false });
     await clickText(t, 'Options');
     await t.advance(0.1);
     const trows = await t.page.evaluate(`[...document.querySelectorAll('.hud .options .optlabel')].filter((e) => !e.closest('[hidden]')).map((e) => e.textContent)`);
-    check('on touch the options offer Steering and Throttle', /steering/i.test(trows.join()) && /throttle/i.test(trows.join()), trows.join(', '));
+    check('on touch the options offer Steering, Hand and Throttle', /steering/i.test(trows.join()) && /hand/i.test(trows.join()) && /throttle/i.test(trows.join()), trows.join(', '));
+    const steerings = await t.page.evaluate(`[...document.querySelectorAll('.hud .options button')].filter((b) => ['pad', 'slider', 'arrows', 'tilt'].includes(b.dataset.value)).map((b) => b.textContent)`);
+    check('Steering: Pad, Slider, Arrows, Tilt', steerings.join() === 'Pad,Slider,Arrows,Tilt', steerings.join());
     const on = (v) => t.page.evaluate((v) => document.querySelector(`.hud .options button[data-value="${v}"]`).classList.contains('on'), v);
-    check('with nothing chosen: Slider and Auto', (await on('slider')) && (await on('auto')));
+    check('with nothing chosen: Pad, the right hand and Auto', (await on('pad')) && (await on('right')) && (await on('auto')));
+    await clickText(t, 'Left', '.options');
+    await t.advance(0.1);
+    check('Hand left is kept under dreamcar.hand and reaches the pad', (await t.page.evaluate(`localStorage.getItem('dreamcar.hand')`)) === 'left' && (await t.page.evaluate('window.__dreamcar.game.input.hand')) === 'left');
     await clickText(t, 'Arrows', '.options');
     await clickText(t, 'Manual', '.options');
     await t.advance(0.1);
     check('Arrows and Manual are kept under dreamcar.steering and dreamcar.throttle and reach the hands',
       (await t.page.evaluate(`localStorage.getItem('dreamcar.steering') + ' ' + localStorage.getItem('dreamcar.throttle')`)) === 'arrows manual'
       && (await t.page.evaluate('window.__dreamcar.game.input.steering + " " + window.__dreamcar.game.input.throttle')) === 'arrows manual');
+    check('the Hand row goes with the pad (the arrows have none)', !(await visible(t, '.hud .options .optrow:has(button[data-value="left"])')));
     await t.go('?manual&q=low&time=day');
-    check('and survive a reload', (await t.page.evaluate('window.__dreamcar.game.input.steering + " " + window.__dreamcar.game.input.throttle')) === 'arrows manual');
+    check('and survive a reload', (await t.page.evaluate('window.__dreamcar.game.input.steering + " " + window.__dreamcar.game.input.throttle + " " + window.__dreamcar.game.input.hand')) === 'arrows manual left');
     await t.close('touch options');
     const n = await open('?manual&q=low&time=day', { w: 393, h: 852, mobile: true, gpu: false, storage: false });
-    await n.page.evaluate(`window.__dreamcar.game.action('steering:arrows'); window.__dreamcar.game.action('throttle:manual')`);
-    check('with no storage the touch choices still apply (for this page)', (await n.page.evaluate('window.__dreamcar.game.input.steering + " " + window.__dreamcar.game.input.throttle')) === 'arrows manual');
+    check('with no storage: the pad, the right hand, auto', (await n.page.evaluate('window.__dreamcar.game.input.steering + " " + window.__dreamcar.game.input.hand + " " + window.__dreamcar.game.input.throttle')) === 'pad right auto');
+    await n.page.evaluate(`window.__dreamcar.game.action('steering:arrows'); window.__dreamcar.game.action('throttle:manual'); window.__dreamcar.game.action('hand:left')`);
+    check('with no storage the touch choices still apply (for this page)', (await n.page.evaluate('window.__dreamcar.game.input.steering + " " + window.__dreamcar.game.input.throttle + " " + window.__dreamcar.game.input.hand')) === 'arrows manual left');
     await n.close('touch options, no storage');
   },
 

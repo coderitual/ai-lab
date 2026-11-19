@@ -32,7 +32,7 @@ export const CANOPY = {
   /** Woods are averaged over this many metres either way along the road: a gap of a tree or two changes little. */
   reach: 15,
   /** The least share of the sky that is left. */
-  floor: 0.3,
+  floor: 0.75,
   /**
    * (forest lane) The woods of the pieces' schemes (trackLayout.js SCHEMES, `wood`), blended in by the scheme's
    * weight (schemes.js): frame e2's pines are tall and stand close (deep shade between the sun's patches), frame e5's

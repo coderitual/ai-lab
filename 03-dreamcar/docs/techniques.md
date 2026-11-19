@@ -73,7 +73,7 @@ Track: out to the solid edge it is the Track's own cross-section; beyond it,
 the hillside the Track asks for, with a cliff where the edge is rock (a rock
 face stands in front of it, `rock.js`); further out it blends over 10 to
 100 m into a field made on a 16 m grid from the road itself (rising inside
-the loop, falling towards the lake and the valleys, a ridge over the tunnel,
+the loop, falling towards the sea, the bay and the valleys, a ridge over the tunnel,
 a ravine under the sky road), with ridged noise on top; far away, mountains.
 
 It is drawn in three pieces that meet without cracks: a **band** that follows
@@ -140,12 +140,46 @@ keys, a hand catches the rear when it slides beyond the rear tyres' peak
 slip (counter-steer 0.75 rad per rad). A stick or a thumb is trusted and only
 given the same lock.
 
-On a touch screen the thumb is read against a fixed slider
-(`src/engine/Input.js`): the steering is the thumb's distance from the
-slider's centre over its half travel, worked out in the pointer handlers and
-stored, so the fixed step only reads a number. The slider itself is linear;
-the curve that makes small corrections easy at speed is the hands'
-(`HANDS.thumb.expo`, the same place as a stick's). Every control owns the
+On a touch screen the default is a one-thumb pad (`src/engine/Input.js`):
+a disc whose centre is set where the thumb lands (`_land`) and never moves
+until it lifts, so the thumb's offset from it is an absolute position, not a
+gesture, and zero at touch-down. Short of room at an edge the offset is
+stretched back (`dx / f`, `f` the compressed share of the travel, at least
+0.6) before it reaches `padControls`; under 0.6 the centre is nudged inward by
+the missing travel and the input held at zero for 6 px of movement from the
+landing point. The disc is drawn inside the safe area (the knob stays on
+the centre). The Hud keeps two discs: the live one under the thumb, and a ghost
+at the layout's home place; the 0.4 s before the ghost returns is a CSS
+transition delay, so no clock is read. A second finger in the zone is the
+handbrake pedal; the pad keeps the pointer that placed it. `padControls(dx, dy, scale, manual,
+tripped)` turns that offset into everything the car needs, and is pure, so the
+scripted thumb of the Node tests drives through the very same function:
+across over 70 px is the steering; down, the first quarter of 56 px lifts
+the throttle (a thumb can trim speed without braking) and the rest brakes,
+fully at 56 px; on beyond 74 px is the handbrake, held until the thumb comes
+back above 62 px, so a hard stab at the brake does not trip it and a held
+slide does not flicker off; the knob is drawn clicked into the red arc while
+it is pulled. The values are worked out in the pointer handlers and stored,
+so the fixed step only reads numbers. The pad and the slider are linear; the
+curve that makes small corrections easy at speed is the hands'
+(`HANDS.thumb.expo`, the same place as a stick's), and so is the smoothing:
+for a thumb, two equal lags in a row (`order: 2`, a critically damped
+follow: no overshoot of its own, about twice the lag to most of the way),
+22 ms standing to 50 ms at speed, and 30 ms on the pad's pedals. That takes a
+shaky thumb's jitter out without a lag a hand feels; a single lag long
+enough to do the same was either sluggish or let the jitter through, and a
+shorter one made the yaw overshoot by 26 % at 250 km/h (the turn-in test
+holds it under 22 %).
+
+Tilt reads `deviceorientation`'s beta and gamma as the world's up in the
+device's frame (`rollOf`), turned into the screen's frame by the screen's
+angle, and the roll is the angle of that up within the screen: so the same
+formula serves an upright phone and one on its side, and does not go through
+the Euler angles' gimbal lock when the phone is held upright (where gamma
+swings wildly for a small roll). Where gravity lies mostly out of the screen
+(the phone flat) there is no roll to read and the last one stands. The zero
+is the roll at the start of a run and at Recentre; ±30° is full lock; the
+hands' smoothing does the rest. Every control owns the
 pointer id that took it (`setPointerCapture`, then a map of pointer id to
 pedal), so two or three fingers never steal from each other, and anything
 that can lose a finger's lift (pointercancel, lostpointercapture, blur, a
@@ -268,7 +302,22 @@ the longer the path through the air), the sun's glow (a wide and a tight
 lobe) and its disc thousands of times brighter than the blue, unclamped, so
 the frame's bloom and flare make the glare from real brightness. Two layers
 of cloud lit from the side the light comes from, with grey-blue bases and
-silver rims near the sun; at golden hour, lit from below. By night the same
+silver rims near the sun; at golden hour, lit from below. The cumulus noise is
+pushed up round one place in the sky (lighting.js `clouds.group`, placed
+against the straight's heading like the sun: 30 degrees left of it, 30 up), so
+that D1's group of big heaps over the massif's shoulder is there whatever the
+noise does elsewhere; their rims are cut sharp (a 0.07 wide edge).
+
+At dusk the clear sky is not the zenith-to-horizon gradient but a twilight
+dome (lighting.js `sky.twilight`, sky.js `twiColumn`): two columns of five
+radiances from the horizon up, one under the sun (rose, orange, pale yellow,
+turquoise, deep blue) and one opposite it (the blue-violet shadow of the
+earth, the pink belt, blue), blended round the sky by how far a direction is
+turned towards the sun, with the sun's glow on top. The clouds' light then
+gathers on the sun's side (`clouds.sunward`): undersides lit orange-rose
+near the sun, dark blue-grey elsewhere; and the first stars show only high
+up and away from the sun (`starsAway`). The environment map, the probes and
+any water are drawn from the same dome, so they mirror it. By night the same
 shader draws the moon, airglow and the Milky Way; stars are points a pixel or
 two wide with their brightness spread over the footprint, so they neither
 flicker nor change with the picture's size.
@@ -287,6 +336,31 @@ domain-warped down from each summit and its own baked sun and moon shadows.
 They lie beyond the far plane, so their vertex shader puts them at the back
 of the depth range; drawn first, depth test always passing, still writing
 depth so the sky does not paint over them.
+
+The massif is back-lit, so its faces are in the sky's light and its form is
+carried by its albedo and its rim (day lane): limestone of albedo about 0.19,
+ribs paler than the gullies between them (a ridged field down the face,
+squared), pale fans of scree where the gullies open onto gentler ground near
+the tree line, a few great buttresses 600 to 1000 m apart cut into the face
+(their flanks turn to the sun or away), gullies that fork and end as they run
+down instead of hanging the whole height of the face. The rim: rock seen
+edge-on near the skyline, looking towards the sun, sends light forwards
+(`uRim`, graze cubed times the view's alignment with the sun to the fourth,
+only where the baked sun reaches): a thin bright line along the ridges on the
+sun's side, as in D1. Its skyline: the ridge left of the main peak stays about
+21 degrees high and the shoulder climbs gently out of the frame.
+
+`far.js` also builds **the green hill** of frame D3 (`greenHill` in
+landmarks.js): a wooded ridge 470 m high with three summits beyond the west
+end of the lake, 41 degrees left of the road 1.9 km out from the ledge's
+first bend and lying across the line of sight from there, so that a green
+hill, not the massif's bare rock, stands over the pale hall. It is inside the
+far plane and drawn as an ordinary surface (12 x 40 cells on low, 24 x 96
+otherwise), wood with clumps of lighter crowns and the odd pale outcrop. From
+the start line it stands behind the left shoulder; its end towards the start
+is kept short and low, so that the golden-hour sun (bearing 215, 2 degrees
+up) sets just clear of it (worked out on paper: the ridge stays under the
+horizon there up to 3 degrees right of the sun).
 
 The sun and moon are placed against the straight's heading
 (`lighting.js` `PLACES`, `placeLights`), not on the map: move the straight and
@@ -358,7 +432,7 @@ the granite's tone.
   number instead of a covariance matrix).
 - **The glare lobe.** A second, anisotropic specular lobe stretched along the
   line of sight lays the low sun's glare along the road as a long streak
-  (`ASPHALT_SHEEN`: along 0.45, across 0.06), broken up by the stones. Dry asphalt keeps 0.3 of the standard material's own isotropic lobe, so that the streak is the sheen's; under water or paint it keeps all of it.
+  (`ASPHALT_SHEEN`, road.js `SHEEN`: along 0.12, across 0.15, at 0.28 of a plain dielectric), broken up by the stones. Dry asphalt keeps 0.25 of the standard material's own isotropic lobe, so that the streak is the sheen's; under water or paint it keeps all of it. The sky's sheen (`SKY_SHEEN`, gain 0.42) fills the shade at a glancing angle.
 - **The racing line and the history.** A polished darker band where cars run,
   rubber in the bends and the braking zones; runs of surfacing with joints,
   seams 2 m either side of the middle, patches, sealed cracks, expansion
@@ -391,6 +465,10 @@ the granite's tone.
   lobe about the mirrored view, narrow across the plane of incidence, long in
   it), and on every tier the cars' tail lamps are drawn so too (`TAIL_GLINT`,
   only behind the car), which the mirror cannot show.
+- **The tail lamps' pool** (`TAIL_POOL`, dusk lane): on dry asphalt too,
+  from dusk on, each lit tail lamp lays red light on the road behind its car
+  (falling with the square of the distance, only behind the car, three times
+  as much with the brakes on), as the head lamps lay their pool ahead.
 - **The canopy** (`src/assets/world/canopy.js`): what the woods beside the road
   hide of the sky, defined once from the Track's `woodAt` and multiplied into
   the baked sky share (`aBake.z`) of the road, the kerbs and the verges, and
@@ -419,6 +497,114 @@ vignette, a filmic tone curve, saturation, split toning, lift, sRGB, grain and
 dither. On low the blur is done inside the final pass and FXAA replaces the
 multisampling. Every pattern (blur jitter, AO rotation, dither) is a function
 of the pixel, grain of the run's own clock.
+
+## The sea (from demo 01)
+
+`src/engine/waves.js`, `src/assets/world/sea.js`, the coast in
+`src/assets/world/terrain.js`. Demo 01's sea brought into this frame: 03
+does not import from 01 (each demo builds alone); the port is 03's own, and
+inside 03 the sea is defined once: the waves in waves.js, where the water is
+in terrain.js (`terrain.sea`), how it looks in sea.js.
+
+**Where it is.** The terrain's height function makes the coast: outside the
+loop, at a bearing from the course's middle outside the mainland's
+(`SEA.mainland`), the land falls from the road's own height to the water
+55 to 170 m beyond the solid edge, steeply at the last (a cliff), and the
+seabed shelves away beyond (`coastAt`). Far from the road the valley itself
+sinks to the seabed in those bearings. The lake's ellipse, drawn out to the
+west, makes the bay. Which low ground is sea is decided by a flood from the
+open water over the 16 m field: whatever it does not reach is a hollow,
+which `keepDry` holds just above the water, because the water is one level
+plane drawn everywhere (the land covers it where it stands higher). Cells of
+the grid and the far land wholly 2 m under the water are not drawn (fewer
+triangles than the lake's world had, on every tier). At start-up the
+terrain also writes the **sea map** (512 x 512 over 4.8 km): the depth, and
+two chamfer distance fields (the land's distance from the water, the
+water's from the land). The water reads it for the shallows and the surf,
+the ground for its coastal colours. Seven sea stacks are bumps in the same
+height function, placed by `rng.fork('stacks')` in the open sea 30 to 120 m
+off the shore.
+
+**The surface** is 01's: a sum of trochoidal (Gerstner) waves with deep-water
+dispersion, the vertex stage moving a camera-centred radial grid (01's, rings
+spaced to keep the cells square) and the fragment stage summing the analytic
+slopes for the normal. Each wave is dropped from the mesh where the mesh has
+fewer than about five vertices per wavelength, and from the normals where it
+is smaller than a pixel (01's rule: at sqrt(570 h L) m for an eye h m over a
+wave L m long). New here: the slope variance a wave stops drawing is added
+to the highlight's (`lost`, alpha^2 = alpha0^2 + 2 sigma^2), and so is the
+ripple map's when it fades with the footprint of the pixel. Close to, the
+sun breaks into glitter on the facets; far out the same light is a smooth,
+wide path: no shimmer, no aliased sparks, with nothing to tune by distance.
+The swell is long and soft (150, 98, 63 m), the chop and the short waves are
+a light breeze's. (Round 2, frame E1) **Wave groups**: a sum of a few long
+trochoids seen from 100 m up reads as ruled lines. Each wave's amplitude is
+multiplied by its own slow factor, 1 + 0.65 cos(g . p + phase), with g about
+7.5 wavelengths long and turned 65 degrees off the wave (`GROUPS`): sets and
+lulls in the swell, rough and calm patches in the chop. The factor is applied
+in the mesh's displacement, the normals, the crest test for foam and in
+`sampleWaves` alike (the sea is still defined once); its own slope is left
+out of the normal (it is a hundredth of the wave's).
+
+**The shading** is a MeshStandardMaterial with the surface written into it
+(shading.js `extend`): the sun or moon, the sky's environment map, the fill,
+the shadow map and the haze reach the water as they reach the land, and the
+time of day's light is all the colour it has. 01's analytic sky becomes the
+environment map; 01's rule that a facet tipped past the horizon shows the sky
+just over it, not the ground under it, is kept (the normal is bent). The body
+is an albedo (what comes back up out of the water: deep blue, greener over
+the shallows by the sea map's depth), lighter at the tops of the waves, with
+01's light through the wave's top towards the sun as a small added term.
+Foam is 01's: the swell's Jacobian now and a moment ago leaves streaks behind
+crests; the surf is bands that run in with the swell over the last 14 to
+26 m of water (the sea map's distance to land), warped by the lace texture;
+far away the lace becomes a share of white. At night the six lamps the wet
+road glints with (lamps.js picks them per view) are drawn into the water as
+streaks, a lobe about the mirrored view narrow across the plane of
+incidence and long in it, widened by the roughness. Far out the water fades
+into `hazeColor` of its own direction, which is what the sky dome shows just
+under the horizon, so the disc's edge never shows. Not 01's: the wake, the
+mirror (a planar reflection would be a scene pass: the sea reflects the
+environment map only), caustics and the sandy bed.
+
+**The coast road's cliff** (round 2, `COAST` in terrain.js). The near
+profile beyond a sea side's solid edge (`nearAt`) is replaced, by the side's
+coast weight eased over 30 m along the road, with `coastCliff`: a lip, then
+`top - (top - foot) * smoothstep(t)` down a run of `drop / steep` metres,
+then the seabed. Two things would undo it. The 16 m land-shape field is
+smoothed three times, which turns a cliff into a 50 m slope: so after the
+smoothing each cell off a sea side is pulled down to the same cliff
+(`coastCell`), and those cells seed the sea's flood. And the band and the
+grid blend the near profile into that field from 10 m out, adding the land's
+small hills and `keepDry`'s lift: on a sea side the near profile is kept to
+the edge of the road's reach (the last 40 m blend), the hills are left off,
+and nothing is lifted (only the sea stacks stand out of it). The spur inside
+the carousel (`COAST.knoll`) is a ridge from the hairpin's centre (the
+Track's point at the piece's middle, `r` to its inside) down the tongue
+between its legs, added after the two legs' grounds are blended, so both
+legs see the same hill, and only beyond the cut's top.
+
+**The low crossing and the big waves** (round 2). The causeway is the same
+cliff function with other numbers (a 2.5 m lip, a bank 0.6 down per metre),
+applied to both sides of a stretch of `back` (`seaSide`: on the inside it
+fades out beyond the lagoon's width, so the land comes back), and on the
+lagoon side the seabed stops at 9 m. The big swell is a factor on the swell's
+amplitudes only, a smoothstep bump round one place (`BOOST`, set by
+`waves.setBoost` from `terrain.sea.surf`): in the shader it multiplies the
+same `waveGroup` factor that the sets and lulls use, so the mesh, the normals,
+the Jacobian foam and `sampleWaves` all see one surface.
+
+**Per-piece road markings** (round 2, road.js `PIECE_MARKS`). A scheme per
+piece id, each scheme one channel of a per-metre RGBA texture (`uMarks`,
+sampled at s / length like the edge texture), eased over 6 m at its ends.
+'coast' (channel r) is a double yellow centre line: two 0.12 m lines 0.12 m
+apart, painted with the edge lines' wear and weight but a yellow paint
+colour. Channels g, b and a are free for other schemes.
+
+**Per tier**: low a flat disc (32 segments, four rings, 160 triangles) and
+the 7 longest waves in the normals; medium 96 segments moved by the swell,
+9 waves; high 160 segments, all 11. The clock is the run's (`world.update`),
+the eye's height sets the waves' reach in `prepareView`.
 
 ## What each pass draws (the budget)
 
