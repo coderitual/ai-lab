@@ -287,6 +287,22 @@ machine without a GPU, and only what is listed here.
   on `high`, in split screen, in motion or with a player driving; the
   playtest (which has no tunnel section) and the soundtest were not run (the
   sound's tunnel reverb reads the Track's sky, which did not move).
+- **The road lane's changes** (the asphalt of frames E2 and E5: its tone,
+  wear, grit, paint, edge, more patches and cracks; 2026-11-19): stills on
+  software WebGL at `medium` 1280x720 by day from the chase camera (t = 29,
+  with and without the speed blur), from two low trackside cameras at bends
+  (t = 17 and 29), on the coast road (t = 50) and at `photo=d1`; at golden
+  hour and in the wet night (t = 29); at `low` 393x852 by day; each beside
+  the branch point's and the references, the asphalt's sRGB measured in
+  patches (sunlit about 77 to 118 luma, against E2's 100 to 145; the woods'
+  shade about 56 against E2's 42; trackside about 98 to 108 against E5's 74
+  to 98; the wet night's road 11 against 8 before). `node tools/unit.mjs`
+  passed (5 files); the playtest's keys section 22 of 22 checks and tiers
+  15 of 15 (a first tiers run was cut off by the session's time limit while
+  drawing the high tier at night, and was run again alone). Not looked at on `high` beyond the playtest's frames, in
+  split screen, or in motion: the grit and the paint's ragged edges were
+  made not to sparkle by construction (averaged where a pixel spans many
+  cells) but no frame sequence was watched for crawl.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
