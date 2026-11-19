@@ -292,6 +292,25 @@ treeMaterial.js, impostors.js, forest.js; numbers in design.md, "The forest".
   crown 25 m tall under a 17 degree sun or moon shades the road 80 m away,
   and a choice by distance from the car left those out, differently for two
   cars a few metres apart (the two-player "water on the track", tools.md).
+  Where no box is placed (the viewer), a tree casts if its shadow comes near
+  the car (forest lane): the level segment from its foot to where the shadow
+  of its top lands is tested against the circle round the car.
+- **Schemes** (forest lane, `schemes.js`): a piece of the plan may name a
+  look (`scheme`, trackLayout.js SCHEMES). Everything that reads it asks
+  one table per Track sample: which scheme, its weight (1 on its pieces,
+  easing to 0 over its `blend` metres either side) and whether the sample
+  is on its own pieces. The weight decides gradually (a tree, a tuft, a
+  boulder is placed with that probability; the asphalt's tone and the
+  concrete strip fade with it); the lines are drawn only on the pieces
+  themselves, so they begin and end at a piece's end. Each part plants or
+  places what the scheme asks from its own random stream (`fork('scheme')`)
+  after everything else is placed, so that the rest of the lap is exactly as
+  it was. A scheme may draw the corridor's solid edges differently without
+  changing them (`curb`): to the cars the edge stays what the Track says (a
+  rail, rock), at the same distance; the world draws a low concrete
+  kerbstone there instead of a rail or a cut face (`schemes.js` `curbAt`,
+  read by rails.js, terrain.js's cliffs, trackside.js), so the physics and
+  its tests are untouched.
 - **Where trees stand** is asked of `track.woodAt(s, side)` from 2 m behind
   the barrier, plus the mass of the forest away from the road where the
   terrain says; a keep-out callback keeps the start area and the town free.
@@ -416,6 +435,25 @@ tyres). The filter (three.js's five-tap PCF) is 1.0 / 1.2 / 1.6 texels wide
 on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car also lays its own contact shadow (the CAR lane's
 `car/shadow.js`), which no map is fine enough to draw.
 
+## Boulders
+
+`boulders.js` (forest lane): a unit icosahedron squashed into an ellipsoid
+and lumped by smooth noise of the direction (the same at every copy of a
+corner, so the non-indexed facets stay closed), then FRACTURED: three to five
+planes, everything beyond a plane pressed back onto it, which leaves the flat
+faces and sharp arrises of granite split along its joints. Painted per
+vertex: the granite flecked, lichen in pale patches, moss where a face looks
+at the sky (the grass's own green), the foot dark where it stands in the
+earth. Its corners are then merged and it is shaded smooth (detail 3 on
+medium, 4 on high: a facet of a 5 m boulder read as a low-poly model). Where
+the ground falls away from the road, a big block reaches up to the road's
+level all the same (taller, standing on the ground). Two shapes (a weathered `round` one and a split `block`), each one
+instanced mesh, scaled, turned and tilted per boulder. groundCover.js places
+each with its middle at least its plan radius (the shape's own widest reach
+in plan at the largest scale, plus 15 cm for the tilt) beyond the solid
+edge, so no car can touch one; the low tier draws them as its plain rocks in
+the granite's tone.
+
 ## The asphalt
 
 `road.js`, `roadTextures.js`, `corridor.js`, `roadHistory.js`.
@@ -469,6 +507,12 @@ on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car als
   showing) and cut away where the road was patched.
 - **The edge:** a thin band of dust and grit along the pavement's own edge
   (`ASPHALT.rim`), then the margin's older, dustier asphalt.
+  Where a piece's scheme asks (forest lane, `uScheme`: one texel a metre,
+  read nearest so that a line begins exactly at its piece's end) a double
+  yellow centre line with short dashes beside it into the bend, the road
+  lane's old surface with more sealed cracks and less rubber, and a flush
+  precast concrete strip 0.32 m wide along the margin's outer side. All of
+  it is paint and tone on the profile: the course is unchanged.
 - **Wetness** (one shared uniform, the time of day's `wetness` or `?wet=`):
   water fills the gaps between stones first (the height channel says which),
   puddles stand in the wheel tracks and low spots, the road under the

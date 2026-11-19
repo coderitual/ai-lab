@@ -346,6 +346,7 @@ export const CAMERA = {
  * the hairpin, the gravel apron, the rail on white posts and the boards on the right, the open sea beyond. Waves (sea
  * lane, round 2): the low crossing on the long right, behind and right of the car, looking ahead and out over the
  * lagoon beside the causeway (not yet staged: the first pose tried, low on the bay side, saw the road and the massif).
+ * E2 and E5 (forest lane): the owner's two frames of the forest (design.md, "The reference frames").
  */
 export const PHOTOS = {
   d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
@@ -355,6 +356,11 @@ export const PHOTOS = {
   k5: { back: 6.2, right: 0, up: 2.3, yaw: 0, pitch: -9, fov: 50, t: 88.7, time: 'twilight' },
   e1: { back: -10, right: 2.5, up: 3.8, yaw: 162, pitch: -10, fov: 38, roll: 7, t: 64.9, time: 'day' },
   waves: { back: 7, right: 3, up: 2.2, yaw: -30, pitch: -4, fov: 55, t: 94.4, time: 'day' },
+  // (forest lane) e2: the forest road of the rise and the first ess, chase-like from behind and above the car, the
+  // low sun crossing from the left; e5: the last ess's exit, on the road ahead of the car, looking back at it coming
+  // round the bend among the granite boulders
+  e2: { back: 6.2, right: 0.3, up: 2.0, yaw: 0, pitch: -5, fov: 50, t: 22.2, time: 'day' },
+  e5: { back: -19.3, right: -3.5, up: 2.95, yaw: 199.4, pitch: -4.5, fov: 40, t: 34.2, time: 'day' },
 };
 
 /**

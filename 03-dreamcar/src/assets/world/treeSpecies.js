@@ -15,7 +15,7 @@
 import { BARK, TILE } from './forestTextures.js';
 
 /** The species, in the order the forest stores them. */
-export const SPECIES = ['spruce', 'fir', 'larch', 'birch', 'maple', 'lime', 'hazel', 'hornbeam'];
+export const SPECIES = ['spruce', 'fir', 'larch', 'birch', 'maple', 'lime', 'hazel', 'hornbeam', 'pine'];
 
 /**
  * Per species: the height range of grown trees (m); `green` the linear multiplier of the atlas colour in summer
@@ -31,6 +31,8 @@ export const SPECIES_DATA = {
   maple: { height: [9, 16], green: [0.19, 0.225, 0.05], autumn: [[1.2, 0.47, 0.05], [1.2, 0.44, 0.05], [1.2, 0.62, 0.06], [1.15, 0.7, 0.08], [1.2, 0.31, 0.045], [1.2, 0.36, 0.045], [1.2, 0.4, 0.045], [1.05, 0.16, 0.04], [1.1, 0.19, 0.04], [0.7, 0.08, 0.035]], turns: 1, value: [0.8, 1.06], hue: 0.35, lean: 0.08, through: 1.0 },
   hazel: { height: [1.8, 3.4], green: [0.18, 0.22, 0.05], autumn: [[0.95, 0.42, 0.07], [1.0, 0.55, 0.08]], turns: 0.35, value: [0.8, 1.1], hue: 0.35, lean: 0.12, through: 0.9 },
   hornbeam: { height: [14, 21], green: [0.2, 0.23, 0.052], autumn: [[0.95, 0.8, 0.3]], turns: 0.15, value: [0.85, 1.12], hue: 0.3, lean: 0.1, through: 1.0 },
+  // (forest lane) the pines of frames e2 and e5: a long bare stem, the crown only in the top third, bluish-green
+  pine: { height: [20, 30], green: [0.48, 0.64, 0.44], autumn: [], turns: 0, value: [0.82, 1.1], hue: 0.2, lean: 0.06, through: 0.35 },
   lime: { height: [12, 21], green: [0.185, 0.23, 0.052], autumn: [[0.973, 0.819, 0.377], [0.897, 0.656, 0.294]], turns: 0.3, value: [0.85, 1.12], hue: 0.3, lean: 0.06, through: 0.95 },
 };
 
@@ -102,6 +104,29 @@ export const VARIANTS = [
     bark: BARK.LARCH,
     // open and irregular: few, thin, drooping branches with upturned ends; one can see through it
     P: { H: 20, trunkR: 0.25, bend: 0.34, crownBase: 0.26, whorls: 13, per: [3, 5], R: 3.1, power: 0.8, elevBase: -0.2, elevTop: 0.6, sag: 0.56, upturn: 0.36, frond: 1.05, curtain: 0, dead: 6, gaps: 0.2, lop: 0.3, droopFronds: 1 },
+  },
+  {
+    // (forest lane) frame e2's pine: a straight bare stem two thirds of its height, with the stubs of the branches the
+    // shade killed, and a high, irregular, gappy crown of a few upswept limbs ending in tufts
+    name: 'pine-a',
+    species: 'pine',
+    kind: 'conifer',
+    frame: 'narrow',
+    tile: TILE.FIR,
+    hangTile: -1,
+    bark: BARK.LARCH,
+    P: { H: 24, trunkR: 0.32, bend: 0.25, crownBase: 0.58, whorls: 15, per: [4, 6], R: 3.5, power: 0.5, elevBase: 0.1, elevTop: 0.7, sag: 0.2, upturn: 0.32, frond: 1.35, curtain: 0, dead: 14, gaps: 0.22, lop: 0.38 },
+  },
+  {
+    // (forest lane) frame e5's stone pine on the inside of the bend: a tall bare stem and a broad, flat-topped umbrella
+    name: 'pine-b',
+    species: 'pine',
+    kind: 'conifer',
+    frame: 'wide',
+    tile: TILE.FIR,
+    hangTile: -1,
+    bark: BARK.LARCH,
+    P: { H: 20, trunkR: 0.38, bend: 0.45, crownBase: 0.66, whorls: 12, per: [5, 7], R: 5.6, power: 0.12, elevBase: 0.32, elevTop: 0.18, sag: 0.25, upturn: 0.22, frond: 1.6, curtain: 0, dead: 10, gaps: 0.12, lop: 0.28 },
   },
   {
     name: 'birch-a',

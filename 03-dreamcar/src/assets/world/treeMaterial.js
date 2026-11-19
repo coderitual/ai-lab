@@ -550,14 +550,18 @@ const NORMAL_BEGIN = THREE.ShaderChunk.normal_fragment_begin.replace('normal *= 
  * @param {number} [o.through] 0..1 how much light its leaves let through
  * @param {boolean} [o.coverage] alpha becomes coverage (a multisampled scene target)
  * @param {boolean} [o.flat] faceted (the rocks)
+ * @param {boolean} [o.vertexColors] times the geometry's `color` (the boulders: granite, lichen, moss)
+ * @param {boolean} [o.twoSided] both sides without a map (the bend signs)
  */
-export function plantMaterial({ map, atmosphere, uniforms, wind, through = 0, coverage = false, flat = false }) {
+export function plantMaterial({ map, atmosphere, uniforms, wind, through = 0, coverage = false, flat = false, vertexColors = false, twoSided = false }) {
   const material = withBake(
     new THREE.MeshStandardMaterial({
       map,
+      // (forest lane) painted per vertex (the boulders), and two-sided without a map (the bend signs)
+      vertexColors,
       alphaTest: map ? ALPHA_CUT : 0,
       alphaToCoverage: !!map && coverage,
-      side: map ? THREE.DoubleSide : THREE.FrontSide,
+      side: map || twoSided ? THREE.DoubleSide : THREE.FrontSide,
       roughness: 0.9,
       metalness: 0,
       flatShading: flat,

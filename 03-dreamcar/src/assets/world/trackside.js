@@ -19,6 +19,7 @@
 // side. Faces are big fields of flat colour: at speed they streak cleanly.
 
 import * as THREE from 'three';
+import { curbAt } from './schemes.js';
 import { levelFrame } from './furniture.js';
 import { BOARD_COUNT, DESIGN, TALL_COUNT } from './signs.js';
 import { PIT } from './gantry.js';
@@ -111,6 +112,8 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
   // runs: the Track's, and on bends whose inside is a wall too, the same stretch on the inside
   const runs = [];
   for (const run of track.boards) {
+    // (forest lane) none where a piece's scheme draws the edge as a kerbstone (schemes.js curbAt)
+    if (curbAt(track, run.s0 + track.wrap(run.s1 - run.s0) / 2)) continue;
     runs.push({ ...run });
     const len = track.wrap(run.s1 - run.s0);
     const mid = run.s0 + len / 2;
@@ -212,7 +215,7 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
       }
     }
   };
-  track.tyreWalls.forEach((wall, i) => tyreRun(wall.s0, track.wrap(wall.s1 - wall.s0), wall.side, tyreFaces[i % tyreFaces.length]));
+  track.tyreWalls.forEach((wall, i) => !curbAt(track, wall.s0 + track.wrap(wall.s1 - wall.s0) / 2) && tyreRun(wall.s0, track.wrap(wall.s1 - wall.s0), wall.side, tyreFaces[i % tyreFaces.length]));
 
   // ---- the start's own (frame D4), on the land side past the pit exit, read from the grid right to left (along
   // the road): two wide dark boards on the low wall, a stack of tyres, then two pale boards
@@ -295,6 +298,7 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
 
   // ---- marshal posts: a hut with an opening towards the road, a light panel on a pole beside it
   for (const m of track.marshals) {
+    if (curbAt(track, m.s)) continue;
     levelFrame(track, m.s, frame);
     const dist = Math.max(Math.abs(m.lat), track.edgeAt(m.s, m.side) + 1.8);
     const p = spot(m.s, m.side, dist);

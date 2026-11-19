@@ -332,7 +332,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,roll][,hud]` | the staging camera (`roll`: degrees the picture leans clockwise) |
-| `?photo=d1`, `d3`, `d4`, `e1`, `k5`, `waves` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; k5 the end of the sweepback's first piece at dusk, t 88.7 s, frame K5's chase camera; waves the low crossing by day, t 94.4 s) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=d1`, `d3`, `d4`, `e1`, `k5`, `waves`, `e2`, `e5` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; k5 the end of the sweepback's first piece at dusk, t 88.7 s, frame K5's chase camera; waves the low crossing by day, t 94.4 s; e2 the forest road of the rise and the first ess by day; e5 the last ess among its granite boulders by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
