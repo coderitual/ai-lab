@@ -251,7 +251,11 @@ vec3 carBoreLines(vec3 p, vec3 r, float spread) {
   if (d > carBoreFrom.w) row = carBoreBars[3];
   // never thinner than about a pixel: seen small (the chase camera on a phone) a bar's width is a fraction of the
   // pixel's footprint on the plane, and filtered to its true share it was a faint grey thread
-  float h = max(0.5 * uBoreLines.w, 0.6 * min(fwidth(lat), 4.0));
+  // (but no wider than 0.6 m, and dimmer the wider it is drawn: where the body turns sharply, at the rear quarter's
+  // corner, the footprint is wide because the mirror curves, and the widened lines met there in a bright V)
+  float h0 = 0.5 * uBoreLines.w;
+  float h = max(h0, 0.6 * min(fwidth(lat), 1.0));
+  float thin = sqrt(h0 / h);
   float across = carBoxSeen(abs(lat) - uBoreLines.x - row.w, h, bLat) + (row.w > 0.0 ? carBoxSeen(abs(lat) - uBoreLines.x + row.w, h, bLat) : 0.0);
   float along = carRowSeen(d, row, bS) * carBoxSeen(d - 0.5 * (carBoreSpan.x + carBoreSpan.y), 0.5 * (carBoreSpan.y - carBoreSpan.x) + 0.5 * row.z, bS);
   // only rays that go up to the plane, and from outside the box only through its mouth
@@ -261,7 +265,7 @@ vec3 carBoreLines(vec3 p, vec3 r, float spread) {
   if (sP < uBoreZone.x || sP > uBoreZone.y) {
     seen *= step(0.0, tm) * step(abs(latP + dl * tm), uBoreLines.x + ${LUMINAIRE.inset.toFixed(3)}) * step(hP + (dh) * tm, uBoreLines.y + 0.1);
   }
-  return uBoreLineColor * (uBoreLines.z * across * along * seen);
+  return uBoreLineColor * (uBoreLines.z * across * thin * along * seen);
 }
 /** Under the roof the probe's lamps and fittings are the analytic lines' (carBoreLines): what it sees is held to a few times the lining's radiance. */
 vec3 carBoreHold(vec3 seen) {

@@ -2,7 +2,7 @@
 // livery for the dark, in the spirit of the expressway racers (nothing of any team, brand, film or game): a black
 // base, sharp angular blades in magenta along the lower flanks rising over the rear wheels, a cyan line beside
 // them, acid-yellow ticks, a big number, made-up marks ("YORU SPEED", "DOMI RACING") and katakana of its own
-// drawing (ドリームカー "dream car", ヨル "night"), and a twin stripe over the bonnet, the roof and the boot.
+// drawing (ドリームカー "dream car", ヨル "night"), and a stripe between two cyan lines over the bonnet, the roof and the boot.
 //
 // The picture has three bands, read by the paint (materials.js, `paintLivery`) in car space, so nothing depends on
 // the skin's own layout:
@@ -95,6 +95,9 @@ function flankGraphics(g, X, Y) {
   };
   // the main blade: from under the front wing, low along the doors, kicking up over the rear wheel to the tail
   poly(MAGENTA, [[0.55, 0.55], [1.1, 0.52], [3.1, 0.6], [3.75, 0.25], [4.75, 0.22], [4.9, 0.3], [3.95, 0.4], [3.35, 0.72], [1.0, 0.68]]);
+  // a violet shard from the C-pillar's foot down to the rear wheel, and a white pinstripe under the blade
+  poly('#7c1cff', [[3.25, 0.1], [4.35, 0.16], [3.62, 0.44], [3.45, 0.3]]);
+  poly(WHITE, [[1.05, 0.69], [3.33, 0.73], [3.95, 0.415], [4.86, 0.315], [4.86, 0.33], [3.97, 0.43], [3.36, 0.75], [1.05, 0.71]]);
   // a cyan line along its upper edge, broken where the blade turns
   poly(CYAN, [[0.95, 0.495], [3.05, 0.565], [3.6, 0.27], [4.7, 0.18], [4.72, 0.205], [3.66, 0.3], [3.12, 0.585], [0.95, 0.515]]);
   // sharp slashes ahead of the front wheel and behind the rear one
@@ -113,6 +116,7 @@ function flankGraphics(g, X, Y) {
 
 /** The words of one flank, `X` mapping metres from the front to the picture (front at the left or right). */
 function flankWords(g, X, Y, px, flip) {
+  // where a word `w` px long starts so that it covers the car from `m` metres behind the front, on either flank
   const at = (m, w) => (flip ? X(m) - w : X(m));
   g.strokeStyle = WHITE;
   g.lineCap = 'round';
@@ -121,24 +125,24 @@ function flankWords(g, X, Y, px, flip) {
   const nh = 0.3 * px;
   const nw = measure('01', nh, 0.18);
   g.strokeStyle = WHITE;
-  write(g, '01', at(flip ? 2.17 : 1.73, nw), Y(0.43), nh, nh * 0.17, 0.18);
+  write(g, '01', at(1.73, nw), Y(0.43), nh, nh * 0.17, 0.18);
   // a made-up sponsor on the front wing, white on magenta
   const sh = 0.055 * px;
   const sw = measure('YORU SPEED', sh);
   g.fillStyle = MAGENTA;
-  g.fillRect(at(flip ? 0.98 : 0.36, sw + sh), Y(0.38) - sh * 1.5, sw + sh, sh * 2);
+  g.fillRect(at(0.36, sw + sh), Y(0.38) - sh * 1.5, sw + sh, sh * 2);
   g.strokeStyle = WHITE;
-  write(g, 'YORU SPEED', at(flip ? 0.98 : 0.36, sw + sh) + sh / 2, Y(0.38) - sh * 0.25, sh, sh * 0.2);
-  // the katakana along the rear door's foot, cyan
+  write(g, 'YORU SPEED', at(0.36, sw + sh) + sh / 2, Y(0.38) - sh * 0.25, sh, sh * 0.2);
+  // the katakana on the rear door, over the blade, cyan
   const kh = 0.07 * px;
   const kw = measure('ドリームカー', kh, 0.2);
   g.strokeStyle = CYAN;
-  write(g, 'ドリームカー', at(flip ? 3.3 : 2.5, kw), Y(0.75), kh, kh * 0.14, 0.2);
+  write(g, 'ドリームカー', at(2.75, kw), Y(0.46), kh, kh * 0.14, 0.2);
   // the team's name under the rear window, small
   const th = 0.04 * px;
   const tw = measure('DOMI RACING', th);
   g.strokeStyle = WHITE;
-  write(g, 'DOMI RACING', at(flip ? 3.95 : 3.2, tw), Y(0.16), th, th * 0.2);
+  write(g, 'DOMI RACING', at(3.2, tw), Y(0.16), th, th * 0.2);
 }
 
 /**
@@ -170,14 +174,15 @@ export function createLiveryTexture(tier = 'medium') {
   const y0 = LIVERY.bands[2] * H;
   const across = (x) => y0 + ((x + LIVERY.half) / (2 * LIVERY.half)) * bandH;
   g.fillStyle = MAGENTA;
-  g.fillRect(0, across(-0.16), W, across(0.04) - across(-0.16));
+  g.fillRect(0, across(-0.1), W, across(0.1) - across(-0.1));
   g.fillStyle = CYAN;
-  g.fillRect(0, across(0.08), W, across(0.12) - across(0.08));
+  g.fillRect(0, across(0.14), W, across(0.17) - across(0.14));
+  g.fillRect(0, across(-0.17), W, across(-0.14) - across(-0.17));
   // ヨル on the bonnet, across the stripe, read from the driver's seat's side (the car's left)
   g.strokeStyle = '#08080c';
   g.lineCap = 'round';
-  const kh = across(0.02) - across(-0.14);
-  write(g, 'ヨル', 0.35 * px, across(0.02), kh, kh * 0.16, 0.25);
+  const kh = across(0.08) - across(-0.08);
+  write(g, 'ヨル', 0.35 * px, across(0.08), kh, kh * 0.16, 0.25);
   const texture = new THREE.CanvasTexture(canvas);
   texture.flipY = false;
   texture.colorSpace = THREE.SRGBColorSpace;
