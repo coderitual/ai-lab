@@ -345,6 +345,20 @@ gAlbedo = mix( gAlbedo, gCanopy * 1.3, gClump * ( 1.0 - min( vMask.x * 3.0, 1.0 
 gAlbedo = mix( gAlbedo, gScreeCol, gScree );
 gAlbedo = mix( gAlbedo, gRockCol, gRock );
 gAlbedo = mix( gAlbedo, gSnowCol, gSnow );
+// (sea lane, round 4) the volcano's island: dark basalt, green low down on its flanks, a pale ash rim at the crater
+if ( uVolcano.z > 0.0 ) {
+  float vq = length( vGroundPos.xz - uVolcano.xy ) / uVolcano.z;
+  float vOn = 1.0 - smoothstep( 0.95, 1.1, vq );
+  if ( vOn > 0.0 ) {
+    float vUp = clamp( ( vGroundPos.y - uSeaBox.w ) / max( 1.0, uVolcano.w - uSeaBox.w ), 0.0, 1.0 );
+    vec3 basalt = mix( vec3( 0.03, 0.028, 0.027 ), vec3( 0.06, 0.05, 0.045 ), gDetRock.g ) * ( 0.8 + 0.4 * gLarge.g );
+    vec3 green = mix( vec3( 0.03, 0.048, 0.018 ), vec3( 0.05, 0.065, 0.025 ), gDet.r );
+    vec3 ash = vec3( 0.32, 0.3, 0.27 ) * ( 0.85 + 0.3 * gDet.b );
+    vec3 vCol = mix( green, basalt, smoothstep( 0.08, 0.3, vUp + 0.12 * ( gMid.g - 0.5 ) ) );
+    vCol = mix( vCol, ash, smoothstep( 0.86, 0.96, vUp ) );
+    gAlbedo = mix( gAlbedo, vCol, vOn * ( 1.0 - gWetBand ) );
+  }
+}
 gAlbedo *= 1.0 - 0.55 * gWetBand;
 diffuseColor.rgb *= gAlbedo;
 // Seen against a low sun a plain rough surface glares (its Fresnel term goes to one at a grazing angle): rock and

@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE } from '../../engine/glsl.js';
 import { extend } from './shading.js';
+import { SEA_UNIFORMS } from './sea.js';
 
 /**
  * The plume: its height over the rim (m), its radius at the rim and at the top, how far it leans downwind at the top
@@ -19,7 +20,8 @@ import { extend } from './shading.js';
  * which it shows (from `glow.from` down to `glow.to`).
  */
 export const VOLCANO_LOOK = {
-  plume: { height: 320, r0: 9, r1: 60, lean: 170, wind: -20, rise: 3.5, color: 0xd9d6cf, opacity: 0.72 },
+  // (round 4: a soft drifting plume that reads as smoke, not a streak) wide, puffy and thin
+  plume: { height: 420, r0: 16, r1: 150, lean: 320, wind: -20, rise: 3.0, color: 0xc9c6c0, opacity: 0.5 },
   glow: { radiance: 60, color: [1.0, 0.42, 0.12], from: 5, to: 1 },
 };
 
@@ -33,6 +35,8 @@ export function createVolcano({ volcano, atmosphere, tier }) {
   const group = new THREE.Group();
   group.name = 'volcano';
   if (!volcano) return { group, setTime() {}, update() {}, dispose() {}, stats: { triangles: 0 } };
+  // the ground's colours on the island (groundMaterial.js reads it)
+  SEA_UNIFORMS.uVolcano.value.set(volcano.x, volcano.z, volcano.r, volcano.top);
   const P = VOLCANO_LOOK.plume;
   const rings = tier === 'low' ? 10 : 18;
   const geometry = new THREE.CylinderGeometry(P.r1, P.r0, P.height, tier === 'low' ? 10 : 16, rings, true).translate(0, P.height / 2, 0);
@@ -63,10 +67,12 @@ transformed += uPlumeWind * pow( plumeH, 1.6 );`,
           `#include <color_fragment>
 // wisps rising and twisting: noise round the tube and up it, drifting up with the clock
 float pa = atan( vPlumeP.z, vPlumeP.x );
-vec3 pq = vec3( cos( pa ) * 2.2, sin( pa ) * 2.2, vPlumeP.y / 38.0 - uPlumeTime * ${(P.rise / 38).toFixed(4)} );
+vec3 pq = vec3( cos( pa ) * 1.6, sin( pa ) * 1.6, vPlumeP.y / 60.0 - uPlumeTime * ${(P.rise / 60).toFixed(4)} );
 float pn = 0.55 * valueNoise( pq ) + 0.3 * valueNoise( pq * 2.3 + 7.1 ) + 0.15 * valueNoise( pq * 5.1 + 3.3 );
 float pFade = smoothstep( 0.0, 0.06, vPlumeH ) * ( 1.0 - smoothstep( 0.35, 1.0, vPlumeH ) );
-diffuseColor.a *= pFade * smoothstep( 0.38, 0.7, pn + 0.25 * ( 1.0 - vPlumeH ) );`,
+// soft billows, thinning as it rises and spreads, and a softer edge where the tube is seen edge-on
+float pEdge = abs( dot( normalize( vNormal ), normalize( vViewPosition ) ) );
+diffuseColor.a *= pFade * smoothstep( 0.3, 0.75, pn + 0.3 * ( 1.0 - vPlumeH ) ) * ( 1.0 - 0.6 * vPlumeH ) * smoothstep( 0.0, 0.5, pEdge );`,
         )
         .replace(
           '#include <emissivemap_fragment>',

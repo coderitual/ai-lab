@@ -86,12 +86,15 @@ export const SEA_LOOK = {
 export const SEA_UNIFORMS = {
   uSeaMap: { value: /** @type {THREE.Texture | null} */ (null) },
   uSeaBox: { value: new THREE.Vector4(0, 0, 1e-6, -1e4) },
+  /** (round 4) the volcano's island, for the ground's colours on it: x, z, its foot's radius, its rim's height (radius 0: none) */
+  uVolcano: { value: new THREE.Vector4(0, 0, 0, 0) },
 };
 
 /** GLSL: reading the sea map. seaMapAt(xz): r depth, g land's distance from the water, b water's from the land, a sea. */
 export const SEA_MAP_GLSL = /* glsl */ `
 uniform sampler2D uSeaMap;
 uniform vec4 uSeaBox;
+uniform vec4 uVolcano;
 vec4 seaMapAt( vec2 p ) {
   return texture2D( uSeaMap, ( p - uSeaBox.xy ) * uSeaBox.z );
 }

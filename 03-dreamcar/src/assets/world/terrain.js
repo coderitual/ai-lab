@@ -97,7 +97,7 @@ const SEA = {
  * a cliff straight down into the sea, `steep` m down per m out (it wanders), rounded at its top and with a talus at
  * its foot, `below` m under the water's level; the seabed shelves away beyond it (SEA.shelf, SEA.deep). `ease`: metres
  * over which a side becomes coast. On the land side, the cut face is `cut` m high (the coast's ochre and rust rock)
- * and the hillside beyond it rises at most `landFar` per metre; inside the carousel's hairpin (`knoll.piece`, the
+ * and the hillside beyond it rises at most `landFar` per metre (a rock edge on a sea side is a wall `seaRock` m high); inside the carousel's hairpin (`knoll.piece`, the
  * bend frame E1 looks at) the headland rises `knoll.rise` m over the road beyond the cut, along a ridge down the
  * tongue between its legs (from nothing at the bend's centre to its full height a third of the way along, gone by
  * `knoll.along` m), `knoll.across` m to either side of it, moved `knoll.shift` of the way towards the hairpin's entry
@@ -126,15 +126,18 @@ const CAUSEWAY = { piece: 'back', from: 0.5, to: 0.93, ease: 50, lip: 2.5, steep
  * `sound`: round it, out to `r` m, the land is drowned to `floor` m under the water (so the island stands free of the
  * massif inside the loop), except within `keep` m of a solid edge, where the road's own ground stays.
  */
-const VOLCANO = { piece: 'viaduct', at: 0.05, out: -300, h: 165, r: 190, concave: 1.7, crater: 34, depth: 26, sound: { r: 560, floor: 16, keep: [60, 120] } };
+// (round 4) moved and sharpened: ahead and to the right from the sky road's start and from the crest and the plunge
+// (the bay inside the loop), a steeper cone so that it reads as a volcano against the sea and the sky
+const VOLCANO = { piece: 'ledge2', at: 0.29, out: -195, h: 190, r: 150, concave: 1.3, crater: 30, depth: 24, sound: { r: 600, floor: 16, keep: [60, 120] } };
 const COAST = {
   lip: [1.5, 4],
-  steep: [1.6, 2.6],
+  steep: [2.2, 3.4],
   below: 7,
   ease: 30,
   cut: 6,
   landFar: 0.25,
-  knoll: { piece: 'carousel', rise: 32, along: 230, across: 44, shift: 0.65 },
+  seaRock: 1.4,
+  knoll: { piece: 'carousel', rise: 0, along: 230, across: 44, shift: 0.65 },
 };
 
 /**
@@ -268,6 +271,9 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   for (let i = 0; i < n; i++) {
     cliffL[i] = Math.max(cliffL[i], rockL[i] * coastR[i] * COAST.cut);
     cliffR[i] = Math.max(cliffR[i], rockR[i] * coastL[i] * COAST.cut);
+    // (round 4) a rock edge on a sea side is a low wall of rock over the cliff, not a cut face
+    cliffL[i] += (rockL[i] * COAST.seaRock - cliffL[i]) * coastL[i];
+    cliffR[i] += (rockR[i] * COAST.seaRock - cliffR[i]) * coastR[i];
   }
   /** The cliff's foot starts this far beyond the edge, and climbs this far out per metre up. */
   /** Bridges shorter than this (m) span a gully across them rather than a valley along them. */

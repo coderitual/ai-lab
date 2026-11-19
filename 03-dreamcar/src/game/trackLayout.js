@@ -96,6 +96,11 @@ export const SIDES = {
   // island out in it (terrain.js VOLCANO). The presets they replace (parapet, highUp) with nothing growing and the
   // coast's cliff beyond the edge; the corridor (edges, slopes, kinds, verges) exactly theirs.
   parapetSea: { kind: 'parapet', edge: [VIADUCT.parapetOffset, VIADUCT.parapetOffset], slope: 0, far: -2.5, verge: 'asphalt', wood: null, coast: true },
+  // (sea lane, round 4: the owner chose "a big bay inside the loop") the inside of the climb and the carousel and the
+  // crest's right: the bay too. The corridor is the preset's it replaces (rock, open); beyond the edge the coast's
+  // cliff, a rock edge only a low wall of rock (terrain.js), nothing growing
+  rockSea: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null, coast: true },
+  openSea: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'grass', wood: null, coast: true },
   coastUp: { kind: 'rail', edge: [3, 5], slope: 0.05, far: 0.45, verge: 'grass', wood: null, coast: true },
   coastDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.35, verge: 'grass', wood: null, coast: true },
   // (sea lane, round 2: frame E1) round the carousel and over the crest the verge is a broad apron of ochre gravel
@@ -169,11 +174,11 @@ const SEGMENTS = [
 
   // The carousel: a climb along the far side, then a right round the spur, the slow corner of the lap.
   // (sea lane) the coast road: from here to the foot of the plunge the sea lies below on the left, the land cut on the right
-  { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 6, L: 'coastDown', R: 'rock' },
-  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'coastRun', R: 'rock', runoff: 'L' },
+  { id: 'climb', sec: 'carousel', len: 150, ease: 90, g: 6, L: 'coastDown', R: 'rockSea' },
+  { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'coastRun', R: 'rockSea', runoff: 'L' },
 
   // The crest: up over the top in the open, the sea far below.
-  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'coastTop', R: 'open' },
+  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'coastTop', R: 'openSea' },
 
   // The plunge: 8 per cent down into a compression.
   { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'coastDown', R: 'coastUp' },
