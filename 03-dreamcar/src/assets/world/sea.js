@@ -76,7 +76,7 @@
 
 import * as THREE from 'three';
 import { createWaveField, SEA_HEIGHT, WAVES } from '../../engine/waves.js';
-import { GLSL_HASH } from '../../engine/glsl.js';
+import { GLSL_HASH, GLSL_PROBE } from '../../engine/glsl.js';
 import { gradientField, normalTexture, valueField, worleyField, fieldTexture } from '../../engine/noise.js';
 import { SHORE, bakeShoreMap } from './seaShore.js';
 import { extend } from './shading.js';
@@ -84,20 +84,28 @@ import { extend } from './shading.js';
 const DEG = Math.PI / 180;
 
 /**
- * Per tier: the mesh's angular segments (its rings grow to keep the cells square), whether the waves move it, how
- * many waves it knows (WAVES, longest first) and how many of those its normals draw as waves (the swell and the
- * longest chop: the shorter ones are the ripple layers' to draw, see the header), which ripple layers are drawn
- * (indices into SEA_LOOK.ripples),
- * how many steps the mirrored ray takes over the land (0: the water mirrors the sky alone) and how much longer each
- * is than the last (the first is 9 m), the shore map's texels a
- * side, whether the surf's lines have relief, cloud shadows, how many lamps it mirrors at night, and how many of the
- * nearest piers standing in the water it knows (foam round their feet; with `land`, their reflections), and how many
- * tail lamps (two a car). The planar mirror is the world's to give (createSea's `mirror`: on high).
+ * How much water each kind of device draws, by name: the three tiers, and `mobile`, which is what medium means on a
+ * phone (`caps.mobile`) unless createSea is told otherwise (`detail`): the same surface with about a third fewer
+ * texture reads a pixel and a quarter of the shore map's texels.
+ *   segments  the mesh's angular segments (its rings grow to keep the cells square); displace: the waves move it
+ *   waves     how many of WAVES it knows (longest first); normals: how many of those its normals draw as waves
+ *             (the swell and the longest chop: the shorter ones are the ripple layers' to draw, see the header)
+ *   ripples   which ripple layers are drawn (indices into SEA_LOOK.ripples); the others count as roughness
+ *   lean      one gust sample instead of two, no slicks, the bed's fine patches from the foam's noise
+ *   land      steps the mirrored ray takes over the land (0: the water mirrors the sky alone); stride: how much
+ *             longer each is than the last (the first is 9 m: medium reaches 1.8 km, mobile 500 m, high 2.2 km)
+ *   probe     the far land beyond the shore map from the car's reflection probe, where the game hands one over
+ *   shore     the shore map's texels a side
+ *   relief    the surf's lines have a crest in the normal; clouds: their shade; caustics: light on a shallow bed
+ *   lamps     lamps mirrored at night; tails: tail lamps (two a car)
+ *   piers     the nearest piers standing in the water (foam round their feet; with `land`, their reflections)
+ * The planar mirror is the world's to give (createSea's `mirror`: on high).
  */
-const TIER = {
-  low: { segments: 32, displace: false, waves: 7, normals: 4, ripples: [1, 3, 4], land: 0, stride: 2, shore: 512, relief: false, clouds: false, lamps: 6, piers: 4, tails: 2 },
-  medium: { segments: 96, displace: true, waves: 9, normals: 4, ripples: [0, 1, 3, 4], land: 6, stride: 2.6, shore: 1024, relief: true, clouds: true, lamps: 6, piers: 8, tails: 4 },
-  high: { segments: 160, displace: true, waves: WAVES.length, normals: 4, ripples: [0, 1, 2, 3, 4], land: 8, stride: 2.2, shore: 1024, relief: true, clouds: true, lamps: 6, piers: 8, tails: 4 },
+export const SEA_TIERS = {
+  low: { segments: 32, displace: false, waves: 7, normals: 4, ripples: [1, 4], lean: true, land: 0, stride: 2, probe: false, shore: 512, relief: false, clouds: false, caustics: false, lamps: 6, piers: 4, tails: 2 },
+  mobile: { segments: 64, displace: true, waves: 7, normals: 4, ripples: [1, 4], lean: true, land: 4, stride: 3.8, probe: true, shore: 512, relief: false, clouds: false, caustics: false, lamps: 6, piers: 4, tails: 2 },
+  medium: { segments: 96, displace: true, waves: 9, normals: 4, ripples: [0, 1, 4], lean: false, land: 6, stride: 2.9, probe: true, shore: 1024, relief: true, clouds: true, caustics: false, lamps: 6, piers: 8, tails: 4 },
+  high: { segments: 160, displace: true, waves: WAVES.length, normals: 4, ripples: [0, 1, 2, 3, 4], lean: false, land: 8, stride: 2.2, probe: false, shore: 1024, relief: true, clouds: true, caustics: true, lamps: 6, piers: 8, tails: 4 },
 };
 
 /**
@@ -119,7 +127,7 @@ export const SEA_LOOK = {
   milk: [0.2, 0.36, 0.35],
   /** the light that comes through the top of a wave towards the eye, per unit of the sun's */
   scatter: [0.0, 0.0045, 0.0036],
-  foam: [0.62, 0.65, 0.66],
+  foam: [0.78, 0.81, 0.82],
   /** the calm surface's roughness, and the slope variance of the capillary ripples no layer draws (in a gust) */
   rough: 0.045,
   capillary: 0.003,
@@ -338,6 +346,7 @@ function mainlandOf(sea) {
  * @property {THREE.Mesh} mesh
  * @property {(time: import('./lighting.js').TimeOfDay) => void} setTime
  * @property {(simTime: number) => void} update the run's clock (fixed step)
+ * @property {(cube: THREE.Texture | null) => void} setProbe the car's reflection probe for the next view (or null)
  * @property {(at: THREE.Vector3) => boolean} mirrored whether the planar mirror is worth drawing for an eye there
  * @property {(beams: Array<object> | null | undefined) => void} setBeams the cars' lamps (their tail lamps streak in the water)
  * @property {(piers: Array<{ x: number, z: number, r: number, top: number }>) => void} setPiers what stands in the
@@ -360,10 +369,12 @@ function mainlandOf(sea) {
  *   lamps' heads, filled per view by lamps.js (the wet road's)
  * @param {import('../../engine/PlanarMirror.js').PlanarMirror | null} [options.mirror] a mirror in the water's level,
  *   which whoever owns the scene draws before each view where `mirrored()` says so (world/index.js; high)
+ * @param {string | null} [options.detail] a name of SEA_TIERS instead of the tier's own (a quality ladder's choice)
  * @returns {Sea}
  */
-export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints = null, mirror = null }) {
-  const spec = TIER[tier] ?? TIER.medium;
+export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints = null, mirror = null, detail = null }) {
+  const name = SEA_TIERS[detail] ? detail : tier === 'medium' && caps.mobile ? 'mobile' : SEA_TIERS[tier] ? tier : 'medium';
+  const spec = SEA_TIERS[name];
   const outer = SEA_LOOK.horizon;
   const waves = createWaveField({ count: spec.waves, segments: spec.displace ? spec.segments : 0, normals: spec.normals });
   // (round 2) the big swell off the low crossing (terrain.js CAUSEWAY.surf, waves.js BOOST)
@@ -451,6 +462,9 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
     uSeaTail: { value: Array.from({ length: spec.tails }, () => new THREE.Vector4()) },
     // the planar mirror's brightest (scene units)
     uSeaMirrorCap: { value: 1 },
+    // the car's reflection probe (the game's, per view) and whether there is one now
+    uSeaProbe: { value: /** @type {THREE.CubeTexture | null} */ (null) },
+    uSeaProbeOn: { value: 0 },
     ...(mirror ? mirror.uniforms : {}),
   };
   const lamps = glints ? Math.min(spec.lamps, glints.pos.value.length) : 0;
@@ -484,7 +498,7 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
 
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: SEA_LOOK.rough, metalness: 0 });
   material.name = 'sea';
-  extend(material, `sea-${tier}`, (shader) => {
+  extend(material, `sea-${name}`, (shader) => {
     Object.assign(shader.uniforms, uniforms, SEA_UNIFORMS);
     const defines = [
       spec.displace ? '#define SEA_DISPLACE' : '',
@@ -492,7 +506,9 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
       `#define SEA_STEP ${f(spec.stride ?? 2, 2)}`,
       spec.relief ? '#define SEA_RELIEF' : '',
       spec.clouds ? '#define SEA_CLOUDS' : '',
-      tier === 'low' ? '#define SEA_LOW' : '',
+      spec.caustics ? '#define SEA_CAUSTICS' : '',
+      spec.lean ? '#define SEA_LEAN' : '',
+      spec.probe ? '#define SEA_PROBE' : '',
       `#define SEA_LAMPS ${lamps}`,
       `#define SEA_PIERS ${spec.piers}`,
       `#define SEA_TAILS ${spec.tails}`,
@@ -507,7 +523,7 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
       // beyond the views' far plane the water stays just inside the depth range, in front of far.js's ridges
       .replace('#include <project_vertex>', '#include <project_vertex>\ngl_Position.z = min( gl_Position.z, gl_Position.w * ( 1.0 - 2.0e-6 ) );');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${defines}\n${GLSL_HASH}\n${waves.glsl}\n${SEA_MAP_GLSL}\n${SEA_SHORE_GLSL}\n${SEA_FRAGMENT_PARS}`)
+      .replace('#include <common>', `#include <common>\n${defines}\n${GLSL_HASH}\n${spec.probe ? GLSL_PROBE : ''}\n${waves.glsl}\n${SEA_MAP_GLSL}\n${SEA_SHORE_GLSL}\n${SEA_FRAGMENT_PARS}`)
       .replace('#include <map_fragment>', seaSurface().replace('/*RIPPLES*/', layerCode.join('\n')).replace('/*UNDRAWN*/', f(undrawn, 5)))
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = seaRough;')
       .replace('#include <normal_fragment_maps>', 'normal = normalize( ( viewMatrix * vec4( seaN, 0.0 ) ).xyz );')
@@ -542,6 +558,14 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
       if (i < 0 || j < 0 || i >= m.size || j >= m.size) return true;
       // the sea map's g: the land's distance from the water, 255 at 500 m and more
       return m.data[(j * m.size + i) * 4 + 1] < 250;
+    },
+    /**
+     * The car's reflection probe for the view about to be drawn (its prefiltered cube), or null: what stands beyond
+     * the shore map (the far massif, the ridges) is mirrored from it on the tiers that have no planar mirror.
+     */
+    setProbe(cube) {
+      uniforms.uSeaProbe.value = cube ?? null;
+      uniforms.uSeaProbeOn.value = cube && spec.probe ? 1 : 0;
     },
     /** The cars' lamps (World.prepareView's `beams`): their tail lamps streak in the water at night. */
     setBeams(beams) {
@@ -605,7 +629,7 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
     },
     /** (for the lab) the material's own uniforms */
     uniforms,
-    stats: { triangles: geometry.index.count / 3, waves: waves.count, shore: baked.stats, shoreSize: baked.size, piers: () => piers.length },
+    stats: { detail: name, triangles: geometry.index.count / 3, waves: waves.count, shore: baked.stats, shoreSize: baked.size, piers: () => piers.length },
     dispose() {
       geometry.dispose();
       material.dispose();
@@ -681,18 +705,25 @@ uniform vec3 uSeaGlintColor[ SEA_LAMPS ];
 #if SEA_TAILS > 0
 uniform vec4 uSeaTail[ SEA_TAILS ];
 #endif
+#ifdef SEA_PROBE
+uniform samplerCube uSeaProbe;    // the car's reflection probe (prefiltered), for the land beyond the shore map
+uniform float uSeaProbeOn;
+#endif
+#if defined( SEA_MIRROR ) || defined( SEA_PROBE )
+uniform float uSeaMirrorCap;
+#endif
 #ifdef SEA_MIRROR
 uniform sampler2D uMirrorTex;     // the scene from the eye mirrored in the water's level (PlanarMirror)
 uniform sampler2D uMirrorStreak;  // and drawn out towards the eye
 uniform mat4 uMirrorMatrix;
 uniform float uMirrorOn;
-uniform float uSeaMirrorCap;
 #endif
 varying vec3 vSeaWorld;
 varying vec2 vSeaBase;
 vec3 seaN;        // the surface's normal (world)
 float seaRough;
 float seaVar;     // the variance of the slopes this pixel does not draw (both axes together)
+float seaF;       // how much the surface mirrors here (the mean Fresnel of rough water)
 float seaFoam;
 float seaFoot;    // metres of water a pixel covers (the geometric mean of across and along the line of sight)
 float seaShade;   // 0..1 the sun's light the clouds let through here
@@ -762,7 +793,7 @@ float sAmp = 0.35 + 0.65 * smoothstep( 0.0, 14.0, sDepth );
 // ---- the wind: gusts (cat's paws) and slicks, slow fields long in the wind's direction, drifting with it
 vec2 sWp = ${windAlong};
 vec4 sN1 = texture2D( uSeaNoise, sWp * vec2( ${f(1 / 930, 6)}, ${f(1 / 270, 6)} ) - vec2( sT * ${f(SEA_LOOK.wind.speed / 930, 6)}, 0.0 ) );
-#ifdef SEA_LOW
+#ifdef SEA_LEAN
 float sGust = smoothstep( 0.32, 0.68, sN1.a );
 float sSlick = 0.0;
 #else
@@ -827,6 +858,13 @@ seaVar = sLost + sRipLost * sWind * sWind;
   }
 }
 seaN = sN;
+// Rough water mirrors less at a glancing angle than calm water: the facets the eye sees are the ones that lean towards
+// it (Bruneton's fit of the mean Fresnel factor of a Gaussian sea surface; calm water: Schlick). What the surface
+// does not mirror comes from below it.
+{
+  float sigma = sqrt( 0.5 * seaVar );
+  seaF = 0.02 + 0.98 * pow( 1.0 - clamp( dot( sN, sV ), 0.0, 1.0 ), 5.0 * exp( - 2.69 * sigma ) ) / ( 1.0 + 22.7 * pow( sigma, 1.5 ) );
+}
 // the highlight widens by the slopes the pixel does not draw (alpha^2 = alpha0^2 + their variance; roughness^2 = alpha)
 seaRough = sqrt( sqrt( ${(SEA_LOOK.rough ** 4).toExponential(3)} + seaVar ) );
 
@@ -843,8 +881,9 @@ float sFront = 1.0 - smoothstep( 0.02, 0.17, sU );
 float sTrail = pow( 1.0 - sU, 1.6 );
 float sGrow = 0.6 + 0.4 * ( 1.0 - smoothstep( 0.0, ${f(0.7 * S.reach)}, sShore ) );
 // (a pixel that covers most of the lines' spacing sees their mean, a third of white: no moire)
-float sLines = mix( max( sFront, 0.8 * sTrail ), 0.36, smoothstep( ${f(0.45 * S.spacing)}, ${f(1.0 * S.spacing)}, sAlong ) );
-float sSurf = sZone * sGrow * sLines * ( 0.7 + 0.3 * sLace.b );
+// (the front's mask is over one: solid white whatever the lace says)
+float sLines = mix( max( 1.3 * sFront, 0.95 * sTrail ), 0.45, smoothstep( ${f(0.45 * S.spacing)}, ${f(1.0 * S.spacing)}, sAlong ) );
+float sSurf = sZone * sGrow * sLines;
 // the sheet on the sand: foam at its very edge, bubbles on the thin water behind it
 float sFilm = sIn * ( 1.0 - smoothstep( 0.03, 0.3, sThick ) ) * sGentle;
 float sEdge = sIn * ( 1.0 - smoothstep( 0.0, 0.07, sThick ) );
@@ -865,9 +904,9 @@ float sRock = sSteep * max( ( 1.0 - smoothstep( 0.8, 5.5, sShore + sWarp * 0.6 )
 }
 #endif
 float sMask = max( max( sCrest * 0.8, sSurf ), max( max( 0.5 * sFilm, 0.95 * sEdge ), sRock ) );
-seaFoam = smoothstep( 1.18 - sMask * 1.05, 1.42 - sMask * 1.05, sChurn ) * ( 0.4 + 0.6 * sMask );
+seaFoam = smoothstep( 1.18 - sMask * 1.05, 1.42 - sMask * 1.05, sChurn ) * min( 1.0, 0.4 + 0.6 * sMask );
 // far away the foam's lace is less than a pixel: a share of white, not threads
-seaFoam = mix( seaFoam, 0.55 * sMask * sMask + 0.3 * sMask, smoothstep( 0.7, 3.5, sAlong ) );
+seaFoam = mix( seaFoam, min( 1.0, 0.55 * sMask * sMask + 0.3 * sMask ), smoothstep( 0.7, 3.5, sAlong ) );
 
 // ---- the body: the bed through the water, over the deep colour
 float sNv = clamp( sV.y, 0.05, 1.0 );
@@ -878,15 +917,21 @@ vec3 sClear = exp( - ${v3(SEA_LOOK.absorb)} * ( sCol * 0.5 * ( 1.0 + 1.0 / sCosT
 vec2 sBedAt = vSeaBase - normalize( sV.xz + vec2( 1.0e-5 ) ) * ( sCol * sqrt( 1.0 - sCosT * sCosT ) / sCosT ) + sN.xz * sCol * 0.6;
 // (two sizes turned against each other: neither's repeat shows)
 vec4 sBedA = texture2D( uSeaNoise, vec2( 0.891 * sBedAt.x + 0.454 * sBedAt.y, - 0.454 * sBedAt.x + 0.891 * sBedAt.y ) * ${f(1 / 113, 5)} + 0.19 );
+#ifdef SEA_LEAN
+vec4 sBedB = sLace;
+#else
 vec4 sBedB = texture2D( uSeaNoise, vec2( 0.588 * sBedAt.x - 0.809 * sBedAt.y, 0.809 * sBedAt.x + 0.588 * sBedAt.y ) * ${f(1 / 19.7, 5)} + 0.63 );
+#endif
 // reef, rock and weed lie in patches, mostly where the bed is not sand; never on the beach's own margin
 float sReef = smoothstep( 0.5, 0.6, 0.45 * sBedA.b + 0.25 * sBedA.a + 0.3 * sBedB.b + 0.3 * ( 1.0 - sSand ) ) * smoothstep( 0.25, 1.2, sCol + 0.9 * ( 1.0 - sSand ) );
 // ripples in the sand, a hand high, a stride apart
 float sSandRip = 0.93 + 0.07 * sin( dot( sBedAt, vec2( 4.1, 2.3 ) ) + 5.0 * sBedB.b ) * ( 1.0 - smoothstep( 0.1, 0.4, sAlong ) );
 vec3 sBed = mix( ${v3(SEA_LOOK.sand)} * sSandRip * ( 0.86 + 0.28 * sBedB.a ), ${v3(SEA_LOOK.reef)} * ( 0.6 + 0.9 * sBedB.r ), sReef );
-// the light the ripples gather on a shallow bed
+// the light the ripples gather on a shallow bed (high)
+#ifdef SEA_CAUSTICS
 float sCaust = pow( 1.0 - min( sLace2.g, texture2D( uSeaNoise, sBedAt * 0.23 - sT * vec2( 0.013, 0.021 ) ).g ) , 6.0 );
 sBed *= 1.0 + 1.4 * sCaust * sWind * smoothstep( 0.05, 0.6, sCol ) * exp( - 0.35 * sCol ) * ( 1.0 - smoothstep( 0.15, 0.6, sAlong ) );
+#endif
 vec3 sBody = uSeaDeep * ( 1.0 - sClear ) + sBed * sClear;
 // a wave's top is thinner: lighter, and lit through when looking towards the sun
 float sTop = smoothstep( -0.2, 0.9, ( vSeaWorld.y - uSeaCentre.y ) / ( ${f(SEA_HEIGHT, 3)} * 0.5 * sAmp ) );
@@ -895,9 +940,9 @@ float sSunward = pow( clamp( dot( - sV, normalize( uSeaSunDir * vec3( 1.0, 0.0, 
 seaScatter = uSeaSun * ${v3(SEA_LOOK.scatter)} * ( 0.3 + 0.7 * sTop ) * ( 0.25 + 0.75 * sSunward ) * max( uSeaSunDir.y, 0.0 ) * 4.0;
 // the face of a line of surf about to break is thin water with the light in it; bubbles turn the water milky
 float sFace = sZone * sGrow * smoothstep( 0.8, 0.97, sU ) * ( 1.0 - smoothstep( ${f(0.45 * S.spacing)}, ${f(1.0 * S.spacing)}, sAlong ) );
-float sMilk = max( smoothstep( 0.05, 0.7, sMask ), 0.6 * sFace );
+float sMilk = max( smoothstep( 0.05, 0.7, min( sMask, 1.0 ) ), 0.6 * sFace );
 sBody = mix( sBody, ${v3(SEA_LOOK.milk)}, 0.62 * sMilk );
-diffuseColor.rgb = mix( sBody, ${v3(SEA_LOOK.foam)} * ( 0.8 + 0.3 * sLace2.r ), seaFoam );
+diffuseColor.rgb = mix( sBody * ( 1.0 - seaF ), ${v3(SEA_LOOK.foam)} * ( 0.8 + 0.3 * sLace2.r ), seaFoam );
 seaRough = mix( seaRough, 0.6, seaFoam );
 seaScatter *= 1.0 - seaFoam;
 `;
@@ -908,7 +953,6 @@ reflectedLight.directDiffuse += seaScatter;
 {
   vec3 hV = normalize( cameraPosition - vSeaWorld );
   vec3 hR = reflect( - hV, seaN );
-  float hNv = clamp( dot( seaN, hV ), 0.0, 1.0 );
 
   // ---- the sun's (the moon's) highlight, in the clouds' shade, broken into sparks
   float hL = max( reflectedLight.directSpecular.r, max( reflectedLight.directSpecular.g, reflectedLight.directSpecular.b ) );
@@ -927,11 +971,10 @@ reflectedLight.directDiffuse += seaScatter;
   reflectedLight.directSpecular *= seaShade;
   reflectedLight.directDiffuse *= mix( 1.0, seaShade, 0.8 );
 
-  // ---- the mirror. Rough water mirrors less at a glancing angle than calm water, and what it mirrors is higher:
-  // the facets the eye sees are the ones that lean towards it (Bruneton's mean Fresnel; the lift is 2.5 sigma at the
-  // horizon, nothing when looking down)
+  // ---- the mirror. What rough water mirrors is higher than what calm water mirrors (the facets the eye sees lean
+  // towards it): the lift is 2.5 sigma at the horizon, nothing when looking down. How much it mirrors: seaF.
   float hSigma = sqrt( 0.5 * seaVar );
-  float hF = 0.02 + 0.98 * pow( 1.0 - hNv, 5.0 * exp( - 2.69 * hSigma ) ) / ( 1.0 + 22.7 * pow( hSigma, 1.5 ) );
+  float hF = seaF;
   float hUp = 2.5 * hSigma;
   vec3 hRe = normalize( vec3( hR.x, sqrt( hR.y * hR.y + hUp * hUp ), hR.z ) );
   float hBlur = clamp( 2.0 * hSigma, 0.03, 0.45 );
@@ -946,6 +989,14 @@ reflectedLight.directDiffuse += seaScatter;
   float hLow = ( 1.0 - smoothstep( 0.03, 0.22, hRe.y ) ) * smoothstep( 0.1, 0.4, hBlur );
   hSky = mix( hSky, hazeColor( normalize( vec3( hRe.x, max( hRe.y, 0.02 ), hRe.z ) ) ), hLow );
 
+  #ifdef SEA_PROBE
+  // ---- what stands beyond the shore map (the far massif and ridges), from the car's reflection probe: between the
+  // horizon and some 30 degrees up, where mountains are and the things beside the car are not
+  if ( uSeaProbeOn > 0.5 ) {
+    float pBand = smoothstep( 0.02, 0.07, hRe.y ) * ( 1.0 - smoothstep( 0.35, 0.55, hRe.y ) );
+    if ( pBand > 0.0 ) hSky = mix( hSky, min( probeSample( uSeaProbe, hRe, max( hBlur, 0.2 ) ), vec3( uSeaMirrorCap ) ), pBand );
+  }
+  #endif
   #if SEA_LAND > 0
   // ---- the land in the mirror: the mirrored ray marched over the shore map's land heights, each step looking at a
   // coarser level (which holds the highest land of the stretch it covers)

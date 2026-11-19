@@ -175,7 +175,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   lap('rock');
   // (sea lane) the sea, where terrain.sea says it is; at night it mirrors the lamps the wet road glints with
   const seaMirror = SEA_MIRROR[tier] && caps.hdr ? new PlanarMirror(renderer, caps, SEA_MIRROR[tier]) : null;
-  const sea = createSea({ caps, tier, atmosphere, sea: terrain.sea, heightAt: terrain.heightAt, far: viewFar, glints: road.glints, mirror: seaMirror });
+  const sea = createSea({ caps, tier, atmosphere, sea: terrain.sea, heightAt: terrain.heightAt, far: viewFar, glints: road.glints, mirror: seaMirror, detail: params.sea });
   lap('sea');
   // (sea lane, round 3) the volcano's plume and the glow in its crater (its island is the terrain's)
   const volcano = createVolcano({ volcano: terrain.volcano, atmosphere, tier, track, terrain });
@@ -300,6 +300,11 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
     mirror,
     /** (water lane) the water's planar reflection (null but on high). */
     seaMirror,
+    /**
+     * (water lane) The car's reflection probe for the view about to be drawn (its prefiltered cube, or null): the
+     * water mirrors the far land from it where it has no planar mirror (sea.js). Call it with prepareView.
+     */
+    setSeaProbe: (cube) => sea.setProbe(cube),
     atmosphere,
     terrain,
     /** The trees (forest.js): where they stand (woodAt, turnedAt), single trees for the viewer (specimen). */

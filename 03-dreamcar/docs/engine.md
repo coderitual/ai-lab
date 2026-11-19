@@ -68,7 +68,10 @@ shows the sky; the AO pass relies on that. The sea (sea.js) is one more
 mesh in it, drawn after the land (`renderOrder` 5), so the pixels the land
 hides are not shaded twice. On low and medium it has no pass of its own (it
 mirrors the environment map and, on medium, the land by a march across its
-shore map); on high the world draws it a planar mirror (pass a2).
+shore map and the far mountains from the view's reflection probe, which the
+game hands over with `world.setSeaProbe(view.probe.texture)` after
+`prepareView`: the prefiltered cube, the one the car's paint reads); on high
+the world draws it a planar mirror (pass a2).
 
 ### Ambient occlusion (2-4)
 

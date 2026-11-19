@@ -1342,6 +1342,8 @@ export class Game {
       if (this.ghostCar?.shadow) mirrorHidden.push(this.ghostCar.shadow);
       mirrorHidden.push(...this.effects.objects);
       this.world.prepareView(view.camera, car.object.position, this.beams, mirrorHidden);
+      // (water lane) the water mirrors the far land from this view's probe (world/sea.js)
+      this.world.setSeaProbe?.(view.probe?.texture ?? null);
       // (ENGINE lane) the car's probe, from the middle of the car, without the car itself; after prepareView, so
       // that the shadows it shows are this view's. In split screen the two take turns. Nearly still (the title's
       // orbit, the grid) it is redrawn on a slower cadence; at speed the faces that see the roadside go by first.

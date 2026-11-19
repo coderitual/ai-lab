@@ -734,14 +734,19 @@ haze reach the water as they reach the land, and the time of day's light is
 all the light it has. What the water adds is in four parts.
 
 *Slopes, and what happens to the ones a pixel cannot draw.* The normal is the
-waves' analytic slopes plus wind ripples: one tiling normal map read at
-several sizes (3.1, 8.3, 23 and 61 m a repeat; its waves are an eighth of
-that and shorter), each layer turned a different way and drifting downwind at
-its own speed, so that no two line up and nothing tiles to the eye. How rough
+analytic slopes of the swell and the longest chop (four waves: 150 to 34 m)
+plus wind ripples: one tiling normal map read at several sizes (3.1, 8.3, 23,
+61 and 173 m a repeat; its waves are an eighth of that and shorter), each
+layer turned a different way and drifting downwind at its own speed, so that
+no two line up and nothing tiles to the eye. The wave field's shorter waves
+(21 m and less) still move the mesh and answer `sampleWaves`, but they are
+not drawn as waves (`createWaveField`'s `normals`): seven sines of one length
+each were the "ruled lines" on the water, which a breeze's chop is not; the
+173 m layer is the chop's picture, and their slopes stay in the roughness. How rough
 the water is at a place is a slow field: gusts (cat's paws, a soft noise drawn
 out three to one along the wind and drifting with it at 3.2 m/s) against
-calmer water between them (0.38 of a gust's ripples), long glassy slicks (the
-noise's cell edges drawn out the same way), the lee of land (the shore map's
+calmer water between them (0.28 of a gust's ripples), long glassy slicks
+(windrows: the same noise drawn out forty to one, here and there), the lee of land (the shore map's
 land channel, read 300 m coarse: any land hereabouts), the shallow margin,
 and the time of day's sea state (evenings are calmer). A layer is drawn only
 while a pixel's footprint along the line of sight is a part of its
@@ -779,16 +784,22 @@ noise's cell edges, raised to a power).
 *The mirror.* The sky is the environment map, clouds and all, read along the
 lifted ray and blurred by the spread. On medium and high the mirrored ray is
 also marched across the shore map's land heights: six or eight steps, each
-2.3 (2.1) times the last from 9 m out, each reading the mip level whose
-texels are about 0.4 of its distance, which holds the highest land of that
+2.9 (2.2) times the last from 9 m out (to 1.8 and 2.2 km), each reading the
+mip level whose texels are about half its distance, which holds the highest land of that
 stretch; where `height / distance` stands over the ray's own slope the water
 shows land instead of sky: dark (a coast's albedo under the time of day's
 light), hazed by its distance, soft by the slopes' spread. Because the ray is
 the pixel's own, the ripples draw the image out towards the eye and break its
 edge, as water does. The viaducts' piers are not land: the eight nearest that
 stand in the water are given to the shader as posts (place, half width, top)
-and the same ray is tested against each. The march is skipped where the
-coarse level says no land is near. On high the world also draws a planar
+and the same ray is tested against each; a pier is lit by which of its faces
+the water sees. The march is skipped where the coarse level says no land is
+near. What stands beyond the shore map (far.js's massif and ridges, 5 to
+17 km out) is in neither: on medium the game hands the water the view's
+reflection probe (`world.setSeaProbe`, one line in Game.js), and between one
+and thirty degrees over the horizon, where mountains are and the things
+beside the car are not, the mirror reads that cube instead of the sky's
+map. On high the world also draws a planar
 mirror for the water (`PlanarMirror`, 0.3 of the view's height, 3 km deep,
 the scene from the eye mirrored in the water's level, without the water, the
 ground cover, the kerbs and the studs): the pixel looks up where its lifted

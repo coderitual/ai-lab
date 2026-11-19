@@ -2,7 +2,7 @@
 // page load, so that a round of work on the water's shader costs one start-up and a few seconds a view.
 //
 //   node tools/sealab.cjs --base http://localhost:5190 --out shots --views views.json
-//   options: --q medium --land toy|real --time day --w 960 --h 540 --prefix lab --only name1,name2 --mobile
+//   options: --q medium --sea mobile --land toy|real --time day --w 960 --h 540 --prefix lab --only name1,name2 --mobile
 //
 // views.json: [{ "name": "beach", "eye": [x, y, z], "at": [x, y, z] (or "sunward": -4), "fov": 50, "t": 12, "time": "day",
 //               "read": { "surf": [480, 300] } }, ...]
@@ -65,7 +65,7 @@ function parseArgs(argv) {
       console.log(`[pageerror] ${e.message}`);
     });
     const started = Date.now();
-    await page.goto(`${a.base}/sealab.html?manual&q=${a.q || 'medium'}&land=${a.land || 'toy'}&time=${time}${look ? `&look=${encodeURIComponent(JSON.stringify(look))}` : ''}`);
+    await page.goto(`${a.base}/sealab.html?manual&q=${a.q || 'medium'}&land=${a.land || 'toy'}${a.sea ? `&sea=${a.sea}` : ''}&time=${time}${look ? `&look=${encodeURIComponent(JSON.stringify(look))}` : ''}`);
     await page.waitForFunction('window.__ready === true');
     console.log(`${time}: ready in ${((Date.now() - started) / 1000).toFixed(1)} s`);
     for (const view of views.filter((v) => pageOf(v) === key)) {

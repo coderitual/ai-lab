@@ -13,7 +13,7 @@
 //   eye=x,y,z   where the camera stands (m; the water's level is the Track's lake level, about -1.8)
 //   at=x,y,z    what it looks at          fov=50   the lens, top to bottom
 //   look={"surf":{"spacing":8}}   other numbers for SEA_LOOK (sea.js), merged into it before the sea is made
-//   t=12        the waves' clock (s)      time, q, manual, dpr, post, ldr, ev: as in the game (engine/params.js)
+//   t=12        the waves' clock (s)      time, q, sea, manual, dpr, post, ldr, ev: as in the game (engine/params.js)
 //
 // The handle: __sealab.read(x, y, half) the picture's colour round a CSS pixel ([r, g, b], 0..255);
 // __sealab.view({ eye, at, fov }) moves the camera ({ eye, sunward: -4 } looks towards the sun, 4 degrees down); __sealab.clock(t) runs the waves' clock on to t;
@@ -202,7 +202,7 @@ const sun = createSun({ renderer: engine.renderer, tier, shadows: params.shadows
 scene.onBeforeRender = (_renderer, _scene, camera) => sun.beforeRender(camera);
 // (as world/index.js: the water's planar mirror on high)
 const mirror = tier === 'high' && caps.hdr ? new PlanarMirror(engine.renderer, caps, { scale: 0.3, far: 3000, streak: 0.4, clipBias: 0.3 }) : null;
-const sea = createSea({ caps, tier, atmosphere, sea: coast.sea, heightAt: coast.heightAt, far: 5000, mirror });
+const sea = createSea({ caps, tier, atmosphere, sea: coast.sea, heightAt: coast.heightAt, far: 5000, mirror, detail: params.sea });
 if (coast.piers) sea.setPiers(coast.piers);
 scene.add(coast.group, sea.mesh, sky.dome, sky.stars, ...sun.objects);
 scene.fog = atmosphere.fog;
