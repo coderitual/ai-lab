@@ -181,7 +181,12 @@ machine without a GPU, and only what is listed here.
   chase camera and two staged cameras over the bay), from the sky road into the sun across the inner bay, across
   the bay to the viaduct, and on the crest (the chase camera and a staged camera over the open sea), each beside
   the same camera before the lane's work; colours read off those stills against the references (design.md).
-  `node tools/playtest.cjs` sections keys, photo and determinism: 54 checks, passed.
+  Round 2: the game on medium at golden hour, twilight and night on the crest (the chase camera and the staged
+  one), frame K5's camera at twilight, the bay's shore at night; the game as a phone (`&mobile=1`, 402x874: the
+  `mobile` level) by day at five places; low by day on the crest; the lab with the ladder's rung shed and at the
+  `mobile` level; the water's share of a frame with the sea on and off (spec.md).
+  `node tools/playtest.cjs` sections keys, photo and determinism: 54 checks, passed (three runs, the last on
+  the merge of 832bebe; the twilight row's last change, two numbers, came after it).
 - **The feel** (`tools/unit.mjs`, drift): 8 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
@@ -584,9 +589,8 @@ Read this before believing anything above about a device.
   one: its cost is known only as texture reads a pixel (spec.md) and as software frames. The `mobile` detail level
   (what a phone's medium tier draws) was only compiled and looked at in the lab. No frame sequence was watched:
   the sparks of the sun's path, the surf's lines, the sheet on the sand, the drifting ripples and gusts were judged
-  in stills, so shimmer, crawling or a visible repeat in motion would not have been seen. The low and high tiers
-  and the times of day other than day were seen in the lab only, not in the game; the planar mirror (high) only
-  in the lab; split screen over the water, the bonnet and bumper cameras, a phone's portrait picture and the
+  in stills, so shimmer, crawling or a visible repeat in motion would not have been seen. The high tier and its planar mirror were seen in the lab only; the twilight water's last numbers (lifted
+  towards frame K5's 31 50 95) were not shot again; split screen over the water, the bonnet and bumper cameras, a phone's portrait picture and the
   8-bit fallback (`?ldr`: no environment map, the sky's stand-in) not at all. The far land from the car's
   reflection probe (medium) was not isolated in a still (it is in every medium game still, with the rest). The
   cars' tail lamps in the water at night were not seen. The surf was developed on the lab's toy beach: the course

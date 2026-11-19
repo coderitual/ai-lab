@@ -177,7 +177,8 @@ export const SEA_LOOK = {
     day: { sky: 0.82, deep: [0.006, 0.028, 0.07], wind: 1 },
     dusk: { sky: 0.6, deep: [0.0016, 0.0105, 0.0115], wind: 0.75 },
     // after the sun: the water dark and deep, the afterglow given back a little brighter than golden hour's
-    twilight: { sky: 0.55, deep: [0.0012, 0.006, 0.012], wind: 0.6 },
+    // (frame K5's water reads 31 50 95: a still of ours read 13 16 43 with 0.55 and [0.0012, 0.006, 0.012])
+    twilight: { sky: 0.8, deep: [0.002, 0.011, 0.024], wind: 0.6 },
     night: { sky: 1, wind: 0.7 },
   },
   /**
