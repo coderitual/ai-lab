@@ -54,7 +54,8 @@ const CAPITAL = { across: 5.6, along: 2.3, height: 1.7 };
  * left) to `to`, carried on `beyond` of its length past each; its deck `deck` m over the water, `width` m wide and
  * `depth` m deep, on the viaduct's own piers every `span` m.
  */
-const SEA_SPAN = { from: ['carousel', 0.45, 260], to: ['crest', 1, 230], beyond: [0.15, 0.7], deck: 52, width: 9, depth: 2.6, span: 48 };
+// (round 5) none: with the coast road brought down to the bay, a deck 52 m over the water passed over the road
+const SEA_SPAN = { off: true, from: ['carousel', 0.45, 260], to: ['crest', 1, 230], beyond: [0.15, 0.7], deck: 52, width: 9, depth: 2.6, span: 48 };
 
 /**
  * @param {object} options
@@ -202,7 +203,7 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
     const a = at(...SEA_SPAN.from);
     const b = at(...SEA_SPAN.to);
     const level = terrain.sea?.level ?? -1.8;
-    if (a && b) {
+    if (a && b && !SEA_SPAN.off) {
       const dir = new THREE.Vector3().subVectors(b, a).setY(0);
       const len = dir.length();
       dir.normalize();

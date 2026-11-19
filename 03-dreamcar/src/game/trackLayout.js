@@ -101,6 +101,8 @@ export const SIDES = {
   // cliff, a rock edge only a low wall of rock (terrain.js), nothing growing
   rockSea: { kind: 'rock', edge: [3, 4], slope: 0.12, far: 1.5, verge: 'grass', wood: null, coast: true },
   openSea: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'grass', wood: null, coast: true },
+  // (sea lane, round 5) the ledge's insides too: the bay reaches them (frame D3's bank was given up for the bay)
+  bankSea: { kind: 'wall', edge: [3.5, 5], slope: 0.07, far: 0.12, verge: 'grass', wood: null, coast: true },
   coastUp: { kind: 'rail', edge: [3, 5], slope: 0.05, far: 0.45, verge: 'grass', wood: null, coast: true },
   coastDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.35, verge: 'grass', wood: null, coast: true },
   // (sea lane, round 2: frame E1) round the carousel and over the crest the verge is a broad apron of ochre gravel
@@ -190,8 +192,8 @@ const SEGMENTS = [
   // the banking tilts the road away from it; at 10 the sun grazed the asphalt at 6 degrees and the bank's tree shade
   // could not be told from the light round it. At 7 the asphalt takes half as much again. (4 and 5 degrees were
   // tried: they put the drift and crest tests of tools/unit.mjs over their limits.)
-  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 7, g: -1, gk: [[0.55, 6.5]], L: 'balcony', R: 'bank', runoff: 'R', kerb: false },
-  { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: -7.5, L: 'midRun', R: 'rock', runoff: 'L' },
+  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 7, g: -1, gk: [[0.55, 6.5]], L: 'balcony', R: 'bankSea', runoff: 'R', kerb: false },
+  { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: -7.5, L: 'midRun', R: 'rockSea', runoff: 'L' },
 
   // Gully bridge: straight across a gully on piers.
   { id: 'gully', sec: 'gully', len: 337.0834, ease: 100, g: -8, L: 'parapet', R: 'parapet', bridge: true, drop: 26 },

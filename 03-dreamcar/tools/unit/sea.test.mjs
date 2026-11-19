@@ -51,7 +51,7 @@ const pieceAt = (id, f) => {
 };
 
 test('the coast presets keep the course: edge, verge slope, verge and barrier as the presets they replaced', () => {
-  const was = { coastDown: 'highDown', coastRun: 'highRun', coastTop: 'open', shoreRun: 'lowRun', shoreUp: 'lowUp', parapetSea: 'parapet', coastUp: 'highUp', rockSea: 'rock', openSea: 'open' };
+  const was = { coastDown: 'highDown', coastRun: 'highRun', coastTop: 'open', shoreRun: 'lowRun', shoreUp: 'lowUp', parapetSea: 'parapet', coastUp: 'highUp', rockSea: 'rock', openSea: 'open', bankSea: 'bank' };
   for (const [name, old] of Object.entries(was)) {
     const a = SIDES[name];
     const b = SIDES[old];

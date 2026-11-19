@@ -603,8 +603,9 @@ camera (it runs from the climb's foot back south-east to the tunnel), so the
 frame's viaduct is not in our picture; its piers stand in the sea where the
 driver sees them, from the tunnel's cutting, the sky road and the climb.
 (Round 3) So that E1 has its bridge, a pale span on the viaduct's own piers
-stands out in the sea off the headland as scenery (viaduct.js `SEA_SPAN`,
-no road on it), crossing the water behind the hairpin from E1's camera; the
+stood out in the sea off the headland as scenery (viaduct.js `SEA_SPAN`,
+no road on it; round 5 switched it off: with the coast road brought down to
+the bay its deck passed over the road), crossing the water behind the hairpin from E1's camera; the
 camera stands low and close (2.2 m up, 7.5 m ahead of the car); round the
 hairpin three red and white boards stand, not a hoarding (the coast road's
 paler asphalt of round 3 went when the road lane's new asphalt came, which is
@@ -666,7 +667,7 @@ comes from behind the camera's left and lights the face.
   kept within 60 m of its edge; beyond it is now the sound.
 - **The bay inside the loop** (round 4; the owner chose it, and accepted
   losing the hill inside that part of the lap, frame D3's bank included).
-  Every side from the sky road to the plunge is now a sea side: the sky
+  (Round 5: the ledge's insides too, `bankSea` and `rockSea`.) Every side from the sky road to the plunge is now a sea side: the sky
   road's right (`parapetSea`), the climb's and the carousel's insides
   (`rockSea`: the rock edge stays, as a low wall of rock 1.4 m high over the
   cliff), the crest's right (`openSea`), the plunge's right (`coastUp`).
