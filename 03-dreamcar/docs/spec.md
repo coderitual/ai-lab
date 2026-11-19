@@ -73,8 +73,8 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | tyre walls | 8 runs, on the outside of the fast bends, painted white and red by blocks of five stacks |
 | the asphalt (road.js, road lane) | albedo [0.11, 0.106, 0.101] on new surfacing to [0.22, 0.211, 0.195] a generation old (`ASPHALT`), its stones apart by 1.05 times their tone; wet, 0.25 of that; each lane's wheel paths 0.85 m either side of its middle, 0.42 m wide, up to 16 % darker (`WEAR`); grit on 11 cm cells, odds 0.05 off the line plus 0.2 at the edges, hardly any on paint (`GRIT`); 17 patches and 59 sealed cracks (49 along the road, 10 across) round the lap (roadHistory.js); paint white 0.74, its edges ragged by 1.8 cm up close (`PAINT`) |
 | trackside boards | 10 runs: the outsides of the run-off bends, and two groups on the straight's lake-side wall (229 to 189 m and 82 to 44 m before the line); none on its land side |
-| distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel |
-| marshal posts | 12 |
+| distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel; each 0.6 m (0.35 m on a parapet) beyond the widest edge across its own width, a parapet's board hung from a bar that starts at the parapet's outer face |
+| marshal posts | 11, 2.5 m beyond the edge, none on a structure or within 40 m of one's ends, none within 150 m of another; the hut's front 1.8 m beyond the widest edge within 2 m of it (trackside.js `MARSHAL`) |
 | start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |
 | street lamps | 23, 9 m high, every 30.4 m on alternating sides along the whole straight |
 | floodlights | 62, 12 m high, every 55 m round the rest of the lap (`lapLamps`): on the inside of bends tighter than 1500 m, alternating elsewhere; none in the tunnel or within 25 m of its portals, none on `ledge1` (frame D3's place) nor on `carousel` and `crest` (frame E1's, round 2); 2.5 m behind the edge where it is a rail (40 of them; a lamp due at a rock face goes to the other side if a rail is there), at the edge in rock cuttings (4) and at parapets (18) |

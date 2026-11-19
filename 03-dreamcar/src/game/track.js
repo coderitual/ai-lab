@@ -726,8 +726,11 @@ function layCircuit(track, plan) {
   const posts = Math.round(track.length / 400);
   for (let k = 0; k < posts; k++) {
     let s = ((k + 0.5) * track.length) / posts;
-    for (let tries = 0; tries < 20 && onStructure(track, s); tries++) s = track.wrap(s + 20);
-    if (onStructure(track, s)) continue;
+    // (sea lane) and 40 m clear of a structure's ends, where the barrier changes from a parapet or a wall to a rail
+    const nearStructure = (q) => onStructure(track, q) || onStructure(track, track.wrap(q - 40)) || onStructure(track, track.wrap(q + 40));
+    for (let tries = 0; tries < 30 && nearStructure(s); tries++) s = track.wrap(s + 20);
+    // (sea lane) and, once moved along, not on top of the next post
+    if (nearStructure(s) || track.marshals.some((m) => Math.abs(track.delta(m.s, s)) < 150)) continue;
     const side = track.edgeAt(s, 1) >= track.edgeAt(s, -1) ? 1 : -1;
     track.marshals.push({ s, side, lat: side * (track.edgeAt(s, side) + 2.5) });
   }

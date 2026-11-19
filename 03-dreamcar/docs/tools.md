@@ -158,6 +158,7 @@ machine without a GPU, and only what is listed here.
   stills of `e1` at the medium tier (day, golden hour, night) beside the
   owner's frame E1, and in the chase camera every 2 s from the tunnel's exit
   to the end of the plunge on the low tier (1280x720 and 393x700).
+- **The furniture** (`tools/unit.mjs`, trackside; sea lane): no vertex of the boards, tyre walls, distance boards, marshal posts, bend signs, chevron boards or kerbstones and no lamp's foot inside the solid edges anywhere on the lap, and no two marshal posts on one spot (it failed before the fix: a parapet board's bar 0.58 m inside at s = 2510 m).
 - **The ground** (`tools/unit.mjs`, ground; sea lane): no triangle of the grid or the far land over the road inside the solid edges, low and medium tiers (it failed on 005dc86: 1.99 m at s = 2590 m on low, 0.66 m at s = 3774 m on medium).
 - **The feel** (`tools/unit.mjs`, drift): 8 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the

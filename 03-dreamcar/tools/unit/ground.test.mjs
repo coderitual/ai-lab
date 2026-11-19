@@ -1,7 +1,7 @@
 // The ground never stands over the road: the terrain's grid and far land, as built for each tier, walked round the
 // whole lap.
 //
-//   node tools/unit/ground.test.mjs        (or: node tools/unit.mjs ground)
+//   node tools/unit/ground.test.mjs        (or: node tools/unit.mjs ground; GROUND_HIGH=1 adds the high tier)
 //
 // (sea lane) The owner's phone showed a dark slab across the lane at the sky road's end: a triangle of the grid
 // spanning from ground under the deck to the top of the rock cut beside the climb stood over the road. Here every
@@ -31,7 +31,9 @@ const track = createTrack(LAYOUT);
 const SAMPLES = [[1 / 3, 1 / 3], [0.8, 0.1], [0.1, 0.8], [0.1, 0.1], [0.5, 0.5], [0.5, 0], [0, 0.5], [0.45, 0.1], [0.1, 0.45], [0.7, 0.25], [0.25, 0.7]];
 const inBore = (s) => track.tunnels.some((t) => track.wrap(s - t.s0) <= t.s1 - t.s0);
 
-for (const tier of ['low', 'medium']) {
+// the high tier's 5 m grid takes several times as long: the release run switches it on (GROUND_HIGH=1)
+const TIERS = process.env.GROUND_HIGH ? ['low', 'medium', 'high'] : ['low', 'medium'];
+for (const tier of TIERS) {
   test(`${tier}: no triangle of the grid or the far land stands over the road inside the solid edges`, () => {
     const terrain = createTerrain({
       track,

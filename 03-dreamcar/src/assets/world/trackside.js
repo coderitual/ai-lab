@@ -44,6 +44,16 @@ const D1_ANCHOR = 211;
 const TYRE = { r: 0.31, h: 1.0, step: 0.62 };
 /** The distance boards: size, height of the foot over the road. */
 const DIST = { size: 1.5, foot: 1.1 };
+/** (sea lane) A marshal post: the reach along the road its hut, roof and light panel take, and how far its front stands beyond the edge (its roof overhangs 1.3 m of that). */
+const MARSHAL = { reach: 2, beyond: 1.8 };
+
+/** The largest solid-edge distance on one side within `reach` m of s: what something that long must stand beyond. */
+export function edgeNear(track, s, side, reach) {
+  let e = 0;
+  for (let d = -reach; d <= reach; d += 0.5) e = Math.max(e, track.edgeAt(track.wrap(s + d), side));
+  return e;
+}
+
 /** The distance boards before the first bend: big enough to read from 150 m. */
 const FIRST_BEND_SIZE = 2.2;
 /** The start's tyre wall (D4): where it begins after the line (m) and how long it is. */
@@ -273,7 +283,7 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
   // ---- distance boards: square, facing the cars, on a post (or hung from the parapet on a bridge)
   const distanceBoard = (s, side, size, label, bridge, room) => {
     levelFrame(track, s, frame);
-    const p = spot(s, side, track.edgeAt(s, side) + size / 2 + room);
+    const p = spot(s, side, edgeNear(track, s, side, size) + size / 2 + room);
     const face = frame.ahead.clone().negate();
     const across = frame.flat.clone().multiplyScalar(-1);
     const uv = signs.distance[label] ?? signs.distance['100'];
@@ -282,8 +292,10 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
     M.makeBasis(X.copy(across).multiplyScalar(size), Y.set(0, size, 0), Z.copy(face).multiplyScalar(0.08)).setPosition(C);
     nb.box(M, { pz: uv, rest: sw.frame });
     if (bridge) {
-      C.copy(p).addScaledVector(frame.flat, -side * (size / 2)).setY(p.y + foot + 0.3);
-      boxAt(C, frame.flat, frame.ahead, size + 0.3, 0.1, 0.1, sw.steel, nb);
+      // the bar it hangs from runs out from the parapet's outer face (sea lane: it used to reach over the parapet's
+      // top onto the deck, inside the edge)
+      C.copy(p).addScaledVector(frame.flat, -side * (room / 2)).setY(p.y + foot + 0.3);
+      boxAt(C, frame.flat, frame.ahead, size + room, 0.1, 0.1, sw.steel, nb);
     } else {
       const g = groundAt(p, p.y);
       for (const e of [-0.3, 0.3]) {
@@ -302,7 +314,7 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
   for (const m of track.marshals) {
     if (curbAt(track, m.s)) continue;
     levelFrame(track, m.s, frame);
-    const dist = Math.max(Math.abs(m.lat), track.edgeAt(m.s, m.side) + 1.8);
+    const dist = Math.max(Math.abs(m.lat), edgeNear(track, m.s, m.side, MARSHAL.reach) + MARSHAL.beyond);
     const p = spot(m.s, m.side, dist);
     const g = groundAt(p, p.y);
     const face = frame.flat.clone().multiplyScalar(-m.side);

@@ -776,6 +776,16 @@ corner within two cells of a corridor is now sampled at eleven points and left o
 (outside a bore) stands over the road; `tools/unit/ground.test.mjs` walks every triangle of the built grid and far land
 near the course on the low and medium tiers and fails if one does.
 
+**No furniture inside the edges** (sea lane). Something placed from the edge at its own s stands inside the corridor
+wherever the edge widens across the thing's own width, as it does past the viaduct's end, where the edge slews from the
+parapet (7.5 m) to the coast's rail (9.9 m). The marshal huts and the distance boards now stand beyond the widest edge
+within their own reach (trackside.js `edgeNear`); marshal posts keep 40 m clear of a structure's ends and 150 m from
+each other (two had landed on one spot after the viaduct), and a parapet's board hangs from a bar that starts at the
+parapet's outer face instead of reaching over it onto the deck. `tools/unit/trackside.test.mjs` builds trackside.js's
+furniture and the forest lane's signs, chevrons and kerbstones with stand-ins for the atlas and the ground, locates every
+vertex on the course, and fails if any lies inside the solid edge on its side (the bar did, 0.58 m, before this); it
+checks every lamp's foot the same way.
+
 **Per-piece road markings** (round 2, road.js `PIECE_MARKS`). A scheme per
 piece id, each scheme one channel of a per-metre RGBA texture (`uMarks`,
 sampled at s / length like the edge texture), eased over 6 m at its ends.
