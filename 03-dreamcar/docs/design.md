@@ -631,11 +631,9 @@ comes from behind the camera's left and lights the face.
   ends) and round a volcanic island in the loop, so that the first part of
   the sky road and the plunge have water on the right (`parapetSea`,
   `coastUp`: the presets they replace with the coast's cliff beyond the edge
-  and nothing growing). The island (terrain.js `VOLCANO`) is a concave cone
-  165 m over the water with a crater 34 m across, some 300 m to the right of
-  the sky road's start and 270 m from the nearest road; round it, out to
-  560 m, the land is drowned except within 60 to 120 m of a solid edge
-  (`VOLCANO.sound`). A thin plume of steam and smoke leans away on the wind
+  and nothing growing). The island (terrain.js `VOLCANO`; round 4 moved and
+  reshaped it, below) has a crater; round it the land is drowned except
+  within 60 to 120 m of a solid edge (`VOLCANO.sound`). A thin plume of steam and smoke leans away on the wind
   from the crater and drifts up with the run's clock; the crater glows
   warm as the sun weakens (volcano.js). Frame D3's bank beside the ledge is
   kept within 60 m of its edge; beyond it is now the sound.
