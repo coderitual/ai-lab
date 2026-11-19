@@ -93,9 +93,10 @@ A second car, in a different paint, is the second player's.
 
 ## The road
 
-A racing circuit, not a public road: 5.14 km, driven clockwise, 69 m between
-the lake shore and the top (71 m above the water; round 5: it was 108 m, on
-the crest, until the coast after the tunnel was brought down to the bay). Paved 12 m wide (three
+A racing circuit, not a public road: 5.14 km, driven clockwise, 61 m between
+the lake shore and the top, just out of the tunnel (the top was 108 m, on the
+crest, until the owner had the coast after the tunnel brought down to the bay:
+it now runs 11 to 44 m over the line, out and back). Paved 12 m wide (three
 lanes, `HALF_WIDTH` 6), a 1.2 m strip beyond each edge line that is a red and
 white kerb in the bends and a paved margin elsewhere, then mown grass 3 to 10 m
 wide (widest on the outside of the fast bends) to a barrier: a steel rail by
@@ -148,18 +149,19 @@ line, m; speeds are the autopilot's at full pace):
 | Shore bend | 250 to 657 | a banked right of 220 m radius (9 degrees) away from the water, starting to climb; about 200 km/h |
 | Forest esses | 657 to 1409 | right 260 m, left 330 m, right 240 m, climbing at 5 to 6 per cent; 205 to 240 km/h |
 | The tunnel | 1409 to 2006 | a rock cutting faced in concrete at its end, the lit box (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out between retaining walls with acoustic screens; up to 255 km/h |
-| The sky road | 2006 to 2582 | on piers over the sea: a 576 m left of 300 m radius, banked 10 degrees, coming down at 8 per cent from 54 m to 12 m over the line, the bay inside the loop on the right and the open sea on the left; about 230 to 260 km/h |
-| The carousel | 2582 to 2915 | the low point by the water (12 m over the line), a 150 m climb, then 190 degrees right at 55 m radius, banked 8 degrees, water on both sides: the only heavy braking of the lap, 90 km/h |
-| The crest | 2915 to 3115 | a 200 m straight climbing at 6.5 per cent on a shelf between the open sea and the bay, the volcano ahead and to the right; about 110 to 165 km/h |
-| The plunge | 3115 to 3394 | a 400 m right still climbing at 6.5 per cent (the name is the old road's); to 200 km/h |
-| The ledge | 3394 to 3778 | a left of 300 m over the lap's top (69 m), a right of 350 m 7.5 per cent down onto the gully bridge as before; 203 to 238 km/h |
-| Gully bridge | 3778 to 4115 | 337 m straight on piers, 26 m over the gully, 8 per cent down; to 271 km/h |
+| The sky road | 2006 to 2582 | on piers over the sea: a 576 m left of 300 m radius, banked 10 degrees, down at 8 per cent from 54 m to 11 m over the line, the open sea on the left and the bay inside the loop on the right; about 230 to 260 km/h |
+| The carousel | 2582 to 2915 | the low point by the water (11 m), a 150 m climb, then 190 degrees right at 55 m radius round the head of the lagoon on a causeway, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
+| The crest | 2915 to 3115 | a 200 m straight on a low shelf between the open sea and the bay, the volcano ahead and to the right; about 110 to 165 km/h |
+| The plunge | 3115 to 3394 | a 400 m right, level, 25 m over the line (the name is the old road's); to 200 km/h |
+| The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m, the bay on the right, climbing to 38 m; 203 to 238 km/h |
+| Gully bridge | 3778 to 4115 | 337 m straight on piers over the bay, over a broad top (44 m), then 8 per cent down to its old end height; to 271 km/h |
 | The long right | 4115 to 4686 | 90 degrees at 300 m radius, banked 9 degrees, onto the straight; 234 to 283 km/h |
 
-The autopilot laps in 85.8 s at full pace, 94.1 s at 0.9, 118.6 s at 0.7
-(round 5; 85.1, 92.9 and 117.1 before the coast ran low: the lap's heights
-from the tunnel's portal to the gully bridge changed, the plan and the length
-did not; the road rejoins its old height at the gully bridge's start, 63.7 m). Sector lines at 1882 m (just out of the tunnel) and
+The autopilot laps in 85.2 s at full pace, 93.5 s at 0.9, 118.3 s at 0.7
+(85.1, 92.9 and 117.1 before the coast ran low: the lap's heights from the
+tunnel's portal to the gully bridge's end changed, the plan and the length did
+not; the road rejoins its old height and grade at the gully bridge's end, 37.6
+m, so the long right, frame K5's place and the straight are as they were). Sector lines at 1882 m (just out of the tunnel) and
 3420 m (the start of the ledge).
 
 The Track says where everything of a circuit goes, as data the world reads

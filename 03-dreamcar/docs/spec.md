@@ -23,11 +23,11 @@ cameras, the HUD's map, the sound) asks the Track.
 | paved width | 12 m (`HALF_WIDTH` 6) |
 | strip beyond each edge | 1.2 m (`SHOULDER`) in the pavement's banked plane: a kerb where the Track puts one, a paved margin elsewhere |
 | verge to the barrier | 1.5 m (tunnel walls, parapets) to 9.95 m (run-off); grass, wandering inside each side's range (`SIDES`), moving at most 0.12 m per metre |
-| height | 0 to 69.0 m above the line, top at s = 3640 m on the ledge (round 5: the coast after the tunnel runs low over the bay, 11.6 m over the line at its lowest, s = 2604 m, 13.4 m over the water); the sea 1.8 m under the line (`lakeLevel`) |
+| height | 0 to 60.6 m above the line, top at s = 1868 m just out of the tunnel; after it the coast runs low over the bay out and back, 10.9 m over the line at its lowest (s = 2622 m), 23 to 44 m on the way back, rejoining at the gully bridge's end (37.6 m, s = 4115 m); the sea 1.8 m under the line (`lakeLevel`) |
 | gradient | -8.0 to +6.0 per cent |
 | tightest radius | 55 m (the carousel); 11 bends |
 | banking | by rule 9° x tanh(250 m / R), or the piece's own; at most 10° (the sky road) |
-| crest | (round 5) none made to lift the car: no crest sharper than 1303 m; the sharpest sag the low point by the bay, 1500 m at s = 2499 m |
+| crest | none made to lift the car: no crest sharper than 1303 m (the gully bridge's, over 43.5 m at s = 3900 m); the sharpest sag 1593 m at s = 4600 m (the long right) |
 | closest approach of two stretches | 85.6 m apart (63.2 m between barriers, 23.5 m of height): the climb and the crest beside the carousel |
 
 ### Sections
@@ -41,13 +41,13 @@ run of `tools/handling.mjs`.
 | `straight` | Lakeside straight | 4686 to 250 (700 m) | finish 340 m, pitIn 110 m, the line, grid 40 m, gridRun 210 m; level | 225 to 279 |
 | `sweep` | Shore bend | 250 to 657 | right R 220 through 80°, banked 9°; 100 m straight climbing to 5 % | 196 to 225 |
 | `esses` | Forest esses | 657 to 1409 | right R 260 55° (bank 8°), left R 330 40° (7°), right R 240 65° (9°); 4 to 5.5 % | 204 to 240 |
-| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens), from the portal down to 7.9 % (round 5) | 216 to 260 |
-| `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers: left R 300 through 110°, banked 10°, ground 96 m under the middle (under the sea: the piers stand in the water); round 5: down at 7.9 % from 53.7 m to 11.8 m over the line, easing to 1 % down at its end | 228 to 261 |
-| `carousel` | The carousel | 2582 to 2915 | 150 m climb from the low point by the bay to 6 %, then right R 55 through 190°, banked 8°, 5 % up (15.5 to 25.5 m) | 90 to 227 |
-| `crest` | The crest | 2915 to 3115 | 200 m straight, climbing at 6.5 % (round 5: no longer the top) | 108 to 166 |
-| `plunge` | The plunge | 3115 to 3394 | right R 400 through 40°, banked 5°, 6.5 % up (round 5; was 8 % down) | 166 to 203 |
-| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 7°; low walls both sides, the valley open inside, a wooded bank outside), right R 350 20° (6°, rock on the inside); over the lap's top (69.0 m at s = 3640 m), then 7.5 % down onto the gully bridge as before | 203 to 238 |
-| `gully` | Gully bridge | 3778 to 4115 (337 m) | straight on piers, ground 26 m under the middle, 8 % down | 238 to 271 |
+| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens), the lap's top just out of the box (60.6 m), then down to 7.9 % | 216 to 260 |
+| `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers over the sea: left R 300 through 110°, banked 10°, down at 7.9 % from 53.7 m to 11.3 m over the line, easing to 2 % down at its end; ground 60 m under the middle (under the sea) | 228 to 261 |
+| `carousel` | The carousel | 2582 to 2915 | the low point by the water (10.9 m), a 150 m climb to 5.5 %, then right R 55 through 190°, banked 8°, 5 % up (13.9 to 23.5 m), water both sides | 90 to 227 |
+| `crest` | The crest | 2915 to 3115 | 200 m straight on a low shelf between the open sea and the bay, 2 % down (23.5 to 26.5 m: no longer the top) | 108 to 166 |
+| `plunge` | The plunge | 3115 to 3394 | right R 400 through 40°, banked 5°, level (26.5 to 25.1 m; the name is the old road's) | 166 to 203 |
+| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 7°, the bay inside), right R 350 20° (6°), climbing to 4 % and 6.3 % (25.1 to 38.0 m) | 203 to 238 |
+| `gully` | Gully bridge | 3778 to 4115 (337 m) | straight on piers over the bay (ground 45 m under the middle), over a broad top (43.5 m) then 8 % down to its old end height, 37.6 m | 238 to 271 |
 | `sweepback` | The long right | 4115 to 4686 | 100 m straight, then right R 300 through 90°, banked 9° | 234 to 283 |
 
 Joints between pieces ease the curvature (and the banking) over 45 to 140 m
@@ -141,19 +141,19 @@ Laps of the real road (flying laps, Node, no drawing):
 
 | driver | lap | notes |
 | --- | --- | --- |
-| autopilot, pace 1.0 | 85.8 s (round 5; was 85.0) | 0 impacts, stability control 5.3 s a lap |
-| autopilot, pace 0.9 (`?ap`) | 94.1 s | 0 impacts |
-| autopilot, pace 0.7 | 118.6 s | 0 impacts |
-| one thumb (full throttle unless braking) | 85.3 s | 0 impacts |
-| pad (analog) | 85.8 s | 0 impacts |
-| keys | 85.7 s | 0 impacts, stability control 7.7 s a lap |
-| ham-fisted keys (flat out, full keys, slow hands) | 86.1 s | 0 impacts, body 1.84 m beyond the pavement at worst |
+| autopilot, pace 1.0 | 85.2 s (85.0 before the coast ran low) | 0 impacts, stability control 5.1 s a lap |
+| autopilot, pace 0.9 (`?ap`) | 93.5 s | 0 impacts |
+| autopilot, pace 0.7 | 118.3 s | 0 impacts |
+| one thumb (full throttle unless braking) | 84.8 s | 0 impacts |
+| pad (analog) | 85.2 s | 0 impacts |
+| keys | 85.1 s | 0 impacts, stability control 7.7 s a lap |
+| ham-fisted keys (flat out, full keys, slow hands) | 90.6 s | 0 impacts, body 2.42 m beyond the pavement at worst |
 
 The one-thumb pad (`tools/unit/drift.test.mjs`, the scripted person of
 `manoeuvres.humanDriver` with its thumb on the pad, through Input's
 `padControls`: across and down together, 900 px/s, wavering 3 px, 0.15 s
-late; round 5's road): a tidy lap 87.2 s against the scripted keys' 87.2 s
-(autopilot 85.8 s), 0 impacts, 9.0 s of braking a lap, 7.5 s of it while
+late; the low coast's road): a tidy lap 86.4 s against the scripted keys' 86.4 s
+(autopilot 85.2 s), 0 impacts, 9.0 s of braking a lap, 7.5 s of it while
 turning at 0.3 g or more (trailing the brake in); the carousel sideways at
 Sport, thrown in with the handbrake by the steering thumb's red arc: 3.9 s
 beyond 12° at 15° mean, 36° at most (by the HANDBRAKE button the same; both a
