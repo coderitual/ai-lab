@@ -123,6 +123,138 @@ const visible = (p, selector) => p.page.evaluate((sel) => {
 }, selector);
 const clickText = (p, text, scope = '.title') => p.page.click(`.hud ${scope} button:has-text("${text}")`, { timeout: 60000 });
 
+/** The split-screen night check's places (track metres) and how far apart the halves' road may be (playtest split). */
+const SPLIT_NIGHT = { places: [240, 300, 420], factor: 1.5 };
+
+/**
+ * (split-bug lane) "On 2 players there is water on the track": at night one half of a split screen showed the wet
+ * road as a pale sheet in the moon's light and the other, a few metres away, dark under the trees, because the trees
+ * that cast into each view's shadow map were chosen by where its car stood (forest.js). Side by side on an upright
+ * phone, at night: the same patch of road seen from both halves must be about as bright in both; the trees that cast
+ * must not depend on where the car stands; and what prepareView sets for a view must be what that view's draw uses.
+ */
+async function splitNight() {
+  const p = await open('?manual&q=low&auto&mode=split&time=night', { w: 393, h: 852, mobile: true });
+  await p.page.evaluate(() => {
+    window.__dreamcar.set('view.split', 'wide');
+    window.__dreamcar.game.layout();
+  });
+  // (after go: before it the cameras dive in from the grid's sweep, not from behind the cars)
+  await toGo(p);
+  // under the trees after the start and further on, the cars abreast and one 9 m behind the other; the patch is the
+  // middle of the road 14 m ahead of the leading car, seen by both halves
+  for (const s0 of SPLIT_NIGHT.places) {
+    for (const behind of [0, 9]) {
+      const r = await p.page.evaluate(({ s0, behind }) => {
+        const d = window.__dreamcar;
+        const g = d.game;
+        const { track } = g;
+        const renderer = g.engine.renderer;
+        const spots = [[s0, 2.5], [s0 - behind, -2.5]];
+        g.racers.forEach((racer, i) => {
+          const [s, lat] = spots[i];
+          const at = track.pointAt(s, lat);
+          const f = track.frameAt(s, {});
+          racer.vehicle.reset({ x: at.x, z: at.z, yaw: Math.atan2(f.tan.x, f.tan.z) });
+        });
+        d.skip(0.05);
+        for (const v of g.views) v.rig.snap(v.racer.vehicle);
+        d.advance(0.1);
+        g.engine.advance(0, 0, true);
+        // read straight after the draw, in the same task, before the canvas is handed on
+        const patch = track.pointAt(s0 + 14, 0);
+        const gl = renderer.getContext();
+        renderer.setRenderTarget(null);
+        return g.views.map((v) => {
+          const n = patch.clone().project(v.camera);
+          const x = Math.round(v.rect.x + ((n.x + 1) / 2) * v.rect.w);
+          const y = Math.round(v.rect.y + ((n.y + 1) / 2) * v.rect.h);
+          const R = 7;
+          const buf = new Uint8Array((2 * R + 1) ** 2 * 4);
+          gl.readPixels(x - R, y - R, 2 * R + 1, 2 * R + 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+          let sum = 0;
+          for (let k = 0; k < buf.length; k += 4) sum += 0.2126 * buf[k] + 0.7152 * buf[k + 1] + 0.0722 * buf[k + 2];
+          return Math.round((10 * sum) / (buf.length / 4)) / 10;
+        });
+      }, { s0, behind });
+      const ratio = Math.max(...r) / Math.max(1, Math.min(...r));
+      check(`split at night, s ${s0}, ${behind ? `car two ${behind} m behind` : 'abreast'}: the road ahead as bright in both halves (within ${SPLIT_NIGHT.factor}x)`,
+        ratio <= SPLIT_NIGHT.factor, `luma ${r.join(' / ')}, ${ratio.toFixed(2)}x`);
+    }
+  }
+
+  // what prepareView set for each view is what that view's draw used, and nothing of one view leaks into the other's
+  const used = await p.page.evaluate(() => {
+    const g = window.__dreamcar.game;
+    const w = g.world;
+    const renderer = g.engine.renderer;
+    let shares = null;
+    let road = null;
+    w.scene.traverse((o) => {
+      if (!shares && o.material?.uniforms?.uShares) shares = o.material.uniforms.uShares.value;
+      if (!road && o.material?.name === 'asphalt') road = o.material;
+    });
+    const glints = () => {
+      const u = renderer.properties.get(road).uniforms?.uGlintPos;
+      return u ? u.value.map((v) => [v.x, v.y, v.z, v.w].map((n) => n.toFixed(2)).join(',')).join(';') : 'none';
+    };
+    const box = () => [w.shadowBox.x, w.shadowBox.y, w.shadowBox.z].map((n) => n.toFixed(2)).join(',');
+    const snap = () => ({
+      shares: shares.version,
+      glints: glints(),
+      box: box(),
+      mirror: w.mirror ? w.mirror.uniforms.uMirrorOn.value : -1,
+      casters: w.forest.stats.view.casters,
+    });
+    const set = [];
+    const atDraw = [];
+    const uploaded = [];
+    const shadowFor = [];
+    const sm = renderer.shadowMap;
+    const smRender = sm.render;
+    sm.render = function (lights, scene, camera) {
+      if (sm.needsUpdate) shadowFor.push(g.views.findIndex((v) => v.camera === camera));
+      return smRender.apply(this, arguments);
+    };
+    const prepare = w.prepareView;
+    w.prepareView = function (...a) {
+      const r = prepare.apply(this, a);
+      set.push(snap());
+      return r;
+    };
+    g.pipeline.render = function (...a) {
+      atDraw.push(snap());
+      const r = Object.getPrototypeOf(this).render.apply(this, a);
+      uploaded.push(renderer.properties.get(shares).__version === shares.version);
+      return r;
+    };
+    try {
+      g.engine.advance(0, 0, true);
+    } finally {
+      sm.render = smRender;
+      w.prepareView = prepare;
+      delete g.pipeline.render;
+    }
+    // the trees that cast into a view's map, with the map where that view put it, asked from either car
+    const view = g.views[1];
+    w.prepareView(view.camera, view.racer.car.object.position, g.beams);
+    const own = w.forest.stats.view.casters;
+    w.forest.prepareView(view.camera, g.views[0].racer.car.object.position, w.shadowBox);
+    const other = w.forest.stats.view.casters;
+    return { set, atDraw, uploaded, shadowFor, own, other };
+  });
+  check('split at night: each view\'s draw uses what its own prepareView set (lamp shares, glints, shadow box, mirror, casters)',
+    used.set.length === 2 && JSON.stringify(used.set) === JSON.stringify(used.atDraw) && used.set[0].box !== used.set[1].box,
+    JSON.stringify(used.atDraw.map((s) => ({ ...s, glints: s.glints.slice(0, 40) }))).slice(0, 400));
+  check('split at night: the lamp shares are uploaded anew for each view before its draw',
+    used.uploaded.length === 2 && used.uploaded.every(Boolean) && used.set[1].shares > used.set[0].shares,
+    `uploaded ${used.uploaded.join('/')}, versions ${used.set.map((s) => s.shares).join('/')}`);
+  check('split at night: the shadow map is drawn once for each view, by its own draw', used.shadowFor.join() === '0,1', used.shadowFor.join());
+  check('split at night: the trees casting into a view\'s shadow map do not depend on where its car stands', used.own > 0 && used.own === used.other,
+    `${used.own} from its own car, ${used.other} from the other`);
+  await p.close('split at night');
+}
+
 // ---- sections -----------------------------------------------------------------------------------------------
 
 const SECTIONS = {
@@ -445,6 +577,7 @@ const SECTIONS = {
     await p.advance(0.3);
     check('the results panel is shown', await visible(p, '.hud .results'));
     await p.close('split');
+    await splitNight();
   },
 
   /** Two stand-in gamepads: the first drives car one, the second car two. */
