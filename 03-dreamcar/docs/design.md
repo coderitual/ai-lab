@@ -823,28 +823,105 @@ comes from behind the camera's left and lights the face.
   (`lapLamps.skip`). Within a few hundred metres of the sea all rock
   is that warm stone and all loose stone ochre grit (groundMaterial.js reads
   the sea map); inland it stays the grey limestone.
-- **The water** is demo 01's sea (engine/waves.js, sea.js): a long soft
+- **The water** moves as demo 01's sea does (engine/waves.js): a long soft
   swell (150, 98 and 63 m long, 0.6 m and less; round 2: lower and spread
   wider in direction, and every wave rising and falling in sets and lulls of
   its own, `GROUPS`, so that from high above it is a texture, not ruled
-  lines) under a light breeze's chop,
-  from the open sea in the north-west; the swell dies down over the shallows
-  and breaks along the shore in bands of surf that run in with it; a few
-  streaks of foam behind crests. Its colour is what it mirrors and what comes
-  back up out of it: the sky's environment map with water's Fresnel, so it
-  pales into a bright band towards the horizon and fades there into the
-  haze the sky shows under the horizon; a dark blue body, greener over the
-  shallows. **Day**: deep blue with the sky in it; the sun stands behind
-  the coast road's views, so its glitter path lies towards the land. **Golden
-  hour**: the low sun over the bay and the south-west, a path of gold glitter
-  on dark teal water (round 2: the water gives back less of the bright
-  golden sky, 0.42, and its body is a dark teal; by day 0.78 and a deeper,
-  more saturated blue, `SEA_LOOK.byTime`). **Night**: black water, the moon's glitter, and the
-  nearest lamps of the lap drawn into it as long streaks (the same lamps the
-  wet road glints with).
-- **Tiers**: low draws a flat disc of 160 triangles with the swell in the
-  normals only; medium and high move the mesh with the swell. One draw call
-  in every pass that sees it; no pass of its own.
+  lines) under a light breeze's chop, from the open sea in the north-west,
+  dying down over the shallows. How it looks is the next section's.
+
+### The water (W1 to W4)
+
+(water lane) The owner, of the water as it stood ("a flat sheet with
+stripes"): "Also water color and shader. Make it look better from the
+distance", then, with pictures, "Some new spec references for detailed water
+terrain and hyperrealistic effect. Treat it really seriously", and of the
+four together: "These look great. Spec exact". The pictures stay out of the
+repository; they are frames of games, and what is taken from them is the
+physics of the look (colour, light, structure), never content. They are
+called W1 to W4 here, and E1 (above), M2 and M3 (the environment references:
+turquoise pools over a pale bed) belong with them. What each says about the
+water, read carefully, with 8-bit colours read off the picture:
+
+- **W1, a low road over calm water** (ours: the low return leg): dark slate
+  blue water a few metres under a railing on both sides of the road, covered
+  in fine wind ripples that the distance compresses into thin horizontal
+  streaks, in patches of rougher and smoother water; lighter towards the
+  horizon; under a wooded island its dark mass lies in the water as a soft
+  band; each pier of a long viaduct is mirrored as a soft dark smear two or
+  three times its own width and as long as it is tall, broken by the
+  ripples; a high thin overcast, no glitter. Near water beside the rail 62 84
+  108 (left) and 69 81 89 (right, under the bridge); middle distance 86 111
+  139; far 99 128 164; a pier's reflection 57 68 74 against 117 133 151
+  between the piers; the island's reflection 70 89 103; the sky above the
+  horizon 129 156 192.
+- **W2, a bend beside a beach** seen through a wire fence: a band of
+  turquoise along a pale beach (86 126 144 to 93 135 156), white surf at its
+  edge, blue beyond it (119 142 164 to 122 143 174), a calm pale bay on the
+  far side that all but mirrors a white sky (135 149 160 to 188 204 219).
+- **W3, the sea from a height**, into a low sun under heavy cloud: a wide
+  blazing road of glitter (231 230 221, burnt out at its heart and breaking
+  into points and streaks towards the eye), dark warm-grey open water either
+  side of it (155 153 138 to 181 176 157), wind streaks across it; inshore
+  teal (80 106 96), then turquoise (94 117 103 to 67 102 87), then the sand
+  showing through (88 82 66) with dark patches of reef, white water round the
+  rocks and along the beach (129 134 115).
+- **W4, a beach under an overcast sky**: small waves breaking in two or three
+  lines along the shore, translucent turquoise where they stand up (77 115
+  121), lacy foam that stretches and thins behind each line (175 207 210) and
+  a solid white edge (213 213 204), a thin sheet of water running up the sand
+  and draining back, the sand darker and mirror-wet where it has been; dark
+  slate water beyond the surf (65 77 86), calm grey-blue further out (102 123
+  137) paling to the horizon (135 155 175); sea stacks whose dark reflection
+  lies on the calm water. No sun on the water at all: it must be right
+  without glitter.
+- **E1**: open sea from a height by day: deep blue near (60 95 129), paler
+  towards a hazy horizon (144 176 194) under a sky of 196 208 220 there.
+- **M3**: a pool a hand deep over a white bed: 113 187 190, paler at its edge
+  (140 207 195).
+
+What that asks of the water, and what answers it (techniques.md, "The sea"):
+
+1. **Colour by depth and by angle.** Shallow water over sand is turquoise to
+   green with the bed, its ripples and its dark reef showing through; then
+   teal; then the deep colour. Looking along the water it carries the sky,
+   looking down into it its own body. One model does both: the bed seen
+   through a column that absorbs red first, and a mirror whose strength and
+   direction follow the roughness. There is no "shallow colour" and no "far
+   colour" in the code.
+2. **Close to** (to 80 m): wind ripples in several sizes moving with the
+   wind, the slow swell under them, sparks towards the sun, and long soft
+   reflections of what stands in or by the water.
+3. **The middle distance** (to 800 m): gusts as darker, rougher patches,
+   slicks as paler threads, the shade of clouds; nothing that repeats.
+4. **Far** (to the horizon, 14 km): the slopes a pixel cannot draw become
+   roughness, so the sun's path is wide and steady and narrows to the
+   horizon; a paler band there; haze into the sky's colour with no line; land
+   mirrored as dark soft shapes.
+5. **Shores**: lines of surf parallel to a beach, foam round rock and piers,
+   the sheet on the sand; all from the shore map.
+6. **Every time of day** the same water: golden hour's path is gold on dark
+   teal; at twilight the water is dark and calm with the band of the sky's
+   colours lying on it far out; at night the moon's path, the road's lamps
+   and the cars' tail lamps as streaks.
+
+**Where the pictures are on our course.** By day the sun stands low in the
+east, over the mainland: from the coast road its path lies across the bay
+inside the loop (1.5 km of water towards the sun from the sky road and the
+crest), not on the open sea, which lies west and north, away from it. W3's
+road of glitter to an open horizon is the golden hour's (the sun in the
+south-west, over the open sea). The low return leg (W1) has water 30 to 40 m
+off on both sides. The bay beside the start straight shelves gently enough to
+show the bed (water under 6 m for 60 to 100 m off the shore); the coast
+after the tunnel falls away at 0.3 per metre and steeper, so its turquoise
+is a narrow band until the coast lane's beach is there. The water needs
+nothing changed when it comes: it reads the shore map.
+
+- **Tiers**: low draws a flat disc of 352 triangles with the swell in the
+  normals only, two ripple layers, the sky alone in the mirror, surf and foam
+  without relief, and no pass of its own; medium moves the mesh, draws three
+  layers, mirrors the land and the piers from the shore map; high draws four
+  layers and has a planar mirror (one more small pass of the scene).
 
 ## The tunnel
 

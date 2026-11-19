@@ -37,6 +37,7 @@ road's mirror; the car's reflection probe is updated just before the call.
 | # | pass | size | format | tiers |
 | --- | --- | --- | --- | --- |
 | a | road mirror (`PlanarMirror`, from `world.prepareView`), then its streaked copy (two passes of 8 taps) | 0.35 (medium) / 0.5 (high) of the view's height | half-float + depth renderbuffer; the copy and its middle step half-float | medium, high, and only with `caps.hdr` |
+| a2 | the water's mirror (`PlanarMirror` again, from `world.prepareView`, only where there is water to see it in and not under a roof), then its streaked copy | 0.3 of the view's height | as a | high, and only with `caps.hdr` |
 | b | reflection probe: faces, then the filter into the prefiltered cube (`ReflectionProbe.update`, from the game) | 128 / 256 / 512 per face | two half-float cubes: what the faces draw (plain mips, depth) and the prefiltered one materials read (M + 1 levels) | all (`PROBE` in game/config.js) |
 | 1 | **the scene**, one render call | the view x render scale | half-float, depth texture, MSAA 0 / 4 / 4 | all |
 | 2 | ambient occlusion term | half | RGBA8 | medium, high; only when `look.ao > 0` |
@@ -69,7 +70,12 @@ that must be in the picture is in the scene. The sky dome is drawn last
 (`renderOrder` 1000) without writing depth, so a pixel whose depth is still 1
 shows the sky; the AO pass relies on that. The sea (sea.js) is one more
 mesh in it, drawn after the land (`renderOrder` 5), so the pixels the land
-hides are not shaded twice; it has no pass of its own and no mirror.
+hides are not shaded twice. On low and medium it has no pass of its own (it
+mirrors the environment map and, on medium, the land by a march across its
+shore map and the far mountains from the view's reflection probe, which the
+game hands over with `world.setSeaProbe(view.probe.texture)` after
+`prepareView`: the prefiltered cube, the one the car's paint reads); on high
+the world draws it a planar mirror (pass a2).
 
 ### Ambient occlusion (2-4)
 
@@ -735,9 +741,17 @@ for by every other pass running on fewer pixels (at 0.72, 52 % of them).
   is not the sea's (a hollow inland) would flood, so the terrain keeps it
   just above the water (`keepDry` in terrain.js); a new shape of land must go
   through the same height function. The disc follows each view's eye
-  (`world.prepareView`) and reaches 0.97 of the far plane, where it has
-  faded into the haze the sky dome shows under the horizon: a longer far
-  plane wants a larger disc, not a second mesh.
+  (`world.prepareView`) and reaches 14 km, beyond the far plane: its vertex
+  stage keeps what lies beyond at depth 1 - 2e-6 (in front of far.js's
+  ridges at 1 - 1e-6, behind everything real), and towards the mainland's
+  bearings ends the disc at 0.97 of the far plane, so no water shows behind
+  the far land. At its edge it has faded into the haze the sky dome shows
+  under the horizon. A depth buffer of fewer than 24 bits cannot tell those
+  two depths apart (far.js relies on the same).
+- **The water's mirror is the second planar mirror** (high): it is drawn
+  from `world.prepareView` like the road's, before the view, with shadow maps
+  left as they are; it hides the water itself, the ground cover, the kerbs
+  and the studs. The road's mirror hides the sea; the sea's shows the road.
 - **Nothing is compiled in the middle of a run.** A switch that can change
   while the game runs (a rung of the ladder, the render scale) is a uniform or
   a pass that is skipped, never a define; a pass first needed in the middle

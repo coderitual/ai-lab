@@ -113,9 +113,12 @@ export function boostAt(x, z, place, i = 0) {
  * @param {number} [options.segments] the angular segments of the mesh they move (0: the mesh is not moved): a wave is
  *   displaced only out to where the mesh still has about five vertices per wavelength, beyond that the normals
  *   carry it
+ * @param {number} [options.normals] how many of them (the longest first) waveNormal draws as slopes; the rest it
+ *   only counts in `lost`, for a caller that draws the short waves some other way (the sea's wind ripples: a few
+ *   sines of one length each read as ruled lines, which a breeze's chop is not)
  * @returns {WaveField}
  */
-export function createWaveField({ count = WAVES.length, segments = 0 } = {}) {
+export function createWaveField({ count = WAVES.length, segments = 0, normals = count } = {}) {
   const waves = BUILT.slice(0, count);
   const n = waves.length;
   const uniforms = {
@@ -133,6 +136,7 @@ export function createWaveField({ count = WAVES.length, segments = 0 } = {}) {
   };
   const glsl = /* glsl */ `
 #define WAVE_COUNT ${n}
+#define WAVE_NORMALS ${Math.min(normals, n)}
 #define SWELL_COUNT ${Math.min(SWELLS, n)}
 uniform vec4 uWaveA[WAVE_COUNT];   // direction (x, z), wavenumber, angular frequency
 uniform vec4 uWaveB[WAVE_COUNT];   // amplitude, horizontal amplitude, phase, how far out the mesh is moved by it
@@ -172,7 +176,8 @@ vec3 waveDisplace( vec2 p, float ampScale, float dist ) {
 }
 
 // The surface's normal at p, its Jacobian (small where it bunches up at a crest), and the slope variance of the
-// waves that were too small to draw at this distance (lost: what a highlight should widen by).
+// waves that were too small to draw at this distance or are not drawn here at all (lost: what a highlight should
+// widen by; both axes together).
 void waveNormal( vec2 p, float ampScale, float dist, out vec3 n, out float jac, out float lost ) {
   vec2 slope = vec2( 0.0 );
   float ny = 0.0;
@@ -183,7 +188,7 @@ void waveNormal( vec2 p, float ampScale, float dist, out vec3 n, out float jac, 
   for ( int i = 0; i < WAVE_COUNT; i ++ ) {
     vec4 A = uWaveA[ i ];
     vec4 B = uWaveB[ i ];
-    float keep = 1.0 - smoothstep( uWaveC[ i ] * 0.5, uWaveC[ i ], dist );
+    float keep = i < WAVE_NORMALS ? 1.0 - smoothstep( uWaveC[ i ] * 0.5, uWaveC[ i ], dist ) : 0.0;
     float ka = A.z * B.x * ampScale * waveGroup( i, p );
     lost += 0.5 * ka * ka * ( 1.0 - keep * keep );
     if ( keep <= 0.0 ) continue;

@@ -13,7 +13,8 @@ draws. See [techniques.md](techniques.md#determinism).
 ## Servers
 
 ```bash
-npm run dev                          # http://localhost:5190   edits reload the page; also serves the sound bench (sound.html)
+npm run dev                          # http://localhost:5190   edits reload the page; also serves the sound bench (sound.html),
+                                     #                         the viewer (viewer.html) and the sea lab (sealab.html)
 npm run build && npm run preview     # http://localhost:4190   the production build
 ```
 
@@ -37,6 +38,7 @@ SwiftShader on four busy cores. Times below are from that machine.
 | `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the fixed controls upright and on its side, 76 checks: the slider's fixed centre, a thumb landing off it steering at once, no drift of the centre after a drag, the knob springing back; power with nothing touched on auto and only from GAS on manual; BRAKE lifting the power and reversing at a standstill; DRIFT; two and three fingers at once, a finger sliding off a pedal, pointercancel, blur and orientationchange; touches elsewhere doing nothing; the arrows; the first-run names; both halves of a tablet split), slide (a handbrake turn through the keys and one through the touch slider and DRIFT, the readout, the driving help kept and applied), window, hud (the touch controls among the boxes: at least 64 px, inside the safe area with a phone's insets stood in for, drawn where Input finds them; solo again on manual), options (with Steering and Throttle on touch, the readout, kept, and with no storage), start, photo, determinism, params, ladder (every level of low and medium by hand: each rung sheds what it says, resolution last and never under the floor, no program compiled; `?scale=`, `?shed=`, `?upscale=0`; a running page has a governor and stays on the ladder, `?dpr=` switches it off), tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
 | `node tools/soundtest.cjs [URL] [outDir]` | Renders scenarios offline with the game's own audio code (the dev server's `sound.html`) and measures them: partials, levels, sides, tails, jumps, gestures, mute. With `outDir` it keeps the WAV files so that someone can listen. | 62 | about 45 s idle |
 | `node tools/frametest.cjs` | The tone curve's numbers (no browser); with `--url` milliseconds per frame for variants of a page (`--vary "ao=0\|ao=1"`), the pipeline's targets, and a pair of frames 1/60 s apart for a flicker check (`--pair`). | | |
+| `node tools/sealab.cjs --base URL --views views.json` | Stills of the sea lab (`sealab.html` on the dev server: the water alone under the game's sky, haze, sun and frame passes, on a made-up coast that has a beach, a cliff, sea stacks, an islet and piers, or with `--land real` on the game's terrain and nothing else of its world), several views and times of day from one page load each. `--q`, `--time`, `--w`, `--h`, `--out`, `--prefix`, `--only`; a view may carry `look` (other numbers for `SEA_LOOK`) and `read` (named pixels whose 8-bit colour is printed). For working on the water's shader without waiting for the world; the page's errors are printed, so a shader that does not compile shows. | | 2 s to start on the toy coast, about 10 s on the real terrain, a few seconds a view |
 | `node tools/screenshots.cjs` | Regenerates every picture of the README and these documents, and `public/og.jpg`. `--list`, `--only day,night` (page loads or picture names), `--base URL` (default 5190), `--q medium`, `--out dir`. | | 45 to 60 min |
 | `node tools/perfcount.cjs --url URL` | What a frame costs, counted (nothing here can time a GPU): draw calls and triangles per pass (scene, shadow map, probe faces, mirror, full-screen passes) at moments of the autopilot's run and at levels of the quality ladder, the trees in each form, layers of tree cards over the picture, the shadow-casting cards' area in the sun's map, the compiled fragment shaders' lengths. `--times 8,26,36,56 --levels 0,5 --frames 4 --w --h --mobile --out file.json`; put a small `dpr=` in the address. The tables of spec.md, "What a frame costs", are its output. | (a table) | 5 to 10 min a page at medium |
 | `node tools/shot.cjs --url URL` | One screenshot of any URL. `--out --w --h --dpr --mobile --eval "js" --resize WxH --wait`. | | 1 to 3 min |
@@ -166,6 +168,20 @@ machine without a GPU, and only what is listed here.
 - **The furniture** (`tools/unit.mjs`, trackside; sea lane): no vertex of the boards, tyre walls, distance boards, marshal posts, bend signs, chevron boards or kerbstones and no lamp's foot inside the solid edges anywhere on the lap, and no two marshal posts on one spot (it failed before the fix: a parapet board's bar 0.58 m inside at s = 2510 m).
 - **The structures** (`tools/unit.mjs`, structures; sea lane): no point of a bridge's deck, abutments, pier caps or joints, nor of a tunnel's floor, walls or portals, more than 25 mm over the road inside the solid edges, on both bridges (low and medium) and the tunnel (low). It failed before the fix: an abutment's top 0.30 m over the shoulder at s = 2006 m.
 - **The ground** (`tools/unit.mjs`, ground; sea lane): no triangle of the grid or the far land over the road inside the solid edges, low and medium tiers (it failed on 005dc86: 1.99 m at s = 2590 m on low, 0.66 m at s = 3774 m on medium).
+- **The water** (water lane, 2026-11-19; `tools/unit.mjs`, sea; `tools/sealab.cjs`). In Node: the shore map is the
+  same bytes every time, is water where `terrain.heightAt` is under the level and land where it is over it (15 571
+  points within 42 m of a shore, 1 wrong), holds depths near the shore to 0.11 m per (1 + depth / 4) for 95 % of
+  them, crosses zero within a texel and a half of where the bed crosses the level (49 crossings, none off), and
+  its coarser levels hold the highest land of the texels they cover; the water's body over sand is sand at 0.3 m,
+  turquoise at 3 and 6 m, teal at 12 m and the deep colour by 60 m; the mirror is Schlick's on calm water and
+  less at a glancing angle on rough water. In the browser (software WebGL, all under one machine's SwiftShader):
+  the sea lab at 960x540 on the toy coast on medium, low and high by day, and on medium at golden hour, twilight
+  and night (beach, surf close to, shallows from 60 m up, piers, the sun's path from 12 and 60 m, open water,
+  a cliff's foot); the lab on the real terrain by day; the game at 1280x720 on medium by day at the start (the
+  chase camera and two staged cameras over the bay), from the sky road into the sun across the inner bay, across
+  the bay to the viaduct, and on the crest (the chase camera and a staged camera over the open sea), each beside
+  the same camera before the lane's work; colours read off those stills against the references (design.md).
+  `node tools/playtest.cjs` sections keys, photo and determinism: 54 checks, passed.
 - **The feel** (`tools/unit.mjs`, drift): 8 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
@@ -554,5 +570,16 @@ Read this before believing anything above about a device.
   the ledge); the photo moments after the coast were moved by the Node
   autopilot's timing (d3, k5, waves, d1 later by 0.4 to 1 s) and not each
   re-staged.
+- **The water** (water lane): nothing here ran on a real GPU or a phone. The water's shader was never timed on
+  one: its cost is known only as texture reads a pixel (spec.md) and as software frames. The `mobile` detail level
+  (what a phone's medium tier draws) was only compiled and looked at in the lab. No frame sequence was watched:
+  the sparks of the sun's path, the surf's lines, the sheet on the sand, the drifting ripples and gusts were judged
+  in stills, so shimmer, crawling or a visible repeat in motion would not have been seen. The low and high tiers
+  and the times of day other than day were seen in the lab only, not in the game; the planar mirror (high) only
+  in the lab; split screen over the water, the bonnet and bumper cameras, a phone's portrait picture and the
+  8-bit fallback (`?ldr`: no environment map, the sky's stand-in) not at all. The far land from the car's
+  reflection probe (medium) was not isolated in a still (it is in every medium game still, with the rest). The
+  cars' tail lamps in the water at night were not seen. The surf was developed on the lab's toy beach: the course
+  has hardly a shelving shore yet.
 - **Accessibility** beyond keyboard reachability of the buttons (screen
   readers, colour blindness, reduced motion) has not been considered.

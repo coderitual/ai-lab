@@ -29,6 +29,7 @@
 //   ?fx=0          no skid marks, smoke, spray or sparks
 //   ?plate=TEXT &plate2=TEXT   what the number plates say
 //   ?paint=NAME    the first car's paint
+//   ?sea=mobile    the water's detail, if not the tier's own (low, mobile, medium, high: what a phone's medium draws is `mobile`)
 //   ?wet=0.6       road wetness, 0..1 (a preview of weather to come; not in the interface)
 //   ?mute          no sound
 //   ?debug=NAME    show one intermediate buffer of the frame
@@ -198,6 +199,8 @@ export function parseParams(search = typeof location !== 'undefined' ? location.
     plate: plate('plate'),
     plate2: plate('plate2'),
     paint: word('paint'),
+    /** the water's detail, by name (assets/world/sea.js SEA_TIERS: low, mobile, medium, high); null: the tier's own */
+    sea: word('sea'),
     // null when not given: the time of day's own wetness (lighting.js) applies
     wet: num('wet') == null ? null : Math.min(1, Math.max(0, num('wet'))),
     mute: q.has('mute'),
