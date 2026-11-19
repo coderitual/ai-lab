@@ -16,9 +16,10 @@ every number there is marked published, measured or estimated. The viewer
 (`viewer.html?asset=car`, parameters at the top of `src/viewer.js`) shows the
 car alone under the world's light; `pin=` puts its camera exactly where one of
 three photographs was taken from, so a still can be laid over the photograph
-pixel on pixel; `studio=1` stands it in a plain studio and `stripes=1` in a
-light tunnel (with `mirror=1`: the paint as a plain mirror), for judging
-surfaces.
+pixel on pixel; `studio=1` stands it in a showroom (dark walls, a soft box overhead, two
+long strip lights either side; with `sun=0&ev=0` the dome is the only light,
+as in a product render) and `stripes=1` in a light tunnel (with `mirror=1`:
+the paint as a plain mirror), for judging surfaces.
 
 Axes (car space, `spec.js`): origin on the ground, on the centre line, midway
 between the axles; +Z forward, +Y up, +X the car's left. Metres.
@@ -296,12 +297,15 @@ So under the tunnel's roof the lines are drawn exactly (`GLSL_BORE` in
   step at speed. The entrance's pairs are two bars 0.34 m apart. From outside
   the box a ray counts only through the mouth, so the lines appear as the
   car nears the portal and nothing pops. The clear coat (and the glass, the
-  lenses, the gloss trims) take them at `BORE_COAT` (2.5) times their
+  lenses, the gloss trims) take them at `BORE_COAT` (5) times their
   radiance through their own Fresnel (at 1, a plain lacquer's, they were
-  faint grey threads on the pale silver): thin and crisp on the roof, the boot lid and the bonnet, drawn out
-  along the shoulders and flanks. The flake layer takes them at
-  `BORE_SHEEN` (0.2) through its roughness: a soft sheen round the crisp
-  line, not a second image.
+  faint grey threads on the pale silver; round 8 doubled round 7's 2.5): thin
+  and crisp on the roof, the boot lid and the bonnet, drawn out along the
+  shoulders and flanks. A bar is never drawn narrower than about a pixel's
+  footprint on the plane (`h` in `carBoreLines`): seen small, from the chase
+  camera on a phone, its true share of a pixel was a faint grey thread. The
+  flake layer takes them at `BORE_SHEEN` (0.3) through its roughness: a soft
+  sheen round the crisp line, not a second image.
 - **The probe under the roof** (`carBoreHold`): its fittings would double
   the lines as blotches, so what it shows is held, in proportion to how far
   the car is under the roof, to four times the lining's radiance

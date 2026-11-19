@@ -893,9 +893,9 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   }`,
       ],
       ['#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += cEmit;'],
-      ['#include <aomap_fragment>', '#include <aomap_fragment>\n  if (carDebug > 0.5 && carDebug < 1.5) { reflectedLight.directDiffuse *= 0.0; reflectedLight.directSpecular *= 0.0; clearcoatSpecularDirect *= 0.0; }\n  if (carDebug > 1.5 && carDebug < 2.5) { reflectedLight.indirectDiffuse *= 0.0; reflectedLight.indirectSpecular *= 0.0; clearcoatSpecularIndirect *= 0.0; }\n  if (carDebug > 2.5) { reflectedLight.directDiffuse *= 0.0; reflectedLight.directSpecular *= 0.0; reflectedLight.indirectDiffuse *= 0.0; clearcoatSpecularDirect *= 0.0; }'],
+      ['#include <aomap_fragment>', '#include <aomap_fragment>\n  if (carDebug > 0.5 && carDebug < 1.5) { reflectedLight.directDiffuse *= 0.0; reflectedLight.directSpecular *= 0.0; clearcoatSpecularDirect *= 0.0; }\n  if (carDebug > 1.5 && carDebug < 2.5) { reflectedLight.indirectDiffuse *= 0.0; reflectedLight.indirectSpecular *= 0.0; clearcoatSpecularIndirect *= 0.0; }\n  if (carDebug > 3.5) { reflectedLight.directDiffuse *= 0.0; reflectedLight.directSpecular *= 0.0; reflectedLight.indirectSpecular *= 0.0; clearcoatSpecularDirect *= 0.0; clearcoatSpecularIndirect *= 0.0; }\n  else if (carDebug > 2.5) { reflectedLight.directDiffuse *= 0.0; reflectedLight.directSpecular *= 0.0; reflectedLight.indirectDiffuse *= 0.0; clearcoatSpecularDirect *= 0.0; }'],
       ['#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  material.clearcoat *= cCoat;'],
-      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN, false, true, true)],
+      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN, false, true, true) + '\n#if defined( RE_IndirectDiffuse )\n  if (carDebug > 4.5) iblIrradiance *= 0.0;\n#endif\n'],
       [
         '#include <lights_fragment_end>',
         /* glsl */ `#include <lights_fragment_end>
@@ -965,7 +965,7 @@ export function createGlassMaterial(shared, caps, channel) {
   else if (n.y > 0.45 && vCarPos.z > -0.1) { transmit = 0.55; frit = 0.025; }
   else if (n.y > 0.45) {
     // (the atlas holds distances to 30 mm: a band any wider would cover the whole pane)
-    transmit = 0.15; frit = 0.028;
+    transmit = 0.1; frit = 0.028;
     // the heating lines: 14, a millimetre wide, 32 mm apart up the slope, copper-brown
     float t = (vCarPos.y - 1.1076) / 0.0158;
     float k = clamp(floor(t + 0.5), 0.0, 13.0);
@@ -977,7 +977,7 @@ export function createGlassMaterial(shared, caps, channel) {
     heat *= smoothstep(4.0, 8.0, 1.0 / max(fwidth(t), 1e-5));
   }
   else if (vCarPos.z > -0.4) { transmit = 0.5; frit = 0.0; }
-  else { transmit = 0.15; frit = 0.0; }`
+  else { transmit = 0.1; frit = 0.0; }`
       : `transmit = vCarPos.z > 0.0 ? 0.94 : 0.74; frit = 0.0;
   // the tail lamp's lens is clear red (the daylight photographs: a bright cherry red unlit, not smoked): it has a
   // colour of its own and holds back some of what is behind it
