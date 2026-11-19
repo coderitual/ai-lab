@@ -20,6 +20,7 @@ import * as THREE from 'three';
 import { fieldTexture, gradientField, normalTexture, valueField, worleyField } from '../../engine/noise.js';
 import { extend, withBake } from './shading.js';
 import { SEA_MAP_GLSL, SEA_UNIFORMS } from './sea.js';
+import { BED } from './rock.js';
 
 /**
  * (finish lane) The one green of the grass, linear albedo: the meadow (lush where it is damp, drier and a little
@@ -182,6 +183,64 @@ float groundGrass;   // how much of this pixel is blades of grass
 float groundSheen;   // how much of a plain rough surface's sheen it keeps (blades and crowns: next to none)
 vec3 groundBump;   // world-space tilt of the normal from the detail
 
+// (nearfield lane) the beds and blocks of rock, the same layout as rock.js builds (its rockHash, bedOffset, blockAt)
+float rockHash( int a, int b, int c ) {
+  uint h = ( uint( a ) * 0x27d4eb2du ) ^ ( uint( b ) * 0x165667b1u ) ^ ( uint( c ) * 0x9e3779b1u );
+  h = ( h ^ ( h >> 15u ) ) * 0x2c1b3c6du;
+  h = ( h ^ ( h >> 12u ) ) * 0x297a2d39u;
+  h ^= h >> 15u;
+  return float( h >> 8u ) / 16777216.0;
+}
+// how far back bed j's block at s stands (0..1), and the block's index
+float rockBack( int j, float s, int sd, out float u, out float len ) {
+  len = 2.6 + 4.2 * rockHash( j, sd, 1 );
+  u = ( s + rockHash( j, sd, 2 ) * len ) / len;
+  return rockHash( j, int( floor( u ) ), sd * 7 + 3 );
+}
+// the block at (s, t) (t metres up from the foot; s metres along): x its shade, y how far back it stands, z the bed
+// below's, w the bed above's (0..1); e metres to its two ends, its foot and its top
+vec4 rockBlock( float s, float t, float side, out vec4 e ) {
+  const float BED = ${BED.toFixed(3)};
+  float off = BED * ( 0.5 + 0.3 * sin( s / 29.0 + side * 1.7 ) + 0.15 * sin( s / 11.3 + 0.4 * side ) );
+  float bb = ( t + off ) / BED;
+  int j = int( floor( bb ) );
+  int sd = int( floor( side + 0.5 ) );
+  float u;
+  float len;
+  float back = rockBack( j, s, sd, u, len );
+  float u2;
+  float len2;
+  float below = rockBack( j - 1, s, sd, u2, len2 );
+  float above = rockBack( j + 1, s, sd, u2, len2 );
+  float fu = fract( u );
+  float fb = fract( bb );
+  e = vec4( fu * len, ( 1.0 - fu ) * len, fb * BED, ( 1.0 - fb ) * BED );
+  return vec4( rockHash( j, int( floor( u ) ), sd * 7 + 5 ), back, below, above );
+}
+
+// (nearfield lane, reference m5) sand sculpted by light: long swells across the wind with a gentle windward slope and
+// a sharp crest falling steeply to the lee, and wind ripples on them; returns how lit (the swells' own shading, about
+// 1) and, in tilt, the world-space tilt (x, z) of the normal. px: metres per pixel (the ripples fade before it is
+// coarser than they are).
+float sandRelief( vec3 p, float px, out vec2 tilt ) {
+  vec2 wind = vec2( 0.8, 0.6 );
+  vec2 across = vec2( -0.6, 0.8 );
+  float warp = 2.2 * sin( dot( p.xz, across ) / 9.0 ) + 1.1 * sin( dot( p.xz, across ) / 3.7 + 1.3 );
+  float u = dot( p.xz, wind ) + warp;
+  float f = fract( u / 6.5 );
+  // the swell: rising over 80 % of its length, falling over the rest
+  float slope = f < 0.8 ? 0.12 : -0.48;
+  float crest = 1.0 - smoothstep( 0.0, 0.05 + px / 6.5, abs( f - 0.8 ) );
+  tilt = -wind * slope;
+  float lit = f < 0.8 ? 1.0 + 0.12 * f : 0.82;
+  // ripples: about 0.3 m, wavering
+  float r = u / 0.32 + 1.5 * sin( dot( p.xz, across ) / 1.3 );
+  float fade = 1.0 - smoothstep( 0.03, 0.09, px );
+  tilt += wind * 0.22 * cos( 6.2832 * r ) * fade;
+  lit *= 1.0 + 0.08 * sin( 6.2832 * r ) * fade;
+  return lit + 0.08 * crest;
+}
+
 // the detail texture on the ground: from above where it is level, from the side on steep faces
 vec4 groundSample( sampler2D tex, vec3 p, vec3 n, float scale ) {
   vec2 top = p.xz / scale;
@@ -235,8 +294,11 @@ vec3 gLush = ${v3(GRASS.lush)};
 vec3 gDry = ${v3(GRASS.dry)};
 vec3 gGrass = mix( gLush, gDry, smoothstep( 0.45, 0.85, gLarge.r + vGroundPos.y * 0.001 ) );
 gGrass *= 0.78 + 0.44 * gDet.r;
-gGrass = mix( gGrass, ${v3(GRASS.straw)} * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.6, 0.85, gMid.b ) * 0.5 );
-gGrass *= 0.72 + 0.56 * gMid.r;
+// (nearfield lane) near the road the big soft blotches of tone are held down (they read as a low-resolution paint
+// map); finer, crisper structure takes over there (gTurf below)
+float gNearLand = 1.0 - smoothstep( 90.0, 200.0, gDist );
+gGrass = mix( gGrass, ${v3(GRASS.straw)} * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.6, 0.85, gMid.b ) * mix( 0.5, 0.25, gNearLand ) );
+gGrass *= mix( 0.72 + 0.56 * gMid.r, 0.88 + 0.24 * gMid.r, gNearLand );
 // forest floor near, the canopy's colour far away
 // (lead) leaf litter, not soot: at 0.04 the floor of the wood behind a barrier was a black void
 vec3 gFloor = vec3( 0.085, 0.072, 0.05 ) * ( 0.7 + 0.6 * gDet.a );
@@ -275,6 +337,112 @@ gOchre *= ( 0.78 + 0.32 * gBedLine ) * ( 1.0 - 0.5 * gPit );
 gOchre *= mix( 0.45, 1.0, smoothstep( 0.5, 6.0, vGroundPos.y - uSeaBox.w ) );
 gRockCol = mix( gRockCol, mix( gOchre * ( 0.75 + 0.25 * gLarge.g ), gOchre, gCut ), gCoast );
 gScreeCol = mix( gScreeCol, vec3( 0.46, 0.255, 0.14 ) * ( 0.82 + 0.36 * gDet.b ), gCoast );
+// (nearfield lane) the rock near the road in beds and blocks, as rock.js builds its cut faces: a limited palette of
+// three tones of the stone (pale grey limestone inland, ochre sandstone on the coast), one per block; large patches
+// of iron staining; each block's lip lit and worn pale where the bed above stands back, and in shade where it stands
+// out; dark joints; a damp, mossy foot and a paler worn top on a cut face, grass and scrub on its ledges and spilling
+// over its top. Joints and bevels fade out before they are a pixel wide, the blocks' tones before a bed is a few.
+vec2 gRockTilt = vec2( 0.0 );
+float gRockRough = 0.82;
+vec3 gLichen = vec3( 0.0 );
+if ( gRock > 0.01 ) {
+  float rs;
+  float rt;
+  float rside = 0.0;
+  // where on the face: a cut face carries metres up it, s and its side (rock.js); the band beside the road s; the
+  // land beyond, the world's own axes
+  if ( gCut > 0.5 ) {
+    rs = vVerge.y;
+    rt = vVerge.x;
+    rside = vVerge.z;
+  } else if ( vVerge.w < 0.9 ) {
+    rs = vVerge.y;
+    rt = vGroundPos.y;
+  } else {
+    rs = abs( gN.x ) > abs( gN.z ) ? vGroundPos.z : vGroundPos.x;
+    rt = vGroundPos.y;
+  }
+  float rPx = max( fwidth( rs ) + fwidth( rt ), 1.0e-4 );
+  vec4 re;
+  vec4 rb = rockBlock( rs, rt, rside, re );
+  float rFine = 1.0 - smoothstep( 0.04, 0.2, rPx );
+  float rCoarse = 1.0 - smoothstep( 0.3, 0.8, rPx );
+  float tone = mix( 0.5, rb.x, rCoarse );
+  vec3 stoneLo = mix( vec3( 0.13, 0.13, 0.125 ), vec3( 0.15, 0.08, 0.04 ), gCoast );
+  vec3 stoneMid = mix( vec3( 0.2, 0.197, 0.188 ), vec3( 0.235, 0.128, 0.062 ), gCoast );
+  vec3 stoneHi = mix( vec3( 0.3, 0.295, 0.28 ), vec3( 0.32, 0.19, 0.095 ), gCoast );
+  // three tones, stepped (a painted look), not a ramp
+  vec3 rc = mix( mix( stoneLo, stoneMid, smoothstep( 0.25, 0.32, tone ) ), stoneHi, smoothstep( 0.72, 0.79, tone ) );
+  // big patches: iron staining inland, a darker weathered rind on the coast
+  float rPatch = smoothstep( 0.55, 0.72, gMid.g + 0.35 * ( gLarge.b - 0.5 ) );
+  rc *= mix( vec3( 1.0 ), mix( vec3( 1.1, 0.93, 0.76 ), vec3( 0.82, 0.8, 0.82 ), gCoast ), rPatch );
+  rc *= 0.93 + 0.14 * gDetRock.g;
+  rc *= mix( 1.0, 0.78 + 0.4 * gGully, gCoast * ( 1.0 - gCut ) );
+  rc *= 1.0 - 0.25 * gStreak;
+  // the lip of a block whose bed above stands back (an open ledge): lit and worn pale; under a bed that stands out, shade
+  float bev = 0.16;
+  float open = smoothstep( 0.05, 0.25, rb.w - rb.y );
+  float lip = ( 1.0 - smoothstep( 0.0, bev, re.w ) ) * rFine * ( 0.35 + 0.65 * open );
+  float under = smoothstep( 0.05, 0.25, rb.y - rb.w ) * ( 1.0 - smoothstep( 0.0, 0.75, re.w ) ) * rCoarse;
+  float foot = ( 1.0 - smoothstep( 0.0, bev, re.z ) ) * rFine;
+  rc *= ( 1.0 + 0.5 * lip ) * ( 1.0 - 0.45 * under ) * ( 1.0 - 0.25 * foot );
+  // the joints between blocks are broken (some run on, some close up), the beds' lines continuous
+  float vj = rb.x < 0.55 ? min( re.x, re.y ) : 9.0;
+  float joint = 1.0 - smoothstep( 0.03, 0.03 + rPx, min( vj, min( re.z, re.w ) ) );
+  rc *= 1.0 - 0.6 * joint * rFine;
+  // (owner's references n1, n2) pitted, pocked erosion: hollows a few tens of centimetres across, dense in some
+  // patches of the face and none in others, each dark inside under a lit lower lip
+  {
+    vec2 pq = vec2( rs, rt ) / 0.75;
+    vec2 pc = floor( pq );
+    float pd = 9.0;
+    float pr = 0.0;
+    for ( int j = -1; j <= 1; j++ ) {
+      for ( int i = -1; i <= 1; i++ ) {
+        vec2 c = pc + vec2( float( i ), float( j ) );
+        int ci = int( c.x );
+        int cj = int( c.y );
+        vec2 o = vec2( rockHash( ci, cj, 91 ), rockHash( ci, cj, 92 ) );
+        float rad = 0.14 + 0.34 * rockHash( ci, cj, 93 ) * rockHash( ci, cj, 94 );
+        float d = length( pq - c - o ) / rad;
+        if ( d < pd ) {
+          pd = d;
+          pr = ( pq.y - c.y - o.y ) / rad;
+        }
+      }
+    }
+    float pitted = smoothstep( 0.45, 0.62, gMid.r + 0.4 * ( gDet2.g - 0.5 ) ) * rCoarse;
+    float hole = ( 1.0 - smoothstep( 0.8, 1.0, pd ) ) * pitted;
+    float rimLit = smoothstep( 0.75, 1.0, pd ) * ( 1.0 - smoothstep( 1.0, 1.25, pd ) ) * step( pr, 0.0 ) * pitted;
+    // dark under the hollow's upper lip, lighter towards its lower one
+    rc *= ( 1.0 - 0.7 * hole * ( 0.4 + 0.6 * smoothstep( -0.6, 0.6, pr ) ) ) * ( 1.0 + 0.4 * rimLit * rFine );
+    gRockTilt.y += ( 0.5 * pr * hole - 0.3 * rimLit ) * rFine;
+  }
+  // a wet sheen where water seeps down the face and in the damp foot: the rock is not matte (n1)
+  gRockRough = mix( 0.62, 0.36, max( gStreak, smoothstep( 0.6, 0.8, gDet2.g ) * 0.6 ) );
+  // orange and yellow lichen in crusts on the coast's rock and on the tops of blocks (n1, n2)
+  gLichen = mix( vec3( 0.42, 0.13, 0.02 ), vec3( 0.36, 0.27, 0.04 ), step( 0.5, gDet2.b ) );
+  float lichen = smoothstep( 0.66, 0.72, gDet.g * 0.5 + gDet2.r * 0.5 + 0.25 * lip ) * smoothstep( 0.4, 0.7, gMid.b + 0.4 * gCoast ) * rCoarse;
+  rc = mix( rc, gLichen * ( 0.8 + 0.4 * gDet.r ), lichen * 0.85 );
+  // the face's height: damp and mossy at the foot, paler where the top is worn
+  float rFrac = gCut > 0.5 ? vMask.y - 2.0 : 0.5;
+  float rDamp = gCut * ( 1.0 - smoothstep( 0.2, 1.1 + 0.6 * gDet2.r, rt ) );
+  rc *= 1.0 - 0.4 * rDamp;
+  rc = mix( rc, vec3( 0.045, 0.055, 0.025 ), rDamp * smoothstep( 0.5, 0.7, gDet.r + 0.2 * ( gDet2.g - 0.5 ) ) * 0.7 );
+  rc *= 1.0 + 0.22 * gCut * smoothstep( 0.7, 1.0, rFrac ) * ( 1.0 - step( 1.001, rFrac ) );
+  // the land's own rock (not a cut face) stays at its old, darker tone, and far away it is what it was
+  float rNear = gCut + ( 1.0 - gCut ) * ( 1.0 - smoothstep( 140.0, 280.0, gDist ) );
+  rc *= mix( 0.62, 1.0, max( gCut, gCoast ) );
+  gRockCol = mix( gRockCol, rc, rNear );
+  gRockTilt = vec2( ( fract( rb.x * 7.31 ) - 0.5 ) * 0.5, ( fract( rb.x * 3.17 ) - 0.5 ) * 0.35 + 1.1 * lip - 0.7 * foot ) * rCoarse * rNear;
+  // grass and scrub: on the ledges (facets that face up) in ragged tufts, and over the top's lip
+  float ledge = gCut * smoothstep( 0.45, 0.7, gN.y ) * smoothstep( 0.3, 0.5, gDet.r + 0.35 * ( gDet2.r - 0.5 ) );
+  float overLip = gCut * smoothstep( 0.0, 0.05, rFrac - 1.04 - 0.1 * ( gDet.r - 0.5 ) );
+  float green = max( ledge, overLip );
+  gGrass = mix( gGrass, mix( gGrass * 1.05, vec3( 0.028, 0.042, 0.018 ), smoothstep( 0.62, 0.78, gDet2.r ) ), green );
+  gRock *= 1.0 - green;
+  gRockRough = mix( gRockRough, 0.3, rDamp );
+}
 // the coast's grass is dry: olive and straw, sun-bleached (frame E1)
 gGrass = mix( gGrass, mix( vec3( 0.06, 0.062, 0.026 ), vec3( 0.105, 0.088, 0.045 ), smoothstep( 0.3, 0.75, gMid.b + 0.3 * ( gDet.r - 0.5 ) ) ) * ( 0.8 + 0.4 * gDet.r ), 0.85 * gCoast );
 vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
@@ -308,14 +476,47 @@ if ( gVerge > 0.0 ) {
   float stones = smoothstep( 0.82, 0.9, gDet.b ) * ( 1.0 - smoothstep( 0.4, 2.0, vd - rag ) );
   // long grass at the barrier's foot, and all over a narrow verge
   float rough = max( smoothstep( -1.2, -0.3, vVerge.z ), narrow );
+  // (nearfield lane) beyond the mower's last pass, longer grass: a ragged but definite edge some metres out
+  float vEdge = 4.2 + 1.6 * ( gDet2.r - 0.5 ) + 2.0 * ( gMid.r - 0.5 );
+  rough = max( rough, 0.75 * smoothstep( vEdge - 0.25, vEdge + 0.25, vd ) );
   vec3 roughCol = gGrass * ( 0.75 + 0.7 * smoothstep( 0.35, 0.7, gDet.r ) );
+  // (nearfield lane) sun-dried patches in the mown grass, metres across, with a clear edge
+  vec3 dryCol = ${v3(GRASS.straw)} * ( 0.85 + 0.3 * gDet.r );
+  mown = mix( mown, dryCol, 0.6 * smoothstep( 0.6, 0.66, 0.65 * gMid.a + 0.35 * gDet2.r ) );
+  // (nearfield lane) blades: fine streaks along the mower's way, light tips and dark gaps, fading with distance
+  float vFade = 1.0 - smoothstep( 0.02, 0.07, vAa );
+  float blade = texture2D( uDetail, vec2( vd * 2.7, vVerge.y * 0.31 ) ).r;
+  mown *= 1.0 + 0.35 * ( blade - 0.5 ) * vFade;
+  // tufts left by the mower at the road's edge, in clumps
+  float edgeTuft = smoothstep( 0.6, 0.66, gDet2.r + 0.25 * ( blade - 0.5 ) ) * ( 1.0 - smoothstep( 0.8, 1.8, vd ) );
+  rough = max( rough, edgeTuft );
   vec3 vergeCol = mix( mown, roughCol, rough );
+  // worn earth where cars cut over the edge: patches some metres long, with two wheels' tracks in them
+  float cut = smoothstep( 0.66, 0.72, texture2D( uLarge, vec2( vVerge.y / 70.0, 0.37 ) ).r ) * ( 1.0 - smoothstep( 2.4, 3.2, vd ) );
+  float tracks = cut * ( 1.0 - smoothstep( 0.18, 0.18 + vAa, abs( abs( vd - 1.2 - 0.3 * sin( vVerge.y / 9.0 ) ) - 0.8 ) ) );
+  earth = max( earth, cut * smoothstep( 0.35, 0.55, gDet.r * 0.6 + gDet2.b * 0.4 ) );
   vergeCol = mix( vergeCol, earthCol, max( earth, stones * 0.8 ) );
+  vergeCol *= 1.0 - 0.3 * tracks;
+  // (nearfield lane) at the foot of whatever stands at the solid edge (rail, wall, rock): a strip of drainage gravel
+  // with a dark line of dirt along its edge, all in the soft shade of what stands there; under woods the leaves
+  // cover it
+  {
+    float gw = 0.6 + 0.2 * ( gDet2.g - 0.5 );
+    float zAa = fwidth( vVerge.z ) + 1.0e-3;
+    float strip = smoothstep( -gw - zAa, -gw + zAa, vVerge.z ) * ( 1.0 - 0.7 * gWoodBehind );
+    float rim = ( 1.0 - smoothstep( 0.0, 0.08 + zAa, abs( vVerge.z + gw ) ) ) * ( 1.0 - 0.7 * gWoodBehind );
+    vec3 gravelCol = mix( vec3( 0.15, 0.145, 0.135 ), vec3( 0.24, 0.23, 0.21 ), smoothstep( 0.35, 0.75, gDet.b ) ) * ( 0.8 + 0.3 * gDet2.g );
+    gravelCol = mix( gravelCol, gScreeCol * 0.75, 0.5 * gCoast );
+    vergeCol = mix( vergeCol, gravelCol, strip );
+    vergeCol *= 1.0 - 0.45 * rim * gFade;
+    vergeCol *= 1.0 - 0.35 * smoothstep( -0.8, 0.0, vVerge.z );
+    gVergeEarth = max( gVergeEarth, strip );
+  }
   // fallen leaves drifted against the barrier's foot under woods (frame D4)
   float leaves = gWoodBehind * smoothstep( -1.6, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
   vergeCol = mix( vergeCol, mix( vec3( 0.2, 0.075, 0.02 ), vec3( 0.09, 0.04, 0.015 ), gDet.b ), leaves );
   gGrass = mix( gGrass, vergeCol, gVerge );
-  gVergeEarth = gVerge * max( earth, stones * 0.8 );
+  gVergeEarth = gVerge * max( max( earth, stones * 0.8 ), gVergeEarth );
   gScree *= 1.0 - gVerge;
   gForest *= 1.0 - gVerge;
 }
@@ -338,9 +539,82 @@ if ( gVerge > 0.0 ) {
 // (env lane) clumps of trees and hedges across open meadow beyond the verge, so no slope reads as bare
 float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) ) * ( 1.0 - gScree ) * ( 1.0 - gCoast );
 gForest = max( gForest, gClump );
+// (nearfield lane, references n1 to n3) beside the road, the ground changes material in readable patches: dense
+// carpets of low plants in clusters a few metres across (heather purple, bilberry red, gorse yellow, bracken
+// rust), and near the sea pale sand, pebbles and bare slab; within about 45 m of the road (the band) and on the cut
+// faces' ledges and lips, never on the mown verge itself
+float gCarpet = 0.0;
+{
+  float nearRoad = vVerge.w < 0.9 ? ( 1.0 - smoothstep( 25.0, 45.0, vVerge.z ) ) * smoothstep( 0.6, 1.4, vVerge.z ) : 0.0;
+  float where = max( nearRoad * ( 1.0 - gRock ), gCut * ( 1.0 - gRock ) );
+  float cluster = smoothstep( 0.6, 0.66, 0.55 * gDet2.r + 0.45 * gMid.a + 0.12 * ( gDet.r - 0.5 ) );
+  // broken into tufts and gaps, not a sheet of colour
+  gCarpet = where * cluster * ( 1.0 - gForest ) * smoothstep( 0.32, 0.45, gDet.r + 0.3 * ( gDet2.b - 0.5 ) );
+  if ( gCarpet > 0.0 ) {
+    float kind = texture2D( uLarge, vGroundPos.xz / 41.0 + vec2( 0.13, 0.71 ) ).g;
+    vec3 plant = kind < 0.42 ? vec3( 0.2, 0.03, 0.085 ) : kind < 0.55 ? vec3( 0.26, 0.03, 0.015 ) : kind < 0.66 ? vec3( 0.34, 0.22, 0.015 ) : vec3( 0.25, 0.075, 0.018 );
+    // the coast's are sedum and thrift: reds and pinks
+    plant = mix( plant, kind < 0.5 ? vec3( 0.3, 0.025, 0.02 ) : vec3( 0.3, 0.07, 0.12 ), gCoast );
+    plant *= 0.6 + 0.7 * smoothstep( 0.3, 0.75, gDet.r );
+    gGrass = mix( gGrass, plant, gCarpet );
+  }
+  // the coast's ground in patches: pale sand, pebbles, bare slab
+  float coastNear = gCoast * nearRoad * ( 1.0 - gRock ) * ( 1.0 - gCarpet ) * smoothstep( 0.12, 0.25, gSlope );
+  if ( coastNear > 0.0 ) {
+    float pk = texture2D( uLarge, vGroundPos.xz / 29.0 + vec2( 0.52, 0.27 ) ).b;
+    float patchy = smoothstep( 0.55, 0.6, pk );
+    vec3 sand = vec3( 0.42, 0.37, 0.28 ) * ( 0.85 + 0.3 * gDet.r );
+    vec3 pebbles = mix( vec3( 0.2, 0.18, 0.15 ), vec3( 0.42, 0.39, 0.34 ), smoothstep( 0.4, 0.7, gDet.b ) );
+    vec3 slab = vec3( 0.3, 0.29, 0.27 ) * ( 0.8 + 0.3 * gDetRock.g );
+    vec3 ground = gMid.g < 0.45 ? sand : gMid.g < 0.6 ? pebbles : slab;
+    gGrass = mix( gGrass, ground, patchy * coastNear );
+    gCarpet = max( gCarpet, patchy * coastNear );
+  }
+}
+// (nearfield lane, reference m5) the coast's loose stone beside the road and the beaches are sand sculpted by light:
+// swells and ripples in the normal, warm on their windward slopes and cool in their lee; pebbles and tiny scrub with
+// a shadow; darker and wet towards the water, coral-pale in the shallows
+vec2 gSandTilt = vec2( 0.0 );
+float gSand = 0.0;
+if ( gCoast > 0.01 ) {
+  float beach = 0.0;
+  // a beach is a strip along the water's edge: low, and within a few metres of the shore (the sea map)
+  if ( uSeaBox.w > -1000.0 ) beach = ( 1.0 - smoothstep( 1.2, 3.0, vGroundPos.y - uSeaBox.w + 1.5 * ( gDet2.r - 0.5 ) ) ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) ) * ( 1.0 - smoothstep( 3.0, 9.0, seaLandOff( seaMapAt( vGroundPos.xz ) ) + 4.0 * ( gDet2.g - 0.5 ) ) );
+  gSand = max( gScree, beach * ( 1.0 - gRock ) ) * gCoast * gNearLand;
+  if ( gSand > 0.01 ) {
+    float px = fwidth( vGroundPos.x ) + fwidth( vGroundPos.z );
+    float lit = mix( 1.0, sandRelief( vGroundPos, px, gSandTilt ), gFade );
+    vec3 sand = mix( vec3( 0.5, 0.36, 0.2 ), vec3( 0.56, 0.5, 0.4 ), beach ) * lit * ( 0.92 + 0.16 * gDet2.g );
+    // wet towards the water
+    float wet = uSeaBox.w > -1000.0 ? 1.0 - smoothstep( 0.2, 1.0, vGroundPos.y - uSeaBox.w ) : 0.0;
+    sand *= 1.0 - 0.4 * wet;
+    // pebbles, and tufts of scrub with a shadow on their lee side
+    float pebble = smoothstep( 0.8, 0.86, gDet.b );
+    sand = mix( sand, mix( vec3( 0.12, 0.11, 0.1 ), vec3( 0.36, 0.34, 0.3 ), smoothstep( 0.86, 0.95, gDet.b ) ), pebble * 0.85 );
+    float scrub = smoothstep( 0.86, 0.89, gDet2.r ) * ( 1.0 - gScree * 0.8 );
+    float shade = smoothstep( 0.7, 0.78, texture2D( uDetail, ( vGroundPos.xz + vec2( 0.35, 0.25 ) ) / ${(DETAIL_SCALE * 0.37).toFixed(2)} ).r ) * ( 1.0 - scrub );
+    sand *= 1.0 - 0.3 * shade * gFade;
+    sand = mix( sand, vec3( 0.06, 0.07, 0.03 ), scrub );
+    gScreeCol = mix( gScreeCol, sand, gSand );
+    gGrass = mix( gGrass, sand, beach * ( 1.0 - gScree ) * gCoast * gNearLand );
+    gSandTilt *= gSand * ( 1.0 - scrub ) * ( 1.0 - pebble );
+  }
+}
+// (nearfield lane) near the road the turf has fine, crisp structure: tufts a little darker and fuller, and grey rock
+// breaking through on the steeper banks in outcrops a few metres across, with a dark rim
+float gOutcrop = 0.0;
+{
+  float tuft = smoothstep( 0.62, 0.68, gDet.r ) * gNearLand * gFade;
+  gGrass *= 1.0 - 0.18 * tuft;
+  float bank = smoothstep( 0.07, 0.16, gSlope ) * ( 1.0 - gRock ) * ( 1.0 - gForest ) * gNearLand * ( 1.0 - gVerge );
+  float o = 0.6 * gDet2.g + 0.4 * gMid.a + 0.15 * smoothstep( 0.15, 0.3, gSlope );
+  gOutcrop = smoothstep( 0.66, 0.68, o ) * bank;
+  float oRim = ( smoothstep( 0.63, 0.66, o ) - smoothstep( 0.66, 0.68, o ) ) * bank;
+  gGrass *= 1.0 - 0.35 * oRim;
+}
 vec3 gAlbedo = gGrass;
 // blades let some light through, the mown verge most (bare earth none)
-groundGrass = ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * ( 1.0 - gVergeEarth );
+groundGrass = ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * ( 1.0 - gVergeEarth ) * ( 1.0 - gCarpet );
 // (render lane, finish lane) the light through the blades is the grass's own green (GRASS.through), about twice
 // what the blades reflect: against the low sun the verge is brighter, as autumn grass, not a neon glow
 groundThrough = ${v3(GRASS.through)} * ( 0.6 + 0.4 * gVerge ) * groundGrass * gFade;
@@ -349,6 +623,7 @@ gAlbedo = mix( gAlbedo, gForestCol, gForest );
 // (seen from the road a clump is crowns, not forest floor)
 gAlbedo = mix( gAlbedo, gCanopy * 1.3, gClump * ( 1.0 - min( vMask.x * 3.0, 1.0 ) ) );
 gAlbedo = mix( gAlbedo, gScreeCol, gScree );
+gAlbedo = mix( gAlbedo, mix( vec3( 0.2, 0.198, 0.19 ), vec3( 0.3, 0.2, 0.12 ), gCoast ) * ( 0.75 + 0.5 * gDetRock.g ), gOutcrop );
 gAlbedo = mix( gAlbedo, gRockCol, gRock );
 gAlbedo = mix( gAlbedo, gSnowCol, gSnow );
 // (sea lane, round 4) the volcano's island: dark basalt, green low down on its flanks, a pale ash rim at the crater
@@ -368,11 +643,16 @@ if ( uVolcano.z > 0.0 ) {
 // (sea lane, round 4) pale sand and pebbles at the water's edge where the shore is gentle (the owner's env references)
 gAlbedo = mix( gAlbedo, vec3( 0.36, 0.33, 0.27 ) * ( 0.8 + 0.4 * gDet.b ), ( 1.0 - smoothstep( 1.2, 3.5, vGroundPos.y - uSeaBox.w ) ) * ( 1.0 - smoothstep( 0.2, 0.45, gSlope ) ) * step( -1000.0, uSeaBox.w ) * gCoast );
 gAlbedo *= 1.0 - 0.55 * gWetBand;
+// (nearfield lane, references n1 to n3) under the shallows, pale sand: the water over it reads clear and turquoise
+if ( uSeaBox.w > -1000.0 ) {
+  float under = ( 1.0 - smoothstep( -0.3, 0.1, vGroundPos.y - uSeaBox.w ) ) * ( 1.0 - smoothstep( 2.0, 7.0, uSeaBox.w - vGroundPos.y ) );
+  gAlbedo = mix( gAlbedo, vec3( 0.46, 0.42, 0.33 ) * ( 0.85 + 0.3 * gDet.b ), under * gCoast );
+}
 diffuseColor.rgb *= gAlbedo;
 // Seen against a low sun a plain rough surface glares (its Fresnel term goes to one at a grazing angle): rock and
 // stones do, a little; turf and tree crowns do not (the far land under the massif stood as a white band in the haze)
 groundSheen = 1.0 - 0.85 * max( groundGrass, gForest * ( 1.0 - gRock ) ) - 0.5 * gVergeEarth;
-groundRoughness = mix( mix( 1.0, 0.92, gScree ), 0.82, gRock );
+groundRoughness = mix( mix( 1.0, 0.92, gScree ), gRockRough, gRock );
 groundRoughness = mix( groundRoughness, 0.55, gSnow );
 `;
 
@@ -387,6 +667,14 @@ const GROUND_NORMAL = /* glsl */ `
   vec3 t = normalize( vec3( 1.0, 0.0, 0.0 ) - gN * gN.x );
   vec3 b = normalize( vec3( 0.0, 0.0, 1.0 ) - gN * gN.z );
   vec3 nw = normalize( gN + ( t * dn.x + b * dn.y ) * strength );
+  // (nearfield lane) the sand's swells and ripples
+  nw = normalize( nw + vec3( gSandTilt.x, 0.0, gSandTilt.y ) );
+  // (nearfield lane) each block of rock its own plane, its lip and foot bevelled (gRockTilt: along the face, up it)
+  float hl = length( gN.xz );
+  if ( gRock > 0.01 && hl > 0.2 ) {
+    vec3 al = vec3( -gN.z, 0.0, gN.x ) / hl;
+    nw = normalize( nw + ( al * gRockTilt.x + cross( al, gN ) * gRockTilt.y ) * gRock );
+  }
   normal = normalize( ( viewMatrix * vec4( nw, 0.0 ) ).xyz );
 }
 `;

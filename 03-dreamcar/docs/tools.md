@@ -120,6 +120,21 @@ probe").
 Only in headless Chromium on software WebGL (SwiftShader), on one Linux
 machine without a GPU, and only what is listed here.
 
+- **Beside the road** (nearfield lane, 2026-11-19): judged in stills of
+  the chase camera by day at 393x852 and 1280x720 on the medium and low
+  tiers (the start straight, a forest bend, the revetments into the tunnel,
+  the walls out of it with the arch ahead, the sky road, the climb, the
+  carousel), in one staged view under the viaduct, at golden hour and at
+  night out of the tunnel and in the carousel (medium, 393x852), and on the
+  high tier at 1280x720 (the climb), before and after.
+  `node tools/unit.mjs` passed; the playtest's keys, photo and determinism
+  sections against the lane's production build: 49 of 49, and after merging the twilight time of day: 54 of 54 (a twilight still out of the tunnel looked right on low). Not verified:
+  motion (every still is one frame: whether the rock's joints, the pits,
+  the verge's blades and the sand's ripples crawl at speed is not known),
+  a real GPU or phone, Safari, the frame rate's cost of the longer ground
+  shader, the low walls' grooves (high tier) seen close, the arch from the
+  sky road's far side.
+
 - **The road** (`tools/unit.mjs`, track): closes on itself; samples every
   metre; `frameAt` and `locate` invert each other; the surface the wheels
   read equals the profile exactly; vertical acceleration at the fastest

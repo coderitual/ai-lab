@@ -30,6 +30,25 @@ const TIER = {
   high: { grass: 3.2, grassReach: 48, bushes: true, bushReach: 95, rockReach: 340 },
 };
 
+/** (nearfield lane) Low shrubs' autumn colours (linear albedo, over the pale cover texture). */
+const ACCENTS = [
+  null,
+  [0.2, 0.03, 0.085], // heather
+  [0.24, 0.03, 0.015], // bilberry
+  [0.32, 0.21, 0.015], // gorse
+  [0.24, 0.075, 0.018], // bracken
+  [0.3, 0.025, 0.02], // sedum (coast)
+  [0.3, 0.07, 0.12], // thrift (coast)
+];
+
+/** Which accent a cluster of shrubs wears at s: 0 (green) for about half of them. */
+function accentAt(s, side, coast) {
+  const c = Math.floor(s / 22) * 2 + (side > 0 ? 1 : 0);
+  const h = Math.abs(Math.sin(c * 12.9898 + 4.1) * 43758.5453) % 1;
+  if (h < 0.5) return 0;
+  return coast ? (h < 0.75 ? 5 : 6) : 1 + Math.floor(((h - 0.5) / 0.5) * 4);
+}
+
 /**
  * (forest lane) Frame E5's boulders, in its places along the granite scheme's own pieces (the last ess), as seen from
  * the `e5` camera: [share of the way along, 'in' (the island) or 'out', metres from the solid edge to the boulder's
@@ -423,7 +442,12 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const y = terrain.heightOnTrack(s, lat);
         const h = r.range(0.5, 1.3);
         const v = r.range(0.7, 1.2);
-        bushItems.push(make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c) => c * v), h));
+        // (nearfield lane, references n1 to n3) in clusters some tens of metres long, low shrubs in autumn colour:
+        // heather, bilberry, gorse, bracken (on the coast road sedum and thrift); the rest the grass's own green
+        const accent = ACCENTS[accentAt(s, side, (side > 0 ? track.coastL : track.coastR)?.[i] === 1)];
+        const tint = accent ? accent.map((c) => c * v) : GRASS.bush.map((c) => c * v);
+        const hh = accent ? h * 0.6 : h;
+        bushItems.push(make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [hh * 1.8, hh, hh * 1.8], tint, hh));
       }
     }
     // rocks: fallen at the foot of the rock faces, and boulders on the slopes beyond the rails

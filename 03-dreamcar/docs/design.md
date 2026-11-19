@@ -484,6 +484,55 @@ with a short `advance` after loading.
 - The paint is a metallic silver under a clear coat: a sharp mirror image of
   the real surroundings over a soft, flake-sparkling base.
 
+## Beside the road (nearfield)
+
+**Art direction.** Everything within about 40 m of the road that is not the
+asphalt or a tree is drawn as material you can name at a glance, not as a
+smear of noise: rock in sculpted beds and swelling blocks with pits, a wet
+sheen, lichen and grass on its ledges; ground that changes material in
+readable patches with crisp edges (mown verge, longer grass, worn earth,
+drainage gravel, carpets of low plants in autumn colour, sand sculpted into
+swells and ripples on the coast); concrete with a rhythm of panels, joints,
+lifts, caps and weathering. Forms first, then a few deliberate tones per
+material, then light: lit lips, shaded undersides, contact shade at every
+foot. Fine detail fades out before it can shimmer at speed.
+
+**The owner's environment references** (refs/env, kept out of the
+repository; other games' pictures, judged for quality and character only,
+nothing of their places, plants, rock shapes or lettering is taken):
+
+- *A canyon with a natural arch:* massive rock with pitted, pocked erosion,
+  strata and overhangs, a strong wet sheen where the sun rakes it, mist in
+  the gaps, a shallow clear stream over pale sand and pebbles, clusters of
+  low red and orange plants.
+- *A shore under a towering pitted cliff:* pale sand, turquoise shallows,
+  dense carpets of red, orange and purple low plants, a rock stack, mist at
+  the cliff's foot.
+- *The same at eye level:* pale rounded boulders with layered caps, vivid
+  plant carpets, turquoise water.
+- *Snowfields at a low sun:* dark rock breaking through, warm light, cool
+  violet shade, every ripple of the surface showing.
+- *A rally stage:* a rich verge of weeds, tufts, dirt and wet ruts, boards on
+  a low wall, flags, poles and wires, a tall-grass field.
+- *Desert dunes (addendum 9):* long soft swells with a sharp crest line,
+  wind ripples, scrub casting small shadows, a warm sunlit side against a
+  cool lee; foreground rock in layered beds with cracks, lichen and a rim of
+  light.
+
+**What was built from them** (techniques.md, "Near the road"): the cut faces
+in beds and rounded blocks with ledges and overhangs, pits, lichen, a wet
+sheen and a damp foot; a natural arch of the same stone spanning the cutting
+where it opens onto the sky road (1972 m, its underside about 11 m over the
+road: the circuit's signature rock, seen for two seconds or so from the
+tunnel's exit); carpets of heather, bilberry, gorse and bracken colours
+beyond the barriers (sedum and thrift reds on the coast), and shrubs in the
+same colours in clusters; the coast's loose stone and beaches as sculpted
+sand, pale under the shallows; the verge in bands with drainage gravel at
+every barrier's foot; one concrete finish for the cuttings, bridges and
+piers; the low walls as precast safety barriers with grooves between blocks
+and worn paint. Not done: mist at the foot of faces, flags, poles and wires,
+pools of water by the road (the water is the sea lane's).
+
 ## The reference frames
 
 The owner chose five frames as the spec for the look ("treat those
