@@ -31,7 +31,7 @@ import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
 import { Input, buzz } from '../engine/Input.js';
 import { ReflectionProbe } from '../engine/ReflectionProbe.js';
-import { TIERS, probeCaps } from '../engine/caps.js';
+import { LADDER, TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
 import { createRng } from '../engine/rng.js';
 import { CameraRig } from './Cameras.js';
@@ -85,6 +85,12 @@ const HINT_KEY = 'dreamcar.hinted.v1';
 const QUALITY_KEY = 'dreamcar.quality';
 const UNITS_KEY = 'dreamcar.units';
 const MAP_KEY = 'dreamcar.map';
+/** The performance readout, on or off. */
+const STATS_KEY = 'dreamcar.stats';
+/** Where the governor ended on this device, as `tier:level`: the next visit starts there instead of at the top. */
+const LEVEL_KEY = 'dreamcar.level.v1';
+/** How often the readout's line is written again (drawn frames). */
+const STATS_EVERY = 20;
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /**
  * The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual'), steering (STEERINGS, the
@@ -150,9 +156,9 @@ export class Game {
   constructor(container, params) {
     this.params = params;
     this.container = container;
-    const engine = new Engine(container, { manual: params.manual, pixelRatio: params.dpr, draw: !params.nodraw });
+    const engine = new Engine(container, { manual: params.manual, pixelRatio: params.dpr, renderScale: params.scale, shed: params.shed, draw: !params.nodraw });
     this.engine = engine;
-    this.caps = probeCaps(engine.renderer, { ldr: params.ldr });
+    this.caps = probeCaps(engine.renderer, { ldr: params.ldr, mobile: params.mobile });
     /** @type {import('../engine/caps.js').Tier} */
     // ?q= wins; then the quality chosen in the options (dreamcar.quality); 'auto' is what the probe chose
     const stored = kept(QUALITY_KEY);
@@ -162,6 +168,8 @@ export class Game {
     /** km/h or mph, and whether the map shows (the options; kept on the device). */
     this.units = kept(UNITS_KEY) === 'mph' ? 'mph' : 'kmh';
     this.mapShown = kept(MAP_KEY) !== 'off';
+    /** The performance readout (the options, kept; ?stats and ?stats=0 win and are not kept). */
+    this.statsShown = params.stats ?? kept(STATS_KEY) === 'on';
     /** The driving help every car gets (a key of ASSISTS.levels), and the touch throttle. */
     const help = kept(ASSISTS_KEY);
     this.assists = help && ASSISTS.levels[help] ? help : ASSISTS.default;
@@ -176,7 +184,12 @@ export class Game {
     /** Why tilt is not steering ('' | 'refused' | 'unavailable'): the options say so. */
     this.tiltNote = '';
     this._zonesSeen = kept(ZONES_KEY) === '1';
-    engine.setMaxPixelRatio(TIERS[this.tier].pixelRatio);
+    engine.setMaxPixelRatio(params.maxDpr ?? TIERS[this.tier].pixelRatio);
+    // what the governor sheds when frames run long, and how low the render scale may then go (engine/governor.js)
+    engine.setLadder(LADDER[this.tier], params.floor ?? TIERS[this.tier].scaleFloor);
+    // a device that had to shed last time starts where it ended, and climbs from there if it now has the time
+    const [keptTier, keptLevel] = (kept(LEVEL_KEY) || '').split(':');
+    if (keptTier === this.tier && Number(keptLevel) > 0) engine.startAt(Number(keptLevel));
     this.rng = createRng(params.seed);
 
     this.pipeline = new FramePipeline(engine.renderer, this.caps, { tier: this.tier, post: params.post });
@@ -187,6 +200,14 @@ export class Game {
     this.params = params;
     this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params, viewFar: VIEW.far });
     if (this.world.time.name !== params.time) this.world.setTime(params.time);
+    // the ladder's rung that is the world's (the pipeline and draw() ask the engine for theirs each frame)
+    const detail = () => this.world.setDetail(engine.isShed('detail'));
+    engine.onQuality(() => {
+      detail();
+      // (kept for the next visit; not the bottom the governor visits for a second while it tests for a frame-rate cap)
+      if (engine.adaptive && !engine.governor.watch?.trial) keep(LEVEL_KEY, `${this.tier}:${engine.qualityStep}`);
+    });
+    detail();
     this.effects = new Effects({
       scene: this.world.scene,
       track: this.track,
@@ -615,6 +636,13 @@ export class Game {
     if (name.startsWith('map:')) {
       this.mapShown = name.slice(4) !== 'off';
       keep(MAP_KEY, this.mapShown ? 'on' : 'off');
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
+    if (name.startsWith('stats:')) {
+      this.statsShown = name.slice(6) === 'on';
+      keep(STATS_KEY, this.statsShown ? 'on' : 'off');
+      this._statsFrame = -1;
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
@@ -1196,6 +1224,7 @@ export class Game {
       qualityFixed: !!this.params.quality,
       units: this.units,
       map: this.mapShown,
+      stats: this.statsShown,
       assists: this.assists,
       assistLevels: Object.keys(ASSISTS.levels),
       paints: PAINT_ORDER,
@@ -1206,6 +1235,7 @@ export class Game {
       tiltNote: this.tiltNote,
     });
     hud.setFade(1 - this._fadeLevel);
+    this._perf();
     // the board: on the title and the pause sheet (and in the results), never over the run
     if (this.phase === 'title' || this.engine.paused) hud.setBoard(this._boardTable(), RULES.medals, this.world.time.name);
     if (this.phase === 'title') return;
@@ -1289,6 +1319,41 @@ export class Game {
     }
   }
 
+  /** The performance readout: one line of what is being drawn and how fast, written a few times a second. */
+  _perf() {
+    const { engine, hud } = this;
+    if (!this.statsShown) {
+      if (this._statsFrame !== -2) hud.setPerf(null);
+      this._statsFrame = -2;
+      return;
+    }
+    if (this._statsFrame >= 0 && engine.frame - this._statsFrame < STATS_EVERY) return;
+    this._statsFrame = engine.frame;
+    hud.setPerf(TEXT.statsLine(this.perfState()));
+  }
+
+  /** What the readout shows (and tests read): the tier, the canvas, the render scale, frames a second, the ladder. */
+  perfState() {
+    const { engine } = this;
+    const q = engine.qualityState();
+    const f = engine.frameStats(3);
+    return {
+      tier: this.tier,
+      width: engine.bufferWidth,
+      height: engine.bufferHeight,
+      ratio: Math.round(engine.pixelRatio * 100) / 100,
+      scale: engine.renderScale,
+      aa: this.pipeline.sceneTarget.samples > 0 ? `msaa${this.pipeline.sceneTarget.samples}` : 'fxaa',
+      fps: f.mean > 0 ? Math.round(1000 / f.mean) : 0,
+      low: f.worst > 0 ? Math.round(1000 / f.worst) : 0,
+      shed: q.shed,
+      cap: q.capMs ? Math.round(1000 / q.capMs) : null,
+      trial: q.trial,
+      // (what the browser calls the GPU, shortened: it is what the tier was guessed from)
+      gpu: `${this.caps.hdr ? '' : 'ldr '}${this.caps.gpu.replace(/^angle \(|\)$/g, '').slice(0, 18)}`.trim(),
+    };
+  }
+
   /** The board's table for the time of day showing (read from storage through a throwaway race when none runs). */
   _boardTable() {
     const name = this.world.time.name;
@@ -1350,7 +1415,8 @@ export class Game {
         const speed = Math.abs(vehicle.speed);
         view.still = view.still ? speed < PROBE.movingAbove : speed < PROBE.stillBelow;
       }
-      const probeEvery = view.still ? (table.stillEvery ?? 1) : table.every;
+      // (the ladder's first rung: the faces redrawn half as often)
+      const probeEvery = (view.still ? (table.stillEvery ?? 1) : table.every) * (this.engine.isShed('probe') ? 2 : 1);
       const inTunnel = vehicle.sky < PROBE.tunnelSky;
       const probeFaces = view.still ? table.stillFaces : inTunnel ? (table.tunnelFaces ?? table.faces) : table.faces;
       if (view.probe && this.engine.frame % (probeEvery * n) === i * probeEvery) {
@@ -1476,6 +1542,7 @@ export class Game {
       pixelRatio: engine.pixelRatio,
       renderScale: engine.renderScale,
       qualityStep: engine.qualityStep,
+      quality: engine.qualityState(),
       pipeline: this.pipeline.stats(),
       tier: this.tier,
       hdr: this.caps.hdr,

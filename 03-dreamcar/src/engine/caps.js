@@ -1,8 +1,9 @@
 // What this device can do, and which quality tier it gets.
 //
 // The probe looks at the WebGL context once. Nothing here is measured by
-// timing: a wrong guess is corrected later by the adaptive render scale in
-// Engine.js, which trades resolution for frame rate while the page runs.
+// timing: a wrong guess is corrected later by the governor (governor.js,
+// run by Engine.js), which sheds the tier's ladder and then resolution for
+// frame rate while the page runs.
 
 import * as THREE from 'three';
 
@@ -40,12 +41,47 @@ import * as THREE from 'three';
  *                the viewer reads this)
  *   probeFaces   faces redrawn on a frame that redraws any
  *   probeEvery   redrawn every n-th frame
+ *   scaleFloor   the smallest render scale the governor may go to once the whole ladder is shed (governor.js): on a
+ *                3x phone at the pixel ratio cap of 2 the floor of 0.72 still draws 1.44 pixels per CSS point
  */
 export const TIERS = {
-  low: { pixelRatio: 1.5, msaa: 0, blurTaps: 6, blurLength: 0.04, blurInline: true, bloomLevels: 4, lens: false, aoSamples: 0, aoTurns: 0, probeSize: 128, probeFaces: 1, probeEvery: 2 },
-  medium: { pixelRatio: 2, msaa: 4, blurTaps: 12, blurLength: 0.075, blurInline: false, bloomLevels: 5, lens: true, aoSamples: 8, aoTurns: 5, probeSize: 256, probeFaces: 1, probeEvery: 1 },
-  high: { pixelRatio: 2, msaa: 4, blurTaps: 18, blurLength: 0.09, blurInline: false, bloomLevels: 6, lens: true, aoSamples: 14, aoTurns: 9, probeSize: 512, probeFaces: 2, probeEvery: 1 },
+  low: { pixelRatio: 1.5, msaa: 0, blurTaps: 6, blurLength: 0.04, blurInline: true, bloomLevels: 4, lens: false, aoSamples: 0, aoTurns: 0, probeSize: 128, probeFaces: 1, probeEvery: 2, scaleFloor: 0.6 },
+  medium: { pixelRatio: 2, msaa: 4, blurTaps: 12, blurLength: 0.075, blurInline: false, bloomLevels: 5, lens: true, aoSamples: 8, aoTurns: 5, probeSize: 256, probeFaces: 1, probeEvery: 1, scaleFloor: 0.72 },
+  high: { pixelRatio: 2, msaa: 4, blurTaps: 18, blurLength: 0.09, blurInline: false, bloomLevels: 6, lens: true, aoSamples: 14, aoTurns: 9, probeSize: 512, probeFaces: 2, probeEvery: 1, scaleFloor: 0.72 },
 };
+
+/**
+ * The ladder: what each tier sheds when frames run long, least visible first, before it gives up any resolution
+ * (governor.js decides when; docs/engine.md, "The quality ladder", says what each rung saves and why it is where it
+ * is). The names are all the engine knows; each rung belongs to whoever draws the thing:
+ *   probe    the car's reflection probe redraws its faces half as often (the game)
+ *   blur     half the motion blur's samples (FramePipeline)
+ *   detail   trees go to their simpler forms sooner and the wood's floor is drawn less far (the world)
+ *   ao       no ambient occlusion: four passes less (FramePipeline)
+ *   msaa     two samples in the scene target instead of four (FramePipeline)
+ */
+export const LADDER = {
+  low: ['probe', 'blur', 'detail'],
+  medium: ['probe', 'blur', 'detail', 'ao', 'msaa'],
+  high: ['probe', 'blur', 'detail', 'ao', 'msaa'],
+};
+
+/**
+ * A module's numbers for a tier on this device: `table[tier]`, with `table.mobile[tier]` laid over it on a phone or
+ * tablet. A table's `mobile` holds only what differs: a phone's GPU has a tenth of a desktop card's memory bandwidth
+ * behind a screen with as many pixels, and the picture is a hand's width across.
+ * @template T
+ * @param {Record<string, T> & { mobile?: Record<string, Partial<T>> }} table
+ * @param {Tier} tier
+ * @param {{ mobile?: boolean }|null} [caps]
+ * @param {Tier} [fallback] the tier to use when the table has none of that name
+ * @returns {T}
+ */
+export function forDevice(table, tier, caps = null, fallback = 'high') {
+  const base = table[tier] ?? table[fallback];
+  const own = caps?.mobile ? table.mobile?.[tier] : null;
+  return own ? { ...base, ...own } : base;
+}
 
 /**
  * Tries the one thing that cannot be read from the extension list: whether a
@@ -69,12 +105,16 @@ function canMultisampleHalfFloat(gl) {
   return complete && clean;
 }
 
-/** Rough classes of GPU, from the renderer string. Unknown mobile chips count as weak. */
-function guessTier(gpu, software, mobile) {
+/**
+ * Rough classes of GPU, from the renderer string. Unknown mobile chips count as weak, except Apple's: every iPhone
+ * and iPad that has WebGL 2 at all has an Apple GPU of 2015 or later, whatever the browser says or hides (Safari's
+ * string is only "Apple GPU", and a browser that hides it would otherwise put a new iPhone on `low`).
+ */
+export function guessTier(gpu, software, mobile, apple = false) {
   if (software) return 'low';
   if (mobile) {
     // recent flagship families; everything older or unnamed starts low and can only be told apart by running
-    if (/apple/.test(gpu)) return 'medium';
+    if (apple || /apple/.test(gpu)) return 'medium';
     if (/adreno \(tm\) (6[4-9]\d|7\d\d|8\d\d)|mali-g(7[1-9]|[6-9]1\d|7\d\d)|immortalis|xclipse/.test(gpu)) return 'medium';
     return 'low';
   }
@@ -84,7 +124,8 @@ function guessTier(gpu, software, mobile) {
 
 /**
  * @param {THREE.WebGLRenderer} renderer
- * @param {{ ldr?: boolean }} [options] `ldr` forces the 8-bit fallback
+ * @param {{ ldr?: boolean, mobile?: boolean|null }} [options] `ldr` forces the 8-bit fallback; `mobile` says what
+ *   kind of device this is in place of the browser (?mobile=: for staging a phone's picture at a desk)
  * @returns {Caps}
  */
 export function probeCaps(renderer, options = {}) {
@@ -105,7 +146,9 @@ export function probeCaps(renderer, options = {}) {
   const nav = typeof navigator !== 'undefined' ? navigator : {};
   const ua = nav.userAgent || '';
   // iPadOS calls itself a Mac; the touch points give it away
-  const mobile = /android|iphone|ipad|ipod|mobile/i.test(ua) || (/macintosh/i.test(ua) && (nav.maxTouchPoints || 0) > 1);
+  const pad = /macintosh/i.test(ua) && (nav.maxTouchPoints || 0) > 1;
+  const mobile = options.mobile ?? (/android|iphone|ipad|ipod|mobile/i.test(ua) || pad);
+  const apple = /iphone|ipad|ipod/i.test(ua) || pad;
 
   return {
     hdr,
@@ -117,7 +160,7 @@ export function probeCaps(renderer, options = {}) {
     gpu,
     software,
     mobile,
-    tier: guessTier(gpu, software, mobile),
+    tier: guessTier(gpu, software, mobile, apple),
   };
 }
 

@@ -28,6 +28,7 @@
 // scene in the same frame use the map as it is.
 
 import * as THREE from 'three';
+import { forDevice } from '../../engine/caps.js';
 
 /**
  * Per tier: the map's edge in texels, half the side of the square it covers (m), and how wide the shadow's edge
@@ -39,6 +40,8 @@ export const SHADOW = {
   low: { size: 1024, reach: 46, radius: 1.0 },
   medium: { size: 2048, reach: 56, radius: 1.2 },
   high: { size: 4096, reach: 66, radius: 1.6 },
+  /** (perf lane) A phone's own numbers, laid over its tier's (caps.mobile; engine/caps.js forDevice): none yet. */
+  mobile: {},
 };
 
 /** How far in from the edge of its square a view's car is kept (m): shadows also fall on what is behind it. */
@@ -110,12 +113,13 @@ function installShadowFade() {
  * @param {object} options
  * @param {THREE.WebGLRenderer} options.renderer
  * @param {import('../../engine/caps.js').Tier} options.tier
+ * @param {import('../../engine/caps.js').Caps} [options.caps] the device: a phone has its own map size (SHADOW.mobile)
  * @param {boolean} options.shadows
  * @returns {Sun}
  */
-export function createSun({ renderer, tier, shadows }) {
+export function createSun({ renderer, tier, caps = null, shadows }) {
   installShadowFade();
-  const { size, reach, radius } = SHADOW[tier];
+  const { size, reach, radius } = forDevice(SHADOW, tier, caps);
   // the map's texels across the light's view (x) and up it (y): y is set per time of day, from the light's height
   const texel = (2 * reach) / size;
   let texelUp = texel;

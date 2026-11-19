@@ -37,6 +37,7 @@
 import * as THREE from 'three';
 import { TILE, createBarkTextures, createFoliageAtlas, tileRect } from './forestTextures.js';
 import { layBy } from './gantry.js';
+import { forDevice } from '../../engine/caps.js';
 import { bakeImpostors } from './impostors.js';
 import { planeNoise, smoothstep } from './shading.js';
 import { GRASS } from './groundMaterial.js';
@@ -62,7 +63,14 @@ const TIER = {
   low: { full: 0, reduced: 55, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: true, fullCap: 1, redCap: 2.6 },
   medium: { full: 58, reduced: 80, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 2.2, redCap: 2.8 },
   high: { full: 80, reduced: 110, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 2, redCap: 2.8 },
+  /**
+   * (perf lane) A phone's own numbers, laid over its tier's (caps.mobile; engine/caps.js forDevice): only how far each
+   * form is drawn and which trees cast (`castSeen`: shadowSeen below), never what is planted. None yet.
+   */
+  mobile: {},
 };
+/** (perf lane) With `castSeen`: a tree whose shadow passes within this far of the eye (m) casts whatever the view shows: the car mirrors what is beside it. */
+const CAST_NEAR = 30;
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
 const BLEND = 8;
 /** How far the wood's floor (grass and fallen leaves under the road's trees) is drawn, per tier (m). */
@@ -231,7 +239,7 @@ export function createTreeKit({ renderer, tier, coverage, rng, atmosphere }) {
  * @param {{ reach: number }} options.shadow half the side of the sun's shadow square (m)
  * @param {(x: number, z: number) => boolean} [options.keepOut] true where no tree may stand
  */
-export function createForest({ renderer, track, terrain, tier, coverage, rng, atmosphere, shadow, keepOut = () => false }) {
+export function createForest({ renderer, track, terrain, tier, caps = null, coverage, rng, atmosphere, shadow, keepOut = () => false }) {
   const started = performance.now();
   const ms = {};
   let clock = started;
@@ -240,7 +248,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     ms[name] = Math.round(now - clock);
     clock = now;
   };
-  const T = TIER[tier] ?? TIER.high;
+  // (perf lane) the tier's numbers, a phone's own laid over them (TIER.mobile: view distances only; what is planted
+  // is the tier's)
+  const T = forDevice(TIER, tier, caps);
   const noise = planeNoise(rng.int(1 << 30));
   const plantRng = rng.fork('plant');
   const plantRngMain = plantRng;
@@ -1043,7 +1053,31 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     const z = c.x * b.dir.x + c.y * b.dir.y + c.z * b.dir.z - b.z;
     return z < b.towards + r && z > -b.away - r;
   };
-  const counts = { full: 0, reduced: 0, impostors: 0, casters: 0, triangles: 0, casterTriangles: 0 };
+  /**
+   * (perf lane) Can the shadow of the crown in sphere (c, r) be seen? Its shadow is the bundle of rays behind the
+   * sphere, away from the light, as far as the map's box reaches. If no part of that bundle is in the view's
+   * frustum and none passes near the eye, nothing the view shows is shaded by this tree, and drawing its card into
+   * the map (every texel of it an alpha test) buys nothing. Exact for the view; the car's reflection probe and
+   * the wet road's mirror, which use the view's map, keep what passes within CAST_NEAR of the eye.
+   * Asks the camera, never the car: two views of the same place choose alike.
+   * @param {import('./sun.js').ShadowBox} b
+   */
+  const seenProbe = new THREE.Sphere();
+  const shadowSeen = (b, c, r) => {
+    const length = c.x * b.dir.x + c.y * b.dir.y + c.z * b.dir.z - b.z + b.away;
+    const steps = Math.max(0, Math.ceil(length / r));
+    const near = (CAST_NEAR + r) ** 2;
+    // (spheres a radius apart, a little larger than the crown's, cover the whole bundle)
+    seenProbe.radius = r * 1.12;
+    for (let k = 0; k <= steps; k++) {
+      seenProbe.center.set(c.x - b.dir.x * k * r, c.y - b.dir.y * k * r, c.z - b.dir.z * k * r);
+      if (seenProbe.center.distanceToSquared(eye) < near || frustum.intersectsSphere(seenProbe)) return true;
+    }
+    return false;
+  };
+  const counts = { full: 0, reduced: 0, impostors: 0, casters: 0, castersUnseen: 0, triangles: 0, casterTriangles: 0 };
+  /** (perf lane) What the detail distances are multiplied by (setDetail). */
+  let detailScale = 1;
   const fullTris = models.map((m) => m.triangles[0]);
   const reducedTris = models.map((m) => m.triangles[1]);
   /** Trees at full detail this view: written to the reduced meshes too (after the reduced ones), for the mirror. */
@@ -1104,9 +1138,12 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     const flat = camera.isOrthographicCamera;
     for (const m of group.children) m.count = 0;
     fullList.length = 0;
+    let unseen = 0;
     const blend = coverage ? BLEND : 0;
-    const fullD = T.full;
-    const redD = T.reduced;
+    // (perf lane) the ladder's rung: the distances at which trees keep their full and their reduced form, and the
+    // floor's reach, times `detailScale` (1 until the governor sheds it; no mesh is rebuilt, nothing is compiled)
+    const fullD = T.full * detailScale;
+    const redD = T.reduced * detailScale;
     for (let k = 0; k < cellSphere.length; k++) {
       if (cellStart[k] === cellStart[k + 1]) continue;
       const cs = cellSphere[k];
@@ -1121,13 +1158,17 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         const v = trees[i].variant;
         sphere.center.set(spheres[i * 4], spheres[i * 4 + 1], spheres[i * 4 + 2]);
         sphere.radius = spheres[i * 4 + 3];
-        if (caster && (box?.on ? inBox(box, sphere.center, sphere.radius) : shadowGap(trees[i].x, trees[i].z, trees[i].h, focus) < shadowR)) write(casterMeshes[0], i, 1);
+        if (caster && (box?.on ? inBox(box, sphere.center, sphere.radius) : shadowGap(trees[i].x, trees[i].z, trees[i].h, focus) < shadowR)) {
+          // (perf lane) on a phone: only if its shadow can be seen
+          if (T.castSeen && box?.on && !shadowSeen(box, sphere.center, sphere.radius)) unseen++;
+          else write(casterMeshes[0], i, 1);
+        }
         if (!seenCell || !frustum.intersectsSphere(sphere)) continue;
         // (small things, the undergrowth and young trees, go to the simpler levels sooner)
         // the floor under it
         if (patchStart[i] < patchStart[i + 1]) {
           const df = flat ? 0 : sphere.center.distanceTo(eye);
-          const reachF = FLOOR_REACH[tier] ?? FLOOR_REACH.high;
+          const reachF = (FLOOR_REACH[tier] ?? FLOOR_REACH.high) * detailScale;
           if (df < reachF) for (let j = patchStart[i]; j < patchStart[i + 1]; j++) writePatch(j, i, coverage ? Math.min(1, (reachF - df) / 15) : 1);
         }
         // (trees behind others, the undergrowth and the mass of the forest go to the simpler levels sooner)
@@ -1159,6 +1200,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     for (const i of fullList) write(reducedMeshes[trees[i].variant], i, 1);
     for (const m of reducedMeshes) m.userData.other = m.count;
     counts.full = counts.reduced = counts.impostors = counts.casters = counts.triangles = counts.casterTriangles = 0;
+    counts.castersUnseen = unseen;
     for (const m of group.children) {
       upload(m);
       m.count = m.userData.main;
@@ -1191,6 +1233,13 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     group,
     uniforms,
     prepareView,
+    /**
+     * (perf lane) Scale the distances at which trees are drawn in full and in reduced form and the floor's reach
+     * (1: the tier's own). Takes effect at the next prepareView.
+     */
+    setDetail(scale) {
+      detailScale = Math.min(1, Math.max(0.3, scale));
+    },
     /** How much of the wood has turned at track distance s (0..1). */
     turnedAt: (s) => turnedAt(track, noise, s),
     /** Is the land beside the road wooded at (s, side): the mix, how much has turned, where the trees begin. */
