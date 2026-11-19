@@ -447,7 +447,8 @@ with a short `advance` after loading.
   mirrors the band as a pale gleam. Street lamps, floodlights and windows on
   (cones in the air at 0.6 of the night's), the cars on low beam with the red
   pool behind them, the road dry and dark (it shows 0.3 of its sky sheen,
-  `roadSheen`). Exposure 6 (between golden hour's
+  `roadSheen`, and 0.4 of the head lamps' pool, `headPool`); the sea dark with
+  the band's pale gleam (sea.js `byTime.twilight`). Exposure 5 (between golden hour's
   4.2 and night's 22), contrast 1.18, saturation 1.15; in the tunnel 4.5, as
   at golden hour (its lamps are the day's).
 - **Night:** a three-quarter moon low ahead and a little left of the start

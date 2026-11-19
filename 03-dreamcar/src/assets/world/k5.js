@@ -18,11 +18,14 @@
 import * as THREE from 'three';
 import { K5, k5Site } from './landmarks.js';
 import { GLSL_TARGET, targetDefines } from '../../engine/glsl.js';
+import { extend } from './shading.js';
 
 /** Segments round the drum, per tier. */
 const ROUND = { low: 40, medium: 72, high: 96 };
 /** The window: its width and height (m), how far down from the top, its radiance at full (times lamps.windows). */
-const WINDOW = { w: 3.2, h: 1.3, down: 7.5, radiance: [0.22, 0.13, 0.06] };
+const WINDOW = { w: 3.2, h: 1.3, down: 2.6, radiance: [0.22, 0.13, 0.06] };
+/** (round 4) How much the flags' sails glow at each time of day (lit by a lamp at their foot), against their colour. */
+const SAIL_GLOW = { day: 0, dusk: 0.06, twilight: 0.12, night: 0.12 };
 /** The far lamps: their radiance at a kilometre (times lamps.street). */
 const LAMP = { radiance: [1.0, 0.62, 0.3], gain: 0.5 };
 
@@ -85,6 +88,7 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
     return { x: P.x, y: ground, z: P.z, road: track.profile(s, side * track.edgeAt(s, side), {}).y, s };
   };
   const solid = writer();
+  const sail = writer();
 
   // ---- the tower
   const T = K5.tower;
@@ -158,10 +162,10 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
     // colours: a yellow band down the pole's side, the rest green (frame K5's are green and yellow, about 1.4 by 4.5 m)
     const H = f.h - 2.0;
     const y0 = base + 2.0;
-    const width = (t) => 1.45 * Math.sin(Math.PI * Math.min(1, 0.04 + 0.96 * t)) ** 0.55 * (0.35 + 0.65 * Math.min(1, t / 0.7));
+    const width = (t) => 1.9 * Math.sin(Math.PI * Math.min(1, 0.04 + 0.96 * t)) ** 0.55 * (0.35 + 0.65 * Math.min(1, t / 0.7));
     const steps = 10;
-    const yellow = [0.42, 0.36, 0.03];
-    const green = [0.05, 0.17, 0.05];
+    const yellow = [0.7, 0.6, 0.04];
+    const green = [0.08, 0.36, 0.07];
     for (let k = 0; k < steps; k++) {
       const t0 = k / steps;
       const t1 = (k + 1) / steps;
@@ -171,8 +175,8 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
       const pt = (u, t, w) => [p.x + ax[0] * w * u, y0 + H * t - 0.18 * w * u * u, p.z + ax[2] * w * u];
       for (const [u0, u1, rgb] of [[0, 0.28, yellow], [0.28, 1, green]]) {
         const a0 = pt(u0, t0, w0), a1 = pt(u0, t1, w1), b0 = pt(u1, t0, w0), b1 = pt(u1, t1, w1);
-        solid.quad(a0, b0, b1, a1, rgb);
-        solid.quad(a0, a1, b1, b0, rgb);
+        sail.quad(a0, b0, b1, a1, rgb);
+        sail.quad(a0, a1, b1, b0, rgb);
       }
     }
   }
@@ -197,6 +201,18 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
     solid.quad(pt(k * 0.03, 0, 0.025), pt(k * 0.14, 0, 0.025), pt(k * -0.2, -0.26, 0.025), pt(k * -0.31, -0.26, 0.025), ink);
   }
 
+  // ---- (round 4) dark low scrub on the right verge, between the barrier and the tower
+  {
+    const scrubRng = rng.fork('k5-scrub');
+    for (let k = 0; k < (tier === 'low' ? 14 : 28); k++) {
+      const p = beside(scrubRng.range(2, T.ahead + 6), -1, scrubRng.range(0.6, T.beyond + 0.5));
+      const r = scrubRng.range(0.35, 0.8);
+      const g = Math.max(p.y, p.road - 0.4);
+      const ang = scrubRng.range(0, Math.PI);
+      solid.box([p.x, g + r * 0.45, p.z], [Math.cos(ang) * r, 0, -Math.sin(ang) * r], [0, r * 0.5, 0], [Math.sin(ang) * r * 0.8, 0, Math.cos(ang) * r * 0.8], [0.02, 0.035, 0.022]);
+    }
+  }
+
   const solidMaterial = atmosphere.patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, side: THREE.DoubleSide }));
   solidMaterial.name = 'k5';
   const solidMesh = new THREE.Mesh(solid.geometry(), solidMaterial);
@@ -206,10 +222,42 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
   solidMesh.matrixAutoUpdate = false;
   group.add(solidMesh);
 
+  // ---- the sails: their own mesh, so that a lamp at their foot can light them after dark (SAIL_GLOW)
+  const sailGlow = { value: 0 };
+  const sailMaterial = atmosphere.patch(
+    extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, side: THREE.DoubleSide }), 'k5-sail', (shader) => {
+      shader.uniforms.uSailGlow = sailGlow;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uSailGlow;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uSailGlow;');
+    }),
+  );
+  sailMaterial.name = 'k5-sails';
+  const sailMesh = new THREE.Mesh(sail.geometry(), sailMaterial);
+  sailMesh.name = 'k5-sails';
+  sailMesh.castShadow = true;
+  sailMesh.matrixAutoUpdate = false;
+  group.add(sailMesh);
+
   // ---- the window: one warm pane high on the drum, turned towards the road that comes
   const pane = writer();
   {
-    const a = front - 0.18;
+    // (round 4) where the frame has it: seen from K5's camera (T.camera m behind the place), T.window degrees right of
+    // the road's heading, on the side of the drum facing that camera
+    const hd = (site.heading * Math.PI) / 180;
+    const cam = { x: site.x - Math.sin(hd) * T.camera, z: site.z - Math.cos(hd) * T.camera };
+    const want = hd - (T.window * Math.PI) / 180;
+    let a = front - 0.18;
+    let bestErr = Infinity;
+    for (let k = 0; k < 360; k++) {
+      const b = (k / 360) * Math.PI * 2;
+      const [px, , pz] = at(b, T.r, 0);
+      // facing the camera
+      if (Math.sin(b) * (cam.x - px) + Math.cos(b) * (cam.z - pz) <= 0) continue;
+      let err = Math.atan2(px - cam.x, pz - cam.z) - want;
+      err = Math.abs(Math.atan2(Math.sin(err), Math.cos(err)));
+      if (err < bestErr) { bestErr = err; a = b; }
+    }
     const half = WINDOW.w / 2 / T.r;
     const y1 = top - WINDOW.down;
     const y0 = y1 - WINDOW.h;
@@ -282,6 +330,7 @@ void main() {
     stats: { triangles: solidMesh.geometry.attributes.position.count / 3, lamps: lamps.length / 3, tower: { x: Math.round(c.x), z: Math.round(c.z) } },
     /** @param {import('./lighting.js').TimeOfDay} time */
     setTime(time) {
+      sailGlow.value = SAIL_GLOW[time.name] ?? 0;
       const w = time.lamps.windows ?? 0;
       paneMaterial.color.setRGB(0.012 + WINDOW.radiance[0] * w, 0.014 + WINDOW.radiance[1] * w, 0.018 + WINDOW.radiance[2] * w);
       const s = (time.lamps.street ?? 0) * LAMP.gain;
@@ -295,6 +344,8 @@ void main() {
     dispose() {
       solidMesh.geometry.dispose();
       solidMaterial.dispose();
+      sailMesh.geometry.dispose();
+      sailMaterial.dispose();
       paneMesh.geometry.dispose();
       paneMaterial.dispose();
       lampGeometry.dispose();

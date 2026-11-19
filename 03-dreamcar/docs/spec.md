@@ -368,9 +368,9 @@ by `placeLights`.
 | | day | dusk (golden hour) | twilight (after sunset) | night |
 | --- | --- | --- | --- | --- |
 | sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | 60° left of the heading, 5° under the horizon; no direct light, no sun shadows | the moon 8° left, 17° up; 0.12 |
-| exposure (tunnel) | 0.68 (5.6) | 4.2 (4.5) | 6 (4.5) | 22 (5) |
+| exposure (tunnel) | 0.68 (5.6) | 4.2 (4.5) | 5 (4.5) | 22 (5) |
 | sky's light on the scene: environment / fill | 0.6 / 0.3 | 0.6 / 0.014 | 0.75 / 0.012 | 1 / 0.013 |
-| sky | zenith [0.15, 0.33, 0.86] | the twilight dome (sky.js), zenith [0.008, 0.022, 0.085] | the twilight dome, zenith [0.006, 0.016, 0.09] | zenith [0.0007, 0.0014, 0.0038] |
+| sky | zenith [0.15, 0.33, 0.86] | the twilight dome (sky.js), zenith [0.008, 0.022, 0.085] | the twilight dome, zenith [0.008, 0.012, 0.11] | zenith [0.0007, 0.0014, 0.0038] |
 | wetness | 0 | 0 | 0 | 0.8 |
 | street lamps and floodlights / tunnel / windows / cones in the air / the tunnel's entrance and exit zones | 0 / 1 / 0 / 0 / 1 | 1 / 1 / 1 / 0.35 / 0.5 | 1 / 1 / 1 / 0.6 / 0.25 | 1 / 1 / 1 / 1 / 0 |
 | car lamps | running lights | low beam | low beam | low beam |

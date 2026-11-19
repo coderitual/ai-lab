@@ -658,7 +658,7 @@ the granite's tone.
   lobe about the mirrored view, narrow across the plane of incidence, long in
   it), and on every tier the cars' tail lamps are drawn so too (`TAIL_GLINT`,
   only behind the car), which the mirror cannot show.
-- **The tail lamps' pool** (`TAIL_POOL`, dusk lane): on dry asphalt too,
+- **The tail lamps' pool** (`TAIL_POOL`, power 0.3, dusk lane): on dry asphalt too,
   from dusk on, each lit tail lamp lays red light on the road behind its car
   (falling with the square of the distance, only behind the car, three times
   as much with the brakes on), as the head lamps lay their pool ahead.
@@ -1100,6 +1100,25 @@ in the tunnel that glows: guidance lights, door frames, signs, signals,
 arrows), far brighter than what they light (`head`, 60 times the lamps'
 colour), so they bloom and the reflection probe sees them; they are not
 lights. No light was added to the scene.
+
+**The strips, the panels, the dashes** (day lane, frame v1). Along the top of
+each wall, just under the haunch, a continuous light strip (`WALL_STRIP`: 0.22
+m high, 9 times the lamps' colour) portal to portal, which the reflection
+probe sees too (a stand-in twice as tall at half the radiance), so the strips
+slide over the cars' paint; the road mirrors them as long soft streaks
+(`uBoreStrip`: where the mirrored ray meets the wall it heads for, how near
+the strip's height, blurred with the distance). Lit panels every 34 m on the
+bend's outside wall (`LIT_PANEL`: a white field with a block of colour, no
+lettering), yellow dashes along the inside edge (`DASHES`). The bounce
+between the walls was halved (`BOUNCE` 0.22, was 0.45): the ceiling stands
+dark between the fittings and the walls take their light from the lamps and
+the strips. The jet fans are drawn with the glow at the radiance the fittings give
+painted steel up there (`FAN_LIT`: a pale shell, a bright rim at each end, a
+dark grille, brackets): as plain paint they took light only from the few real
+lamps near the car and hung ahead as black holes in the ceiling. All of it is emissive geometry in the meshes the tunnel already
+had; no light was added. Inside, every time of day uses its own
+`tunnelExposure` (day 5.6, golden hour and twilight 4.5, night 5), eased in
+the fixed step like any exposure.
 
 **What the road mirrors** (road.js `TUNNEL_SHEEN`). The tunnel's road is
 dry, so there is no planar mirror there; the asphalt follows its own mirrored
