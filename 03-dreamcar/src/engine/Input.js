@@ -13,20 +13,25 @@
 // size by layoutOf() (which the HUD draws from, so a finger finds what it
 // sees). Four steering schemes:
 //
-// - 'pad' (the default), for one thumb: a fixed round pad on the side of the
-//   holding hand ('right' or 'left'). The thumb's offset from its centre, which
-//   never moves, is everything: across is the steering, down is the speed (the
-//   first quarter lifts, the rest brakes; on manual up is the throttle), and
-//   pulled on into the red arc at the pad's foot it pulls the handbrake (see
-//   padControls). A round HANDBRAKE button stands in the other bottom corner
-//   for a second thumb.
+// - 'pad' (the default), for one thumb: the pad appears under the thumb. A thumb
+//   landing anywhere in the zone (not on a button) puts the pad's centre at that
+//   very point, and it stays there, fixed, until that thumb lifts. The thumb's
+//   offset from the centre is everything (so the first input is zero): across is
+//   the steering, down is the speed (the first quarter lifts, the rest brakes; on
+//   manual up is the throttle), and pulled on into the red arc at the pad's foot
+//   it pulls the handbrake (see padControls). Short of room at an edge the travel
+//   is compressed, to 60 % at the least, and under that the centre is nudged
+//   inward with the input held at zero for the first 6 px (see _land). A second
+//   finger anywhere is the handbrake while held. With no thumb the pad rests as a
+//   ghost at the holding hand's place ('right' or 'left'), where a round HANDBRAKE
+//   button stands in the other bottom corner too.
 // - 'tilt': the same pad for the speed, the steering from rolling the device
 //   (deviceorientation, ±TILT.full degrees from where it was at the start).
 // - 'slider' (a track with a marked centre) or 'arrows' (steering as keys do)
 //   at the bottom left, with the pedals at the bottom right: BRAKE, GAS (only
 //   with the throttle on manual) and DRIFT (the handbrake) above them.
 //
-// A thumb anywhere in the steering zone takes the steering; each control
+// A thumb in the steering zone (anywhere, for the pad) takes the steering; each control
 // keeps the pointer that took it until that pointer lifts or is cancelled,
 // wherever it slides; a touch anywhere else does nothing to the car. With the
 // throttle on auto (the default) the car drives by itself, touched or not,
@@ -132,6 +137,9 @@ export function buzz(ms = 8) {
     /* not allowed here: no buzz */
   }
 }
+/** A placed pad short of room: the travel never shrinks under this share of the full, and a nudged centre holds the input at zero for this many px. */
+const PAD_MIN_TRAVEL = 0.6;
+const PAD_HOLD = 6;
 const PAD_DEAD = 0.12; // of the stick's travel that does nothing
 const PAD_CURVE = 1.6; // power of the stick's response: fine near the centre, all of the lock at the edge
 const PAD_PEDAL_DEAD = 0.04;
@@ -446,9 +454,11 @@ export class Input {
       else Object.assign(drift, { x: cx, y: cy - r - T.gap - b });
     }
     const pad = { cx, cy, r, s, knob: P.knob * s };
+    // (where a thumb may stand: the safe area; a placed pad's room is measured to these edges)
+    const bounds = { l, r: rgt, t: 0, b: bot };
     const zone = right ? { x0: Math.min(w * 0.5, cx - r - T.gap), x1: w } : { x0: 0, x1: Math.max(w * 0.5, cx + r + T.gap) };
     zone.y0 = Math.min(h * (1 - P.zoneShare), cy - r - T.gap);
-    return { key, x0: zr.left, y0: zr.top, w, h, steering: this.steering, hand: right ? 'right' : 'left', zone, pad, slider: null, arrows: null, brake: null, gas: null, drift };
+    return { key, x0: zr.left, y0: zr.top, w, h, steering: this.steering, hand: right ? 'right' : 'left', zone, pad, bounds, slider: null, arrows: null, brake: null, gas: null, drift };
   }
 
   /** Which of a zone's pedals is under a point (client px), or ''. */
@@ -478,13 +488,63 @@ export class Input {
       st.value = this._steerAt(i, x);
       return;
     }
+    if (st.s === undefined) return;
     const was = st.tripped;
-    st.dx = x - L.x0 - L.pad.cx;
-    st.dy = y - L.y0 - L.pad.cy;
-    padControls(st.dx, st.dy, L.pad.s, this.throttle === 'manual', was, st.pad);
+    st.dx = x - L.x0 - st.cx;
+    st.dy = y - L.y0 - st.cy;
+    // where the room is short the travel is compressed (never under PAD_MIN_TRAVEL of it): the offset is stretched
+    // back to what padControls expects; a nudged centre holds everything at zero until the thumb has moved PAD_HOLD px
+    let ex = st.dx < 0 ? st.dx / st.fl : st.dx / st.fr;
+    let ey = st.dy > 0 ? st.dy / st.fd : st.dy;
+    if (st.hold) {
+      if (Math.hypot(x - st.lx, y - st.ly) < PAD_HOLD) ex = ey = 0;
+      else st.hold = false;
+    }
+    st.ex = ex;
+    st.ey = ey;
+    padControls(ex, ey, st.s, this.throttle === 'manual', was, st.pad);
     st.tripped = st.pad.tripped;
     st.value = st.pad.steer;
     if (st.tripped && !was) buzz();
+  }
+
+  /**
+   * A thumb landing at client (x, y) in zone `i` on the pad: the pad's centre is that very point (a first input of
+   * zero) and stays. Short of room (less than the travel the steering or the handbrake needs to the safe area's edge)
+   * that direction's travel shrinks to the room, but never under PAD_MIN_TRAVEL of it; with less room than that the
+   * centre is nudged inward by what is missing and the input is held at zero until the thumb has moved PAD_HOLD px.
+   * `ox`, `oy`: how far the drawn disc is moved to stand inside the safe area (the knob stays on the centre).
+   */
+  _land(i, id, x, y) {
+    const L = this.layoutOf(i);
+    const P = TOUCH.pad;
+    const B = L.bounds;
+    const s = L.pad.s;
+    const u = x - L.x0;
+    const v = y - L.y0;
+    const need = { side: P.steer * s, down: P.trip * s };
+    let cx = u;
+    let cy = v;
+    let hold = false;
+    const f = (room, n, shift) => {
+      if (room >= n) return 1;
+      const least = PAD_MIN_TRAVEL * n;
+      if (room < least) {
+        shift(least - room);
+        hold = true;
+        return PAD_MIN_TRAVEL;
+      }
+      return room / n;
+    };
+    const fl = f(u - B.l, need.side, (m) => (cx += m));
+    const fr = f(B.r - u, need.side, (m) => (cx -= m));
+    const fd = f(B.b - v, need.down, (m) => (cy -= m));
+    const r = L.pad.r;
+    const inside = (c, lo, hi) => (hi - lo < 2 * r ? 0 : c - r < lo ? lo - (c - r) : c + r > hi ? hi - (c + r) : 0);
+    return {
+      id, x, y, dx: 0, dy: 0, ex: 0, ey: 0, value: 0, tripped: false, pad: {}, s, cx, cy, fl, fr, fd, hold, lx: x, ly: y,
+      ox: inside(cx, B.l, B.r), oy: inside(cy, B.t, B.b), r,
+    };
   }
 
   _down(e) {
@@ -505,6 +565,17 @@ export class Input {
     if (pedal) {
       if (pedal === 'drift' && !this._held(zi, 'drift')) buzz();
       z.pedals.set(e.pointerId, pedal);
+      took = true;
+    } else if (L.pad) {
+      if (!z.steer) {
+        // the pad appears under the first thumb anywhere in the zone: its centre is where it landed
+        z.steer = this._land(zi, e.pointerId, e.clientX, e.clientY);
+        this._place(zi, z.steer, e.clientX, e.clientY);
+      } else {
+        // a second finger anywhere else is the handbrake while it is held; the pad keeps its own finger
+        if (!this._held(zi, 'drift')) buzz();
+        z.pedals.set(e.pointerId, 'drift');
+      }
       took = true;
     } else if (!z.steer && u >= L.zone.x0 && u < L.zone.x1 && v >= L.zone.y0) {
       // the steering zone: the first thumb there steers at once by where it is from the fixed centre
@@ -571,7 +642,10 @@ export class Input {
       layout: L,
       steer: st ? st.value : null,
       // the pad's knob: the thumb's offset from the centre (px), and whether it has pulled the handbrake
-      knob: st && L.pad ? { dx: st.dx, dy: st.dy, tripped: st.tripped } : null,
+      knob: st && L.pad ? { dx: st.dx, dy: st.dy, ey: st.ey, tripped: st.tripped } : null,
+      // the pad under the thumb: its centre (px from the zone's top left), radius, scale, and how far the disc is moved
+      // to stand inside the safe area; null with no thumb (the pad is then a ghost at the layout's home place)
+      placed: st && L.pad ? { cx: st.cx, cy: st.cy, r: st.r, s: st.s, ox: st.ox, oy: st.oy } : null,
       tilt: L.steering === 'tilt' ? this._tiltSteer() : null,
       held: { brake: this._held(i, 'brake'), gas: this._held(i, 'gas'), drift: this._held(i, 'drift') },
     };

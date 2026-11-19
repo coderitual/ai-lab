@@ -19,6 +19,7 @@
 import * as THREE from 'three';
 import { fieldTexture, gradientField, normalTexture, valueField, worleyField } from '../../engine/noise.js';
 import { extend, withBake } from './shading.js';
+import { SEA_MAP_GLSL, SEA_UNIFORMS } from './sea.js';
 
 /**
  * (finish lane) The one green of the grass, linear albedo: the meadow (lush where it is damp, drier and a little
@@ -120,7 +121,7 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
   material.name = 'ground';
   extend(material, 'ground', (shader) => {
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, uniforms, SEA_UNIFORMS);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec2 aMask;\nattribute vec4 aVerge;\nvarying vec2 vMask;\nvarying vec4 vVerge;\nvarying vec3 vGroundPos;\nvarying vec3 vGroundNormal;')
       .replace(
@@ -165,6 +166,7 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
 }
 
 const GROUND_PARS = /* glsl */ `
+${SEA_MAP_GLSL}
 uniform sampler2D uDetail;
 uniform sampler2D uDetailN;
 uniform sampler2D uRockN;
@@ -215,7 +217,11 @@ vec4 gMid = texture2D( uLarge, vGroundPos.xz / 93.0 + vec2( 0.37, 0.61 ) );
 float gSlope = 1.0 - gN.y;
 // (env lane) aMask.y = 2 marks a cut rock face (rock.js): rock whatever its facets' slopes
 float gCut = step( 1.5, vMask.y );
-float gRock = gCut + ( 1.0 - gCut ) * smoothstep( 0.2, 0.34, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
+// (sea lane, round 2) near the sea a slope stays dry grass and scrub up to a steeper pitch before it is bare rock: the
+// headlands' sides read as grass over a cut, not as a quarry (frame E1)
+float gNearSea = 0.0;
+if ( uSeaBox.w > -1000.0 ) gNearSea = 1.0 - smoothstep( 160.0, 460.0, seaLandOff( seaMapAt( vGroundPos.xz ) ) );
+float gRock = gCut + ( 1.0 - gCut ) * smoothstep( 0.2 + 0.16 * gNearSea, 0.34 + 0.2 * gNearSea, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
 float gScree = max( min( vMask.y, 1.0 ), smoothstep( 0.68, 0.8, gMid.a ) * smoothstep( 0.12, 0.25, gSlope ) * 0.7 ) * ( 1.0 - gRock );
 // (env lane) scrub: dark clumps of box and juniper on the moderate slopes, between meadow and rock
 float gScrub = smoothstep( 0.06, 0.16, gSlope + ( gMid.b - 0.5 ) * 0.12 ) * smoothstep( 0.35, 0.6, gDet.r * 0.5 + gMid.g * 0.7 ) * ( 1.0 - gRock );
@@ -245,6 +251,25 @@ vec3 gLime = mix( vec3( 0.15, 0.15, 0.145 ), vec3( 0.26, 0.255, 0.24 ), 0.3 + 0.
 float gStreak = smoothstep( 0.55, 0.8, texture2D( uLarge, vec2( ( vGroundPos.x + vGroundPos.z ) / 23.0, vGroundPos.y / 400.0 ) ).b );
 gLime *= 1.0 - 0.45 * gStreak;
 gRockCol = mix( gRockCol, gLime, gCut );
+// (sea lane) the coast: within a few hundred metres of the sea (the sea map) the rock is a warm ochre and rust
+// sandstone in beds, the loose stone (the gravel beyond the coast road's barrier: aMask.y) ochre grit, and a band
+// just over the water is dark and wet. Inland it stays the grey limestone.
+float gCoast = 0.0;
+float gWetBand = 0.0;
+if ( uSeaBox.w > -1000.0 ) {
+  vec4 gSea = seaMapAt( vGroundPos.xz );
+  gCoast = 1.0 - smoothstep( 160.0, 460.0, seaLandOff( gSea ) + 120.0 * ( gLarge.b - 0.5 ) );
+  gWetBand = ( 1.0 - smoothstep( 0.4, 1.6 + 0.8 * gDet.g, vGroundPos.y - uSeaBox.w ) ) * smoothstep( 0.3, 0.6, gSea.a + gCoast );
+}
+// (round 2, frame E1) rust and ochre earth and soft rock, its beds faint, scored by erosion gullies that run down the
+// face (dark in their shade, pale on their ribs) and darker towards its foot
+float gGullyX = texture2D( uLarge, vec2( ( vGroundPos.x - vGroundPos.z ) / 31.0, vGroundPos.y / 260.0 ) ).g;
+float gGully = smoothstep( 0.35, 0.65, gGullyX + 0.25 * ( gDetRock.g - 0.5 ) );
+vec3 gOchre = mix( vec3( 0.2, 0.105, 0.05 ), vec3( 0.3, 0.175, 0.085 ), 0.6 * gBedTone * 0.35 + 0.65 * gGully ) * ( 0.72 + 0.4 * gDetRock.g ) * ( 1.0 - 0.3 * gStreak );
+gRockCol = mix( gRockCol, mix( gOchre * ( 0.75 + 0.25 * gLarge.g ), gOchre, gCut ), gCoast );
+gScreeCol = mix( gScreeCol, vec3( 0.46, 0.255, 0.14 ) * ( 0.82 + 0.36 * gDet.b ), gCoast );
+// the coast's grass is dry: olive and straw, sun-bleached (frame E1)
+gGrass = mix( gGrass, mix( vec3( 0.06, 0.062, 0.026 ), vec3( 0.105, 0.088, 0.045 ), smoothstep( 0.3, 0.75, gMid.b + 0.3 * ( gDet.r - 0.5 ) ) ) * ( 0.8 + 0.4 * gDet.r ), 0.85 * gCoast );
 vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 
 // (env lane) the verge: mown grass in stripes along the road, a strip of worn earth and loose stones along the
@@ -304,7 +329,7 @@ if ( gVerge > 0.0 ) {
   }
 }
 // (env lane) clumps of trees and hedges across open meadow beyond the verge, so no slope reads as bare
-float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) );
+float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) ) * ( 1.0 - gScree ) * ( 1.0 - gCoast );
 gForest = max( gForest, gClump );
 vec3 gAlbedo = gGrass;
 // blades let some light through, the mown verge most (bare earth none)
@@ -319,6 +344,7 @@ gAlbedo = mix( gAlbedo, gCanopy * 1.3, gClump * ( 1.0 - min( vMask.x * 3.0, 1.0 
 gAlbedo = mix( gAlbedo, gScreeCol, gScree );
 gAlbedo = mix( gAlbedo, gRockCol, gRock );
 gAlbedo = mix( gAlbedo, gSnowCol, gSnow );
+gAlbedo *= 1.0 - 0.55 * gWetBand;
 diffuseColor.rgb *= gAlbedo;
 // Seen against a low sun a plain rough surface glares (its Fresnel term goes to one at a grazing angle): rock and
 // stones do, a little; turf and tree crowns do not (the far land under the massif stood as a white band in the haze)

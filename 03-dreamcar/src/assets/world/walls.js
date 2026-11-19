@@ -11,8 +11,8 @@
 //
 // The paint depends on where the wall stands, by rule (PAINT):
 //  - along the stretch through the start line, on the side with nothing
-//    behind it (the lake): blocks of our own colours, graphite and a bright
-//    teal by turns (frame D1's wall is dark with bright blocks);
+//    behind it (the lake): blocks of a warm grey and a burnt orange by
+//    turns (frame D1's wall);
 //  - along the same stretch on the side where the land is (woods behind it:
 //    the pit wall and the grid's far side): white (frame D4);
 //  - everywhere else (the ledge's bend, frame D3): one deep bottle green,
@@ -130,8 +130,9 @@ float wY = vWall.y;
 float wBlock = floor( wS / ${BLOCK.toFixed(1)} );
 float wAa = fwidth( wS ) + 1.0e-3;
 float wJoint = 1.0 - smoothstep( 0.012, 0.012 + wAa, abs( fract( wS / ${BLOCK.toFixed(1)} + 0.5 ) - 0.5 ) * ${BLOCK.toFixed(1)} );
-// the paint (PAINT): graphite and a bright teal by turns; white; a deep bottle green
-vec3 wPaint = mod( wBlock, 2.0 ) < 0.5 ? vec3( 0.022, 0.026, 0.03 ) : vec3( 0.04, 0.4, 0.42 );
+// the paint (PAINT): a warm grey and a burnt orange by turns (day lane: frame D1's, in shade (50, 45, 43) and
+// (90, 52, 38); the teal read as another wall); white; a deep bottle green
+vec3 wPaint = mod( wBlock, 2.0 ) < 0.5 ? vec3( 0.07, 0.062, 0.056 ) : vec3( 0.36, 0.11, 0.04 );
 wPaint = vWallPaint > ${(PAINT.WHITE - 0.5).toFixed(1)} ? vec3( 0.6, 0.59, 0.56 ) : wPaint;
 wPaint = vWallPaint > ${(PAINT.DARK - 0.5).toFixed(1)} ? vec3( 0.018, 0.048, 0.036 ) : wPaint;
 vec3 wConcrete = vec3( 0.36, 0.35, 0.32 );

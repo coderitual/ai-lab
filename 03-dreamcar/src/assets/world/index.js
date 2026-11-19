@@ -10,7 +10,7 @@
 //   road.js         the pavement and its asphalt, its wetness and the wet road's mirror (with PlanarMirror)
 //   kerbs.js        the red and white kerbs on the margins, from track.kerbs
 //   rock.js         the cut rock faces at the rock edges
-//   lake.js         the water beside the straight
+//   sea.js          the sea beyond the coast road and the bay beside the straight (the waves: engine/waves.js)
 //   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
 //   forest.js       the trees (treeGeometry.js, forestTextures.js), planted from the Track and the ground
 //   groundCover.js  grass, bushes and rocks along the verges and under the trees
@@ -34,7 +34,7 @@ import { createAtmosphere } from './atmosphere.js';
 import { createEnvironment } from './environment.js';
 import { TIMES, placeLights } from './lighting.js';
 import { createGroundMaterial } from './groundMaterial.js';
-import { createLake } from './lake.js';
+import { createSea } from './sea.js';
 import { createFar } from './far.js';
 import { CASTER_LAYER, createForest } from './forest.js';
 import { createGroundCover } from './groundCover.js';
@@ -119,9 +119,10 @@ const SMALL = new Map([
  * @param {import('../../engine/rng.js').Rng} options.rng
  * @param {import('../../engine/params.js').Params} options.params
  * @param {(x: number, z: number) => boolean} [options.keepOut] where no tree may stand (the start area, the town)
+ * @param {number} [options.viewFar] the views' far plane (m): the sea reaches just inside it
  * @returns {World}
  */
-export function createWorld({ renderer, caps, tier, track, rng, params, keepOut }) {
+export function createWorld({ renderer, caps, tier, track, rng, params, keepOut, viewFar = 5000 }) {
   const scene = new THREE.Scene();
   /** Start-up milliseconds of each part (world.stats.ms). */
   const ms = {};
@@ -162,8 +163,9 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   // (the tunnel's cuttings are concrete: tunnel.js builds them where concreteCut says)
   const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock'), except: (s) => !!concreteCut(track, s) });
   lap('rock');
-  const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
-  lap('lake');
+  // (sea lane) the sea, where terrain.sea says it is; at night it mirrors the lamps the wet road glints with
+  const sea = createSea({ caps, tier, atmosphere, sea: terrain.sea, far: viewFar, glints: road.glints });
+  lap('sea');
   // (the trees' alpha becomes coverage where the scene target is multisampled: the pipeline's rule, caps.js)
   const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
   // no tree where the pit building, the stand and the towns stand (startPlan.js), nor where the caller says
@@ -200,7 +202,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   }
   const smallReach = SMALL_REACH[tier] ?? SMALL_REACH.medium;
   const eye = new THREE.Vector3();
-  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, sea.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -213,7 +215,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   };
   let startLights = 0;
   /** What the wet road's mirror leaves out: the road itself and what lies under or far beyond it. */
-  const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, lake.mesh, cover.group, far.group, ...structures.mirrorHidden];
+  const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, sea.mesh, cover.group, far.group, ...structures.mirrorHidden];
   /** mirrorHidden and what the caller of prepareView adds (the cars' contact shadows, smoke and spray). */
   const mirrorHiddenAll = [];
   const mirrorPoint = new THREE.Vector3();
@@ -262,7 +264,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     /** The sun's shadow map's box as the last prepareView placed it (sun.js), for tests. */
     shadowBox: sun.box,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
+    stats: { ms, sea: sea.stats, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -289,6 +291,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       scene.environmentIntensity = time.env.intensity;
       forest.setTime(time);
       far.setTime(time);
+      sea.setTime(time);
       structures.setTime(time);
       studs.setTime(time);
       groundMaterial.setTime(time);
@@ -297,7 +300,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
 
     update(dt, simTime) {
       sky.update(dt, simTime);
-      lake.update(simTime);
+      sea.update(simTime);
       forest.update(dt, simTime);
       far.update(dt, simTime);
       structures.update(dt);
@@ -307,6 +310,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       eye.setFromMatrixPosition(camera.matrixWorld);
       for (const p of small) p.object.visible = p.sphere.center.distanceTo(eye) - p.sphere.radius < smallReach * p.reach;
       sun.prepareView(camera, focus);
+      sea.prepareView(camera);
       forest.prepareView(camera, focus, sun.box);
       cover.prepareView(camera);
       road.setBeams(beams);
@@ -379,7 +383,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       cover.dispose();
       terrain.dispose();
       road.dispose();
-      lake.dispose();
+      sea.dispose();
       rock.dispose();
       structures.dispose();
       studs.dispose();
