@@ -273,7 +273,18 @@ silver rims near the sun; at golden hour, lit from below. The cumulus noise is
 pushed up round one place in the sky (lighting.js `clouds.group`, placed
 against the straight's heading like the sun: 30 degrees left of it, 30 up), so
 that D1's group of big heaps over the massif's shoulder is there whatever the
-noise does elsewhere; their rims are cut sharp (a 0.07 wide edge). By night the same
+noise does elsewhere; their rims are cut sharp (a 0.07 wide edge).
+
+At dusk the clear sky is not the zenith-to-horizon gradient but a twilight
+dome (lighting.js `sky.twilight`, sky.js `twiColumn`): two columns of five
+radiances from the horizon up, one under the sun (rose, orange, pale yellow,
+turquoise, deep blue) and one opposite it (the blue-violet shadow of the
+earth, the pink belt, blue), blended round the sky by how far a direction is
+turned towards the sun, with the sun's glow on top. The clouds' light then
+gathers on the sun's side (`clouds.sunward`): undersides lit orange-rose
+near the sun, dark blue-grey elsewhere; and the first stars show only high
+up and away from the sun (`starsAway`). The environment map, the probes and
+any water are drawn from the same dome, so they mirror it. By night the same
 shader draws the moon, airglow and the Milky Way; stars are points a pixel or
 two wide with their brightness spread over the footprint, so they neither
 flicker nor change with the picture's size.
@@ -395,6 +406,10 @@ on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car als
   lobe about the mirrored view, narrow across the plane of incidence, long in
   it), and on every tier the cars' tail lamps are drawn so too (`TAIL_GLINT`,
   only behind the car), which the mirror cannot show.
+- **The tail lamps' pool** (`TAIL_POOL`, dusk lane): on dry asphalt too,
+  from dusk on, each lit tail lamp lays red light on the road behind its car
+  (falling with the square of the distance, only behind the car, three times
+  as much with the brakes on), as the head lamps lay their pool ahead.
 - **The canopy** (`src/assets/world/canopy.js`): what the woods beside the road
   hide of the sky, defined once from the Track's `woodAt` and multiplied into
   the baked sky share (`aBake.z`) of the road, the kerbs and the verges, and

@@ -285,21 +285,21 @@ beside D1 and A, golden hour beside D4 and D2, night beside B):
 
 | | day | dusk (golden hour) | night |
 | --- | --- | --- | --- |
-| `contrast` | 1.14 | 1.2 | 1.12 |
-| `saturation` | 1.18 | 1.16 | 0.94 |
-| `tint` | [1.0, 0.99, 0.965] | [1.05, 1.0, 0.9] | [0.95, 0.985, 1.05] |
+| `contrast` | 1.14 | 1.24 | 1.12 |
+| `saturation` | 1.18 | 1.22 | 0.94 |
+| `tint` | [1.0, 0.99, 0.965] | [1.03, 1.0, 0.94] | [0.95, 0.985, 1.05] |
 | `lift` | [0.0004, 0.0006, 0.001] | [0.0004, 0.00025, 0.0001] | [0.0006, 0.0009, 0.0018] |
 | `vignette` | 0.28 | 0.3 | 0.32 |
 | `chroma` | 0.0012 | 0.001 | 0.0012 |
 | `grain` | 0.5 | 0.6 | 1.2 |
-| `bloom` | 0.05 | 0.09 | 0.15 |
-| `halo` | 0 | 0.05 | 0.15 |
+| `bloom` | 0.05 | 0.11 | 0.15 |
+| `halo` | 0 | 0.1 (the lamps are on against a lit sky) | 0.15 |
 | `ghosts` | 0.00015 (faint: D1 shows glare and glints, not rings) | 0.0002 | 0 |
 | `glare` | 0.015 (more greys the whole sky round the sun) | 0.03 | 0 |
 | `flare` | the sun, light 1.0, reach 0.6, sky 0.3 | the low sun, light 0.6, reach 0.5, sky 0.1 | none |
 | `star` | 0.02 (sun glints on paint and glass) | 0.015 | 0.015 |
 | `ao` | 0.8 (fades out on sunlit surfaces brighter than white anyway) | 1.0 | 0.9 |
-| split toning | none | shadows [1.06, 0.98, 0.9], highlights [1.05, 1.0, 0.88], balance 0.45 (rust in the shade, gold in the light) | none |
+| split toning | none | shadows [0.97, 0.99, 1.05], highlights [1.05, 1.0, 0.88], balance 0.45 (cool shade, gold in the light) | none |
 
 Split toning tried for the old wet violet dusk: `splitShadows`
 [1.1, 0.98, 0.92], `splitHighlights` [0.9, 1.02, 1.15], `splitBalance` 0.45.

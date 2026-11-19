@@ -120,6 +120,13 @@ const GLINT = { across: 0.006, along: 0.12, gain: 0.12 };
  */
 const TAIL_GLINT = { across: 0.05, along: 0.3, radiance: 1.6, brake: 3, gain: 0.6, color: [1.0, 0.03, 0.015] };
 /**
+ * (dusk lane) The tail lamps' red light pooled on dry asphalt behind the car (the owner's twilight reference): what
+ * each lamp lays on the road, per unit of its TAIL_GLINT radiance, falling with the square of the distance, only
+ * behind the car, softened within about `soft` m (m^2 added to the squared distance: the lamp is not a point, and the
+ * road right under the bumper must not burn); `color` its red after the asphalt has taken it. Brake lamps triple it, as they do the glint.
+ */
+const TAIL_POOL = { power: 3, soft: 2.5, color: [1.0, 0.05, 0.025] };
+/**
  * (tunnel lane) Under the tunnel's roof the dry asphalt mirrors, softly (TUNNEL_SHEEN): the two lines of luminaires
  * (shading.js BORE_UNIFORMS: where they are and how bright), blurred `blur[0]` m across plus `blur[1]` m for every
  * metre the ray travels to them, at `gain` of the sky's sheen; and the cars' tail lamps as short broad streaks
@@ -1021,5 +1028,19 @@ const ASPHALT_BEADS = /* glsl */ `
     pool += e * back;
   }
   totalEmissiveRadiance += vRoadWorld.w * pool * diffuseColor.rgb * ( 0.6 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
+
+  // (dusk lane) the tail lamps' red pool on the road behind each car (TAIL_POOL), from dusk on
+  float redPool = 0.0;
+  for ( int i = 0; i < ${BEAMS}; i ++ ) {
+    if ( uTailPower[ i ] <= 0.0 ) continue;
+    for ( int k = 0; k < 2; k ++ ) {
+      vec3 l = uTailPos[ i * 2 + k ] - vRoadWorld.xyz;
+      float d = max( length( l ), 0.3 );
+      l /= d;
+      float behind = smoothstep( -0.1, 0.5, dot( -l, -uBeamDir[ i ] ) );
+      redPool += uTailPower[ i ] * behind * max( l.y, 0.0 ) / ( d * d + ${TAIL_POOL.soft.toFixed(2)} );
+    }
+  }
+  totalEmissiveRadiance += vRoadWorld.w * ${TAIL_POOL.power.toFixed(2)} * redPool * diffuseColor.rgb * RECIPROCAL_PI * ( 1.0 - 0.85 * roadPuddle ) * vec3( ${TAIL_POOL.color.map((c) => c.toFixed(3)).join(', ')} );
 }
 `;
