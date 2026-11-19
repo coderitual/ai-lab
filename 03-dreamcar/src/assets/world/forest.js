@@ -630,8 +630,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   // forest near the road turns to its conifers. Done after everything else is planted, from its own stream, so that
   // the rest of the lap is planted exactly as before.
   //   pinewood (frame e2): pines with long bare stems, a few spruces and firs, close to both edges, rows behind
-  //   stonepine (frame e5): pines, firs and spruces in open groups with sunny glades between; on the inside of the
-  //   bend, near its apex, a tall stone pine standing alone
+  //   stonepine (frame e5): pines, firs and spruces in open groups with sunny glades between, a full wood behind; on
+  //   the inside of the bend, near its apex, a tall stone pine standing alone
   const schemeRng = rng.fork('scheme');
   const schemeRuns = [];
   {
@@ -668,6 +668,14 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         [SPRUCE, SPRUCE_B, 0.11, [19, 26]],
         [FIR, -1, 0.05, [15, 21]],
       ],
+      // (e2) the rows further back: crowns lower down, 4 to 20 m up, which is where the 16 degree sun passes on its way
+      // to the road 15 to 45 m off; open, so that it comes through between them in patches (the pines' high crowns
+      // throw their shade beyond the road, only their trunks cross it)
+      pinewoodBack: [
+        [SPRUCE, SPRUCE_B, 0.45, [16, 22]],
+        [FIR, -1, 0.35, [13, 19]],
+        [PINE, PINE_A, 0.2, [20, 27]],
+      ],
       stonepine: [
         [PINE, PINE_A, 0.58, [18, 26]],
         [FIR, -1, 0.24, [12, 19]],
@@ -700,9 +708,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       if (t.road) continue;
       // (e2) the wood behind the road's rows thinned, so that the low sun comes through between the crowns and lies on
       // the road in patches; under a closed canopy 60 to 90 m deep towards the sun the road was in plain shade
-      if (wood === 'pinewood' && schemeRng.next() < 0.85) continue;
-      // (e5) the island inside the bend open to the low sun
-      if (wood === 'stonepine' && beyond < 45 && Math.sign(track.curvature[spot.index] || 1) === side) continue;
+      if (wood === 'pinewood' && schemeRng.next() < 0.55) continue;
       const m = pick(wood);
       const variants = VARIANTS_OF[m[0]];
       t.variant = m[1] >= 0 ? m[1] : variants[schemeRng.int(variants.length)];
@@ -717,10 +723,11 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     // the scheme's own rows
     const ROWS_OF = {
       pinewood: [
-        { off: [0.2, 2.2], step: [4.5, 8], r: 2.6, detail: 1.8, inside: 0.15, lean: [0.0, 0.04] },
-        { off: [3.5, 7.5], step: [6, 10], r: 2.8, detail: 1.3, inside: 0.35 },
-        { off: [9, 15], step: [8, 14], r: 3, detail: 0.9, inside: 0.5 },
-        { off: [17, 27], step: [10, 16], r: 3.2, detail: 0.6, inside: 0.6 },
+        { off: [0.2, 2.2], step: [3.8, 6.5], r: 2.6, detail: 1.8, inside: 0.15, lean: [0.0, 0.04] },
+        { off: [3.5, 7.5], step: [4.5, 8], r: 2.8, detail: 1.3, inside: 0.35 },
+        { off: [9, 15], step: [6, 11], r: 3, detail: 0.9, inside: 0.5, mix: 'pinewoodBack' },
+        { off: [17, 27], step: [6, 11], r: 3.2, detail: 0.6, inside: 0.6, mix: 'pinewoodBack' },
+        { off: [30, 42], step: [7, 12], r: 3.4, detail: 0.5, inside: 0.6, mix: 'pinewoodBack' },
       ],
       stonepine: [
         { off: [0.5, 4], step: [5, 11], r: 3.2, detail: 1.6, inside: 0.1, glade: 0.5 },
@@ -731,8 +738,6 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     for (const run of schemeRuns) {
       const rows = ROWS_OF[run.wood];
       if (!rows) continue;
-      // the inside of the bend (the side the road turns to over the run's middle)
-      const islandSide = track.curvature[Math.round(track.wrap((run.s0 + run.s1) / 2) / track.ds) % track.count] >= 0 ? 1 : -1;
       const blend = 100;
       for (const side of [1, -1]) {
         rows.forEach((row) => {
@@ -744,9 +749,6 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
             if (!track.woodAt?.(s, side) && !woodAt(track, noise, s, side)) continue;
             // (e5) sunny glades: no trees where the noise says so
             if (row.glade && noise.fbm(s / 38 + side * 7.3, 5.1, 2) > row.glade) continue;
-            // (e5) the island inside the bend stays open: one thin row, so that the low sun, which stands beyond it from
-            // the frame's camera, lies on the grass, the boulders and the road
-            if (run.wood === 'stonepine' && side === islandSide && (row !== rows[0] || schemeRng.next() < 0.5)) continue;
             const lat = side * (track.edgeAt(s, side) + BARRIER_CLEAR + schemeRng.range(row.off[0], row.off[1]));
             track.pointAt(s, lat, point);
             if (blocked(point.x, point.z, 0, hint)) continue;
@@ -754,7 +756,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
             if (!free(point.x, point.z, row.r)) continue;
             const y = terrain.heightAt(point.x, point.z);
             if (y < lakeLevel + 0.5) continue;
-            const m = pick(run.wood);
+            const m = pick(row.mix ?? run.wood);
             const x = point.x;
             const z = point.z;
             let lean = null;
@@ -767,8 +769,8 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
           }
         });
       }
-      // (e5) the wood all round, closing the picture behind the island and the outcrops: this high on the hill the mass
-      // of the forest is thin (the tree line), but the frame's bend lies in a full wood
+      // (e5) the wood all round, closing the picture behind the boulders and the outcrops: the frame's bend lies in a
+      // full wood, fuller than the mass of the forest planted from the terrain
       if (run.wood === 'stonepine') {
         for (const side of [1, -1]) {
           let hint = -1;
@@ -778,8 +780,6 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
             if (!sch || sch.def.wood !== run.wood) continue;
             for (let out = 14 + schemeRng.range(0, 5); out < 110; out += schemeRng.range(5, 8)) {
               if (schemeRng.next() >= sch.w) continue;
-              // (the island: the wood only far in, and thin)
-              if (side === islandSide && (out < 45 || schemeRng.next() < 0.6)) continue;
               const lat = side * (track.edgeAt(s, side) + out);
               track.pointAt(s, lat, point);
               if (blocked(point.x, point.z, 1, hint)) continue;

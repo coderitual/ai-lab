@@ -287,6 +287,19 @@ machine without a GPU, and only what is listed here.
   on `high`, in split screen, in motion or with a player driving; the
   playtest (which has no tunnel section) and the soundtest were not run (the
   sound's tunnel reverb reads the Track's sky, which did not move).
+- **The forest lane's changes** (the per-piece schemes: frame E2's forest
+  road on the rise and the first ess, frame E5's granite bend on the last
+  ess; pines, boulders, verges, kerbstones instead of rails there, chevron
+  boards, bend signs, the double yellow line and its dashes, the casters
+  chosen by where their shadow falls): stills on software WebGL at `medium`
+  1280x720 by day from the `e2` and `e5` cameras beside the owner's frames,
+  six rounds of E5 (the first four on the carousel, which the coast lane
+  then took for its frame E1) and five of E2, judged by eye; at `low` a few
+  rounds of each; a chase sheet through the forest at `medium` 640x360; draw
+  calls and triangles counted (spec.md, design.md "The forest").
+  `node tools/unit.mjs` passed. Not looked at on `high`, in split screen or
+  in motion; golden hour and night only at `low` in the forest pieces once;
+  the playtest and the soundtest were not run.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.

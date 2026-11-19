@@ -357,6 +357,7 @@ export const PHOTOS = {
   // (forest lane) e2: the forest road of the rise and the first ess, chase-like from behind and above the car, the
   // low sun crossing from the left; e5: the last ess's exit, on the road ahead of the car, looking back at it coming
   // round the bend among the granite boulders
+  e2: { back: 6.2, right: 0.3, up: 2.0, yaw: 0, pitch: -5, fov: 50, t: 22.2, time: 'day' },
   e5: { back: -19.3, right: -3.5, up: 2.95, yaw: 199.4, pitch: -4.5, fov: 40, t: 34.2, time: 'day' },
 };
 
