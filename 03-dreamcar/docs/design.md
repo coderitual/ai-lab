@@ -639,6 +639,25 @@ comes from behind the camera's left and lights the face.
   from the crater and drifts up with the run's clock; the crater glows
   warm as the sun weakens (volcano.js). Frame D3's bank beside the ledge is
   kept within 60 m of its edge; beyond it is now the sound.
+- **The bay inside the loop** (round 4; the owner chose it, and accepted
+  losing the hill inside that part of the lap, frame D3's bank included).
+  Every side from the sky road to the plunge is now a sea side: the sky
+  road's right (`parapetSea`), the climb's and the carousel's insides
+  (`rockSea`: the rock edge stays, as a low wall of rock 1.4 m high over the
+  cliff), the crest's right (`openSea`), the plunge's right (`coastUp`).
+  The tongue between the climb and the crest is a channel of the sea, and
+  the hill that stood on it is gone (`COAST.knoll.rise` 0). The coast's
+  cliff is steeper (2.2 to 3.4 m down per metre out) so that the water lies
+  30 to 40 m beyond a right edge and the channel is water in its middle.
+  The volcano was moved where the chase camera sees it ahead and to the
+  right from the sky road's start and from the crest and the plunge: 195 m
+  right of the ledge's second bend (`VOLCANO`), a steeper cone (190 m, foot
+  150 m, flanks to the power 1.3) of dark basalt, green low down, a pale ash
+  rim (groundMaterial.js reads `uVolcano`), its foot 31 m beyond the nearest
+  solid edge at the least; the plume is wider, thinner and softer, a billow
+  of smoke 420 m tall leaning 320 m downwind. Round it the land is drowned to
+  600 m (`VOLCANO.sound`). Frame K5's place at the start of the long right
+  is untouched.
 - **The low crossing and the big waves** (round 2; the owner: "after the
   tunnel it would be nice to see some sea side with BIG waves. Maybe some
   river that will be super nice to cross ... we will be very close to it").
