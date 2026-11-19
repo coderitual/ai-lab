@@ -896,4 +896,24 @@ ms) and 1.1-1.3 s on low (300 / 400-550 / 150-200 / 50-120 / 60-120 ms):
 over the 1 s and 0.7 s aimed at. Textures 47.7 MB (medium, high), 23 MB
 (low).
 
+(forest lane) Before and after the two stretches, the autopilot's chase view,
+same build otherwise (`low` by day at 393x852, `medium` by night at
+1280x720; whole frame's calls / the forest's own calls and triangles):
+
+| t (s), place | low before | low after | medium night before | medium night after |
+| --- | --- | --- | --- | --- |
+| 14, the shore bend | 124 / 12, 53 k | 125 / 13, 50 k | 246 / 23, 265 k | 250 / 22, 286 k |
+| 20, the rise (E2) | 121 / 12, 55 k | 113 / 6, 28 k | 265 / 22, 314 k | 235 / 9, 334 k |
+| 26, the second ess | 161 / 14, 32 k | 154 / 7, 23 k | 358 / 24, 215 k | 330 / 13, 213 k |
+| 33, the last ess (E5) | 137 / 13, 34 k | 128 / 8, 7 k | 302 / 24, 286 k | 271 / 12, 128 k |
+| 34.2, the E5 camera's moment | | 138 / 4, 3 k | | 286 / 11, 117 k |
+
+The low tier at t = 26 and medium by night at t = 26 were over their budgets
+(150 and 300 calls) before and still are (154, 330); the medium forest at
+t = 20 is over its 300 k triangles (334 k, was 314 k). The forest's start-up
+measured 0.71 s on low and 1.01 s on medium after (0.85 s and 1.2 s before,
+the same machine, loaded: within the scatter); the ground cover's 30 ms and
+104 ms (21 and 77 before: the boulders, the ferns, the flowers, the signs,
+kerbstones and chevrons).
+
 Not measured on a real phone or a real GPU.

@@ -161,3 +161,26 @@ from straight behind, the silver going warm in a low sun.
   overtaking is the next step.
 - **Replays.** The run is deterministic from its inputs: recording the
   inputs is enough to replay it from any camera.
+
+## What still differs from frames E2 and E5 (forest lane)
+
+- **E5** (the last ess, `photo=e5`): the frame's road folds back round its
+  island and shows again higher up between the trunks; ours is a 65 degree
+  bend (the one bend that folds back, the carousel, is the coast's E1). The
+  car passes at 190 km/h, so the staged still streaks the foreground where
+  the frame is crisp; the boulders are smooth rounded lumps without the
+  frame's cracks, sharp split faces and dark weathering; the trees are fewer
+  and darker than the frame's lush, sunlit mix; the bank inside the bend is
+  a bare grass slope where the frame has scrub; the outcrop on the outside is
+  smaller and further off; the sky is the day's (another lane's), not the
+  frame's hazy white.
+- **E2** (the first ess, `photo=e2`): the frame's sharp dapple across the
+  road is barely there: the pines' crowns are too high to shade the road
+  under a 16 degree sun and the lower crowns behind them (`pinewoodBack`)
+  have not yet been seen to fill it; the ambient light raised by the lead
+  (0.3) and the canopy floor (0.75) keep the shade light, as asked, so what
+  shadow there is is faint. Our stretch bends gently (260 m radius) where
+  the frame's is straight; the kerbstone stands at the solid edge 3 to 10 m
+  out, the frame's at the road's edge; floodlight poles still stand along
+  it; no people or other cars.
+- Not looked at: either stretch on `high`, in motion, in split screen.
