@@ -140,10 +140,6 @@ from straight behind, the silver going warm in a low sun.
   mid-range Android, both ways up, should set them. The pad now appears under the thumb, in
   either hand; whether the edge rule (60 % travel, a 6 px hold) feels right
   at a real phone's edges is for a real thumb to say.
-- **The second half's wet road in split screen** (tools.md, "water on the
-  track"): at night one half of a split can show the wet road as a sheet of
-  water where the other does not; it follows the camera's place. Look at
-  which lamps light each view (lamps.js chooses them by the eye).
 - **Analog pedals for the slider and the arrows.** Where on BRAKE or GAS the
   finger is could set the pressure (the pad already gives an analog brake);
   not done: the pad came first.

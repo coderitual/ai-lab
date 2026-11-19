@@ -264,7 +264,12 @@ treeMaterial.js, impostors.js, forest.js; numbers in design.md, "The forest".
   coverage-preserving mips and a hard swap. No hashed or dithered
   transparency anywhere: under the motion blur it smears into noise.
 - **Shadows** are impostor cards turned to the sun, on a layer only the sun's
-  shadow camera sees: two triangles a tree.
+  shadow camera sees: two triangles a tree. The trees that cast are those
+  whose crown lies inside the shadow map's box as `sun.prepareView` placed it
+  for this view (`sun.box`, forest.js `inBox`), not those near the car: a
+  crown 25 m tall under a 17 degree sun or moon shades the road 80 m away,
+  and a choice by distance from the car left those out, differently for two
+  cars a few metres apart (the two-player "water on the track", tools.md).
 - **Where trees stand** is asked of `track.woodAt(s, side)` from 2 m behind
   the barrier, plus the mass of the forest away from the road where the
   terrain says; a keep-out callback keeps the start area and the town free.

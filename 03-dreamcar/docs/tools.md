@@ -186,17 +186,28 @@ machine without a GPU, and only what is listed here.
   change). Not verified: a real phone, Safari, real thumbs (is 60 % of the
   travel and a 6 px hold right at a real edge? does a second finger anywhere
   feel like a handbrake?), the gauge's eased bars at a real frame rate.
-- **The two-player "water on the track"** (CONTROLS lane, round 2): reproduced
-  at night on low in a side-by-side split of an upright phone
-  (`?mode=split&time=night&t=14`, view.split wide, 393x852): the second
-  half's road reads as a sheet of water, the first half's beside it does not.
-  It does not depend on the order the halves are drawn in, on the wet road's
-  mirror (low has none; at medium night the mirror is drawn once per view
-  with that view's camera), on the cars' head lamp beams, or on which car's
-  half it is: drawn from the second camera's place, the first half shows it
-  too. So it follows where the camera stands, by a few metres; the likeliest
-  cause is the per-eye choice of lit lamps at night (lamps.js, the world's
-  lane), not fixed here (src/assets/ is another lane's).
+- **The two-player "water on the track"** (CONTROLS lane found it, SPLIT-BUG
+  lane fixed it, 2026-11-19): at night in a side-by-side split of an upright
+  phone (`?manual&q=low&auto&mode=split&time=night&t=14`, view.split wide,
+  393x852) the second half's road was a pale sheet in the moonlight broken by
+  dark "puddles" (the shadows of the nearer trees), the first half's beside
+  it dark. The cause was not the lamps: the trees that cast into the moon's
+  shadow map were chosen by distance from the view's car (50 m on low), and
+  a 17 degree moon throws a crown's shadow 70 to 100 m, so the trees that
+  shade the road at the car were left out depending on where the car stood;
+  two cars a few metres apart got different sets (139 and 136 casters, now
+  573 and 566, chosen by the map's own box: forest.js `inBox`). The same
+  patch of road measured in the two halves: 104 against 126 grey levels
+  before, 95 against 89 after. The playtest's `split` section now checks it
+  at night on 393x852 (the same patch from both halves within 1.5x, cars
+  abreast and 9 m apart at three places: 1.26x to 1.43x after the fix, the halves' camera angles differ), that each view's draw uses what
+  its own prepareView set (lamp shares, glints, shadow box, mirror, casters),
+  that the lamp shares are uploaded anew for each view, that the shadow map
+  is drawn once per view by its own draw, and that the casting trees do not
+  depend on where the car stands. Looked at on low only, side by side only;
+  medium (its mirror), stacked halves, dusk and day not looked at (the fix
+  is not split-specific: solo pictures change where the left-out trees
+  shaded the road).
 - **The sound** (`tools/soundtest.cjs`): 62 of 62 checks (audio lane). The
   squeal "stands out at the limit" passes at exactly its 12 dB threshold.
 - **The pictures**: the stills in `docs/images/` and the lanes' comparison
