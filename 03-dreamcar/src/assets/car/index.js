@@ -18,6 +18,7 @@ import { createLampLights } from './lamps.js';
 import {
   PAINTS,
   PAPER,
+  copyProxy,
   createDarkMaterial,
   createLampPartMaterial,
   createGhostMaterial,
@@ -264,9 +265,10 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       shared.carBoreUp.value.copy(up);
       shared.carBoreMove.value.set(Math.abs(speed) * BORE_SHUTTER, near && length > 0 ? 1 : 0);
     },
-    setReflections({ cube, sky, exposure }) {
-      for (const wheel of wheels) wheel.setReflections({ cube, sky, exposure });
+    setReflections({ cube, sky, exposure, proxy = null }) {
+      for (const wheel of wheels) wheel.setReflections({ cube, sky, exposure, proxy });
       if (!shared) return;
+      copyProxy(shared, proxy);
       if (exposure) shared.carKey.value = PAPER / exposure;
       shared.carProbe.value = cube || null;
       shared.carProbeOn.value = cube ? 1 : 0;

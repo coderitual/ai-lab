@@ -156,16 +156,16 @@ layer of metal flake under a clear coat.
   the sun as a colour of its own as well as a broad sheen. Round 4's 0.92 /
   0.27 mirrored everything, and next to the photographs the car read as
   chrome; at 0.6 / 0.5 and a brighter base it read as white plastic.
-- **The flake layer's read of the probe** (`carSoftProbe`): a rough read is a
-  read of a coarse mip, and the mips are plain 2x2 averages, so at these
-  roughnesses a 128 or 256 cube is a few texels a face; filtered between
-  them, the wood's autumn crowns came out as large blocky yellow patches on
-  the bonnet and roof. The layer reads instead nine taps in a cone as wide as
-  its highlight, at a mip four times finer: a smooth bell of the
-  surroundings, no blocks, no face seams. What it shows is held to 65 % of
-  its colour, and the probe's average round that direction still caps a
-  small fierce thing in it (the sun's glare on the road behind the car, a
-  lamp) at five times, so that it makes a highlight, not a burnt-out panel.
+- **The flake layer's read of the probe** (`carSoftProbe`): one read at
+  the layer's roughness, which the probe's levels hold as the surroundings
+  convolved with that GGX lobe (engine.md, "The reflection probe"). Until
+  round 8 the mips were plain 2x2 averages, the wood's crowns printed as
+  blocky yellow patches through them, and the layer took nine taps in a cone
+  at a finer level and capped what it saw at five times the cube's average.
+  What it shows is held to 65 % of its colour, less the brighter it is
+  against the moment's white paper: a coloured lamp (the green start lights
+  at night) tints the panel with its light instead of washing a flank in its
+  colour.
 - **Lamps and the sun in the probe** (`GLSL_KEY`, `carKey`): the car takes
   their light from the lights themselves (the sun, the floodlights' pool of
   spots, its own lamps), so what the probe's few coarse texels of a lamp add
@@ -175,11 +175,12 @@ layer of metal flake under a clear coat.
   ring round the rims from the start lamps. Every read of the probe is held to
   a number of white papers of the moment (`carKey` = `PAPER` 0.7 over the
   picture's exposure, which `setReflections({ exposure })` hands over from the
-  view), rolling off slowly above it: 1.2 for a rough read (`KEY_ROUGH`), 16
+  view), rolling off slowly above it: 3 for a rough read (`KEY_ROUGH`), 16
   for a crisp one (`KEY_CRISP`: the clear coat, the glass, gloss trim), so a
   lamp stays a small bright highlight in the lacquer. The wheels do the same
-  (`mirrorProbe`). By day the cap is about the sky round the sun, so only the
-  sun's disc and its glare on the road are held.
+  (`mirrorProbe`). By day 3 papers is about the sky round the sun, so the
+  sky's sheen on the boot lid and the roof is kept and only the sun's glare
+  on the road is held (the probe leaves the sun's disc out).
 - **Clear coat**, roughness 0.03, a plain lacquer's reflectance (4 % face on,
   `COAT_GAIN` 1): the only crisp reflection, strong only at grazing angles.
   Its image is held to 30 % of its colour (45 % until round six, which still
@@ -235,19 +236,9 @@ needles were a hatching all over the paint). So the probe is never read
 sharper than the pixel's own footprint in it (`FOOTPRINT`): crisp on the flat
 of a door, smooth round a corner, nothing crawling.
 
-What that leaves visible is the cube's own size. A texel of a 256 cube is
-0.35 degrees; a pixel of a 1280-wide picture looking at a door from five
-metres is about 0.06. So:
-
-| | cube | refresh |
-| --- | --- | --- |
-| title orbit, high | 512 (17 MB half float with its mips) | all six faces once, then one face every few frames: the car stands still |
-| title orbit, medium / low | 256 / 128 | the same |
-| the run, high / medium / low | 256, 2 faces a frame / 128, 1 face / 64, every other frame (as `TIERS` has it) | speed and motion blur hide the rest |
-
-The coat's roughness of 0.03 reads mip 0 of cubes up to about 670 texels; a
-1024 cube would need `clearcoatRoughness` 0.02 to show more than a 512 one.
-`probesize=N` in the viewer tries any size.
+What that leaves visible is the cube's own size: one cube per view, 128 /
+256 / 512 on low / medium / high (`PROBE` in config.js; engine.md has how it
+is drawn, filtered and eased in). `probesize=N` in the viewer tries any size.
 
 Two guards on every probe read (`REFLECTIONS` in `materials.js`):
 
@@ -256,9 +247,15 @@ Two guards on every probe read (`REFLECTIONS` in `materials.js`):
   road's asphalt shader where the road is seen exactly edge on from the probe;
   see below), the mips spread it, and the paint sampled it: black here, a
   screen-filling white bloom on other GPUs.
-- `carGround` (written, switched off: `REFLECTIONS(..., ground)` defaults to
-  false): a parallax correction for the road's plane. On a 64 to 256 cube it
-  magnified the road's few texels into dark blotches on the bumper.
+- **Parallax** (`GLSL_PROBE_PROXY`, the probe's own: `probeProxyDir`): the
+  probe stands at the middle of the car and knows directions only. Each read
+  follows the reflected ray from the fragment's place in the world to the
+  probe's proxy (the ground's plane; in the tunnel the bore as a box) and
+  reads the direction from the probe to where it meets it, for hits within 8
+  to 20 m. `setReflections({ proxy })` copies the probe's four uniforms into
+  the car's (and the wheels') each frame. It replaced the car's own `carGround`
+  (switched off: on 64 to 256 cubes of plain mips it magnified the road's few
+  texels into blotches) and `carBoreBox`.
 
 ### In the tunnel
 
@@ -310,10 +307,8 @@ So under the tunnel's roof the lines are drawn exactly (`GLSL_BORE` in
   the lines as blotches, so what it shows is held, in proportion to how far
   the car is under the roof, to four times the lining's radiance
   (`uBoreGlow`), rolling off slowly above it; what is left is the walls, the
-  ceiling, the walkway and the dado, the green lights. And it is
-  box-projected (`carBoreBox`): a reflected ray meeting a wall or the
-  ceiling within 60 m is turned into the direction from the probe to that
-  point, so the walls stand at their true distance in the flanks.
+  ceiling, the walkway and the dado, the green lights. The probe's box
+  (above, "Parallax") puts the walls at their true distance in the flanks.
 - The glass roof's roll-off of bright reflections (a tenth of the sun's
   light) does not apply under the roof, where the lines cross it.
 

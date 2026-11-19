@@ -491,7 +491,12 @@ engine.onDraw = () => {
   }
   if (asset.probe) {
     const at = asset.car.box.center.clone().applyMatrix4(stand.matrixWorld);
+    // the ground under the car is the probe's parallax plane (GLSL_PROBE_PROXY), as in the game
+    asset.probe.setProxy(new THREE.Vector3(0, 1, 0), stand.getWorldPosition(new THREE.Vector3()));
     asset.probe.update(world.scene, at, [asset.car.object, asset.car.shadow, ...world.probeHidden].filter(Boolean), 6);
+    // the car's paint holds lamps in its probe to a few white papers of the picture (materials.js GLSL_KEY): in the
+    // studio its lights are the dome itself, lights nowhere else, so nothing is held there
+    asset.car.setReflections({ cube: asset.probe.texture, sky: 1, exposure: studio ? 1e-3 : frame.exposure * 2 ** extraStops, proxy: asset.probe.uniforms });
   }
   const exposure = frame.exposure;
   frame.exposure *= 2 ** extraStops;

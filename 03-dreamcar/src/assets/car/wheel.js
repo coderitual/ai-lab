@@ -26,7 +26,7 @@
 
 import * as THREE from 'three';
 import { targetDefines } from '../../engine/glsl.js';
-import { PAPER, mirrorProbe, probeUniforms } from './materials.js';
+import { PAPER, copyProxy, mirrorProbe, probeUniforms } from './materials.js';
 import { TYRES } from './spec.js';
 import { TYRE_MARK as MARK, TYRE_REPEAT, TYRE_TREAD_V, FINISH, createCoverTexture, createPalette, createTyreMarkTexture, createTyreTextures, paletteU } from './wheelTextures.js';
 
@@ -1366,8 +1366,9 @@ export function createWheel({ front, left, tier = 'high', caps = null }) {
       tyreMaterial.userData.uniforms.uSpun.value = smoothstep(FADE.tread[0], FADE.tread[1], speed);
     },
 
-    setReflections({ cube, sky, exposure }) {
+    setReflections({ cube, sky, exposure, proxy = null }) {
       if (exposure) reflections.carKey.value = PAPER / exposure;
+      copyProxy(reflections, proxy);
       reflections.carProbe.value = cube || null;
       reflections.carProbeOn.value = cube ? 1 : 0;
       reflections.carSky.value = sky;
