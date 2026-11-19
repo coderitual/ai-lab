@@ -166,11 +166,11 @@ const SEGMENTS = [
   // The tunnel: a rock cutting, then the bore through the spur, bending gently right.
   { id: 'cutting', sec: 'tunnel', len: 70, ease: 70, g: 3.5, L: 'rock', R: 'rock' },
   { id: 'tunnel', sec: 'tunnel', r: -1000, deg: 20, ease: 60, g: 3, L: 'wallDown', R: 'wallUp', tunnel: true },
-  { id: 'mouth', sec: 'tunnel', len: 177.7441, ease: 50, g: 3.5, L: 'cutting', R: 'cutting' },
+  { id: 'mouth', sec: 'tunnel', len: 177.7441, ease: 50, g: -7.9, gk: [[0.8, -7.9]], L: 'cutting', R: 'cutting' },
 
   // The sky road: out of the mountain onto piers, a long banked left across an inlet of the sea (sea lane, round 2:
   // the ground under the middle of the deck is 96 m down, under the water: the piers stand in the sea).
-  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapetSea', bridge: true, drop: 96 },
+  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: -1, gk: [[0.82, -7.9]], L: 'parapet', R: 'parapetSea', bridge: true, drop: 96 },
 
   // The carousel: a climb along the far side, then a right round the spur, the slow corner of the lap.
   // (sea lane) the coast road: from here to the foot of the plunge the sea lies below on the left, the land cut on the right
@@ -178,10 +178,10 @@ const SEGMENTS = [
   { id: 'carousel', sec: 'carousel', r: -55, deg: 190, ease: 45, bank: 8, g: 5, L: 'coastRun', R: 'rockSea', runoff: 'L' },
 
   // The crest: up over the top in the open, the sea far below.
-  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'coastTop', R: 'openSea' },
+  { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 6.5, gk: [[0.2, 6.5]], L: 'coastTop', R: 'openSea' },
 
   // The plunge: 8 per cent down into a compression.
-  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'coastDown', R: 'coastUp' },
+  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: 6.5, L: 'coastDown', R: 'coastUp' },
 
   // The ledge: fast downhill sweepers along the hillside. The first, a left, has the valley open on its inside over
   // a low wall and a wooded bank on its outside (and no kerb on its inside: a white line, the paved margin and
@@ -190,7 +190,7 @@ const SEGMENTS = [
   // the banking tilts the road away from it; at 10 the sun grazed the asphalt at 6 degrees and the bank's tree shade
   // could not be told from the light round it. At 7 the asphalt takes half as much again. (4 and 5 degrees were
   // tried: they put the drift and crest tests of tools/unit.mjs over their limits.)
-  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 7, g: -7.5, gk: [[0.3, -7.5]], L: 'balcony', R: 'bank', runoff: 'R', kerb: false },
+  { id: 'ledge1', sec: 'ledge', r: 300, deg: 50, ease: 110, bank: 7, g: -1, gk: [[0.55, 6.5]], L: 'balcony', R: 'bank', runoff: 'R', kerb: false },
   { id: 'ledge2', sec: 'ledge', r: -350, deg: 20, ease: 120, bank: 6, g: -7.5, L: 'midRun', R: 'rock', runoff: 'L' },
 
   // Gully bridge: straight across a gully on piers.
