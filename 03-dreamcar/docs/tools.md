@@ -31,13 +31,14 @@ SwiftShader on four busy cores. Times below are from that machine.
 
 | script | what it does | checks | time here |
 | --- | --- | --- | --- |
-| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (112 166 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). `drift.test.mjs`: the feel: each device's turn-in time, the three assist levels, slides asked for, held and let go on every device, what the default level never lets happen, people's laps on the real road (7 tests). | 4 files | about 1 min |
+| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (112 166 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). `governor.test.mjs`: the quality governor run through made-up phones (engine.md, "The quality ladder"): the ladder's order and floors, a slow phone, a weak one, a 30 Hz cap alone and with a slow GPU, recovery, a cap that comes on later and one that goes, a hitch in a measurement, a second visit, no governor for stills, the tier guess (13 tests, under a second). `drift.test.mjs`: the feel: each device's turn-in time, the three assist levels, slides asked for, held and let go on every device, what the default level never lets happen, people's laps on the real road (7 tests). | 5 files | about 1 min |
 | `node tools/handling.mjs` | The car measured the way a road test would; prints the table of spec.md. `--json`, `--no-laps`. | (a table, not checks) | 6 s |
 | `node tools/trackmap.mjs out.svg` | Draws the circuit from above with its height, gradient and speed envelope, and prints its numbers (sections, structures, kerbs, dressing, lamps, sectors, pieces). `--png out.png`, `--fit a,b` (close the loop after an edit). | | under 1 s |
-| `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the fixed controls upright and on its side, 76 checks: the slider's fixed centre, a thumb landing off it steering at once, no drift of the centre after a drag, the knob springing back; power with nothing touched on auto and only from GAS on manual; BRAKE lifting the power and reversing at a standstill; DRIFT; two and three fingers at once, a finger sliding off a pedal, pointercancel, blur and orientationchange; touches elsewhere doing nothing; the arrows; the first-run names; both halves of a tablet split), slide (a handbrake turn through the keys and one through the touch slider and DRIFT, the readout, the driving help kept and applied), window, hud (the touch controls among the boxes: at least 64 px, inside the safe area with a phone's insets stood in for, drawn where Input finds them; solo again on manual), options (with Steering and Throttle on touch, kept, and with no storage), start, photo, determinism, params, tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
+| `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the fixed controls upright and on its side, 76 checks: the slider's fixed centre, a thumb landing off it steering at once, no drift of the centre after a drag, the knob springing back; power with nothing touched on auto and only from GAS on manual; BRAKE lifting the power and reversing at a standstill; DRIFT; two and three fingers at once, a finger sliding off a pedal, pointercancel, blur and orientationchange; touches elsewhere doing nothing; the arrows; the first-run names; both halves of a tablet split), slide (a handbrake turn through the keys and one through the touch slider and DRIFT, the readout, the driving help kept and applied), window, hud (the touch controls among the boxes: at least 64 px, inside the safe area with a phone's insets stood in for, drawn where Input finds them; solo again on manual), options (with Steering and Throttle on touch, the readout, kept, and with no storage), start, photo, determinism, params, ladder (every level of low and medium by hand: each rung sheds what it says, resolution last and never under the floor, no program compiled; `?scale=`, `?shed=`, `?upscale=0`; a running page has a governor and stays on the ladder, `?dpr=` switches it off), tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
 | `node tools/soundtest.cjs [URL] [outDir]` | Renders scenarios offline with the game's own audio code (the dev server's `sound.html`) and measures them: partials, levels, sides, tails, jumps, gestures, mute. With `outDir` it keeps the WAV files so that someone can listen. | 62 | about 45 s idle |
 | `node tools/frametest.cjs` | The tone curve's numbers (no browser); with `--url` milliseconds per frame for variants of a page (`--vary "ao=0\|ao=1"`), the pipeline's targets, and a pair of frames 1/60 s apart for a flicker check (`--pair`). | | |
 | `node tools/screenshots.cjs` | Regenerates every picture of the README and these documents, and `public/og.jpg`. `--list`, `--only day,night` (page loads or picture names), `--base URL` (default 5190), `--q medium`, `--out dir`. | | 45 to 60 min |
+| `node tools/perfcount.cjs --url URL` | What a frame costs, counted (nothing here can time a GPU): draw calls and triangles per pass (scene, shadow map, probe faces, mirror, full-screen passes) at moments of the autopilot's run and at levels of the quality ladder, the trees in each form, layers of tree cards over the picture, the shadow-casting cards' area in the sun's map, the compiled fragment shaders' lengths. `--times 8,26,36,56 --levels 0,5 --frames 4 --w --h --mobile --out file.json`; put a small `dpr=` in the address. The tables of spec.md, "What a frame costs", are its output. | (a table) | 5 to 10 min a page at medium |
 | `node tools/shot.cjs --url URL` | One screenshot of any URL. `--out --w --h --dpr --mobile --eval "js" --resize WxH --wait`. | | 1 to 3 min |
 | `tools/soundlab.cjs` | The arithmetic the soundtest is built on (spectra, levels); not run by itself. | | |
 
@@ -95,7 +96,9 @@ node tools/screenshots.cjs                # if anything visible changed; look at
 | `skip(seconds)` | run the fixed step that long without drawing, then draw one frame |
 | `advance(seconds, fps = 60)` | play that long, drawing every frame |
 | `state()` | a plain JSON picture of the run: phase, mode, time of day, clock, lamps; per driver lap, `s`, `lat`, distance, speed, gear, rpm, pedals, laps and splits, sector, gaps, position, medal, camera, lamps, assists, the put-back offer |
-| `stats()` | frame time, draw calls, triangles, programs, textures, buffer size, HUD writes, pixel ratio, render scale, the pipeline's targets, tier, `hdr`, GPU string |
+| `stats()` | frame time, draw calls, triangles, programs, textures, buffer size, HUD writes, pixel ratio, render scale, `quality` (the governor: level, rungs shed, floor, the cap once found, trials), the pipeline's targets and what it draws now (samples, blur taps, occlusion samples, whether the frame went through the upscale), tier, `hdr`, GPU string |
+| `engine.setQualityStep(n)`, `engine.setRenderScale(x)` | place the quality ladder by hand (level 0: everything; engine.md), or only the render scale; the governor is then off. `game.pipeline.upscale = false` is the plain stretch |
+| `game.perfState()` | what the readout shows, as an object |
 | `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`, `e2`, `e5`); `photo(null)` ends it |
 | `set(path, value)` | change a number of lighting.js or config.js and show it: `set('times.night.exposure', 20)`, `set('camera.chase.distance', 6)` |
 
@@ -104,7 +107,9 @@ node tools/screenshots.cjs                # if anything visible changed; look at
 The parameters tests use most: `?manual`, `?t=`, `?seed=`, `?auto` (a run at
 once), `?ap` (the autopilot), `?q=low` (always test on low: the full world at
 medium takes minutes to draw on software WebGL), `?nodraw`, `?time=`,
-`?mode=split`, `?laps=`, `?ui=0`, `?mute`, `?photo=`, `?debug=`. All of them
+`?mode=split`, `?laps=`, `?ui=0`, `?mute`, `?photo=`, `?debug=`; to stage what a
+phone draws: `?mobile=1` (the tiers' numbers for phones), `?scale=`, `?shed=`,
+`?upscale=0`. All of them
 are in [spec.md](spec.md#url-parameters).
 
 To look at the car's reflection probe itself: `?debug=probe` draws the view's
@@ -427,6 +432,31 @@ machine without a GPU, and only what is listed here.
   fallback (`?ldr`), and anything in motion (the easing was reasoned, not
   watched).
 
+- **The quality ladder, the floors, the sharpening upscale, the readout**
+  (perf lane, 2026-11-19). `node tools/unit.mjs`: 6 files passed
+  (`governor.test.mjs`: 14 tests). The playtest against the lane's
+  production build: ladder 25 of 25, options and params 79 of 79, hud 100 of
+  100 (the readout on in every layout), keys and determinism 42 of 42; the
+  tiers section was left to the lead. Stills at an upright phone's size
+  (402x874 at device scale 3, the canvas at the pixel ratio's cap), the
+  start straight at t = 8, medium and low by day: at render scale 1 the
+  picture is the same file, byte for byte, as before the lane (both tiers);
+  at the floor through the upscale the gradient of the picture's brightness
+  is 0.94 of the native picture's against 0.70 for the old floor stretched
+  (medium), and the number plate reads (no pixel can leave the range of the
+  four texels round it by more than 8 % of that range: the pass clamps it). The owner's screenshots of 2026-11-19 put beside these stills are
+  the low tier at its old floor (engine.md, "The quality ladder"). Counted
+  with `tools/perfcount.cjs` (spec.md, "What a frame costs").
+  Not verified: any frame rate, so whether the ladder pays for the floor on
+  any phone; whether the governor's trial (the bottom of the ladder for 40
+  frames, once) is noticed; the upscale in motion (stills only; a pair of
+  frames 1/60 s apart is all that was compared); the rungs seen being taken
+  in a running game (each was placed by hand in a still); Safari's
+  30-a-second Low Power Mode itself (the governor was fed made-up frame
+  times with such a cap, in Node); whether Safari names the iPhone's GPU as
+  the tier guess expects (every iPhone and iPad is now medium whatever it
+  says).
+
 ## What has not been verified
 
 Read this before believing anything above about a device.
@@ -452,8 +482,19 @@ Read this before believing anything above about a device.
   Adreno and Mali GPUs are right are all unknown.
 - **Frame rates.** Every cost here is from software WebGL, where a medium
   frame of the full world takes tens of seconds to draw. No frame rate on
-  any real GPU has been measured. The adaptive render scale has been seen to
-  step, never on a real device.
+  any real GPU has been measured. The quality governor has been run through
+  made-up devices in Node and placed by hand in the page, never watched on a
+  real device. **Nothing of the perf lane ran on a real phone.** What will
+  say how it does there is the readout (Options, Readout: Shown; or
+  `?stats`): a screenshot with it on carries the tier (and so whether the
+  phone is on `low` or `medium`), what the browser calls the GPU, the canvas
+  in device pixels, the render scale, whether the scene is multisampled, the
+  mean and the slowest frame rate of the last three seconds, which rungs of
+  the ladder are shed, and the frame-rate cap if the governor found one.
+  From two or three such screenshots (the start, the forest, the tunnel) it
+  can be told whether the floor is affordable, which rungs are always shed
+  (and should be the tier's own numbers for phones), and whether Low Power
+  Mode was on.
 - **The budgets.** Counted, not timed, at four moments of one autopilot
   run (spec.md): after the finish lane the low tier draws 133 to 149 calls
   by day (budget 150) and medium 228 to 291 by night (budget 300); triangles

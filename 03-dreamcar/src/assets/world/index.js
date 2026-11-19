@@ -55,7 +55,7 @@ import { createStuds } from './studs.js';
 import { createKerbs } from './kerbs.js';
 import { ROW_STEP, createTerrain } from './terrain.js';
 import { PlanarMirror } from '../../engine/PlanarMirror.js';
-import { TIERS } from '../../engine/caps.js';
+import { TIERS, forDevice } from '../../engine/caps.js';
 
 /**
  * The wet road's planar reflection, per tier: the target's height against the view's, how far it reaches (m), and
@@ -81,6 +81,13 @@ const SMALL = new Map([
   ['lamp-fittings', 1],
   ['viaduct-joints', 1],
 ]);
+
+/**
+ * (perf lane) The ladder's `detail` rung: what the forest's detail distances are multiplied by while it is shed. On
+ * medium the full trees then end at 41 m instead of 58 and the reduced ones at 56 instead of 80; the impostors
+ * that take their place are two triangles each.
+ */
+const DETAIL_SHED = 0.7;
 
 /**
  * @typedef {object} Beam one car's head lamps, for whatever answers them (reflectors), and its tail lamps (the wet
@@ -109,6 +116,8 @@ const SMALL = new Map([
  * @property {number} wetness 0..1 road wetness: the time of day's (lighting.js), unless ?wet= or a setter overrides it
  * @property {import('./atmosphere.js').Atmosphere} atmosphere the haze; `atmosphere.patch(material)` makes a
  *   material of one's own fade into it
+ * @property {(shed: boolean) => void} setDetail the ladder's `detail` rung (caps.js LADDER): shed, the trees go to
+ *   their simpler forms at DETAIL_SHED of the tier's distances and the wood's floor reaches that much less far
  * @property {() => void} refresh apply the numbers of lighting.js again after they were changed by hand
  * @property {() => void} restore draw again what only lived on the GPU, after a lost WebGL context has come back
  * @property {() => void} dispose
@@ -145,7 +154,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   const sky = createSky({ tier, rng: rng.fork('sky'), atmosphere });
   lap('sky');
   const environment = createEnvironment({ renderer, caps, sky, atmosphere });
-  const sun = createSun({ renderer, tier, shadows: params.shadows });
+  const sun = createSun({ renderer, tier, caps, shadows: params.shadows });
   // (look lane) the sun's shadow map is drawn by the view's own render, not by a probe or mirror before it
   scene.onBeforeRender = (_renderer, _scene, camera) => sun.beforeRender(camera);
   const groundMaterial = createGroundMaterial({ caps, tier, atmosphere });
@@ -179,7 +188,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   // (day lane) and none on the banks in front of frame K5's place (landmarks.js)
   const k5Bare = k5NoTrees(track);
   const noTrees = keepOut ? (x, z) => built(x, z) || k5Bare(x, z) || keepOut(x, z) : (x, z) => built(x, z) || k5Bare(x, z);
-  const forest = createForest({ renderer, track, terrain, tier, coverage, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high, keepOut: noTrees });
+  const forest = createForest({ renderer, track, terrain, tier, caps, coverage, rng: rng.fork('forest'), atmosphere, shadow: forDevice(SHADOW, tier, caps), keepOut: noTrees });
   // the trees' shadow-only proxies live on a layer only the sun's shadow camera sees
   sun.light.shadow.camera.layers.enable(CASTER_LAYER);
   lap('forest');
@@ -359,6 +368,10 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
           structures.halos?.hide();
         } else mirror.uniforms.uMirrorOn.value = 0;
       }
+    },
+
+    setDetail(shed) {
+      forest.setDetail(shed ? DETAIL_SHED : 1);
     },
 
     setStartLights(n) {
