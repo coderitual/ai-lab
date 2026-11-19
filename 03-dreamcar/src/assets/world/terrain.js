@@ -128,7 +128,9 @@ const CAUSEWAY = { piece: 'back', from: 0.5, to: 0.93, ease: 50, lip: 2.5, steep
  */
 // (round 4) moved and sharpened: ahead and to the right from the sky road's start and from the crest and the plunge
 // (the bay inside the loop), a steeper cone so that it reads as a volcano against the sea and the sky
-const VOLCANO = { piece: 'ledge2', at: 0.29, out: -195, h: 190, r: 150, concave: 1.3, crater: 30, depth: 24, sound: { r: 600, floor: 16, keep: [60, 120] } };
+// (the low coast) moved again, further from the gully, whose right it filled: ahead and right from the crest and the
+// plunge, beside the sky road's start
+const VOLCANO = { piece: 'viaduct', at: 0.103, out: -178, h: 175, r: 130, concave: 1.3, crater: 28, depth: 22, sound: { r: 600, floor: 16, keep: [60, 120] } };
 const COAST = {
   lip: [1.5, 4],
   steep: [2.2, 3.4],
