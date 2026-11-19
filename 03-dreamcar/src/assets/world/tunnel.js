@@ -62,7 +62,20 @@ const SHELL = 0.5;
 /** Rows of the box along the road: one every this many metres, per tier (its faces are flat: a 1000 m bend needs few). */
 const ROW = { low: 4, medium: 2, high: 2 };
 /** The box's own light bounced about, as a share of what one lamp lays on the wall beside it. */
-const BOUNCE = 0.45;
+// (day lane: 0.45 lit the ceiling and the walls as a flat pale box; the strips and the fittings now carry the light)
+const BOUNCE = 0.22;
+/**
+ * (day lane, frame v1) The continuous light strip along the top of each wall, under the haunch: its height (m) and
+ * the height above the road of its middle, and its radiance against the luminaires' colour. The probe sees it too:
+ * it slides over the cars' paint.
+ */
+const WALL_STRIP = { height: 0.22, at: CEILING - HAUNCH.down - 0.3, radiance: 9 };
+/** (day lane) Lit panels along the outside wall: length, height, the height of their middle, spacing (m), radiance. */
+const LIT_PANEL = { length: 5.6, height: 1.3, at: 3.3, step: 34, radiance: 2.2 };
+/** Our own panels: a white field with a coloured block (no lettering). */
+const PANEL_COLORS = [[0.1, 0.55, 1.0], [1.0, 0.45, 0.05], [0.1, 0.9, 0.45], [0.95, 0.15, 0.2]];
+/** (day lane) Yellow dashes along the inside edge: length, gap, width, lat from the pavement's edge (m). */
+const DASHES = { length: 1.2, step: 3.6, width: 0.14, inset: 0.45, asBoxes: false };
 /**
  * The luminaires: how far in from the wall (m, on the ceiling at the haunch's foot), their emitter's size across and
  * along, the gap between a pair's two bars, and the zones: pairs of bars every `entrance[1]` m over the first
@@ -83,6 +96,8 @@ const GUIDE = 12.5;
 const GUIDE_H = 1.0;
 /** Jet fans: a pair every FANS m, the first FAN_FIRST m in. Lane signals every SIGNALS m (and at the entrance). */
 const FANS = 110;
+/** (day lane) The jet fans' radiance as the tunnel's fittings light them (drawn with the glow: see where they are built). */
+const FAN_LIT = { shell: [0.075, 0.078, 0.082], rim: [0.32, 0.34, 0.36], grille: [0.014, 0.015, 0.017], bracket: [0.05, 0.052, 0.055] };
 const FAN_FIRST = 70;
 const SIGNALS = 120;
 /** The three lanes' middles (m left of the centre line): where the lane signals hang. */
@@ -117,14 +132,13 @@ const PAINT = {
   steel: [0.32, 0.33, 0.34],
   galvanised: [0.42, 0.43, 0.42],
   pipe: [0.28, 0.1, 0.06],
-  fan: [0.5, 0.5, 0.48],
-  fanInside: [0.03, 0.03, 0.035],
   door: [0.16, 0.17, 0.17],
   signal: [0.025, 0.025, 0.03],
   blue: [0.01, 0.07, 0.32],
   white: [0.8, 0.8, 0.78],
   black: [0.02, 0.02, 0.02],
   banner: [0.75, 0.2, 0.03],
+  yellow: [0.6, 0.42, 0.03],
 };
 /** Radiance (scene units, linear) of what glows. */
 const GLOW = {
@@ -397,6 +411,53 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
       d += spacingAt(d, length - d);
     }
 
+    // ---- (day lane, frame v1) the light strips along the top of both walls, continuous portal to portal
+    {
+      const stripColor = spec.color.map((c) => c * WALL_STRIP.radiance);
+      const STEP = 8;
+      for (let d = 0; d < length; d += STEP) {
+        const len = Math.min(STEP, length - d);
+        const { M } = place(track, t.s0 + d + len / 2);
+        for (const side of [1, -1]) {
+          glow.add(UNIT_BOX, M(side * (Wb - 0.02), WALL_STRIP.at, 0, [0.04, WALL_STRIP.height, len + 0.02]), stripColor);
+          probeGlow.add(UNIT_BOX, M(side * (Wb - 0.02), WALL_STRIP.at, 0, [0.04, WALL_STRIP.height * 2, len + 0.02]), stripColor.map((c) => c * 0.5));
+        }
+      }
+      BORE_UNIFORMS.uBoreStrip.value.set(Wb - 0.02, WALL_STRIP.at, WALL_STRIP.height / 2, WALL_STRIP.radiance);
+    }
+    // ---- lit panels along the outside wall (the bend's outside: its left on a right-hand bend), our own blocks of colour
+    {
+      levelFrame(track, (t.s0 + t.s1) / 2, frame);
+      const outside = frame.curvature > 0 ? -1 : 1;
+      let k = 0;
+      for (let d = LIT_PANEL.step * 0.75; d < length - LIT_PANEL.step * 0.5; d += LIT_PANEL.step, k++) {
+        const { M } = place(track, t.s0 + d);
+        const white = [LIT_PANEL.radiance, LIT_PANEL.radiance, LIT_PANEL.radiance * 0.96];
+        const block = PANEL_COLORS[k % PANEL_COLORS.length].map((c) => c * LIT_PANEL.radiance * 0.8);
+        const third = LIT_PANEL.length / 3;
+        glow.add(UNIT_BOX, M(outside * (Wb - 0.03), LIT_PANEL.at, third / 2, [0.04, LIT_PANEL.height, 2 * third]), white);
+        glow.add(UNIT_BOX, M(outside * (Wb - 0.03), LIT_PANEL.at, -third, [0.04, LIT_PANEL.height, third]), block);
+        paint.add(UNIT_BOX, M(outside * (Wb - 0.01), LIT_PANEL.at, 0, [0.02, LIT_PANEL.height + 0.16, LIT_PANEL.length + 0.16]), PAINT.housing);
+      }
+    }
+    // ---- yellow dashes along the inside edge
+    {
+      levelFrame(track, (t.s0 + t.s1) / 2, frame);
+      const inside = frame.curvature > 0 ? 1 : -1;
+      const dashProf = {};
+      const dashProf0 = {};
+      // (lead) Off for now: as level boxes these stood up to 4 cm over a road that falls and tilts under them
+      // (tools/unit/structures.test.mjs). They belong in the road's own paint (road.js's marks), which follows it.
+      for (let d = 2; DASHES.asBoxes && d < length - 2; d += DASHES.step) {
+        const { M } = place(track, t.s0 + d);
+        // (lead) on the road's own surface at that distance from the centre line: the pavement falls away from the
+        // crown, and a dash laid at the centre line's height stood 0.25 m over the shoulder
+        const lat = inside * (track.halfWidth - DASHES.inset);
+        const fall = track.profile(t.s0 + d, lat, dashProf).y - track.profile(t.s0 + d, 0, dashProf0).y;
+        paint.add(UNIT_BOX, M(lat, fall + 0.012, 0, [DASHES.width, 0.01, DASHES.length]), PAINT.yellow);
+      }
+    }
+
     // ---- on the walls: guidance lights, emergency doors with lit frames and signs, fire points
     for (let d = GUIDE / 2; d < length; d += GUIDE) {
       const { M } = place(track, t.s0 + d);
@@ -443,14 +504,22 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
       const sides = low ? 8 : 16;
       const shell = new THREE.CylinderGeometry(0.56, 0.56, 1, sides, 1, true).rotateX(Math.PI / 2);
       const face = new THREE.CircleGeometry(0.52, sides);
+      // (day lane) the fans are drawn with the glow, at the radiance the fittings give painted steel up there: as plain
+      // paint they took light only from the few real lamps near the car and hung ahead as black holes in the ceiling.
+      // A pale painted shell, a bright rim at each end, a dark grille (never black), brackets.
+      const rim = new THREE.CylinderGeometry(0.6, 0.6, 1, sides, 1, true).rotateX(Math.PI / 2);
       for (let d = FAN_FIRST; d < length - 40; d += FANS) {
         const { M } = place(track, t.s0 + d);
         for (const lat of [3.1, -3.1]) {
-          paint.add(shell, M(lat, CEILING - 0.82, 0, [1, 1, 3.6]), PAINT.fan);
-          if (!low) for (const e of [-1.7, 1.7]) paint.add(face, M(lat, CEILING - 0.82, e, [1, 1, 1], [0, e > 0 ? 0 : Math.PI, 0]), PAINT.fanInside);
-          for (const e of [-1, 1]) paint.add(UNIT_BOX, M(lat, CEILING - 0.14, e, [0.1, 0.28, 0.1]), PAINT.steel);
+          glow.add(shell, M(lat, CEILING - 0.82, 0, [1, 1, 3.6]), FAN_LIT.shell);
+          for (const e of [-1.74, 1.74]) {
+            glow.add(rim, M(lat, CEILING - 0.82, e, [1, 1, 0.14]), FAN_LIT.rim);
+            glow.add(face, M(lat, CEILING - 0.82, e * 0.97, [1, 1, 1], [0, e > 0 ? 0 : Math.PI, 0]), FAN_LIT.grille);
+          }
+          for (const e of [-1, 1]) glow.add(UNIT_BOX, M(lat, CEILING - 0.14, e, [0.1, 0.28, 0.1]), FAN_LIT.bracket);
         }
       }
+      rim.dispose();
       shell.dispose();
       face.dispose();
     }

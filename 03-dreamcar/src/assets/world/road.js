@@ -186,7 +186,7 @@ const TAIL_GLINT = { across: 0.05, along: 0.3, radiance: 1.6, brake: 3, gain: 0.
  * behind the car, softened within about `soft` m (m^2 added to the squared distance: the lamp is not a point, and the
  * road right under the bumper must not burn); `color` its red after the asphalt has taken it. Brake lamps triple it, as they do the glint.
  */
-const TAIL_POOL = { power: 0.7, soft: 2.5, color: [1.0, 0.05, 0.025] };
+const TAIL_POOL = { power: 0.3, soft: 2.5, color: [1.0, 0.05, 0.025] };
 /**
  * (tunnel lane) Under the tunnel's roof the dry asphalt mirrors, softly (TUNNEL_SHEEN): the two lines of luminaires
  * (shading.js BORE_UNIFORMS: where they are and how bright), blurred `blur[0]` m across plus `blur[1]` m for every
@@ -387,6 +387,7 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     ...WET_UNIFORMS,
     // (day lane) the time of day's share of the sky's sheen (lighting.js roadSheen: twilight's road is near black)
     uSkySheenShare: { value: 1 },
+    uHeadPoolShare: { value: 1 },
     ...BORE_UNIFORMS,
     ...(mirror ? mirror.uniforms : {}),
   };
@@ -459,8 +460,9 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
       WET_UNIFORMS.uWet.value = w;
     },
     /** @param {number} share how much of the sky's sheen the asphalt shows at this time of day (lighting.js roadSheen) */
-    setSkySheen(share) {
+    setSkySheen(share, pool = 1) {
       uniforms.uSkySheenShare.value = share;
+      uniforms.uHeadPoolShare.value = pool;
     },
     /** @param {import('./index.js').Beam[]} beams */
     setBeams(beams) {
@@ -663,6 +665,18 @@ if ( vRoadWorld.w > 0.5 && vRoad.w < 0.6 && uBoreZone.y > uBoreZone.x ) {
     duty = max( duty, 0.42 * ( 1.0 - smoothstep( uBoreZone.w - 10.0, uBoreZone.w + 10.0, toExit ) ) );
     duty *= smoothstep( -1.0, 1.0, into ) * smoothstep( -1.0, 1.0, toExit );
     tAdd += uBoreLineColor * ( uBoreLines.z * duty * across * ${TUNNEL_SHEEN.gain.toFixed(3)} );
+    // (day lane) the wall strips: where the mirrored ray meets the wall it heads for, how near the strip's height,
+    // blurred more the further it travels; continuous, so long soft streaks down the road
+    float tSide = dot( tR, tL );
+    if ( abs( tSide ) > 0.02 && uBoreStrip.w > 0.0 ) {
+      float tWall = ( sign( tSide ) * uBoreStrip.x - vRoad.x ) / tSide;
+      float hWall = tUp * tWall;
+      float sS = vRoad.y + dot( tR, tA ) * tWall;
+      float ws = uBoreStrip.z + ${TUNNEL_SHEEN.blur[1].toFixed(3)} * tWall * tWall * 0.5;
+      float ds = ( hWall - uBoreStrip.y ) / ws;
+      float inside = smoothstep( uBoreZone.x - 1.0, uBoreZone.x + 1.0, sS ) * smoothstep( uBoreZone.y + 1.0, uBoreZone.y - 1.0, sS );
+      tAdd += uBoreLineColor * ( uBoreStrip.w * exp( - ds * ds ) * uBoreStrip.z / ws * inside * ${TUNNEL_SHEEN.gain.toFixed(3)} );
+    }
   }
   // the tail lamps, short and broad in the dry stone
   float tTail = 0.0;
@@ -762,8 +776,10 @@ uniform vec4 uGrid[${GRID_SLOTS}];
 uniform float uHalf;
 uniform float uWet;
 uniform float uSkySheenShare;
+uniform float uHeadPoolShare;
 uniform vec3 uBoreGlow;
 uniform vec4 uBoreLines;
+uniform vec4 uBoreStrip;
 uniform vec3 uBoreLineColor;
 uniform vec4 uBoreZone;
 uniform vec3 uBeamPos[${BEAMS}];
@@ -1216,8 +1232,8 @@ const ASPHALT_BEADS = /* glsl */ `
     float back = exp( -pow( acos( clamp( dot( l, toEye ), -1.0, 1.0 ) ), 2.0 ) / 0.09 );
     pool += e * back;
   }
-  // (day lane: 0.6 painted the road white round the car from the chase camera at twilight; 0.4)
-  totalEmissiveRadiance += vRoadWorld.w * pool * diffuseColor.rgb * ( 0.4 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
+  // (day lane: at twilight the time of day's headPool share of it: the full pool painted the road white round the car)
+  totalEmissiveRadiance += vRoadWorld.w * pool * uHeadPoolShare * diffuseColor.rgb * ( 0.6 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
 
   // (dusk lane) the tail lamps' red pool on the road behind each car (TAIL_POOL), from dusk on
   float redPool = 0.0;

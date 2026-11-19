@@ -319,6 +319,16 @@ machine without a GPU, and only what is listed here.
   staged towards it looked into the stand). Not looked at on `high`, in
   motion, in split screen or in the chase view; the playtest, the soundtest
   and the docs' screenshots were not run.
+- **K5 round 4 and the tunnel's fittings** (cones lower and wider with coarse
+  ribs and broken snow, an ultramarine top, exposure 5, `headPool` 0.4 at
+  twilight only (the night keeps the full pool), the tail lamps' pool 0.3
+  (was 0.7), flags and the tower's window placed to the frame, the tower's
+  gallery, scrub on the right verge, the sea's twilight entry; in the tunnel
+  the wall strips and their reflections, lit panels, yellow dashes, half the
+  bounce, the jet fans drawn lit): K5 at `medium` 1280x720 and 393x852, the
+  tunnel inside, approaching the exit and just outside at day, dusk,
+  twilight and night at `medium`; draw calls in the tunnel on low by day
+  149 and 159 at t = 39 and 41; `node tools/unit.mjs` passed.
 - **K5 round 3 and the tunnel's exposure** (twilight's sunset bearing, raised
   and more saturated bands, exposure 6 and environment 0.75, the dry road's
   sky sheen and its own sky mirror at 0.3 at twilight (`roadSheen`), the head

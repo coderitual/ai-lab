@@ -19,6 +19,13 @@ import { createTunnels } from '../../src/assets/world/tunnel.js';
 import { TIMES } from '../../src/assets/world/lighting.js';
 import { createRng } from '../../src/engine/rng.js';
 
+// (coast lane) The tunnel's banner is painted on a canvas (tunnel.js buildBanner). Node has none: a stand-in whose 2D
+// context takes every call and draws nothing. Only the geometry is tested here.
+if (typeof document === 'undefined') {
+  const context = new Proxy(function () {}, { get: (t, k) => (k === 'canvas' ? { width: 1, height: 1 } : k === 'measureText' ? () => ({ width: 1 }) : context), set: () => true, apply: () => context });
+  globalThis.document = { createElement: () => ({ width: 1, height: 1, style: {}, getContext: () => context }) };
+}
+
 let failures = 0;
 function test(name, fn) {
   const before = failures;

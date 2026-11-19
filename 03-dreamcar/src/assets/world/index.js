@@ -349,7 +349,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       scene.environmentIntensity = time.env.intensity;
       forest.setTime(time);
       far.setTime(time);
-      road.setSkySheen(time.roadSheen ?? 1);
+      road.setSkySheen(time.roadSheen ?? 1, time.headPool ?? 1);
       k5.setTime(time);
       sea.setTime(time);
       volcano.setTime(time);

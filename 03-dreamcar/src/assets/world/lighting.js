@@ -121,6 +121,7 @@
  *   none, as a real tunnel's are dimmed to the interior's level after dark)
  * @property {number} wetness 0..1 how wet the road is (world.wetness defaults to it; ?wet= overrides): the night
  *   is the night after rain, the road a dark mirror with puddles in the wheel tracks and low spots
+ * @property {number} [headPool] the share of the head lamps' pool the road shows (1 if not given; road.js)
  * @property {number} [roadSheen] the share of the sky's sheen the dry asphalt shows (1 if not given; road.js)
  * @property {'drl'|'low'} carLights what a car's automatic lamps do under the open sky (in the tunnel: always low)
  */
@@ -341,8 +342,9 @@ export const TIMES = {
         at: [0.075, 0.15, 0.27, 0.6],
         // (round 3, sampled off K5: top (110, 151, 246), the turquoise-to-pale band (194, 246, 246), orange (225, 226,
         // 165) and a rose-red line (187, 130, 126) on the horizon: saturated and banded, an ultramarine top)
-        sun: [[0.1, 0.03, 0.028], [0.13, 0.06, 0.018], [0.1, 0.12, 0.08], [0.02, 0.06, 0.11], [0.006, 0.016, 0.09]],
-        away: [[0.006, 0.006, 0.018], [0.01, 0.009, 0.024], [0.026, 0.016, 0.03], [0.012, 0.022, 0.07], [0.006, 0.016, 0.09]],
+        // (round 4: the top ultramarine, not cyan: less green over the turquoise)
+        sun: [[0.1, 0.03, 0.028], [0.13, 0.06, 0.018], [0.1, 0.12, 0.08], [0.016, 0.045, 0.12], [0.008, 0.012, 0.11]],
+        away: [[0.006, 0.006, 0.018], [0.01, 0.009, 0.024], [0.026, 0.016, 0.03], [0.012, 0.018, 0.08], [0.008, 0.012, 0.11]],
       },
       ground: [0.004, 0.005, 0.009],
       stars: 2e-6,
@@ -355,9 +357,9 @@ export const TIMES = {
     env: { intensity: 0.75 },
     ambient: { sky: [0.5, 0.65, 1.0], ground: [0.5, 0.4, 0.4], intensity: 0.012 },
     // the haze a deep blue; only a little rose straight under the sunset (the far land stays dark blue against the band)
-    fog: { color: [0.004, 0.007, 0.022], sun: [0.008, 0.006, 0.008], sunLobe: 12, density: 0.00025, heightFalloff: 0.011, air: 0.00004 },
+    fog: { color: [0.004, 0.007, 0.022], sun: [0.008, 0.006, 0.008], sunLobe: 12, density: 0.00025, heightFalloff: 0.011, air: 0.00002 },
     // (round 3: 9 and env 1 made the road beside the car (50, 53, 68) against the frame's (20, 15, 30))
-    exposure: 6,
+    exposure: 5,
     // the box's lamps are the day's: an eye adapted to them sees the lining as by day, not burnt white
     tunnelExposure: 4.5,
     shadeEv: 0.4,
@@ -383,6 +385,8 @@ export const TIMES = {
     // (round 3) the dry road near black: a third of the sky's sheen and of its own mirror of the sky (the band's light at a glancing angle painted it
     // a pale grey-blue, (61, 67, 90) beside the car against the frame's (20, 15, 30))
     roadSheen: 0.3,
+    // (round 4) the head lamps' pool on the road as the chase camera sees it, against the other times' (road.js)
+    headPool: 0.4,
     wetness: 0,
     carLights: 'low',
   },

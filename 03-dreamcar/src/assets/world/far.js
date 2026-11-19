@@ -571,8 +571,9 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const y = -80 + (c.y + 80) * t ** 0.85;
         // (round 3) ridges and gullies down the flanks: the face stands out or falls back by up to 220 m, most
         // mid-slope, so that the sky's light picks out ribs; snow lies in the gullies longest
-        const gully = cn.ridged(b * 1.3 + 2, t * 1.6, 3);
-        const r = c.dist - (c.y + 80) * 1.6 * (1 - t) + 220 * (1 - gully) * Math.sin(Math.PI * t);
+        // (round 4: coarse enough to read at 12 km in a 1280 px picture: a rib every 2 or 3 degrees)
+        const gully = cn.ridged(b * 0.45 + 2, t * 1.2, 2);
+        const r = c.dist - (c.y + 80) * 1.6 * (1 - t) + 420 * (1 - gully) * Math.sin(Math.PI * t);
         const v = (i * (rows + 1) + j) * 3;
         pos[v] = k5.x + sb * r;
         pos[v + 1] = y;
@@ -580,9 +581,12 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         // dark rock and scrub, darker at the foot; snow on a cone's upper flanks, reaching further down the gullies
         const snow = c.cone > 600 ? smoothstep(0.52, 0.64, y / c.cone + 0.12 * (1 - gully) + 0.06 * (cn.fbm(b * 2.1, t * 3, 2) - 0.5)) : 0;
         const base = (0.03 + 0.03 * t) * (0.8 + 0.4 * gully) + 0.01 * cn.fbm(b * 0.7, t * 2 + 5, 2);
-        col[v] = base * 0.9 + (0.74 - base * 0.9) * snow;
-        col[v + 1] = base + (0.76 - base) * snow;
-        col[v + 2] = base * 1.1 + (0.8 - base * 1.1) * snow;
+        // (round 4) the snow bright and broken by dark ridges: the ribs stay bare where they stand out
+        const bare = smoothstep(0.75, 0.95, gully);
+        const sn = snow * (1 - 0.8 * bare);
+        col[v] = base * 0.9 + (0.85 - base * 0.9) * sn;
+        col[v + 1] = base + (0.87 - base) * sn;
+        col[v + 2] = base * 1.1 + (0.92 - base * 1.1) * sn;
       }
     }
     const index = [];
