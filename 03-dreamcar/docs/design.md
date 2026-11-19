@@ -13,9 +13,9 @@ circuit in the mountains by a lake: a lakeside straight, fast esses through the
 woods, a lit tunnel, a road on piers across the valley, a slow carousel, a
 crest, a plunge, a ledge, a second bridge and a long right back to the shore.
 Three laps against the clock, alone or against a friend in split screen. The
-same circuit exists three times: on a sunlit autumn afternoon with the sun
-straight down the start straight, at golden hour, and on a wet night after
-rain, when the picture is made of lamps and their reflections in the asphalt.
+same circuit exists four times: on a sunlit autumn afternoon with the sun
+straight down the start straight, at golden hour, at twilight after the sun
+has set, and on a wet night after rain, when the picture is made of lamps and their reflections in the asphalt.
 It plays in a browser with a keyboard, a gamepad, or thumbs on a phone.
 
 It is an original demo. Two things were looked at for what "good" looks like
@@ -103,11 +103,18 @@ beside the pits (the rest of the land side is a rail), rock where the road is
 cut into the hill, parapets on the bridges, the walkways' kerbs in the tunnel. Trees stand
 behind the barrier, never as it.
 
-How the ground is drawn (src/assets/world): the asphalt (road.js) is
-dark, fine racing asphalt with a polished, darker racing line and rubber in
+How the ground is drawn (src/assets/world): the asphalt (road.js) is an
+old mountain road's kept for racing, as in frames E2 and E5 (below): a pale
+to mid grey in sun, a shade warm (albedo 0.11 new to 0.22 a generation old),
+a cooler grey in the woods' shade that still shows its stones; fine stone
+grain close by fading to a clean tone; each lane's wheel paths darker and
+smoother, the crown and the edges lighter, long faint streaks along the road;
+small dark grit off the line and towards the edges, a thin band of dust
+along the edge; a polished, darker racing line and rubber in
 the bends and the braking zones (corridor.js), runs of surfacing of different
-ages with joints, the paver's seams 2 m either side of the middle, a few
-patches and sealed cracks, tyre marks before the carousel (roadHistory.js);
+ages with joints, the paver's seams 2 m either side of the middle, patches
+(about one per 300 m) and cracks sealed with tar (about one per 90 m), tyre
+marks before the carousel (roadHistory.js);
 its markings are a solid white line inside each edge (0.28 m), the start line
 and twelve grid boxes from `track.grid`, nothing else, but on the two forest
 stretches of frames E2 and E5 (below, "The forest"), where a piece's
@@ -356,7 +363,9 @@ needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
 day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 76.6 s),
-`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green) and
+`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green),
+`?photo=k5` (frame K5, strict spec at dusk: t 88.7 s, the end of the sweepback's first piece, a chase camera
+6.2 m back and 2.3 m up, pitched 9 degrees down, lens 50 degrees) and
 `?photo=e1` (frame E1, strict spec for the coast stretch: day, t 64.9 s, the car coming out of the carousel,
 the camera on the crest looking back at it; a `roll` of 7 degrees tilts the horizon as the frame's does); a name
 brings its own moment of the autopilot's run and its time of day unless the
@@ -422,6 +431,17 @@ with a short `advance` after loading.
   cars run on low beam, their head lamps pooling on the road ahead and their
   tail lamps laying a red pool on the asphalt behind them (road.js
   `TAIL_POOL`).
+- **Twilight** (frame K5, strict, and the twilight references): the sun 5°
+  under the horizon at the golden hour's bearing; no direct light and no sun
+  shadows, only the sky's (the environment map, strength 1, and a faint blue
+  fill), so the land is dark blue and what faces the sunset catches its band
+  as a warm rim. The dome deep blue overhead through turquoise and pale
+  yellow to an orange-rose band over the sunset, the earth's shadow and its
+  pink belt opposite, all but clear, the first stars high up. The water
+  mirrors the band as a pale gleam. Street lamps, floodlights and windows on
+  (cones in the air at 0.6 of the night's), the cars on low beam with the red
+  pool behind them, the road dry and dark. Exposure 9 (between golden hour's
+  4.2 and night's 22), contrast 1.18, saturation 1.15.
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
@@ -495,6 +515,22 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   in low warm light, with rust in their shade and dark trunks below; a gantry
   over the road carrying columns of round start lamps; boards, a tyre wall, a
   low concrete wall; the asphalt in shade, the car's tail lamps lit.
+- **E2** and **E5** (road lane; the owner: "Road should be like that
+  exactly"; the spec for the asphalt everywhere on the lap): a two-lane road
+  through pines, by day. In sun the asphalt is a pale to mid grey, a shade
+  warm (sampled: sRGB about 100 to 150, luma; the lane seen across the light
+  about 100, patches lit straight on about 145), in the trees' shade a cool
+  dark grey (about [34, 43, 51]) that still shows its texture; fine stone
+  grain close to the camera fading smoothly to a clean tone; a soft sheen
+  towards the sun at grazing angles, no mirror; darker, smoother bands where
+  the tyres run, the crown and edges lighter, long faint streaks along the
+  road; thin dark meandering cracks, some sealed with tar, an occasional
+  rectangular patch a different grey, a few per hundred metres; small dark
+  stones scattered off the line and near the edges (E5); crisp but slightly
+  worn paint: white edge lines and a double yellow centre line; a clean
+  asphalt edge meeting a low concrete kerb or the verge with a thin band of
+  dust along it. Only the road is answered to; the cars, people and captions
+  in them are not ours to copy.
 - **E1** (sea lane; strict spec for the coast stretch, preset `e1`): a road
   winding in an S round a cut hill on a headland high above an open sea; the
   whole frame is described under "The sea".
@@ -537,7 +573,27 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   wet road mirrors; the last warm side light with long shadows across the
   road and a lit snowy mountain against a clear pale sky.
 
-Day answers to D1, D3, E1 and A, and its two forest stretches to E2 and E5; golden hour to D4, D2 and the twilight references; the wet night to two
+- **K5**, one of those twilight frames made strict spec for one place ("treat
+  it as spec of one of the place on the track; beside the car everything is
+  spec"): after sunset, a chase camera low behind the car on a wide dark road
+  high over the water, curving gently right. The sky deep blue overhead
+  through pale turquoise and yellow to an orange-rose band on the horizon,
+  clear. Across the left and the middle a pale sheet of water with a bright
+  gleam, dark blue mountains beyond it with a few snow-capped cones. On the
+  left a guard rail, low scrub, small warm lamps far off, a yellow chevron
+  board and two tall dark feather flags on poles; on the right a guard rail
+  curving with the road and a big dark round tower with a railing round its
+  top and one warm lit window. The road dark, its white lines catching the
+  sky, the tail lamps' red glow on the asphalt behind the car. Our place is
+  the end of the sweepback's first piece, where the road comes off the gully
+  bridge high over the bay, due south, and begins its long right turn down to
+  the shore (`?photo=k5`; landmarks.js `K5`): the bay and the open sea to the
+  west lie ahead and to the left, the golden-hour sun stands 35 degrees to the
+  right behind the tower, the far cones (far.js) stand across the sea, and the
+  tower, the flags, the chevron and the lamps are k5.js's. Our flags are plain;
+  the tower is our own.
+
+Day answers to D1, D3, E1 and A, its two forest stretches to E2 and E5 (and the asphalt everywhere to E2 and E5; D1's "dark smooth asphalt" gave way to them); golden hour to D4, D2 and the twilight references (K5 strictly); the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
 light, the materials, the vegetation, the composition and the sense of speed:

@@ -38,12 +38,14 @@
  * @typedef {[number, number, number]} Rgb linear, scene units
  *
  * @typedef {object} TimeOfDay
- * @property {'day'|'night'} name
+ * @property {string} name 'day', 'dusk', 'twilight' or 'night'
  *
  * @property {object} sun the one light that casts the long shadows: the sun, or the moon at night
  * @property {[number, number, number]} sun.dir unit vector towards it
  * @property {Rgb} sun.color its colour (the brightest channel is 1)
  * @property {number} sun.intensity what it lays on a surface facing it
+ * @property {{ dir: number[], intensity: number }} [sun.light] what the directional light does instead when the sun
+ *   is under the horizon (twilight: nothing; sun.js)
  *
  * @property {object} sky what the dome draws, and with it the environment map that lights the scene from all round
  * @property {Rgb} sky.zenith radiance straight up
@@ -144,7 +146,7 @@ export function towards(bearing, elevation) {
  *   dusk   125 degrees left of the heading (out over the lake, behind the driver's left shoulder), 2 up.
  *   moon   8 degrees left of the heading, 17 up, beside the massif's main peak.
  */
-export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 2 }, moon: { left: 8, up: 17 }, clouds: { left: 30, up: 30 } };
+export const PLACES = { day: { left: -3, up: 16 }, dusk: { left: 125, up: 2 }, moon: { left: 8, up: 17 }, twilight: { left: 125, up: -5 }, clouds: { left: 30, up: 30 } };
 const SUN = towards(90 - PLACES.day.left, PLACES.day.up);
 /**
  * (day lane) Where the group of cumulus stands (sky.js `group`): over the massif's great shoulder, left of its main
@@ -170,6 +172,13 @@ const MOON = towards(90 + PLACES.moon.left, PLACES.moon.up);
 const DUSK_SUN = towards(90 + PLACES.dusk.left, PLACES.dusk.up);
 
 /**
+ * (day lane) TWILIGHT (frame K5 and the owner's twilight references): the same sunset bearing as the golden hour, the
+ * sun 5 degrees under the horizon. It lights nothing directly; the sky's dome is oriented by it (the band over the
+ * sunset bearing, the earth's shadow opposite).
+ */
+const TWILIGHT_SUN = towards(90 + PLACES.twilight.left, PLACES.twilight.up);
+
+/**
  * Turns the sun, the moon and the golden-hour sun to the start straight's real heading (a bearing on the map, in
  * degrees: 0 is +Z, 90 is +X). The arrays are changed in place, so every table that holds them (look.flare too)
  * follows. Bearing "left" of a heading is a larger bearing.
@@ -178,11 +187,12 @@ const DUSK_SUN = towards(90 + PLACES.dusk.left, PLACES.dusk.up);
 export function placeLights(heading) {
   SUN.splice(0, 3, ...towards(heading + PLACES.day.left, PLACES.day.up));
   DUSK_SUN.splice(0, 3, ...towards(heading + PLACES.dusk.left, PLACES.dusk.up));
+  TWILIGHT_SUN.splice(0, 3, ...towards(heading + PLACES.twilight.left, PLACES.twilight.up));
   MOON.splice(0, 3, ...towards(heading + PLACES.moon.left, PLACES.moon.up));
   CLOUD_GROUP.splice(0, 3, ...towards(heading + PLACES.clouds.left, PLACES.clouds.up));
 }
 
-/** @type {{ day: TimeOfDay, dusk: TimeOfDay, night: TimeOfDay }} */
+/** @type {{ day: TimeOfDay, dusk: TimeOfDay, twilight: TimeOfDay, night: TimeOfDay }} */
 export const TIMES = {
   // A clear autumn afternoon (D1): the sun 16 degrees up, straight down the start straight; long shadows; haze in
   // the valleys and thin air over the far land; small cumulus that catch the light.
@@ -247,7 +257,8 @@ export const TIMES = {
       horizon: [0.17, 0.11, 0.06],
       falloff: 0.2,
       phase: 0.3,
-      glow: { color: [1.0, 0.58, 0.26], wide: [0.45, 0.6], tight: [18, 0.985] },
+      // (day lane, frame K5) a tight, weak wide glow: 35 degrees from the sun the dome's own bands show, not a gold wash
+      glow: { color: [1.0, 0.58, 0.26], wide: [0.12, 0.82], tight: [18, 0.985] },
       disc: { size: 0.45, radiance: 600, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
       // (dusk lane, the owner's twilight references) the whole dome, not one tint (sky.js twiColumn): under the sun
       // a rose and orange horizon rising through gold and pale yellow into turquoise and deep blue overhead; opposite
@@ -272,7 +283,8 @@ export const TIMES = {
     ambient: { sky: [0.95, 0.78, 0.6], ground: [1.0, 0.62, 0.34], intensity: 0.014 },
     // (dusk lane) the haze is the horizon's: blue-violet away from the sun (the far land stands in layered blue
     // silhouettes), gold and rose towards it
-    fog: { color: [0.02, 0.022, 0.048], sun: [0.3, 0.13, 0.045], sunLobe: 5, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
+    // (frame K5: the thin air 3e-5, was 8e-5: the far cones across the sea stand dark against the band, not lost in gold)
+    fog: { color: [0.02, 0.022, 0.048], sun: [0.25, 0.1, 0.035], sunLobe: 24, density: 0.00025, heightFalloff: 0.011, air: 0.00003 },
     exposure: 4.2,
     tunnelExposure: 6,
     shadeEv: 0.6,
@@ -299,6 +311,67 @@ export const TIMES = {
       splitBalance: 0.45,
     },
     lamps: { street: 1, tunnel: 1, windows: 1, haze: 0.35, entrance: 0.5 },
+    wetness: 0,
+    carLights: 'low',
+  },
+
+  // (day lane) TWILIGHT, after sunset (frame K5, strict spec, and the owner's twilight references): no direct sun and no
+  // sun shadows; the sky's light alone, a strong blue fill from above and the warm horizon band in the environment map
+  // (so the paint and the road catch it as a rim); dark blue land, water with a pale gleam, lamps and windows on, the
+  // cars on low beam. Dry. Clear over the sunset.
+  twilight: {
+    name: 'twilight',
+    // the directional light is switched off (sun.js: `light`, kept high so the shadow box stays sane)
+    sun: { dir: TWILIGHT_SUN, color: [1.0, 0.6, 0.4], intensity: 0, light: { dir: [0, 1, 0], intensity: 0 } },
+    sky: {
+      zenith: [0.0018, 0.006, 0.034],
+      horizon: [0.04, 0.02, 0.02],
+      falloff: 0.2,
+      phase: 0.3,
+      glow: { color: [1.0, 0.5, 0.25], wide: [0.025, 0.75], tight: [0, 0.9] },
+      disc: { size: 0.45, radiance: 0, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
+      // the dome (sky.js twiColumn), read off K5 and the twilight references: rose on the horizon under the sunset,
+      // orange, pale yellow, turquoise, a deep blue overhead; opposite, the blue-violet shadow of the earth and the
+      // pink belt over it
+      twilight: {
+        at: [0.035, 0.09, 0.22, 0.55],
+        sun: [[0.075, 0.02, 0.02], [0.095, 0.032, 0.01], [0.07, 0.058, 0.026], [0.016, 0.04, 0.05], [0.0018, 0.006, 0.034]],
+        away: [[0.006, 0.006, 0.016], [0.009, 0.008, 0.02], [0.022, 0.012, 0.022], [0.008, 0.014, 0.04], [0.0018, 0.006, 0.034]],
+      },
+      ground: [0.004, 0.005, 0.009],
+      stars: 2e-6,
+      starsAway: true,
+      milkyWay: 0,
+      airglow: [0, 0, 0],
+      // all but clear: a few thin streaks, lit rose from below over the sunset, dark elsewhere
+      clouds: { cover: 0.05, wisps: 0.15, lit: 0, light: [0.05, 0.02, 0.012], silver: 1.2, sunward: 0.95, shade: [0.003, 0.004, 0.01], drift: [0.0011, 0.0004] },
+    },
+    env: { intensity: 1.0 },
+    ambient: { sky: [0.5, 0.65, 1.0], ground: [0.5, 0.4, 0.4], intensity: 0.012 },
+    // the haze a deep blue; only a little rose straight under the sunset (the far land stays dark blue against the band)
+    fog: { color: [0.005, 0.0065, 0.016], sun: [0.022, 0.01, 0.007], sunLobe: 12, density: 0.00025, heightFalloff: 0.011, air: 0.00003 },
+    exposure: 9,
+    tunnelExposure: 7,
+    shadeEv: 0.4,
+    look: {
+      contrast: 1.18,
+      saturation: 1.15,
+      tint: [1.0, 1.0, 1.02],
+      lift: [0.0003, 0.0004, 0.0009],
+      vignette: 0.3,
+      chroma: 0.001,
+      grain: 0.8,
+      bloom: 0.13,
+      ghosts: 0,
+      glare: 0,
+      ao: 0.9,
+      star: 0.015,
+      halo: 0.12,
+      splitShadows: [0.97, 0.99, 1.05],
+      splitHighlights: [1.04, 1.0, 0.92],
+      splitBalance: 0.45,
+    },
+    lamps: { street: 1, tunnel: 1, windows: 1, haze: 0.6, entrance: 0.25 },
     wetness: 0,
     carLights: 'low',
   },

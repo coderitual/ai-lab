@@ -199,8 +199,10 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
       const p = spot(s, side, track.edgeAt(s, side) + TYRE.r + inset);
       const g = groundAt(p, p.y) - 0.05;
       const face = frame.flat.clone().multiplyScalar(-side);
-      // every third block of stacks painted, the rest plain
-      const uv = Math.floor(k / 5) % 3 === 1 ? look : signs.special.tyres;
+      // (lead) painted throughout, white and red by blocks of five stacks (a wall with a plain run keeps one plain block in
+      // three): a long plain wall in the shade of the wood was a black slab beside the road in the picture
+      const block = Math.floor(k / 5);
+      const uv = look === signs.special.tyres ? (block % 3 === 2 ? look : block % 3 === 0 ? signs.special.tyresWhite : signs.special.tyresRed) : block % 2 === 0 ? signs.special.tyresWhite : signs.special.tyresRed;
       // the half of each stack that faces the road (a right-handed frame whose angles 0 .. PI sweep that side)
       const z = face.clone().negate();
       const axis = { x: new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), z), y: new THREE.Vector3(0, 1, 0), z };

@@ -16,9 +16,10 @@ every number there is marked published, measured or estimated. The viewer
 (`viewer.html?asset=car`, parameters at the top of `src/viewer.js`) shows the
 car alone under the world's light; `pin=` puts its camera exactly where one of
 three photographs was taken from, so a still can be laid over the photograph
-pixel on pixel; `studio=1` stands it in a plain studio and `stripes=1` in a
-light tunnel (with `mirror=1`: the paint as a plain mirror), for judging
-surfaces.
+pixel on pixel; `studio=1` stands it in a showroom (dark walls, a soft box overhead, two
+long strip lights either side; with `sun=0&ev=0` the dome is the only light,
+as in a product render) and `stripes=1` in a light tunnel (with `mirror=1`:
+the paint as a plain mirror), for judging surfaces.
 
 Axes (car space, `spec.js`): origin on the ground, on the centre line, midway
 between the axles; +Z forward, +Y up, +X the car's left. Metres.
@@ -34,7 +35,7 @@ between the axles; +Z forward, +Y up, +X the car's left. Metres.
 | `body.js` | the skin sampled into a mesh (per tier), the atlas layout, wheel-arch holes, lips and liners |
 | `features.js` | outlines of everything flush with the skin: glass, lenses, grille, intakes, shut lines, reflectors, arches |
 | `atlas.js` | bakes those outlines into two RGBA8 textures of signed distances over the skin |
-| `materials.js` | paint (and every flush region it turns into), glass and lenses, trim, lamp parts, plates, dark insides, ghost; how every car material reads the reflection probe |
+| `materials.js` | paint (and every flush region it turns into), glass and lenses, trim, lamp parts, plates, dark insides, ghost; how every car material reads the reflection probe; the tunnel's lines of luminaires in the paint and glass (`GLSL_BORE`) |
 | `parts.js` | the tools for small solid parts: rays at the skin, a list of triangles per material |
 | `details.js` | the solid small parts: stars, grille pins and louvre, intake slats, pipe trims, diffuser fins, mirrors, handle grips, wipers, plates and their frames, third brake light, plate lamps, cabin |
 | `lampUnits.js` | the head and tail lamp units behind their lenses, as geometry |
@@ -146,23 +147,40 @@ distance keeps the false zero away.
 layer of metal flake under a clear coat.
 
 - **Base** (`PAINTS`: colour, metalness, roughness, flop, flake). Silver, this
-  car's high-tech silver: linear 0.59 / 0.615 / 0.675 (cool), metalness 0.82,
-  roughness 0.42, falling to 40 % edge-on (flop). A metallic paint, not
+  car's high-tech silver: linear 0.59 / 0.615 / 0.675 (cool), metalness 0.86,
+  roughness 0.33, falling to 22 % edge-on (flop, as `pow(1 - n.v, 1.15)`;
+  round 8: at 0.82 / 0.42 / 40 % the body was one even pale grey at night and
+  in the tunnel, with nothing to say where a panel turned). A metallic paint, not
   polished metal: the flake layer shades softly from light to dark across a
   panel, light silver in the sun and mid grey turned away from it, and takes
   the sun as a colour of its own as well as a broad sheen. Round 4's 0.92 /
   0.27 mirrored everything, and next to the photographs the car read as
   chrome; at 0.6 / 0.5 and a brighter base it read as white plastic.
-- **The flake layer's read of the probe** (`carSoftProbe`): a rough read is a
-  read of a coarse mip, and the mips are plain 2x2 averages, so at these
-  roughnesses a 128 or 256 cube is a few texels a face; filtered between
-  them, the wood's autumn crowns came out as large blocky yellow patches on
-  the bonnet and roof. The layer reads instead nine taps in a cone as wide as
-  its highlight, at a mip four times finer: a smooth bell of the
-  surroundings, no blocks, no face seams. What it shows is held to 65 % of
-  its colour, and the probe's average round that direction still caps a
-  small fierce thing in it (the sun's glare on the road behind the car, a
-  lamp) at five times, so that it makes a highlight, not a burnt-out panel.
+- **The flake layer's read of the probe** (`carSoftProbe`): one read at
+  the layer's roughness, which the probe's levels hold as the surroundings
+  convolved with that GGX lobe (engine.md, "The reflection probe"). Until
+  round 8 the mips were plain 2x2 averages, the wood's crowns printed as
+  blocky yellow patches through them, and the layer took nine taps in a cone
+  at a finer level and capped what it saw at five times the cube's average.
+  What it shows is held to 65 % of its colour, and every rough read (the
+  wheels' too) loses colour the brighter it is against the moment's white
+  paper (`carTint`, GLSL_KEY): a coloured lamp (the green start lights at
+  night) lights the panel instead of washing a flank and the rims green.
+- **Lamps and the sun in the probe** (`GLSL_KEY`, `carKey`): the car takes
+  their light from the lights themselves (the sun, the floodlights' pool of
+  spots, its own lamps), so what the probe's few coarse texels of a lamp add
+  through a rough layer is a second copy of that light smeared over a panel.
+  At night it was most of what the paint showed: a pale grey glow over the
+  whole body, blotches that moved as the probe's faces were redrawn, a green
+  ring round the rims from the start lamps. Every read of the probe is held to
+  a number of white papers of the moment (`carKey` = `PAPER` 0.7 over the
+  picture's exposure, which `setReflections({ exposure })` hands over from the
+  view), rolling off slowly above it: 3 for a rough read (`KEY_ROUGH`), 16
+  for a crisp one (`KEY_CRISP`: the clear coat, the glass, gloss trim), so a
+  lamp stays a small bright highlight in the lacquer. The wheels do the same
+  (`mirrorProbe`). By day 3 papers is about the sky round the sun, so the
+  sky's sheen on the boot lid and the roof is kept and only the sun's glare
+  on the road is held (the probe leaves the sun's disc out).
 - **Clear coat**, roughness 0.03, a plain lacquer's reflectance (4 % face on,
   `COAT_GAIN` 1): the only crisp reflection, strong only at grazing angles.
   Its image is held to 30 % of its colour (45 % until round six, which still
@@ -218,19 +236,9 @@ needles were a hatching all over the paint). So the probe is never read
 sharper than the pixel's own footprint in it (`FOOTPRINT`): crisp on the flat
 of a door, smooth round a corner, nothing crawling.
 
-What that leaves visible is the cube's own size. A texel of a 256 cube is
-0.35 degrees; a pixel of a 1280-wide picture looking at a door from five
-metres is about 0.06. So:
-
-| | cube | refresh |
-| --- | --- | --- |
-| title orbit, high | 512 (17 MB half float with its mips) | all six faces once, then one face every few frames: the car stands still |
-| title orbit, medium / low | 256 / 128 | the same |
-| the run, high / medium / low | 256, 2 faces a frame / 128, 1 face / 64, every other frame (as `TIERS` has it) | speed and motion blur hide the rest |
-
-The coat's roughness of 0.03 reads mip 0 of cubes up to about 670 texels; a
-1024 cube would need `clearcoatRoughness` 0.02 to show more than a 512 one.
-`probesize=N` in the viewer tries any size.
+What that leaves visible is the cube's own size: one cube per view, 128 /
+256 / 512 on low / medium / high (`PROBE` in config.js; engine.md has how it
+is drawn, filtered and eased in). `probesize=N` in the viewer tries any size.
 
 Two guards on every probe read (`REFLECTIONS` in `materials.js`):
 
@@ -239,9 +247,70 @@ Two guards on every probe read (`REFLECTIONS` in `materials.js`):
   road's asphalt shader where the road is seen exactly edge on from the probe;
   see below), the mips spread it, and the paint sampled it: black here, a
   screen-filling white bloom on other GPUs.
-- `carGround` (written, switched off: `REFLECTIONS(..., ground)` defaults to
-  false): a parallax correction for the road's plane. On a 64 to 256 cube it
-  magnified the road's few texels into dark blotches on the bumper.
+- **Parallax** (`GLSL_PROBE_PROXY`, the probe's own: `probeProxyDir`): the
+  probe stands at the middle of the car and knows directions only. Each read
+  follows the reflected ray from the fragment's place in the world to the
+  probe's proxy (the ground's plane; in the tunnel the bore as a box) and
+  reads the direction from the probe to where it meets it, for hits within 8
+  to 20 m. `setReflections({ proxy })` copies the probe's four uniforms into
+  the car's (and the wheels') each frame. It replaced the car's own `carGround`
+  (switched off: on 64 to 256 cubes of plain mips it magnified the road's few
+  texels into blotches) and `carBoreBox`.
+
+### In the tunnel
+
+The tunnel is a bright box with two lines of LED bars along the haunches of
+its ceiling (`docs/design.md`, "The tunnel"), and a polished car under strip
+lights is two long, crisp lines of light running the length of the body,
+bending with it and streaming back as it moves. The probe cannot draw them:
+it sees each line as broad stand-ins a few texels wide (a 128 cube on medium,
+0.6 m bars), a face or two refreshed a frame, so the image in it is up to a
+fifth of a second (13 m) old. In the paint the bars came out as large soft
+blotches on the boot lid, the rear quarters and the bumper (the flake layer's
+blurred read of a radiance-48 stand-in, held only to five times its
+surroundings), and on the roof and the glass as small broken flecks.
+
+So under the tunnel's roof the lines are drawn exactly (`GLSL_BORE` in
+`materials.js`), and the probe gives everything else:
+
+- **Where they are** is the tunnel's own: `BORE_UNIFORMS` (shading.js: the
+  lines' distance from the centre line, their height, their radiance and
+  colour, where the tunnel begins and ends, all set by tunnel.js), and the
+  rows of bars from `LUMINAIRE` (tunnel.js, exported for this), walked by its
+  spacing rule into up to four rows (`boreRows`: the entrance's pairs every
+  2 m, single bars every 3 m, every 6 m inside, every 3 m before the exit).
+  Nothing of the tunnel is copied into the car.
+- **Where the car is**: each frame the game hands the car its place in the
+  road's level frame (`setBore`, from `Game._poseBore`: its origin as drawn
+  across and along the road and above the centre line's grade, the road's
+  heading, left and the world's up in car space, the grade, how far it is
+  under the roof, its speed).
+- **The lines** (`carBoreLines`): the reflected ray from the body's own point
+  is followed to the lines' plane; across the road, a box as wide as a bar
+  seen through a box filter as wide as the pixel's footprint there plus the
+  layer's own spread (2 roughness squared per metre travelled); along the
+  road, the row of bars through the same kind of filter, lengthened by the
+  car's travel in a 90th of a second so that the dashes stream rather than
+  step at speed. The entrance's pairs are two bars 0.34 m apart. From outside
+  the box a ray counts only through the mouth, so the lines appear as the
+  car nears the portal and nothing pops. The clear coat (and the glass, the
+  lenses, the gloss trims) take them at `BORE_COAT` (5) times their
+  radiance through their own Fresnel (at 1, a plain lacquer's, they were
+  faint grey threads on the pale silver; round 8 doubled round 7's 2.5): thin
+  and crisp on the roof, the boot lid and the bonnet, drawn out along the
+  shoulders and flanks. A bar is never drawn narrower than about a pixel's
+  footprint on the plane (`h` in `carBoreLines`): seen small, from the chase
+  camera on a phone, its true share of a pixel was a faint grey thread. The
+  flake layer takes them at `BORE_SHEEN` (0.3) through its roughness: a soft
+  sheen round the crisp line, not a second image.
+- **The probe under the roof** (`carBoreHold`): its fittings would double
+  the lines as blotches, so what it shows is held, in proportion to how far
+  the car is under the roof, to four times the lining's radiance
+  (`uBoreGlow`), rolling off slowly above it; what is left is the walls, the
+  ceiling, the walkway and the dado, the green lights. The probe's box
+  (above, "Parallax") puts the walls at their true distance in the flanks.
+- The glass roof's roll-off of bright reflections (a tenth of the sun's
+  light) does not apply under the roof, where the lines cross it.
 
 ### The glass
 
@@ -523,6 +592,25 @@ they were (eyebrow, projector domes). The tunnel was not staged (the chase
 camera at `t=33` of this build is outside it). At night the plate lamps light
 the dish round the plate brightly.
 
+### Round eight: shading and light, at night, in the tunnel, by day
+
+Staged at night at the grid, in the forest and on the coast (chase camera
+and two photo cameras, 1280 x 720 and 393 x 700, medium and low), in the
+tunnel by day, at the start by day, and in the viewer's showroom; probed with
+a debug switch that drew one share of the light at a time (direct, indirect,
+the probe's reflection alone).
+
+| what was wrong | why | now |
+| --- | --- | --- |
+| at night the body one even pale grey, no panel turning dark | nearly all of it was the probe: the flake layer's blurred read of lamps that also light the car as spots, and of the floodlit ground | lamps held in rough reads (GLSL_KEY); silver 0.86 / 0.33 / flop 0.22 |
+| green on the flank, the C-pillar and a ring round both rims | the start lamps through the rough layers | the hold and `carTint` |
+| a pale wash with a straight edge across the tail in stills | a face of the probe left from 14 s earlier: stills that `skip` must draw a few frames before the picture (`advance(0.12)`); not a fault in play | |
+| displays shining through the roof and rear screen as white bars | full brightness under the night's exposure | dimmed with the light (6 papers) |
+| plate a glaring white | 0.06 of its colour emitted | 0.035 |
+| tunnel: lines thin and grey, body flat pale | lines filtered to their true share of a wide pixel; coat 2.5 | at least a pixel wide; `BORE_COAT` 5, `BORE_SHEEN` 0.3 |
+| rear screen and rear doors showed the seats in the tunnel | 15 % transmission | 10 % |
+| showroom: the world's sky and forest showed through the dome | the dome wrote no depth; the forest arrived after the viewer gathered its scenery | the dome writes depth, the forest is hidden, the dome redrawn as a showroom |
+
 ## What each tier costs
 
 Re-measured after round six (the arches' flare moves the net's points and
@@ -541,7 +629,11 @@ returned handle, shader compilation not included):
 | high | 185.2k | 31 (27) | ~1000 ms |
 | ghost (not re-measured since round two) | 92.5k | 10 | ~150-190 ms |
 
-Plus one draw call for the contact shadow. The four blur shells are hidden at
+Plus one draw call for the contact shadow. Round 8 added no triangles or
+draw calls; per fragment, the paint's flake layer reads the probe once instead
+of nine times (on every tier), and every probe read adds the parallax
+correction (a ray against a plane or a box) and the hold (a few ALU
+operations): cheaper than round 7 on every tier. The four blur shells are hidden at
 rest and the spokes at speed, so the count on the road is the smaller one.
 The atlas bake is most of the difference between tiers; the wheels are about
 150 ms of every build (their textures are shared by the four corners); the
@@ -577,15 +669,23 @@ Most visible first:
 - **At night the paint is dark** where nothing bright is near: it mirrors
   what the probe sees, and needs the wet road and the town to be the glossy
   car of the owner's night reference.
+- **The showroom** (`studio=1&sun=0&ev=0`) is not yet a product render: with
+  the new probe the dome's strip lights come back in the paint (even as a
+  plain mirror, `stripes=1`) several times dimmer than they are seen
+  directly, so the body reads a flat mid grey. Not found in round 8; the game's
+  own reflections (lamps, the tunnel's lines, the sky) are not affected in the
+  stills.
+- **In the tunnel** the pale walls, box-projected into the flanks, keep the
+  silver pale between the lines; a darker body would need darker walls.
 - **By day in low sun** the silver goes warm in the game's grade; it reads
   silver under a higher sun.
 - **Bloom** round the brake lamps is the frame pipeline's; at night it still
   tints the boot lid red.
-- **Tunnel lamp streaks**: the probe does see the tunnel's luminous panels
-  (they are ordinary meshes of the world, not in `probeHidden`); in a viewer
-  still in the bore (`s=1641`) they show as bright spots on the roof and the
-  glass. Whether they stretch into streaks at speed is the probe's refresh
-  and the frame's motion blur, not the car's.
+- **In the tunnel** the lines of luminaires are analytic (see "In the
+  tunnel"), but the wheels read the probe directly (`mirrorProbe`) and so
+  show the stand-ins' soft highlights; the haunches' chamfer, the services
+  under the ceiling and the jet fans are not in the box projection (it is
+  two walls and a flat ceiling).
 - In the light tunnel (`stripes=1&mirror=1`) the stripes pinch a little at
   the tail lamp's outer tip, where the shoulder, the lid's lip and the wing
   meet; the handle dishes' edges are slightly ragged as a plain mirror.

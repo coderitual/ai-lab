@@ -14,7 +14,7 @@ export const TEXT = {
   day: 'Day',
   night: 'Night',
   /** A time of day's name on a button (lighting.js may add times: any other name is shown capitalised). */
-  timeName: (name) => ({ day: 'Day', dusk: 'Dusk', night: 'Night' })[name] || name.charAt(0).toUpperCase() + name.slice(1),
+  timeName: (name) => ({ day: 'Day', dusk: 'Dusk', twilight: 'Twilight', night: 'Night' })[name] || name.charAt(0).toUpperCase() + name.slice(1),
   soundOn: 'Sound on',
   soundOff: 'Sound off',
   resume: 'Resume',

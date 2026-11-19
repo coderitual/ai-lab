@@ -82,6 +82,16 @@ function installShadowFade() {
 }
 
 /**
+ * The map's box in the light's own frame, as prepareView last placed it: a point p is in it when
+ * |p.right - x| < halfX, |p.up - y| < halfY and -away < p.dir - z < towards (`dir` points at the light).
+ * @typedef {object} ShadowBox
+ * @property {THREE.Vector3} right @property {THREE.Vector3} up @property {THREE.Vector3} dir
+ * @property {number} x @property {number} y @property {number} z
+ * @property {number} halfX @property {number} halfY @property {number} towards @property {number} away
+ * @property {boolean} on false while the map is not drawn at all (no shadows)
+ */
+
+/**
  * @typedef {object} Sun
  * @property {THREE.DirectionalLight} light
  * @property {THREE.HemisphereLight} fill
@@ -91,6 +101,8 @@ function installShadowFade() {
  * @property {(camera: THREE.Camera, focus: THREE.Vector3) => void} prepareView puts the shadow round what this
  *   view looks at, and asks for the map to be drawn
  * @property {(share: number) => void} setFill how much of the fill reaches the view's car (none in the tunnel)
+ * @property {ShadowBox} box what the map covers for the view prepareView last placed it for (forest.js chooses the
+ *   trees that cast from it)
  * @property {() => void} dispose
  */
 
@@ -150,6 +162,8 @@ export function createSun({ renderer, tier, shadows }) {
   const fillSky = new THREE.Color();
   const fillGround = new THREE.Color();
   let standOff = 0;
+  /** @type {ShadowBox} */
+  const box = { right, up, dir, x: 0, y: 0, z: 0, halfX: reach, halfY: reach, towards: 0, away: 0, on: shadows };
   /** @type {THREE.Camera|null} */
   let pendingFor = null;
 
@@ -157,6 +171,7 @@ export function createSun({ renderer, tier, shadows }) {
     light,
     fill,
     objects: [light, light.target, fill],
+    box,
 
     setTime(time, sky, ground) {
       // (look lane, dusk) a sun under the horizon lights nothing directly: `light` is then the soft key the
@@ -186,6 +201,9 @@ export function createSun({ renderer, tier, shadows }) {
       const towards = upReach / slope + CASTER_HEIGHT / dir.y;
       const away = upReach / slope + GROUND_DROP;
       standOff = towards + 10;
+      box.halfY = upReach;
+      box.towards = towards;
+      box.away = away;
       shadow.camera.near = 10;
       shadow.camera.far = standOff + away;
       shadow.camera.updateProjectionMatrix();
@@ -209,6 +227,9 @@ export function createSun({ renderer, tier, shadows }) {
       const y = Math.round(centre.dot(up) / texelUp) * texelUp;
       const z = centre.dot(dir);
       centre.set(0, 0, 0).addScaledVector(right, x).addScaledVector(up, y).addScaledVector(dir, z);
+      box.x = x;
+      box.y = y;
+      box.z = z;
       light.target.position.copy(centre);
       light.position.copy(centre).addScaledVector(dir, standOff);
       light.target.updateMatrixWorld();

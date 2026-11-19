@@ -69,7 +69,8 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; the walkways' kerb faces in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
 | structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
-| tyre walls | 8 runs, on the outside of the fast bends |
+| tyre walls | 8 runs, on the outside of the fast bends, painted white and red by blocks of five stacks |
+| the asphalt (road.js, road lane) | albedo [0.11, 0.106, 0.101] on new surfacing to [0.22, 0.211, 0.195] a generation old (`ASPHALT`), its stones apart by 1.05 times their tone; wet, 0.25 of that; each lane's wheel paths 0.85 m either side of its middle, 0.42 m wide, up to 16 % darker (`WEAR`); grit on 11 cm cells, odds 0.05 off the line plus 0.2 at the edges, hardly any on paint (`GRIT`); 17 patches and 59 sealed cracks (49 along the road, 10 across) round the lap (roadHistory.js); paint white 0.74, its edges ragged by 1.8 cm up close (`PAINT`) |
 | trackside boards | 10 runs: the outsides of the run-off bends, and two groups on the straight's lake-side wall (229 to 189 m and 82 to 44 m before the line); none on its land side |
 | distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel |
 | marshal posts | 12 |
@@ -328,7 +329,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,roll][,hud]` | the staging camera (`roll`: degrees the picture leans clockwise) |
-| `?photo=d1`, `d3`, `d4`, `e1`, `waves`, `e2`, `e5` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; waves the low crossing by day, t 94.4 s; e2 the forest road of the rise and the first ess by day; e5 the last ess among its granite boulders by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=d1`, `d3`, `d4`, `e1`, `k5`, `waves`, `e2`, `e5` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; k5 the end of the sweepback's first piece at dusk, t 88.7 s, frame K5's chase camera; waves the low crossing by day, t 94.4 s; e2 the forest road of the rise and the first ess by day; e5 the last ess among its granite boulders by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -337,22 +338,22 @@ Read once by `src/engine/params.js`.
 
 ## Times of day
 
-`TIMES` in `src/assets/world/lighting.js`, in order: day, dusk, night. The sun
-and the moon are placed against the start straight's heading by
-`placeLights`.
+`TIMES` in `src/assets/world/lighting.js`, in order: day, dusk, twilight,
+night. The sun and the moon are placed against the start straight's heading
+by `placeLights`.
 
-| | day | dusk (golden hour) | night |
-| --- | --- | --- | --- |
-| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | the moon 8° left, 17° up; 0.12 |
-| exposure (tunnel) | 0.68 (5.6) | 4.2 (6) | 22 (5) |
-| sky's light on the scene: environment / fill | 0.6 / 0.13 | 0.6 / 0.014 | 1 / 0.013 |
-| sky at the zenith (radiance) | [0.22, 0.38, 0.78] | [0.02, 0.034, 0.068] | [0.0007, 0.0014, 0.0038] |
-| wetness | 0 | 0 | 0.8 |
-| street lamps and floodlights / tunnel / windows / cones in the air / the tunnel's entrance and exit zones | 0 / 1 / 0 / 0 / 1 | 1 / 1 / 0.7 / 0 / 0.5 | 1 / 1 / 1 / 1 / 0 |
-| car lamps | running lights | low beam | low beam |
-| clouds cover | 0.45 | 0.45 | 0.3 |
-| bloom / glare / ghosts | 0.05 / 0.015 / 0.00015 | 0.09 / 0.03 / 0.0002 | 0.15 / 0 / 0 |
-| contrast / saturation | 1.14 / 1.18 | 1.2 / 1.16 | 1.12 / 0.94 |
+| | day | dusk (golden hour) | twilight (after sunset) | night |
+| --- | --- | --- | --- | --- |
+| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | the same bearing, 5° under the horizon; no direct light, no sun shadows | the moon 8° left, 17° up; 0.12 |
+| exposure (tunnel) | 0.68 (5.6) | 4.2 (6) | 9 (7) | 22 (5) |
+| sky's light on the scene: environment / fill | 0.6 / 0.3 | 0.6 / 0.014 | 1 / 0.012 | 1 / 0.013 |
+| sky | zenith [0.15, 0.33, 0.86] | the twilight dome (sky.js), zenith [0.008, 0.022, 0.085] | the twilight dome, zenith [0.0018, 0.006, 0.034] | zenith [0.0007, 0.0014, 0.0038] |
+| wetness | 0 | 0 | 0 | 0.8 |
+| street lamps and floodlights / tunnel / windows / cones in the air / the tunnel's entrance and exit zones | 0 / 1 / 0 / 0 / 1 | 1 / 1 / 1 / 0.35 / 0.5 | 1 / 1 / 1 / 0.6 / 0.25 | 1 / 1 / 1 / 1 / 0 |
+| car lamps | running lights | low beam | low beam | low beam |
+| clouds cover | 0.36 | 0.28 | 0.05 | 0.3 |
+| bloom / glare / ghosts | 0.05 / 0.015 / 0.00015 | 0.11 / 0.03 / 0.0002 | 0.13 / 0 / 0 | 0.15 / 0 / 0 |
+| contrast / saturation | 1.14 / 1.18 | 1.24 / 1.22 | 1.18 / 1.15 | 1.12 / 0.94 |
 
 N, or the title's choice, fades to black and back (0.25 s each way) to switch.
 
@@ -393,7 +394,7 @@ pass with their sizes. In short:
 | bloom levels | 4 | 5 | 6 |
 | lens (flare source, ghosts, glare, star) | no | yes | yes |
 | ambient occlusion | no | 8 samples, half size | 14 samples |
-| car's probe at speed / standing | 64 / 128 per face, a face every 2nd frame (standing too) | 128 / 256; a face every 2nd frame (2 in the tunnel), standing 2 every 3rd | 256 / 512, 2 faces a frame (3 in the tunnel), standing 3; in the tunnel the faces see 160 m |
+| car's probe (engine.md, "The reflection probe") | 128 per face, prefiltered (8 samples), a face every 2nd frame (standing too), sees 260 m | 256 (12 samples); a face every 2nd frame (2 in the tunnel), standing too, sees 300 m | 512 (20 samples), 2 faces a frame (3 in the tunnel), standing 2, sees 400 m; in the tunnel the faces see 160 m |
 | wet road mirror | none (the six nearest lamps' heads drawn into the water analytically) | 0.35 of the view's height, to 220 m, streaked copy 0.3 of its height | 0.5, to 320 m, streak 0.3 |
 | forest: full / reduced / impostor trees to | 0 / 60 / 650 m | 34 / 95 / 900 m | 50 / 130 / 1200 m |
 | effects: skid quads / soft particles / sparks | 800 / 192 / 48 | 1500 / 320 / 96 | 2000 / 400 / 128 |

@@ -80,7 +80,24 @@ It is drawn in three pieces that meet without cracks: a **band** that follows
 the road row by row with the Track's samples, its columns on the corridor's
 own kinks (so it is exact where the eye is closest); a **grid** of square
 cells over the course with the band's cells dropped; the **far land** in
-100 m cells. The road's outermost vertices are the band's innermost ones.
+100 m cells (140 m on the low tier). The road's outermost vertices are the
+band's innermost ones. The far land has a hole where the grid is: the lines
+of its lattice nearest the grid's border are moved onto the border, their
+heights read there from the same lattice the grid's border eases onto, and no
+triangle is made inside them. (It used to run on under the grid, sunk 150 m
+in the middle but at its own height for two cells in from the border. Where
+the road stood within those two cells, in a cutting lower than the land, one
+of its triangles lay over the road, visible only from above: a dark slab over
+the car in the tall picture of a phone held upright, at the esses.)
+
+**Light in baked shade** (`shading.js`). The sky's share never falls under
+`BAKE_SKY_FLOOR` (0.7) of the open sky's, and by day and at golden hour the
+indirect light where the baked sun is gone is multiplied by up to
+1 + `BAKE_BOUNCE` (1.0): what the sunlit surroundings throw back. Without it
+the grass run-off inside a bend under the trees was a featureless dark sheet.
+The wood's floor is leaf litter of albedo about 0.07 (it was 0.04 and read as
+a black void behind the barrier), and the tyre walls are painted white and
+red by blocks of five stacks, so a long wall in shade is not a black band.
 
 **Baked sun shadows** (`shading.js`, `terrain.js`). At a low sun whole
 valleys lie in the shade of a ridge kilometres away, far beyond the shadow
@@ -219,18 +236,23 @@ are a feature atlas (`atlas.js`, `features.js`) drawn on the skin rather than
 separate meshes; what must have depth (lamp units, mirrors, wheels) is
 modelled. The paint is a standard physical material with a clear coat and a
 metallic base with flakes; what it mirrors is the car's reflection probe
-(`src/engine/ReflectionProbe.js`): a cube picture of the surroundings round
-the car, a face or two a frame at speed, a larger cube redrawn whole while the
-car is still (the title, the grid), sizes in `PROBE` per tier. The probes
-leave out what would only cost (the start's dressing, the town; on `low`
-also the rails, the guide posts and the lamps' glow, which are less than a
-texel of its 64-texel faces). A face sees the whole world round the car and
-costs about as many triangles as the view, so on `medium` one face is
-redrawn every other frame at speed and two every third frame standing still
-(`PROBE.every`, `stillEvery`). What is big and far is drawn for the probes by
-a cheaper stand-in on `PROBE_LAYER`, a layer only the probes' cameras have:
-the massif's grid on every other column and row (a quarter of its triangles);
-the full grid sets its draw range to nothing for a probe's camera.
+(`src/engine/ReflectionProbe.js`, in full in engine.md, "The reflection
+probe"): a cube picture of the surroundings round the car, 128 / 256 / 512
+texels a face by tier, one or two faces redrawn a frame (the ones that see
+the roadside go by first), and filtered into a second cube whose mips hold the
+GGX lobe of one roughness each, so that any layer reads its whole glossy
+reflection in one lookup at its own roughness and a lamp in it is a soft
+lobe, not a blotch; each new picture is eased in over a few frames, so a
+refreshed face does not pop. The probes leave out what would only cost (the
+start's dressing, the town; on `low` also the rails, the guide posts and the
+lamps' glow) and see no further than 260 to 400 m. A face sees the whole world
+round the car and costs about half as many triangles as the view; the cube's
+resolution costs next to nothing beside that. What is big and far is drawn for
+the probes by a cheaper stand-in on `PROBE_LAYER`, a layer only the probes'
+cameras have: the massif's grid on every other column and row (a quarter of
+its triangles); the full grid sets its draw range to nothing for a probe's
+camera. The sky dome draws no sun or moon disc for them (the light's own
+highlight is the disc's).
 
 ## The trees
 
@@ -264,15 +286,15 @@ treeMaterial.js, impostors.js, forest.js; numbers in design.md, "The forest".
   coverage-preserving mips and a hard swap. No hashed or dithered
   transparency anywhere: under the motion blur it smears into noise.
 - **Shadows** are impostor cards turned to the sun, on a layer only the sun's
-  shadow camera sees: two triangles a tree. A tree casts if its SHADOW comes
-  near the car, not the tree itself (forest lane): the level segment from its
-  foot to where the shadow of its top lands (its height times 3.5 under the
-  day's 16 degree sun, at most 160 m) is tested against the circle round the
-  car. Under a low sun the crowns that dapple the road ahead stand 50 to
-  90 m off towards the sun; tested by where they stood, they were left out
-  and the road lay in plain light or plain shade. The leaf gaps in the
-  baked pictures' alpha are what make the patches; the trunks of the trees
-  near the road make the long stripes.
+  shadow camera sees: two triangles a tree. The trees that cast are those
+  whose crown lies inside the shadow map's box as `sun.prepareView` placed it
+  for this view (`sun.box`, forest.js `inBox`), not those near the car: a
+  crown 25 m tall under a 17 degree sun or moon shades the road 80 m away,
+  and a choice by distance from the car left those out, differently for two
+  cars a few metres apart (the two-player "water on the track", tools.md).
+  Where no box is placed (the viewer), a tree casts if its shadow comes near
+  the car (forest lane): the level segment from its foot to where the shadow
+  of its top lands is tested against the circle round the car.
 - **Schemes** (forest lane, `schemes.js`): a piece of the plan may name a
   look (`scheme`, trackLayout.js SCHEMES). Everything that reads it asks
   one table per Track sample: which scheme, its weight (1 on its pieces,
@@ -350,17 +372,16 @@ only where the baked sun reaches): a thin bright line along the ridges on the
 sun's side, as in D1. Its skyline: the ridge left of the main peak stays about
 21 degrees high and the shoulder climbs gently out of the frame.
 
-`far.js` also builds **the green hill** of frame D3 (`greenHill` in
-landmarks.js): a wooded ridge 470 m high with three summits beyond the west
-end of the lake, 41 degrees left of the road 1.9 km out from the ledge's
-first bend and lying across the line of sight from there, so that a green
-hill, not the massif's bare rock, stands over the pale hall. It is inside the
-far plane and drawn as an ordinary surface (12 x 40 cells on low, 24 x 96
-otherwise), wood with clumps of lighter crowns and the odd pale outcrop. From
-the start line it stands behind the left shoulder; its end towards the start
-is kept short and low, so that the golden-hour sun (bearing 215, 2 degrees
-up) sets just clear of it (worked out on paper: the ridge stays under the
-horizon there up to 3 degrees right of the sun).
+`far.js` also builds **the far cones** of frame K5 (`K5.cones` in
+landmarks.js): across the open sea from K5's place, 14 to 17 km out, a long
+low range with three volcano-like cones (1600 to 1800 m: lower ones hid behind the bay's far shore) on it, snow on
+their upper flanks, built like a ring (a strip of faces from under the sea's
+horizon to the crest, facing the place, drawn first at the back of the depth
+range; 90 x 6 cells on low, 220 x 10 otherwise). At dusk they are a dark
+blue silhouette under the horizon's band; by day blue in the thin air with
+white tops. (The green hill this file built for D3 was taken out: every place
+on its line of sight from the ledge lies in K5's view, which is the stricter
+spec; `landmarks.js` `inK5View` now keeps the pale hall out of that view too.)
 
 The sun and moon are placed against the straight's heading
 (`lighting.js` `PLACES`, `placeLights`), not on the map: move the straight and
@@ -375,6 +396,25 @@ to 200 m across (finite differences of smooth 3D noise, not screen
 derivatives, so it does not speckle), so that under the low sun facets light
 up and turn away between the gullies. Each fades out where a pixel covers
 more than its scale.
+
+## Frame K5's place
+
+`landmarks.js` `K5` and `k5Site`: the place is a distance into the section
+`sweepback` (101 m: where the road, due south off the gully bridge, begins
+its right turn), and everything of the frame is placed from it: the drum
+tower beyond the right edge, the flags and the chevron beyond the left one
+(metres past the place and beyond the solid edge, so a change of the corridor
+moves them with it), the far lamps on the low shore below (bearings and
+distances from the place, kept where the ground is just above the water),
+and the far cones across the sea (far.js). `inK5View` says whether a point of
+the map lies in the frame's view (bearings 128 to 238 from the place, within
+3 km, or within 260 m of it): the pale hall of D3 is kept out of it.
+`k5.js` builds the scenery as one mesh of coloured triangles (the drum in dark
+ribbed panels, its walkway, roof and railing, the flags' poles and bowed
+sails, the chevron board), one pane for the window and a cloud of points for
+the lamps: three draw calls where it is in view, about 1300 triangles on low.
+The window and the lamps are emissive, switched by `lamps.windows` and
+`lamps.street`; no light is added.
 
 ## The sun's shadow
 
@@ -433,20 +473,46 @@ the granite's tone.
 - **The glare lobe.** A second, anisotropic specular lobe stretched along the
   line of sight lays the low sun's glare along the road as a long streak
   (`ASPHALT_SHEEN`, road.js `SHEEN`: along 0.12, across 0.15, at 0.28 of a plain dielectric), broken up by the stones. Dry asphalt keeps 0.25 of the standard material's own isotropic lobe, so that the streak is the sheen's; under water or paint it keeps all of it. The sky's sheen (`SKY_SHEEN`, gain 0.42) fills the shade at a glancing angle.
+- **The tone** (road.js `ASPHALT`, road lane, fitted to frames E2 and E5):
+  albedo from 0.11 on the newest surfacing (binder over everything) to
+  0.22 a generation old (the binder weathered grey, the stones' tops bare), a
+  shade warm, the single stones of the old standing apart by 1.05 times their
+  tone about its mean. Sunlit it reads a pale to mid grey, in the woods' shade
+  a cooler grey that keeps its stones; wet, its pores full, it keeps 0.25 of
+  that (`damp`), so the wet night's road stays dark. The dry road's diffuse
+  light from the sky and the fill loses half its colour (`shadeGrey` 0.5):
+  in a wood's shade it is lit by the sunlit ground and crowns about it as well
+  as by the blue sky, and E2's shade is a cool grey, not blue.
+- **Wear** (road.js `WEAR`): each lane's two wheel paths (0.85 m either side
+  of the lane's middle) darker by up to 16 % and smoother, the outer metre
+  lighter, and faint streaks along the road: the large field stretched about
+  three hundred times along it, which changes the tone by 14 % and thins the
+  paint where the wheels cross it.
+- **Grit** (road.js `GRIT`): small dark stones on a grid of 11 cm cells, one
+  per cell at most, odds of 0.05 off the line rising by 0.2 towards each
+  edge, none on the wheel paths or the racing line. A pixel that spans many
+  cells shows their average darkening instead of single dots, so the grit
+  cannot sparkle or crawl; up close each stone stands 3 mm proud.
 - **The racing line and the history.** A polished darker band where cars run,
   rubber in the bends and the braking zones; runs of surfacing with joints,
-  seams 2 m either side of the middle, patches, sealed cracks, expansion
-  joints on the decks, tyre marks before the carousel: single things placed
-  by rule along the Track and drawn exactly.
-- **Paint:** a solid white line inside each edge, the start line and the
-  grid's boxes, a few millimetres proud, worn where tyres cross it. Where a
-  piece's scheme asks (forest lane, `uScheme`: one texel a metre, read
-  nearest so that a line begins exactly at its piece's end) a double yellow
-  centre line, two 12 cm lines 16 cm apart; an older surface (the binder
-  worn off the stones, paler, rougher, less rubber, more sealed cracks); and
-  a flush precast concrete strip 0.32 m wide with a joint every metre along
-  the margin's outer side. All of it is paint and tone on the profile: the
-  course is unchanged.
+  seams 2 m either side of the middle, patches (about one per 300 m, more on
+  old runs), cracks sealed with tar (about one per 90 m), expansion joints on
+  the decks, tyre marks before the carousel: single things placed by rule
+  along the Track (roadHistory.js, its own `rng` forks) and drawn exactly.
+- **Paint** (road.js `PAINT`): a solid white line inside each edge, the start
+  line and the grid's boxes, and where a piece carries one a double yellow
+  centre line; a few millimetres proud, its edges following the stones it was
+  sprayed over by a centimetre or two up close, worn where tyres cross it
+  (flecked through along the wheel paths, thinner, the asphalt's grey
+  showing) and cut away where the road was patched.
+- **The edge:** a thin band of dust and grit along the pavement's own edge
+  (`ASPHALT.rim`), then the margin's older, dustier asphalt.
+  Where a piece's scheme asks (forest lane, `uScheme`: one texel a metre,
+  read nearest so that a line begins exactly at its piece's end) a double
+  yellow centre line with short dashes beside it into the bend, the road
+  lane's old surface with more sealed cracks and less rubber, and a flush
+  precast concrete strip 0.32 m wide along the margin's outer side. All of
+  it is paint and tone on the profile: the course is unchanged.
 - **Wetness** (one shared uniform, the time of day's `wetness` or `?wet=`):
   water fills the gaps between stones first (the height channel says which),
   puddles stand in the wheel tracks and low spots, the road under the
@@ -747,11 +813,19 @@ the box its faces see only 160 m (`PROBE.tunnelFar`: what lies beyond is
 culled) and on medium two faces are redrawn every other frame instead of one
 (`tunnelFaces`), so the cube is a tenth of a second old at speed and the lines
 of fittings slide over the roof, the shoulders and the glass with the car.
-The probe stands at the middle of the car and knows directions only: a line 5
-to 6 m overhead is mirrored almost where it should be on the roof and the
-glass, and a little wide on the flanks. A correction for the ceiling's plane in
-the car's materials, as `carGround` corrects for the road's, would put them
-exactly; it has not been made.
+The probe stands at the middle of the car, knows directions only and sees
+the fittings as broad stand-ins a fifth of a second old: in the paint they
+came out as blotches and broken flecks. So the car draws the two lines of
+luminaires itself (car.md, "In the tunnel"): each reflected ray is followed
+from the body's own point to the lines' plane, with the rows of bars and their
+places read from the tunnel (`BORE_UNIFORMS`, `LUMINAIRE`) and the car's place
+in the road's frame handed over by the game each frame (`setBore`); the probe's
+read is held to a few times the lining's radiance under the roof, so the
+fittings in it do not double them, and box-projected onto the walls and the
+ceiling. In the tunnel the probe hands the materials the bore as a box (wall to
+wall, road to ceiling, 30 m each way: `probeBox`, GLSL_PROBE_PROXY), and the
+car's materials read the probe through it (box projection), so the walls and
+the ceiling stand at their true distance in the flanks.
 
 **The portals and the cuttings.** The faces are a rectangle with the mouth
 cut out (ShapeGeometry), a reveal, a lintel standing out, a coping. The
@@ -790,7 +864,7 @@ and railing, the banner as a colour.
 ## The staging camera
 
 `setPhoto` in `src/game/Game.js`, `_photo` in `src/game/Cameras.js`.
-`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, which also set the moment of the autopilot's run and the time of day) places every view's
+`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, `e1`, `k5`, `waves`, which also set the moment of the autopilot's run and the time of day) places every view's
 camera `back` m behind, `right` m right of and `up` m above the car's origin
 in the car's level frame (its heading only, not its pitch or roll), turned
 `yaw` degrees left of the heading and `pitch` degrees up, with a lens of

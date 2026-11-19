@@ -16,7 +16,7 @@ src/engine/            reusable; knows nothing about cars or roads
   glsl.js              GLSL_COMMON (hashes, noise, luma, sRGB, toneCurve, toTarget / fromTarget), GLSL_PROBE, TONE
   FullscreenPass.js    one big triangle; createPassMaterial
   FramePipeline.js     everything from the scene target to the canvas (this document)
-  ReflectionProbe.js   a cube picture round one point, a face or two a frame
+  ReflectionProbe.js   a cube picture round one point, a face or two a frame, prefiltered for roughness and eased in
   PlanarMirror.js      a flat mirror in any plane (the wet road's)
   chunks.js            cuts meshes that run the length of the scene into pieces three.js can cull (techniques.md, "the budget")
   rng.js math.js noise.js Input.js Audio.js
@@ -34,7 +34,7 @@ road's mirror; the car's reflection probe is updated just before the call.
 | # | pass | size | format | tiers |
 | --- | --- | --- | --- | --- |
 | a | road mirror (`PlanarMirror`, from `world.prepareView`), then its streaked copy (two passes of 8 taps) | 0.35 (medium) / 0.5 (high) of the view's height | half-float + depth renderbuffer; the copy and its middle step half-float | medium, high, and only with `caps.hdr` |
-| b | reflection probe faces (`ReflectionProbe.update`, from the game) | 64 / 128 / 256 per face at speed, 128 / 256 / 512 standing still | half-float cube, mipmapped | all (`PROBE` in game/config.js) |
+| b | reflection probe: faces, then the filter into the prefiltered cube (`ReflectionProbe.update`, from the game) | 128 / 256 / 512 per face | two half-float cubes: what the faces draw (plain mips, depth) and the prefiltered one materials read (M + 1 levels) | all (`PROBE` in game/config.js) |
 | 1 | **the scene**, one render call | the view x render scale | half-float, depth texture, MSAA 0 / 4 / 4 | all |
 | 2 | ambient occlusion term | half | RGBA8 | medium, high; only when `look.ao > 0` |
 | 3 | its blur along x, then along y | half (two passes) | RGBA8 | as 2 |
@@ -303,6 +303,12 @@ beside D1 and A, golden hour beside D4 and D2, night beside B):
 | `ao` | 0.8 (fades out on sunlit surfaces brighter than white anyway) | 1.0 | 0.9 |
 | split toning | none | shadows [0.97, 0.99, 1.05], highlights [1.05, 1.0, 0.88], balance 0.45 (cool shade, gold in the light) | none |
 
+Twilight (after sunset, frame K5): contrast 1.18, saturation 1.15, tint
+[1.0, 1.0, 1.02], lift [0.0003, 0.0004, 0.0009], vignette 0.3, grain 0.8,
+bloom 0.13, halo 0.12, no flare, ghosts or glare (the sun is down), star
+0.015, ao 0.9, split toning shadows [0.97, 0.99, 1.05], highlights
+[1.04, 1.0, 0.92], balance 0.45.
+
 Split toning tried for the old wet violet dusk: `splitShadows`
 [1.1, 0.98, 0.92], `splitHighlights` [0.9, 1.02, 1.15], `splitBalance` 0.45.
 For that old dusk, the split toning moved the measured road from (65, 56, 69) to
@@ -314,25 +320,152 @@ The game's shutter (`VIEW.motionBlur` in game/config.js) is 0.9 at 70 m/s
 and above, 0.12 at rest (eased between by the 1.5th power of the speed's
 share): 0.8 to 0.9 matches references D1 and D3.
 
-## The probe and the mirror in materials
+## The reflection probe
 
-`GLSL_PROBE` (glsl.js) is the whole convention: look the cube up with the plain
-world-space direction from the probe's centre, unflipped (it is a cube render
-target drawn by this renderer, which three.js does not flip), and pick the mip
-level from roughness: `level = log2(1.65 r² size)`, clamped. The mips are plain
-2x2 averages. What comes back is linear scene light; a material that reads it
-must carry `targetDefines(caps)` so the 8-bit fallback's encoding is undone.
+`ReflectionProbe` (engine) keeps a cube picture of the surroundings of the
+view's car, for everything on the car that mirrors: the clear coat, the flake
+layer, glass, trim, tyres. Each view has one; the game places it at the middle
+of the car's box every update and leaves the car out of it.
 
-The probe redraws `faces` of its six faces per update, round and round; the
-first update after construction or `reset()` draws all six. An update may give
-its faces a nearer far plane than the probe was made with (`far`): in an
-enclosed place (the tunnel, game/config.js `PROBE.tunnelFar`) what lies beyond
-is culled, which pays for redrawing more faces there. Its cameras see
-layer 0 and `PROBE_LAYER` (30), which no other camera has: a cheaper stand-in
-for something big lives on that layer alone, and the full thing draws nothing
-when `camera.layers.isEnabled(PROBE_LAYER)` (the massif does this). Its cameras skip
-what the caller hides (the car itself, effects) and the shadow maps are not
-drawn again for it.
+**Two cubes.** `raw` is what the six cameras draw (90 degrees, negative field
+of view as three.js's CubeCamera, so the faces are stored as OpenGL looks them
+up), with a depth buffer and plain 2x2 mips made by the hardware; only the
+filter reads it. `target` (`probe.texture`) is what materials read: the same
+size, no depth, `M + 1` mip levels (M = log2(size) - 2: the last level's faces
+are 4 texels wide), each level the raw cube convolved with the GGX lobe of one
+roughness:
+
+| level | roughness r (GGX alpha = r²) | 256 cube: face edge, r |
+| --- | --- | --- |
+| 0 | 0: the sharp picture (a texel-for-texel copy) | 256, 0 |
+| k = 1 .. M | alpha = 2^(k - M): each level halves alpha | 128 0.18, 64 0.25, 32 0.35, 16 0.5, 8 0.71, 4 (M = 6) 1 |
+
+A level's lobe (2.6 alpha radians across) is about 6.6 of its own texels
+wide at every level and every size, so a bilinear read of any level is smooth.
+`probeLevel` (glsl.js, with a JS twin) inverts it: `M + log2(r²)`, and below
+level 1 linear in r² towards the sharp picture. A material reads the whole
+glossy reflection of a layer with one `probeSample(cube, R, roughness)`: no
+taps round the mirror direction.
+
+**The filter** (one draw per level per face, a full-screen triangle into that
+face's level): the texel's direction N (OpenGL's cube table backwards), then
+`samples` GGX samples of the lobe whose view is its normal (Hammersley's
+points: the same pattern for every texel, so the result is a smooth function of
+N, never noise), each L weighted by N.L, each read from the raw cube's plain
+mip whose texel is the sample's share of the lobe, one level coarser still
+(filtered importance sampling, Krivanek and Colbert: lod = 0.5 log2(1 /
+(n pdf Ωtexel)) + 1). That last level is what keeps a small bright thing (a
+lamp's head, the sun's glare on the road, a light bar in the tunnel) from being
+printed once per sample: each sample sees it already spread over four times its
+own share, so a lamp becomes one soft bright lobe. Simulated for a point light
+swept past the output texels (`S/probe/sim/fis.mjs`, the samples' reads as
+tents of a texel of their mip), the response changes by at most 1 to 2 % per
+quarter texel at every level (4 % without the extra level). The filter reads
+the raw cube by direction, and WebGL 2 filters cube maps across their edges, so
+there are no seams at any level. A texel that is not a number (the road's
+shader writes one seen exactly edge on) is dropped by the filter: blended into
+the output it would stay for good.
+
+**Easing in.** Every level of every face is drawn with blending: the new result
+replaces the share `1 - exp(-dt / fade)` of what the level holds (`PROBE.fade`
+0.05 s; dt the time since that level was last filtered), so when a face is
+redrawn from where the car is now, its light slides in over three or four
+frames instead of jumping. Level 0 is filtered every update; of the rough
+levels, `levels` per update, round and round (their share is from their own
+dt, so they converge as fast in time). An update that finds the probe more
+than 6 m from the last (`CUT`: a skip, a reset, a respawn), the first update,
+and the first after `reset()` (a lost context) draw all six faces and replace
+every level outright.
+
+**Which faces.** `faces` per update (`stillFaces` when the car is nearly
+still, `tunnelFaces` in the tunnel), chosen by age times a weight: the
+up face 1, the down face 0.6 (road, which the materials' ground correction
+places anyway), the four sideways faces 1 + 2 (1 - |cos|) of the angle
+between the face and the car's velocity, the 2 at 40 m/s and above: at speed
+a face that looks sideways is redrawn three times as often as the ones that
+look ahead and back, because what it sees goes by at the car's speed.
+
+**The local proxy.** The probe knows directions only. `probe.uniforms`
+(`setProxy`, set by the game after each update) describe where its light comes
+from near by, for a parallax correction in the materials
+(`GLSL_PROBE_PROXY` in glsl.js, `probeProxyDir(P, R)`):
+
+| uniform | what |
+| --- | --- |
+| `probeCenter` vec3 | where the cube was drawn from (world) |
+| `probePlane` vec4 | the road's plane under the car: n.xyz, d (n.x + d = 0), from `track.surfaceAt` |
+| `probeBox` mat4 | world to a box's own -1..1 cube: in the tunnel the bore, wall to wall (the solid edges plus the walkway, tunnel.js `BORE`), road to ceiling, `PROBE.tunnelBox` (30 m) each way along the road |
+| `probeProxy` vec2 | x: the plane is in use (always), y: the box is (in the tunnel) |
+
+A ray from the surface point P along R is cut by the box (if any, from
+inside) or the plane (if it goes down), and the direction from `probeCenter`
+to that point is used instead of R, faded back to R for hits 8 to 20 m away.
+Beside walls and rails there is no proxy: R as it is.
+
+**What the faces see.** Layer 0 and `PROBE_LAYER` (30), which no other
+camera has: a cheaper stand-in for something big lives on that layer alone,
+and the full thing draws nothing when `camera.layers.isEnabled(PROBE_LAYER)`
+(the massif does this; the sky dome draws no sun or moon disc for it, as the
+environment map has none: the disc's highlight is the light's own, and a
+prefiltered disc would lay a second, broad one on the flake layer). The faces
+skip what the caller hides (the car itself, effects, the stars, the kerbs and
+ground cover; on low the near trees and small things), the shadow maps are
+not drawn again for them, and their far plane is `PROBE.far` (260 / 300 /
+400 m) or, in the tunnel, `tunnelFar` (160 m): what lies beyond is culled.
+The sky and the mountains are drawn at infinity and stay.
+
+**Formats.** Both cubes are half-float where the device can draw into it, or
+the 8-bit encoding of glsl.js under the fallback (`caps.hdr` false or `?ldr`):
+the filter decodes what it reads and encodes what it writes; the easing blends
+encoded values, which is close enough for a cross-fade. Nothing needs float
+targets beyond what `createTarget` would choose.
+
+**Per tier** (`PROBE` in game/config.js):
+
+| | low | medium | high |
+| --- | --- | --- | --- |
+| cube | 128 (6 levels) | 256 (7) | 512 (8) |
+| faces at speed | 1 every other frame | 1 every other frame (2 in the tunnel) | 2 a frame (3 in the tunnel) |
+| standing still | 1 every other frame | 1 every other frame | 2 a frame |
+| far plane | 260 m | 300 m | 400 m |
+| filter | 8 samples; level 0 and 1 rough level per update | 12; level 0 and 2 | 20; every level |
+| filter draws per update (tiny: level 1 of a 256 cube is 128 x 128) | 12 | 18 | 48 |
+
+Before this (b1536ef) the probe was one cube with plain 2x2 mips, 64 / 128 /
+256 at speed and a second one of twice the size standing still, the faces in
+fixed order, read by `level = log2(1.65 r² size)`.
+
+**Cost, measured** (`renderer.renderBufferDirect` wrapped in the page and
+labelled by pass, as in spec.md "Quality tiers and budgets"; 960x540, day,
+autopilot from `?seed=1`, 12 frames each at t = 6 (the grid), 33 (the esses)
+and 45 (the sky road); per frame):
+
+| | probe faces: draw calls | triangles | filter draws | whole frame: calls |
+| --- | --- | --- | --- | --- |
+| low, before | 10 to 14 | 34 to 38 k | none (hardware mips) | 132 to 163 |
+| medium, before (a face every other frame) | 15 to 18 | 109 to 126 k | none | 176 to 216 |
+| medium, a face every frame (tried) | 28 to 34 | 216 to 252 k | 18 | 199 to 236 |
+| low, after (128, 8 samples) | 10 to 13 | 33 to 37 k | 6 | 144 to 170 |
+| medium, as committed (a face every other frame) | as before: 15 to 18 (not measured again) | 109 to 126 k | 9 | about 185 to 225 |
+
+A face costs about the same as before (the far plane of 300 m instead of 400
+cuts little: most of a face's 220 to 250 k triangles are drawn at infinity
+or reach it, the mountains 50 k, the massif's stand-in 23 k, the far terrain 18
+k, the terrain's grid 27 to 46 k), so medium keeps its cadence of a face every
+other frame and gains the cube, the filter and the easing for 9 tiny draws a
+frame. Low gains them for 6 tiny draws a frame (its faces cost what they did:
+the filter's passes are the only addition; its frame time was not measured). The resolution costs fill only: a 256 face is 65 k pixels, a fortieth of
+a phone's screen. Memory: two cubes of half floats with their mips, 2.1 MB at
+128, 8.4 MB at 256, 34 MB at 512 (plus the raw cube's depth).
+
+What the paint reads (car/materials.js as it stands, 256 cube, M = 6): the
+clear coat at roughness max(0.03, footprint): level 0 on flat panels
+(alpha 0.0009 is under level 1's 0.031), up to level 2 or 3 where the body
+curves away; the flake layer of the silver (roughness 0.42) through
+`carSoftProbe`, nine reads at roughness 0.21 (alpha 0.044, level 1.5) round
+the mirror direction; the cap of the metal layer at roughness 1 (level 6).
+
+## The road's mirror
 
 The road's mirror (`PlanarMirror`) is a camera mirrored in the road's plane
 under the view's car, drawn into its own small target before the view, with
@@ -449,7 +582,9 @@ every scale.
 
 `?debug=` shows one buffer instead of the picture: `scene` (exposure and the
 tone curve only), `depth`, `velocity` (red and green: the streak, blue: sharp
-boxes), `bloom`, `probe` (the cube unrolled), `ao` (the occlusion term).
+boxes), `bloom`, `probe` (the view's probe unrolled four times, at roughness 0,
+0.3, 0.6 and 1: top left, top right, bottom left, bottom right), `ao` (the
+occlusion term).
 
 Grade overrides replace the Look's fields in every view (FramePipeline reads
 them from the page's URL through params.js): `?ao=`, `?halo=`, `?star=`,
