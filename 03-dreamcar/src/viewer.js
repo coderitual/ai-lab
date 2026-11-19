@@ -477,11 +477,6 @@ const sunOff = query.get('sun') === '0';
 const extraStops = number('ev', sunOff ? 2 : 0);
 engine.onDraw = () => {
   if (sunOff) world.scene.traverse((o) => { if (o.isDirectionalLight) o.intensity = 0; });
-  // in the studio with the sun off, the dome is the only light (through the car's probe): no sky fill, no sky map
-  if (sunOff && studio) {
-    world.scene.traverse((o) => { if (o.isHemisphereLight || o.isAmbientLight) o.intensity = 0; });
-    world.scene.environment = null;
-  }
   if (Number.isFinite(view.focus)) track.pointAt(view.focus, view.lat, focus);
   else stand.getWorldPosition(focus);
   world.prepareView(camera, focus, beams);

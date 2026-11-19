@@ -15,6 +15,7 @@ import { ATLAS_SIZE, bakeAtlas } from './atlas.js';
 import { MESH_EDGE, createArchGeometry, createLayout, inArch, sampleSkin, skinGeometry, skinIndex } from './body.js';
 import { buildDetails } from './details.js';
 import { createLampLights } from './lamps.js';
+import { createLiveryTexture } from './livery.js';
 import {
   PAINTS,
   PAPER,
@@ -68,7 +69,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
   object.name = ghost ? 'ghost car' : 'car';
   const disposables = [];
   const keep = (thing) => {
-    disposables.push(thing);
+    if (thing) disposables.push(thing);
     return thing;
   };
   const skin = createSkin();
@@ -100,6 +101,10 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
   let shadow = null;
   let lights = null;
   let ghostMaterial = null;
+  /** What setPaint changes: the paint's material and the body-coloured trim (the mirror caps). */
+  let paintMaterial = null;
+  let bodyTrim = null;
+  let livery = null;
   if (ghost) {
     ghostMaterial = keep(createGhostMaterial());
     skinMesh(() => true, ghostMaterial);
@@ -119,7 +124,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
     const { u, v } = lay;
     const extremes = (channel, i, k) => atlas.extremes(channel, u.coords[i], u.coords[i + 1], v.coords[k], v.coords[k + 1]);
     shared = createShared(textures);
-    const paintMaterial = keep(createPaintMaterial(shared, caps, paint, {
+    paintMaterial = keep(createPaintMaterial(shared, caps, paint, {
       shoulderV: v.atlas[RAIL.shoulder],
       extentV: lay.extent[1],
       texel: Math.max(lay.extent[0] / atlas.width, lay.extent[1] / atlas.height),
@@ -163,7 +168,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       gloss: () => createTrimMaterial(shared, caps, { color: [0.01, 0.01, 0.012], metal: 0, rough: 0.06, coat: 1 }),
       matte: () => createTrimMaterial(shared, caps, { color: [0.02, 0.02, 0.022], metal: 0, rough: 0.65 }),
       glass: () => createTrimMaterial(shared, caps, { color: [0.38, 0.39, 0.4], metal: 1, rough: 0.02 }),
-      body: () => createTrimMaterial(shared, caps, { color: numbers.color, metal: numbers.metal, rough: numbers.rough, coat: 1 }),
+      body: () => (bodyTrim = createTrimMaterial(shared, caps, { color: numbers.color, metal: numbers.metal, rough: numbers.rough, coat: 1 })),
       emit: () => createLampPartMaterial(shared, caps),
       // the cabin: black leather and plastic (0.012: at 0.028 the seats read cream in the low sun through the
       // windscreen), lit by whatever sun comes in through the glass; under its roof it sees
@@ -211,7 +216,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
   });
   const level = { drl: 0, low: 0, high: 0, tail: 0, brake: 0, reverse: 0, indicatorL: 0, indicatorR: 0, interior: 0 };
   const middle = (STATIONS.nose + STATIONS.tail) / 2;
-  return {
+  const car = {
     object,
     headlights: lights ? lights.headlights : [],
     taillight: lights ? lights.taillight : null,
@@ -220,6 +225,36 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       half: new THREE.Vector3(DIMS.widthWithMirrors / 2, DIMS.height / 2, DIMS.length / 2),
     },
     paints: Object.keys(PAINTS),
+    /** The paint showing (a key of PAINTS). */
+    paint: null,
+    /**
+     * Repaint the car (a key of PAINTS; an unknown name is silver): the paint's and the trim's uniforms, the wheels'
+     * finish, and the livery's picture, drawn the first time it is wanted and kept. Nothing is rebuilt or recompiled.
+     */
+    setPaint(name) {
+      const key = PAINTS[name] ? name : 'silver';
+      this.paint = key;
+      const p = PAINTS[key];
+      for (const wheel of wheels) wheel.setFinish?.(p.wheels ?? null);
+      if (!paintMaterial) return;
+      const u = paintMaterial.userData.paint;
+      u.paintColor.value.set(...p.color);
+      u.paintMetal.value = p.metal;
+      u.paintRough.value = p.rough;
+      u.paintFlop.value = p.flop;
+      u.paintFlake.value = p.flake;
+      u.paintCoat.value = p.coat ?? 1;
+      paintMaterial.clearcoatRoughness = p.coatRough ?? 0.03;
+      if (p.livery && !livery) livery = keep(createLiveryTexture(tier));
+      u.paintLivery.value = p.livery ? livery : null;
+      u.paintLiveryOn.value = p.livery && livery ? 1 : 0;
+      if (bodyTrim) {
+        bodyTrim.color.setRGB(...p.color, THREE.LinearSRGBColorSpace);
+        bodyTrim.metalness = p.metal;
+        bodyTrim.roughness = p.rough;
+        bodyTrim.clearcoat = p.coat ?? 1;
+      }
+    },
     /** The contact shadow: the game adds it to the scene (it is not part of `object`) and poses it. */
     shadow: shadow ? shadow.mesh : new THREE.Group(),
     poseShadow(point, normal, yaw, strength) {
@@ -277,4 +312,6 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       for (const thing of disposables) thing.dispose();
     },
   };
+  car.setPaint(paint);
+  return car;
 }

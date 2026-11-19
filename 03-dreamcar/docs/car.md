@@ -17,8 +17,7 @@ every number there is marked published, measured or estimated. The viewer
 car alone under the world's light; `pin=` puts its camera exactly where one of
 three photographs was taken from, so a still can be laid over the photograph
 pixel on pixel; `studio=1` stands it in a showroom (dark walls, a soft box overhead, two
-long strip lights either side; with `sun=0&ev=0` the dome is the only light,
-as in a product render) and `stripes=1` in a light tunnel (with `mirror=1`:
+broad bands of light either side; the world's sun stays as the key light) and `stripes=1` in a light tunnel (with `mirror=1`:
 the paint as a plain mirror), for judging surfaces.
 
 Axes (car space, `spec.js`): origin on the ground, on the centre line, midway
@@ -216,8 +215,29 @@ layer of metal flake under a clear coat.
   on the low tier, its stars (`GRILLE_STARS`, shared with `details.js`), red reflectors, the
   plate carriers, the parking sensors. The fuel flap, on the right only, is
   analytic.
-- The other paints (`graphite`, `blue`, `red`, `white`, `black`) are the
-  same material with other numbers: `?paint=NAME`.
+- **The other paints** (`PAINTS`, listed in the options in `PAINT_ORDER`):
+  black (almost no flake: its look is the clear coat's), white, blue, red,
+  a matte grey wrap (no clear coat, a rough film), graphite and the
+  night-race livery. They are the same material with other numbers
+  (`paintCoat` for the clear coat), changed on a built car by
+  `CarModel.setPaint(name)`: uniforms only, nothing rebuilt or recompiled;
+  the body-coloured trim (the mirror caps) and the wheels' dark finish
+  (`wheels`, `setFinish`) follow. `?paint=NAME`, the options, `paint=` in the
+  viewer.
+- **The night-race livery** (`night`, `livery.js`): an original
+  street-racing livery for the dark: a black metallic base, magenta blades
+  along the lower flanks kicking up over the rear wheels with a cyan line
+  beside them, acid-yellow slashes, a big number 01 on the front doors,
+  made-up marks (YORU SPEED, DOMI RACING), katakana of the file's own strokes
+  (ドリームカー "dream car" on the rear doors, ヨル "night" on the bonnet), a
+  magenta and cyan twin stripe over the bonnet, roof and boot, magenta wheels.
+  Nothing of any team, brand, film or game. It is a picture drawn at
+  start-up the first time the paint is chosen (2048 / 1024 / 512 px wide on
+  high / medium / low, three bands: each flank seen from its own side, so
+  the words are never mirrored, and the top), read by the paint in car space
+  (`LIVERY`), so it does not depend on the skin's layout; vinyl over the
+  paint (not metal), under the same clear coat. Off, the paint skips it (a
+  branch on a uniform): no cost to the other paints.
 
 Every patched material has its own `customProgramCacheKey`: without it three
 handed materials each other's programs (the gloss trim rendered white).
@@ -300,7 +320,11 @@ So under the tunnel's roof the lines are drawn exactly (`GLSL_BORE` in
   and crisp on the roof, the boot lid and the bonnet, drawn out along the
   shoulders and flanks. A bar is never drawn narrower than about a pixel's
   footprint on the plane (`h` in `carBoreLines`): seen small, from the chase
-  camera on a phone, its true share of a pixel was a faint grey thread. The
+  camera on a phone, its true share of a pixel was a faint grey thread. It is
+  widened to 0.6 m at most and dimmed as the square root of how much it was
+  widened: where the body turns sharply (the rear quarter's corner) the
+  footprint is wide because the mirror curves, and the two widened lines met
+  there in a bright V. The
   flake layer takes them at `BORE_SHEEN` (0.3) through its roughness: a soft
   sheen round the crisp line, not a second image.
 - **The probe under the roof** (`carBoreHold`): its fittings would double
@@ -611,6 +635,25 @@ the probe's reflection alone).
 | rear screen and rear doors showed the seats in the tunnel | 15 % transmission | 10 % |
 | showroom: the world's sky and forest showed through the dome | the dome wrote no depth; the forest arrived after the viewer gathered its scenery | the dome writes depth, the forest is hidden, the dome redrawn as a showroom |
 
+### Round nine: trims from the newest photographs, the paints
+
+The owner's three newest photographs (a low rear three-quarter in daylight,
+a front three-quarter on a road, a front three-quarter in a showroom) were
+put beside the viewer at their angles (the lane's `angles.sh`; they stay out
+of the repository). The shape agreed to what that comparison can show; the
+trims did not:
+
+| what | before | after |
+| --- | --- | --- |
+| side windows' outline | gloss black band all round | a bright trim 11 mm wide along the frames' tops and the belt, the outer part of the band; the B-pillar and the divider stay black |
+| side skirt | painted blade | a bright strip on the blade between the arches (18 mm) |
+| rear apron | a gloss black rail on the diffuser's top, the pipe trims apart | a bright blade along the diffuser's top the whole width, joining the pipe trims |
+
+All three are regions of the paint (no geometry, no cost on any tier).
+The cameras fitted to the earlier photographs (`pin=`) no longer land the
+car where it stood in round 2 (the stand moved with the world), so no
+pixel-on-pixel overlay was made this round.
+
 ## What each tier costs
 
 Re-measured after round six (the arches' flare moves the net's points and
@@ -669,12 +712,12 @@ Most visible first:
 - **At night the paint is dark** where nothing bright is near: it mirrors
   what the probe sees, and needs the wet road and the town to be the glossy
   car of the owner's night reference.
-- **The showroom** (`studio=1&sun=0&ev=0`) is not yet a product render: with
-  the new probe the dome's strip lights come back in the paint (even as a
-  plain mirror, `stripes=1`) several times dimmer than they are seen
-  directly, so the body reads a flat mid grey. Not found in round 8; the game's
-  own reflections (lamps, the tunnel's lines, the sky) are not affected in the
-  stills.
+- **The showroom** (`studio=1&sun=0&ev=0`): round 8 found the body a flat mid
+  grey. Round 9 read the probe's faces back: the strip lights are in it at
+  full radiance, so neither the probe nor the hold dimmed them; they were
+  too thin (4 degrees, at 8 and 30 degrees up) for the angles a flank leaning
+  in by 10 to 25 degrees mirrors from eye height. They are now broad bands
+  (4 to 22 and 27 to 46 degrees).
 - **In the tunnel** the pale walls, box-projected into the flanks, keep the
   silver pale between the lines; a darker body would need darker walls.
 - **By day in low sun** the silver goes warm in the game's grade; it reads

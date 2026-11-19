@@ -77,6 +77,8 @@ export const SEA_LOOK = {
   byTime: {
     day: { sky: 0.78, deep: [0.004, 0.02, 0.058] },
     dusk: { sky: 0.42, deep: [0.0016, 0.0105, 0.0115] },
+    // after the sun: the water dark and deep, the afterglow given back a little brighter than golden hour's
+    twilight: { sky: 0.55, deep: [0.0012, 0.006, 0.012] },
   },
   /** at night: lamps' streaks, across and along (radians, about), and their share of the head's radiance */
   lamp: { across: 0.012, along: 0.22, gain: 0.06 },

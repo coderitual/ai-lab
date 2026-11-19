@@ -11,6 +11,7 @@
 // its last metres, turned a little away from the road, as real terminals are.
 
 import * as THREE from 'three';
+import { curbAt } from './schemes.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { EDGE, along, levelFrame, runsOf, stripGeometry, upright } from './furniture.js';
 import { retroReflective } from './retro.js';
@@ -110,7 +111,8 @@ export function createRails({ track, tier, atmosphere }) {
   };
   for (const side of [1, -1]) {
     const kinds = side > 0 ? track.kindL : track.kindR;
-    for (const run of runsOf(track, (i) => kinds[i] === EDGE.RAIL)) {
+    // (forest lane) not where a piece's scheme draws the edge as a kerbstone (schemes.js curbAt)
+    for (const run of runsOf(track, (i) => kinds[i] === EDGE.RAIL && !curbAt(track, i * track.ds))) {
       const before = kinds[(run.i0 - 1 + n) % n];
       const after = kinds[(run.i1 + 1) % n];
       const freeStart = before !== EDGE.WALL && before !== EDGE.PARAPET;

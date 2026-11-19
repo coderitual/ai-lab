@@ -116,6 +116,34 @@ export const SIDES = {
   coastTop: { kind: 'rail', edge: [6, 9], slope: -0.02, far: -0.3, verge: 'gravel', wood: null, coast: true },
 };
 
+/**
+ * (forest lane) How a piece of road looks when it is not the circuit's default: its paint, its kerbs, its verge, what
+ * grows and lies beside it. A piece names one with `scheme`; the world blends each into its neighbours over `blend`
+ * metres (the planting, the verge, the asphalt's tone), while the lines start and end at the piece's own ends. Pure
+ * looks: nothing here changes the course (profile, kerbs, edges and grip are the pieces' and the sides' as before).
+ *   lines    'double-yellow': two solid yellow lines `gap` apart about the centre line, besides the white edge lines
+ *   asphalt  how much paler and more worn the surface is (0: the circuit's dark racing asphalt, 1: an old road's)
+ *   cracks   how many sealed cracks more than the default (0..1)
+ *   strip    a flush precast concrete strip this wide (m) on the outer side of the paved margin (0: none)
+ *   kerb     the two paints of the kerbs that lie mostly inside the scheme's pieces, linear RGB (default red/white)
+ *   wood     what is planted in the first rows beside the road: 'pinewood' (tall bare-trunk pines and firs close to
+ *            both edges) or 'stonepine' (pines and firs in open groups, a tall stone pine on the inside of the bend)
+ *   verge    'meadow' (long grass, ferns, yellow flowers) or 'islands' (grass islands with purple and yellow flowers)
+ *   boulders 'mossy' (boulders among the trunks) or 'granite' (pale granite boulders and outcrops at the roadside)
+ *   sign     a bend-warning sign this many metres before the piece, on its outside (0: none)
+ *   chevrons a row of this many chevron boards on the outside of the bend (0: none)
+ *   dashes   short yellow dashes beside the centre line on the inside, over the first `dashes` m of the bend (0: none)
+ *   rockface pale granite faces and outcrops along the outside of the bend (groundCover.js)
+ *   curb     the solid edges on its pieces (rail or rock to the cars) are drawn as low concrete kerbstones this high
+ *            (m): no rail, no cut face or cliff, no tyre walls, boards or marshal posts there
+ * The two schemes answer the owner's frames e2 (a forest road in low side sun: the rise and the first ess) and e5 (a
+ * mountain bend among granite boulders: the last ess), design.md "The reference frames".
+ */
+export const SCHEMES = {
+  pinewood: { lines: 'double-yellow', gap: 0.16, asphalt: 0.9, cracks: 0.6, strip: 0.32, kerb: [[0.4, 0.39, 0.37], [0.52, 0.51, 0.49]], wood: 'pinewood', verge: 'meadow', boulders: 'mossy', sign: 0, curb: 0.2, blend: 90 },
+  granite: { lines: 'double-yellow', gap: 0.16, asphalt: 0.5, cracks: 0.4, strip: 0.32, kerb: [[0.02, 0.09, 0.42], [0.62, 0.61, 0.58]], wood: 'stonepine', verge: 'islands', boulders: 'granite', sign: 90, chevrons: 6, dashes: 70, rockface: true, curb: 0.32, blend: 70 },
+};
+
 /** The named stretches, in driving order. */
 const SECTION_NAMES = {
   straight: 'Lakeside straight',
@@ -151,6 +179,7 @@ const SECTION_NAMES = {
  * @property {'L' | 'R'} [runoff] the side whose verge is the run-off of a fast bend (tyre wall, boards)
  * @property {boolean} [kerb] false: no kerb on the inside of this bend (a white line, the paved margin and the verge
  *   instead); the outside kerb at its exit stays
+ * @property {keyof typeof SCHEMES} [scheme] (forest lane) how it looks, if not as the circuit's default
  */
 
 /** @type {Segment[]} */
@@ -162,12 +191,15 @@ const SEGMENTS = [
 
   // Shore bend: a fast banked right away from the water, starting to climb.
   { id: 'sweep', sec: 'sweep', r: -220, deg: 80, ease: 110, bank: 9, g: 3, L: 'lowRun', R: 'lowUp', runoff: 'L' },
-  { id: 'rise', sec: 'sweep', len: 100, ease: 80, g: 5, L: 'lowDown', R: 'lowUp' },
+  // (forest lane) the rise and the first ess are frame e2's forest road: the day's sun crosses them square from the left
+  { id: 'rise', sec: 'sweep', len: 100, ease: 80, g: 5, L: 'lowDown', R: 'lowUp', scheme: 'pinewood' },
 
   // Forest esses: long bends climbing through the wood, the last one turning the road along the hillside.
-  { id: 'ess1', sec: 'esses', r: -260, deg: 55, ease: 100, bank: 8, g: 5.5, L: 'midRun', R: 'midUp', runoff: 'L' },
+  { id: 'ess1', sec: 'esses', r: -260, deg: 55, ease: 100, bank: 8, g: 5.5, L: 'midRun', R: 'midUp', runoff: 'L', scheme: 'pinewood' },
   { id: 'ess2', sec: 'esses', r: 330, deg: 40, ease: 120, bank: 7, g: 5, L: 'highUp', R: 'highRun', runoff: 'R' },
-  { id: 'ess3', sec: 'esses', r: -240, deg: 65, ease: 120, bank: 9, g: 4, L: 'highRun', R: 'highUp', runoff: 'L' },
+  // (forest lane) the last ess, the tightest forest bend, is frame E5's mountain bend among granite boulders (the
+  // carousel, the one bend that folds back, is the sea lane's coast frame E1)
+  { id: 'ess3', sec: 'esses', r: -240, deg: 65, ease: 120, bank: 9, g: 4, L: 'highRun', R: 'highUp', runoff: 'L', scheme: 'granite' },
 
   // The tunnel: a rock cutting, then the bore through the spur, bending gently right.
   { id: 'cutting', sec: 'tunnel', len: 70, ease: 70, g: 3.5, L: 'rock', R: 'rock' },
@@ -222,6 +254,8 @@ export const LAYOUT = {
   start: { x: 0, y: 0, z: 0, yaw: 90 },
   segments: SEGMENTS,
   sides: SIDES,
+  /** (forest lane) the looks pieces may name (`scheme`). */
+  schemes: SCHEMES,
   /** Banking into the bends by rule: `bank` degrees times tanh(bankRadius / radius); a piece may name its own. */
   bank: 9,
   bankRadius: 250,
@@ -237,12 +271,13 @@ export const LAYOUT = {
    * edge, `spacing` metres apart, everywhere outside the tunnels and the straight's own lamps (lamps keep `clear`
    * metres from a portal): on the inside of every bend tighter than `inside` metres, alternating sides elsewhere.
    * None stand on the pieces in `skip`: the ledge's first bend is frame D3's place, which has no poles; (sea lane,
-   * round 2) the carousel and the crest are frame E1's, which has none either.
+   * round 2) the carousel and the crest are frame E1's, which has none either. (forest lane) The last
+   * ess is frame E5's, which has none.
    * (finish lane) Where the edge is a rail or the trees, a pole stands `setback` metres behind it, so that it is never
    * between the chase camera and the car, and `height` m high; one due at a rock face goes to the other side if that is
    * a rail or the trees; at a rock face, a wall or a parapet it stands at the edge.
    */
-  lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1', 'carousel', 'crest'] },
+  lapLamps: { spacing: 55, height: 12, setback: 2.5, clear: 25, inside: 1500, skip: ['ledge1', 'carousel', 'crest', 'ess3'] },
   /**
    * (tunnel lane) The tunnel's lamp rows: the light of the lines of fittings along the haunches (tunnel.js draws the
    * fittings), `drop` under the ceiling and `inset` in from the kerb's face (over the shoulder: from there the light

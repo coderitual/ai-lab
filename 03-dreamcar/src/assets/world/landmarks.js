@@ -27,14 +27,15 @@ export const K5 = {
   along: 101,
   view: [128, 238],
   reach: 3000,
-  tower: { ahead: 24, beyond: 6, r: 11, h: 18 },
-  flags: [{ ahead: 18, beyond: 2, h: 7 }, { ahead: 55, beyond: 2.5, h: 7 }],
+  trees: 170,
+  tower: { ahead: 24, beyond: 3.5, r: 11, h: 18 },
+  flags: [{ ahead: 14, beyond: 2.5, h: 6.5 }, { ahead: 46, beyond: 3, h: 6.5 }],
   chevron: { ahead: 28, beyond: 0.8 },
   lamps: { count: 16, near: 260, far: 1600, bearings: [150, 235] },
   cones: [
-    { bearing: 210, dist: 15000, h: 1750, r: 4600 },
-    { bearing: 198, dist: 16500, h: 1600, r: 4200 },
-    { bearing: 168, dist: 15000, h: 1800, r: 4600 },
+    { bearing: 210, dist: 11500, h: 1900, r: 4200 },
+    { bearing: 198, dist: 12500, h: 1750, r: 3800 },
+    { bearing: 168, dist: 11500, h: 1950, r: 4200 },
   ],
 };
 
@@ -49,6 +50,21 @@ export function k5Site(track) {
   const s = track.wrap(sec.s0 + K5.along);
   const f = track.frameAt(s, {});
   return { s, x: f.pos.x, y: f.pos.y, z: f.pos.z, heading: (Math.atan2(f.tan.x, f.tan.z) * 180) / Math.PI };
+}
+
+/**
+ * Whether a tree may not stand at a point of the map: in front of K5's place, within `trees` m (the frame's banks are
+ * bare: low scrub on the left, grass and the tower on the right).
+ */
+export function k5NoTrees(track) {
+  const k = k5Site(track);
+  return (x, z) => {
+    if (!k) return false;
+    const d = Math.hypot(x - k.x, z - k.z);
+    if (d > K5.trees) return false;
+    const b = ((Math.atan2(x - k.x, z - k.z) * 180) / Math.PI + 360) % 360;
+    return b > 60 && b < K5.view[1];
+  };
 }
 
 /** Whether a point of the map lies in frame K5's view (and so must not carry another frame's landmark). */

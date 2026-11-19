@@ -30,7 +30,8 @@ export const BAKE_UNIFORMS = { uBakeSel: { value: new THREE.Vector3(1, 0, 0) } }
 /**
  * Which baked channel the directional light reads: the day's sun (x), the night's moon (y) or the golden hour's sun
  * (aBake.w; env lane). Geometry whose aBake has only three numbers reads w = 1 (lit) at dusk.
- * @param {'day'|'dusk'|'night'} name
+ * @param {string} name a time of day; one with no baked light of its own (twilight: no sun) selects none, and
+ *   bakedSun() is then 1 (its directional light is off anyway)
  */
 export function selectBake(name) {
   BAKE_UNIFORMS.uBakeSel.value.set(name === 'day' ? 1 : 0, name === 'night' ? 1 : 0, name === 'dusk' ? 1 : 0);

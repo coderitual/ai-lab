@@ -96,7 +96,7 @@ node tools/screenshots.cjs                # if anything visible changed; look at
 | `advance(seconds, fps = 60)` | play that long, drawing every frame |
 | `state()` | a plain JSON picture of the run: phase, mode, time of day, clock, lamps; per driver lap, `s`, `lat`, distance, speed, gear, rpm, pedals, laps and splits, sector, gaps, position, medal, camera, lamps, assists, the put-back offer |
 | `stats()` | frame time, draw calls, triangles, programs, textures, buffer size, HUD writes, pixel ratio, render scale, the pipeline's targets, tier, `hdr`, GPU string |
-| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`); `photo(null)` ends it |
+| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`, `e2`, `e5`); `photo(null)` ends it |
 | `set(path, value)` | change a number of lighting.js or config.js and show it: `set('times.night.exposure', 20)`, `set('camera.chase.distance', 6)` |
 
 `window.__ready` is true once the first frame has been drawn.
@@ -280,6 +280,32 @@ machine without a GPU, and only what is listed here.
   staged towards it looked into the stand). Not looked at on `high`, in
   motion, in split screen or in the chase view; the playtest, the soundtest
   and the docs' screenshots were not run.
+- **K5 round 3 and the tunnel's exposure** (twilight's sunset bearing, raised
+  and more saturated bands, exposure 6 and environment 0.75, the dry road's
+  sky sheen and its own sky mirror at 0.3 at twilight (`roadSheen`), the head
+  lamps' pool 0.4, the tower ribbed with a lower window, green and yellow
+  feather flags, ridged snowy cones; the tunnel at dusk and twilight exposed
+  4.5): K5 stills at `medium` 1280x720 and 393x852 sampled against the frame
+  (scratch samp.py), tunnel stills inside and at the exit at dusk and
+  twilight; the playtest's keys, options, results, board (99 checks) and
+  photo, determinism (32 checks) passed, determinism now with a check that
+  `?manual&t=40` in the tunnel shows the adapted exposure on every load;
+  `node tools/unit.mjs` passed. The exposure's easing was already in the
+  fixed step: the white tunnel in earlier stills was the tunnel's own
+  exposure (6 and 7), not an unsettled one.
+- **Twilight, the fourth time of day** (lighting.js `twilight`, K5 at
+  twilight, the drum smooth, feather flags, nearer cones, no trees on K5's
+  banks): stills on software WebGL at `medium`, K5 at 1280x720 beside the
+  frame and at 393x852 `--mobile`, a lap's highlights at twilight (grid,
+  forest, tunnel, its exit, coast, K5), d1 and d4 at day, dusk and night
+  and d4 at twilight; one round on `low`; `node tools/unit.mjs` passed; the
+  playtest's keys, results, board, options and tiers sections passed
+  against this lane's preview (117 checks, 0 failed, 75 min, most of it
+  tiers). The docs' screenshots (a twilight one was added to
+  tools/screenshots.cjs) were not regenerated. The tunnel's interior in
+  stills still shows the outside exposure for the first seconds (stills
+  fast-forward without drawing; the exposure eases while drawing): not judged
+  in motion.
 - **Frame K5's place** (k5.js, landmarks.js `K5`, the far cones, the
   massif's west end lowered beyond D1's left edge, the D3 green hill removed,
   the pale hall kept out of K5's view, the dusk haze and glow tightened):
@@ -316,6 +342,19 @@ machine without a GPU, and only what is listed here.
   on `high`, in split screen, in motion or with a player driving; the
   playtest (which has no tunnel section) and the soundtest were not run (the
   sound's tunnel reverb reads the Track's sky, which did not move).
+- **The forest lane's changes** (the per-piece schemes: frame E2's forest
+  road on the rise and the first ess, frame E5's granite bend on the last
+  ess; pines, boulders, verges, kerbstones instead of rails there, chevron
+  boards, bend signs, the double yellow line and its dashes, the casters
+  chosen by where their shadow falls): stills on software WebGL at `medium`
+  1280x720 by day from the `e2` and `e5` cameras beside the owner's frames,
+  six rounds of E5 (the first four on the carousel, which the coast lane
+  then took for its frame E1) and five of E2, judged by eye; at `low` a few
+  rounds of each; a chase sheet through the forest at `medium` 640x360; draw
+  calls and triangles counted (spec.md, design.md "The forest").
+  `node tools/unit.mjs` passed. Not looked at on `high`, in split screen or
+  in motion; golden hour and night only at `low` in the forest pieces once;
+  the playtest and the soundtest were not run.
 - **The car lane's round 8** (the paint, glass and lamps at night, in the
   tunnel and by day, with the probe lane's prefiltered probe and its
   parallax): stills on software WebGL at `medium` 1280x720 by night (grid,
@@ -341,6 +380,18 @@ machine without a GPU, and only what is listed here.
   split screen, or in motion: the grit and the paint's ragged edges were
   made not to sparkle by construction (averaged where a pixel spans many
   cells) but no frame sequence was watched for crawl.
+- **The car lane's round 9** (the paints and the options' Paint rows, the
+  night-race livery, the window, sill and apron trims, the showroom's bands,
+  the tunnel lines' widening): the playtest's `options` and `params` sections
+  against a production build: 72 checks, 0 failed (with the new paint
+  checks: the row offers every paint, silver by default, the second
+  player's row hidden solo, a choice kept under `dreamcar.paint` and on the
+  car at once, `?paint=night` not kept, an unknown name silver). Stills on
+  software WebGL at `medium`: the livery at the night start, in the tunnel
+  and by day (1280x720), every paint in the viewer's showroom, the car at the
+  newest photographs' angles. `node tools/unit.mjs` passed. Not run: the
+  split-screen paint row with two players, the `keys` section, high tier in
+  the game, phones.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.

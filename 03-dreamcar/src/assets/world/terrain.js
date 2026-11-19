@@ -33,6 +33,7 @@
 import * as THREE from 'three';
 import { planeNoise, smoothstep, withBake } from './shading.js';
 import { CANOPY, canopyOpen } from './canopy.js';
+import { schemeTable } from './schemes.js';
 
 // The Track's EDGE and SURFACE values (the world never imports from game/).
 const EDGE_ROCK = 1;
@@ -208,7 +209,10 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   /** 0..1 how much of a rock edge each sample is, eased over a few metres so the cliffs rise and fall. */
   const rockiness = (kinds) => {
     const raw = new Float32Array(n);
-    for (let i = 0; i < n; i++) raw[i] = kinds[i] === EDGE_ROCK ? 1 : 0;
+    // (forest lane) a rock edge that a piece's scheme draws as a low kerbstone (`curb`) has no cliff behind it
+    const st = schemeTable(track);
+    const curb = (i) => st.index[i] >= 0 && st.on[i] && !!st.defs[st.index[i]].curb;
+    for (let i = 0; i < n; i++) raw[i] = kinds[i] === EDGE_ROCK && !curb(i) ? 1 : 0;
     const out = new Float32Array(n);
     const half = Math.round(6 / ds);
     for (let i = 0; i < n; i++) {

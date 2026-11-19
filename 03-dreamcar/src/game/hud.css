@@ -104,6 +104,19 @@
   border-color: var(--ice);
 }
 
+/* a choice of many (the paints): the buttons wrap onto more lines, each a separate key */
+.hud .segment.wrap {
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+}
+.hud .segment.wrap button,
+.hud .segment.wrap button:first-child,
+.hud .segment.wrap button:last-child {
+  border-radius: 6px;
+  border-left-width: 1px;
+}
+
 /* ---------------------------------------------------------------- a view */
 
 .hud .view {
@@ -1743,4 +1756,10 @@
   .hud * {
     animation: none !important;
   }
+}
+
+/* the paints: as many to a line as fit, at least a thumb wide each */
+.hud .optrow .segment.wrap button {
+  flex: 1 0 auto;
+  min-width: 72px;
 }

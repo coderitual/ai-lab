@@ -13,9 +13,9 @@ circuit in the mountains by a lake: a lakeside straight, fast esses through the
 woods, a lit tunnel, a road on piers across the valley, a slow carousel, a
 crest, a plunge, a ledge, a second bridge and a long right back to the shore.
 Three laps against the clock, alone or against a friend in split screen. The
-same circuit exists three times: on a sunlit autumn afternoon with the sun
-straight down the start straight, at golden hour, and on a wet night after
-rain, when the picture is made of lamps and their reflections in the asphalt.
+same circuit exists four times: on a sunlit autumn afternoon with the sun
+straight down the start straight, at golden hour, at twilight after the sun
+has set, and on a wet night after rain, when the picture is made of lamps and their reflections in the asphalt.
 It plays in a browser with a keyboard, a gamepad, or thumbs on a phone.
 
 It is an original demo. Two things were looked at for what "good" looks like
@@ -118,10 +118,13 @@ ages with joints, the paver's seams 2 m either side of the middle, patches
 (about one per 300 m) and cracks sealed with tar (about one per 90 m), tyre
 marks before the carousel (roadHistory.js);
 its markings are a solid white line inside each edge (0.28 m), the start line
-and twelve grid boxes from `track.grid`, nothing else. A second, anisotropic
+and twelve grid boxes from `track.grid`, nothing else, but on the two forest
+stretches of frames E2 and E5 (below, "The forest"), where a piece's
+`scheme` adds a double yellow centre line and an older, paler surface. A second, anisotropic
 specular lobe stretched along the line of sight lays the low sun's glare on it
 as a long streak (`ASPHALT_SHEEN`). The kerbs (kerbs.js) are red and white
-painted concrete, one colour per tooth, on `track.kerbs`, exactly on
+painted concrete (blue and white in E5's bend, bare pale concrete in E2's
+wood: the scheme's paints), one colour per tooth, on `track.kerbs`, exactly on
 `track.profile()` (on low, rows at every second tooth top). Beyond the margin
 the terrain's band carries the verge: mown stripes 1.6 m wide, a ragged strip
 of worn earth along the kerbs, longer grass at the barrier, with tufts of
@@ -433,6 +436,20 @@ with a short `advance` after loading.
   cars run on low beam, their head lamps pooling on the road ahead and their
   tail lamps laying a red pool on the asphalt behind them (road.js
   `TAIL_POOL`).
+- **Twilight** (frame K5, strict, and the twilight references): the sun 5°
+  under the horizon, 60° left of the start straight's heading (from K5's
+  place the band is brightest a little right of the road, over the tower);
+  no direct light and no sun shadows, only the sky's (the environment map,
+  strength 0.75, and a faint blue fill), so the land is dark blue and what faces the sunset catches its band
+  as a warm rim. The dome deep blue overhead through turquoise and pale
+  yellow to an orange-rose band over the sunset, the earth's shadow and its
+  pink belt opposite, all but clear, the first stars high up. The water
+  mirrors the band as a pale gleam. Street lamps, floodlights and windows on
+  (cones in the air at 0.6 of the night's), the cars on low beam with the red
+  pool behind them, the road dry and dark (it shows 0.3 of its sky sheen,
+  `roadSheen`). Exposure 6 (between golden hour's
+  4.2 and night's 22), contrast 1.18, saturation 1.15; in the tunnel 4.5, as
+  at golden hour (its lamps are the day's).
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
@@ -470,7 +487,10 @@ with a short `advance` after loading.
 ## The reference frames
 
 The owner chose five frames as the spec for the look ("treat those
-screenshots as spec, not suggestion"). They are kept out of the repository
+screenshots as spec, not suggestion"), and later two more for the forest,
+E2 and E5 ("another spec references"; "certain parts of the track can
+still be as they are, but I want it to have some parts that look like on
+the screenshots"). They are kept out of the repository
 and described here in words. Every change to the light, the materials or the
 grade is judged by staging our still beside the frame it answers to, at the
 same framing, and listing what still differs (ideas.md keeps the lists).
@@ -523,6 +543,32 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   winding in an S round a cut hill on a headland high above an open sea; the
   whole frame is described under "The sea".
 
+- **E2** (the owner's "another spec reference"), from a console racing game,
+  by day: a straight road through a wood of tall conifers with long bare
+  trunks and high crowns standing close on both sides, deep shade under
+  them; the low sun coming through from the side lays crisp patches of light
+  and long trunk shadows across pale grey, slightly worn asphalt; a double
+  yellow centre line and white edge lines; a low concrete kerb at the road's
+  edge, then a bright verge of long grass with ferns and yellow flowers;
+  mossy boulders among the trunks; a forested hillside at the vanishing
+  point under a bright sky with clouds.
+- **The owner's video** of the same game on the same kind of road
+  ("another detailed spec ... exact spec"; overcast; cut into sheets of its
+  best shots): long faces of pale grey granite rising 10 m and more straight
+  from the verge with pines on top, besides loose boulders; rows of five or
+  six yellow chevron arrows on black boards on the outside of the bends,
+  bright even in shade; the double yellow centre line with short yellow
+  dashes beside it into the bends; long blue and white kerbs on the inside
+  of each bend with a flat concrete strip behind; dry olive grass and dark
+  low shrubs on the verges; a red board here and there.
+- **E5**, the same game, a mountain bend: big pale granite boulders and
+  outcrops right at the roadside, some as large as a van, shrubs between
+  them; mixed pines and firs, a tall stone pine with a bare trunk on the
+  inside; open sunny glades; grass islands with purple and yellow flowers; a
+  blue and white painted kerb at the apex; the double yellow line following
+  the bend; a yellow diamond warning sign (ours is a plain bend arrow of our
+  own drawing); more road beyond through the trees.
+
 - **The twilight references** (four more frames of racing games, sent with
   "in the dusk lighting the tunnel and after the tunnel looks dull and bad";
   their light, sky, colour and mood only): after sunset, a sky from deep blue
@@ -555,7 +601,7 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   tower, the flags, the chevron and the lamps are k5.js's. Our flags are plain;
   the tower is our own.
 
-Day answers to D1, D3, E1 and A (and the asphalt everywhere to E2 and E5; D1's "dark smooth asphalt" gave way to them); golden hour to D4, D2 and the twilight references (K5 strictly); the wet night to two
+Day answers to D1, D3, E1 and A, its two forest stretches to E2 and E5 (and the asphalt everywhere to E2 and E5; D1's "dark smooth asphalt" gave way to them); golden hour to D4, D2 and the twilight references (K5 strictly); the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
 light, the materials, the vegetation, the composition and the sense of speed:
@@ -880,6 +926,62 @@ yellowing, larch green-gold, spruce and fir dark. Built in
   tree of the road's rows, fallen leaves under every turned one. Shadows:
   impostor cards on a layer only the sun's shadow camera sees.
 
+**The two stretches of frames E2 and E5** (forest lane). The owner: "certain
+parts of the track can still be as they are, but I want it to have some parts
+that look like on the screenshots"; E5 is strict spec. Two pieces' looks are
+set by a `scheme` on the pieces of the plan (trackLayout.js `SCHEMES`; read
+through `schemes.js`), each blended into its neighbours over 70 to 90 m (the
+tree mix, the verge, the asphalt's tone), its lines starting and ending at its
+pieces' ends. Everything else on the lap is planted and placed exactly as
+before (the schemes' trees, cover and boulders come from their own random
+streams after the rest).
+
+- **E2, the forest road: the rise and the first ess** (557 to 906 m). The day's
+  sun crosses it square from the left (70 to 99 degrees off the road's
+  heading, 16 up): the only forest stretch it crosses from the side for its
+  whole length; the lap has no forest straight longer than the rise's 100 m
+  (a longer one would move every piece after it), so the rise and the gentle
+  first ess (260 m radius) are the frame's straight. Pines with long bare
+  stems (`pine-a`: the crown in the top 40 %, stubs of dead branches below),
+  a few spruces and firs, in four rows from 2 to 29 m behind the edges on
+  both sides; the mass of the wood behind them thinned by 70 % and turned to
+  the same conifers, so that the sun comes through between the crowns 50 to
+  90 m off towards it. Double yellow centre line; paler, older asphalt with
+  more sealed cracks; a flush concrete strip on the margin's outer side; the
+  kerbs bare pale concrete; no rail (the solid edge, a rail to the cars, is
+  drawn as a low concrete kerbstone, 0.2 m: `curb`), no tyre walls or boards;
+  long grass, ferns and patches of yellow flowers on the verge; mossy boulders
+  among the trunks. The canopy term (canopy.js) there: crowns 24 m high,
+  stopping 60 % of the sky.
+- **E5, the mountain bend: the last ess** (1137 to 1409 m), a right of 240 m
+  radius, the tightest forest bend. (The frame's road folds back round an
+  island; on our lap only the carousel does, and the carousel and the crest
+  are the sea lane's coast frame E1: so no second piece of road shows beyond
+  the island here.) Its solid edges stay what they were to the cars (rails at
+  the same distances: the course drives exactly as before); the world draws
+  them as low concrete kerbstones, 0.32 m (`curb`), and no tyre walls, boards,
+  marshal posts or floodlight poles stand on the piece (`lapLamps.skip`, as
+  on D3's bend). Pale granite boulders in the frame's places (`E5_ROCKS` in
+  groundCover.js: a 5 m boulder and its neighbour on the inside by the exit,
+  a rock further in, an outcrop of 2.4 to 5.8 m blocks stacked on the outside
+  round the apex) and singly and in outcrops along both sides, dark shrubs at
+  their feet; pines, firs and spruces in open groups round sunny glades, the
+  inside kept open to the low sun, a full wood behind, a stone pine
+  (`pine-b`) alone on the inside near the apex; grass
+  islands with patches of purple lupins and yellow flowers; blue and white
+  kerbs; the double yellow line round the bend, with short yellow dashes
+  beside it on the inside over the bend's first 70 m; a bend sign of our own
+  (a yellow diamond, a black bent arrow) 90 m before the bend on its outside.
+  From the owner's video of the same kind of place ("exact spec", overcast,
+  read here by day): a face of pale granite along the outside of the bend's
+  first half (blocks of 4 to 6.5 m at the verge and a second tier stacked
+  behind and above them, 8 to 12 m in all, shrubs at their feet), a row of
+  six chevron boards of our own drawing (a black board, two yellow
+  arrowheads) on the outside over the bend's first part, and dry olive grass
+  on its verges.
+  The camera `e5` stands on the road 19 m past the car near the exit, looking
+  back at it across the inside of the bend.
+
 Measured on software WebGL in this container (shared with other work, so the
 times scatter by a third), the forest alone in the main view:
 
@@ -899,5 +1001,25 @@ bake, meshes): about 1.3 s on medium (400 / 450-550 / 200 / 100-160 / 80-160
 ms) and 1.1-1.3 s on low (300 / 400-550 / 150-200 / 50-120 / 60-120 ms):
 over the 1 s and 0.7 s aimed at. Textures 47.7 MB (medium, high), 23 MB
 (low).
+
+(forest lane) Before and after the two stretches, the autopilot's chase view,
+same build otherwise (`low` by day at 393x852, `medium` by night at
+1280x720; whole frame's calls / the forest's own calls and triangles):
+
+| t (s), place | low before | low after | medium night before | medium night after |
+| --- | --- | --- | --- | --- |
+| 14, the shore bend | 124 / 12, 53 k | 125 / 13, 50 k | 246 / 23, 265 k | 250 / 22, 286 k |
+| 20, the rise (E2) | 121 / 12, 55 k | 113 / 6, 28 k | 265 / 22, 314 k | 235 / 9, 334 k |
+| 26, the second ess | 161 / 14, 32 k | 154 / 7, 23 k | 358 / 24, 215 k | 330 / 13, 213 k |
+| 33, the last ess (E5) | 137 / 13, 34 k | 128 / 8, 7 k | 302 / 24, 286 k | 271 / 12, 128 k |
+| 34.2, the E5 camera's moment | | 138 / 4, 3 k | | 286 / 11, 117 k |
+
+The low tier at t = 26 and medium by night at t = 26 were over their budgets
+(150 and 300 calls) before and still are (154, 330); the medium forest at
+t = 20 is over its 300 k triangles (334 k, was 314 k). The forest's start-up
+measured 0.71 s on low and 1.01 s on medium after (0.85 s and 1.2 s before,
+the same machine, loaded: within the scatter); the ground cover's 30 ms and
+104 ms (21 and 77 before: the boulders, the ferns, the flowers, the signs,
+kerbstones and chevrons).
 
 Not measured on a real phone or a real GPU.

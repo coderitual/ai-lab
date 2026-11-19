@@ -100,6 +100,20 @@ const LOADS = [
     ],
   },
   {
+    name: 'twilight',
+    size: WIDE,
+    query: 'time=twilight&ap',
+    shots: [
+      {
+        name: 'twilight',
+        start: true,
+        dist: 4216,
+        photo: { back: 6.2, right: 0, up: 2.3, yaw: 0, pitch: -9, fov: 50 },
+        caption: 'Twilight: frame K5\'s place, high over the bay at the end of the gully bridge',
+      },
+    ],
+  },
+  {
     name: 'night',
     size: WIDE,
     query: 'time=night&ap',

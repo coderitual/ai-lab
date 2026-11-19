@@ -43,6 +43,7 @@ import { GRASS } from './groundMaterial.js';
 import { growTrees } from './treeGeometry.js';
 import { createTreeUniforms, impostorDepthMaterial, impostorMaterial, plantMaterial, treeDepthMaterial, treeMaterial } from './treeMaterial.js';
 import { SPECIES, SPECIES_DATA, VARIANTS, VARIANTS_OF } from './treeSpecies.js';
+import { schemeAt } from './schemes.js';
 
 /** The Track's edge kind TREES (game/track.js EDGE.TREES; assets/ does not import game/). */
 const EDGE_TREES = 4;
@@ -242,6 +243,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const T = TIER[tier] ?? TIER.high;
   const noise = planeNoise(rng.int(1 << 30));
   const plantRng = rng.fork('plant');
+  const plantRngMain = plantRng;
 
   // ---------------------------------------------------------------- planting
   /** @type {{ x: number, y: number, z: number, variant: number, h: number, rank: number, road: boolean, turned: number, inside: number }[]} */
@@ -314,10 +316,10 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
    *   heights times this, or height: [lo, hi] its own range (m); detail: how far out it keeps its finer levels of
    *   detail (1: the tier's distances; trees behind others need less); lean: [x, z, rad] leaning that way by so much
    */
-  function addTree(x, y, z, species, { road, turned, inside, young = 1, height = null, detail = 1, lean = null, slim = 1 }) {
+  function addTree(x, y, z, species, { road, turned, inside, young = 1, height = null, detail = 1, lean = null, slim = 1, rng: plantRng = plantRngMain, variant: chosen = -1 }) {
     const data = SPECIES_DATA[SPECIES[species]];
     const variants = VARIANTS_OF[species];
-    const variant = variants[plantRng.int(variants.length)];
+    const variant = chosen >= 0 ? chosen : variants[plantRng.int(variants.length)];
     const lo = height ? height[0] : data.height[0] * young;
     const hi = height ? height[1] : data.height[1] * young;
     const u = plantRng.next();
@@ -519,7 +521,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       addTree(point.x, y - 0.1, point.z, species, { road: true, turned: wood.turned, inside: 0, young: sapling ? 0.3 : 1, detail: 0.6 });
     }
   }
-  const roadTrees = trees.length;
+  let roadTrees = trees.length;
 
   // THE VALLEY BELOW THE LEDGE'S FIRST BEND (D3's left): nothing but low growth on the slopes the bend looks out
   // over, as far as the wooded ridge beyond. Kept as the bend's centre line where its inside is open, with the
@@ -622,6 +624,202 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies(nearMix, y, false, turned), { road: false, turned, inside: 0.75, detail: 0.5 });
     }
   }
+
+  // (forest lane) THE SCHEMES' WOODS (trackLayout.js SCHEMES, schemes.js): on the pieces that name one, and blended
+  // into their neighbours over its `blend` metres, the road's rows give way to the scheme's own and the mass of the
+  // forest near the road turns to its conifers. Done after everything else is planted, from its own stream, so that
+  // the rest of the lap is planted exactly as before.
+  //   pinewood (frame e2): pines with long bare stems, a few spruces and firs, close to both edges, rows behind
+  //   stonepine (frame e5): pines, firs and spruces in open groups with sunny glades between, a full wood behind; on
+  //   the inside of the bend, near its apex, a tall stone pine standing alone
+  const schemeRng = rng.fork('scheme');
+  const schemeRuns = [];
+  {
+    const runs = [];
+    for (let s = 0; s < track.length; s += 4) {
+      const sch = schemeAt(track, s);
+      if (!sch?.def.wood) continue;
+      const last = runs[runs.length - 1];
+      if (last && last.wood === sch.def.wood && s - last.s1 <= 8) last.s1 = s;
+      else runs.push({ wood: sch.def.wood, s0: s, s1: s });
+    }
+    for (const run of runs) {
+      const box = [1e9, 1e9, -1e9, -1e9];
+      for (let s = run.s0; s <= run.s1; s += 8) {
+        track.pointAt(s, 0, point);
+        box[0] = Math.min(box[0], point.x - 160);
+        box[1] = Math.min(box[1], point.z - 160);
+        box[2] = Math.max(box[2], point.x + 160);
+        box[3] = Math.max(box[3], point.z + 160);
+      }
+      schemeRuns.push({ ...run, box });
+    }
+  }
+  if (schemeRuns.length) {
+    const PINE = SPECIES.indexOf('pine');
+    const SPRUCE = SPECIES.indexOf('spruce');
+    const SPRUCE_B = VARIANTS.findIndex((v) => v.name === 'spruce-b');
+    const PINE_A = VARIANTS.findIndex((v) => v.name === 'pine-a');
+    const PINE_B = VARIANTS.findIndex((v) => v.name === 'pine-b');
+    const MIX = {
+      // [species, variant or -1, share, height range (m)]
+      pinewood: [
+        [PINE, PINE_A, 0.84, [21, 29]],
+        [SPRUCE, SPRUCE_B, 0.11, [19, 26]],
+        [FIR, -1, 0.05, [15, 21]],
+      ],
+      // (e2) the rows further back: crowns lower down, 4 to 20 m up, which is where the 16 degree sun passes on its way
+      // to the road 15 to 45 m off; open, so that it comes through between them in patches (the pines' high crowns
+      // throw their shade beyond the road, only their trunks cross it)
+      pinewoodBack: [
+        [SPRUCE, SPRUCE_B, 0.45, [16, 22]],
+        [FIR, -1, 0.35, [13, 19]],
+        [PINE, PINE_A, 0.2, [20, 27]],
+      ],
+      stonepine: [
+        [PINE, PINE_A, 0.58, [18, 26]],
+        [FIR, -1, 0.24, [12, 19]],
+        [SPRUCE, -1, 0.18, [14, 22]],
+      ],
+    };
+    const pick = (wood) => {
+      const r = schemeRng.next();
+      let acc = 0;
+      for (const m of MIX[wood]) if (r < (acc += m[2])) return m;
+      return MIX[wood][0];
+    };
+    const inBox = (t) => schemeRuns.some((run) => t.x > run.box[0] && t.x < run.box[2] && t.z > run.box[1] && t.z < run.box[3]);
+    // the road's rows give way, the mass near the road turns to the scheme's conifers
+    const kept = [];
+    for (const t of trees) {
+      if (!inBox(t)) {
+        kept.push(t);
+        continue;
+      }
+      track.locate(t.x, t.z, -1, spot);
+      const sch = schemeAt(track, spot.s);
+      const side = spot.lat >= 0 ? 1 : -1;
+      const beyond = Math.abs(spot.lat) - track.edgeAt(spot.s, side);
+      const wood = sch?.def.wood;
+      if (!wood || !MIX[wood] || schemeRng.next() >= sch.w || beyond > 150) {
+        kept.push(t);
+        continue;
+      }
+      if (t.road) continue;
+      // (e2) the wood behind the road's rows thinned, so that the low sun comes through between the crowns and lies on
+      // the road in patches; under a closed canopy 60 to 90 m deep towards the sun the road was in plain shade
+      if (wood === 'pinewood' && schemeRng.next() < 0.55) continue;
+      const m = pick(wood);
+      const variants = VARIANTS_OF[m[0]];
+      t.variant = m[1] >= 0 ? m[1] : variants[schemeRng.int(variants.length)];
+      t.h = m[3][0] + (m[3][1] - m[3][0]) * schemeRng.next();
+      t.turned = 0;
+      kept.push(t);
+    }
+    trees.length = 0;
+    trees.push(...kept);
+    hash.clear();
+    for (const t of trees) occupy(t.x, t.z);
+    // the scheme's own rows
+    const ROWS_OF = {
+      pinewood: [
+        { off: [0.2, 2.2], step: [3.8, 6.5], r: 2.6, detail: 1.8, inside: 0.15, lean: [0.0, 0.04] },
+        { off: [3.5, 7.5], step: [4.5, 8], r: 2.8, detail: 1.3, inside: 0.35 },
+        { off: [9, 15], step: [6, 11], r: 3, detail: 0.9, inside: 0.5, mix: 'pinewoodBack' },
+        { off: [17, 27], step: [6, 11], r: 3.2, detail: 0.6, inside: 0.6, mix: 'pinewoodBack' },
+        { off: [30, 42], step: [7, 12], r: 3.4, detail: 0.5, inside: 0.6, mix: 'pinewoodBack' },
+      ],
+      stonepine: [
+        { off: [0.5, 4], step: [5, 11], r: 3.2, detail: 1.6, inside: 0.1, glade: 0.5 },
+        { off: [6, 12], step: [5, 10], r: 3.4, detail: 1.1, inside: 0.3, glade: 0.55 },
+        { off: [14, 26], step: [6, 11], r: 3.6, detail: 0.7, inside: 0.5, glade: 0.6 },
+      ],
+    };
+    for (const run of schemeRuns) {
+      const rows = ROWS_OF[run.wood];
+      if (!rows) continue;
+      const blend = 100;
+      for (const side of [1, -1]) {
+        rows.forEach((row) => {
+          let hint = -1;
+          for (let d = -blend + schemeRng.range(0, row.step[0]); d < run.s1 - run.s0 + blend; d += schemeRng.range(row.step[0], row.step[1])) {
+            const s = track.wrap(run.s0 + d);
+            const sch = schemeAt(track, s);
+            if (!sch || sch.def.wood !== run.wood || schemeRng.next() >= sch.w) continue;
+            if (!track.woodAt?.(s, side) && !woodAt(track, noise, s, side)) continue;
+            // (e5) sunny glades: no trees where the noise says so
+            if (row.glade && noise.fbm(s / 38 + side * 7.3, 5.1, 2) > row.glade) continue;
+            const lat = side * (track.edgeAt(s, side) + BARRIER_CLEAR + schemeRng.range(row.off[0], row.off[1]));
+            track.pointAt(s, lat, point);
+            if (blocked(point.x, point.z, 0, hint)) continue;
+            hint = spot.index;
+            if (!free(point.x, point.z, row.r)) continue;
+            const y = terrain.heightAt(point.x, point.z);
+            if (y < lakeLevel + 0.5) continue;
+            const m = pick(row.mix ?? run.wood);
+            const x = point.x;
+            const z = point.z;
+            let lean = null;
+            if (row.lean) {
+              track.pointAt(s, 0, point);
+              const l = Math.hypot(point.x - x, point.z - z) || 1;
+              lean = [(point.x - x) / l, (point.z - z) / l, schemeRng.range(row.lean[0], row.lean[1])];
+            }
+            addTree(x, y - 0.15, z, m[0], { road: true, turned: 0, inside: row.inside, height: m[3], detail: row.detail, lean, rng: schemeRng, variant: m[1] });
+          }
+        });
+      }
+      // (e5) the wood all round, closing the picture behind the boulders and the outcrops: the frame's bend lies in a
+      // full wood, fuller than the mass of the forest planted from the terrain
+      if (run.wood === 'stonepine') {
+        for (const side of [1, -1]) {
+          let hint = -1;
+          for (let d = -60; d < run.s1 - run.s0 + 60; d += schemeRng.range(4.5, 7)) {
+            const s = track.wrap(run.s0 + d);
+            const sch = schemeAt(track, s);
+            if (!sch || sch.def.wood !== run.wood) continue;
+            for (let out = 14 + schemeRng.range(0, 5); out < 110; out += schemeRng.range(5, 8)) {
+              if (schemeRng.next() >= sch.w) continue;
+              const lat = side * (track.edgeAt(s, side) + out);
+              track.pointAt(s, lat, point);
+              if (blocked(point.x, point.z, 1, hint)) continue;
+              hint = spot.index;
+              // (only beside its own stretch: another stretch's corridor is somebody else's)
+              if (Math.abs(track.delta(spot.s, s)) > 60) continue;
+              if (!free(point.x, point.z, 3.4)) continue;
+              const y = terrain.heightAt(point.x, point.z);
+              if (y < lakeLevel + 0.5) continue;
+              const m = pick(run.wood);
+              addTree(point.x, y - 0.2, point.z, m[0], { road: false, turned: 0, inside: 0.6, height: m[3], detail: out < 40 ? 0.9 : 0.5, rng: schemeRng, variant: m[1] });
+            }
+          }
+        }
+      }
+      // (e5) the stone pine: alone on the inside of the bend near its apex, its umbrella over the grass island
+      if (run.wood === 'stonepine') {
+        const mid = run.s0 + (run.s1 - run.s0) * 0.5;
+        const k = track.curvature[Math.round(track.wrap(mid) / track.ds) % track.count];
+        const inside = k >= 0 ? 1 : -1;
+        for (const [along, off, h] of [
+          [0.02, 4.5, [20, 22]],
+          [-0.16, 9, [15, 17]],
+        ]) {
+          const s = track.wrap(mid + along * (run.s1 - run.s0));
+          const lat = inside * (track.edgeAt(s, inside) + BARRIER_CLEAR + off);
+          track.pointAt(s, lat, point);
+          if (blocked(point.x, point.z, 0)) continue;
+          // room for its crown
+          for (let j = trees.length - 1; j >= 0; j--) {
+            const t = trees[j];
+            if ((t.x - point.x) ** 2 + (t.z - point.z) ** 2 < 7 * 7) trees.splice(j, 1);
+          }
+          const y = terrain.heightAt(point.x, point.z);
+          addTree(point.x, y - 0.2, point.z, PINE, { road: true, turned: 0, inside: 0, height: h, detail: 2.4, rng: schemeRng, variant: PINE_B });
+        }
+      }
+    }
+  }
+  roadTrees = trees.filter((t) => t.road).length;
   lap('plant');
 
   // ---------------------------------------------------------------- the trees themselves
@@ -880,6 +1078,17 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     }
   }
 
+  /** Level direction the shadows fall in (away from the sun), and their length per metre of height (forest lane). */
+  const fall = { x: 0, z: 0, per: 0 };
+  /** How far (m, level) the shadow of something `h` m tall standing at (x, z) passes from the focus. */
+  function shadowGap(x, z, h, focus) {
+    const L = Math.min(CAST_REACH, h * fall.per);
+    const px = focus.x - x;
+    const pz = focus.z - z;
+    const t = L > 0 ? Math.min(L, Math.max(0, px * fall.x + pz * fall.z)) : 0;
+    return Math.hypot(px - fall.x * t, pz - fall.z * t);
+  }
+
   /**
    * @param {THREE.Camera} camera
    * @param {THREE.Vector3} focus the view's car
@@ -902,7 +1111,9 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       if (cellStart[k] === cellStart[k + 1]) continue;
       const cs = cellSphere[k];
       const dEye = flat ? 0 : cs.center.distanceTo(eye) - cs.radius;
-      const caster = casterMeshes.length > 0 && (box?.on ? inBox(box, cs.center, cs.radius) : Math.hypot(cs.center.x - focus.x, cs.center.z - focus.z) - cs.radius < shadowR);
+      // the sun's shadow box when it is placed (the trunk's exact test); else (forest lane) where the shadow falls: under
+      // a low sun the crowns that dapple the road ahead stand far off towards the sun (3.5 m away per metre of height)
+      const caster = casterMeshes.length > 0 && (box?.on ? inBox(box, cs.center, cs.radius) : shadowGap(cs.center.x, cs.center.z, 2 * cs.radius, focus) - cs.radius < shadowR);
       const seenCell = dEye < T.far && frustum.intersectsSphere(cs);
       if (!caster && !seenCell) continue;
       for (let j = cellStart[k]; j < cellStart[k + 1]; j++) {
@@ -910,7 +1121,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         const v = trees[i].variant;
         sphere.center.set(spheres[i * 4], spheres[i * 4 + 1], spheres[i * 4 + 2]);
         sphere.radius = spheres[i * 4 + 3];
-        if (caster && (box?.on ? inBox(box, sphere.center, sphere.radius) : Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR)) write(casterMeshes[0], i, 1);
+        if (caster && (box?.on ? inBox(box, sphere.center, sphere.radius) : shadowGap(trees[i].x, trees[i].z, trees[i].h, focus) < shadowR)) write(casterMeshes[0], i, 1);
         if (!seenCell || !frustum.intersectsSphere(sphere)) continue;
         // (small things, the undergrowth and young trees, go to the simpler levels sooner)
         // the floor under it
@@ -988,6 +1199,13 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       uniforms.uTime.value = simTime;
     },
     setTime(time) {
+      const d = time.sun?.dir;
+      if (d) {
+        const level = Math.hypot(d[0], d[2]) || 1;
+        fall.x = -d[0] / level;
+        fall.z = -d[2] / level;
+        fall.per = d[1] > 0.01 ? level / d[1] : 0;
+      }
       // a breath of wind by day, less at night
       uniforms.uWind.value.z = time.name === 'night' ? 0.5 : 1;
     },

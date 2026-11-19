@@ -21,6 +21,7 @@
 
 import * as THREE from 'three';
 import { createCar } from '../assets/car/index.js';
+import { PAINTS, PAINT_ORDER } from '../assets/car/materials.js';
 import { LAMPS as CAR_LAMPS } from '../assets/car/spec.js';
 import { createWorld } from '../assets/world/index.js';
 import { CANOPY, canopyOpen } from '../assets/world/canopy.js';
@@ -93,6 +94,8 @@ const ASSISTS_KEY = 'dreamcar.assists';
 const THROTTLE_KEY = 'dreamcar.throttle';
 const STEERING_KEY = 'dreamcar.steering';
 const HAND_KEY = 'dreamcar.hand';
+/** Each local driver's paint (a key of PAINTS): the first driver's, the second's. */
+const PAINT_KEYS = ['dreamcar.paint', 'dreamcar.paint2'];
 const STEERINGS = ['pad', 'slider', 'arrows', 'tilt'];
 const ZONES_KEY = 'dreamcar.zones.v1';
 
@@ -165,6 +168,11 @@ export class Game {
     this.throttle = kept(THROTTLE_KEY) === 'manual' ? 'manual' : 'auto';
     this.steering = STEERINGS.includes(kept(STEERING_KEY)) ? kept(STEERING_KEY) : STEERINGS[0];
     this.hand = kept(HAND_KEY) === 'left' ? 'left' : 'right';
+    /** Each driver's paint (the options, kept on the device; ?paint= for the first driver, not kept). */
+    this.paints = DRIVERS.map((who, i) => {
+      const own = i === 0 && PAINTS[params.paint] ? params.paint : kept(PAINT_KEYS[i]);
+      return PAINTS[own] ? own : who.paint;
+    });
     /** Why tilt is not steering ('' | 'refused' | 'unavailable'): the options say so. */
     this.tiltNote = '';
     this._zonesSeen = kept(ZONES_KEY) === '1';
@@ -318,7 +326,7 @@ export class Game {
 
     this.racers = DRIVERS.slice(0, n).map((who, index) => {
       const car = createCar({
-        paint: (index === 0 && params.paint) || who.paint,
+        paint: this.paints[index] ?? who.paint,
         plate: (index === 0 ? params.plate : params.plate2) || who.plate,
         tier: this.tier,
         caps: this.caps,
@@ -362,7 +370,7 @@ export class Game {
       return racer;
     });
     if (!split) {
-      this.ghostCar = createCar({ ghost: true, paint: DRIVERS[0].paint, plate: '', tier: this.tier, caps: this.caps });
+      this.ghostCar = createCar({ ghost: true, paint: this.paints[0], plate: '', tier: this.tier, caps: this.caps });
       this.ghostCar.object.visible = false;
       world.scene.add(this.ghostCar.object);
     }
@@ -582,6 +590,19 @@ export class Game {
       this.input.hand = this.hand;
       this.input.release();
       keep(HAND_KEY, this.hand);
+      if (this.engine.manual && !this._rendering) this.engine.advance(0);
+      return;
+    }
+    if (name.startsWith('paint:')) {
+      // paint:<driver>:<name>: repainted at once (uniforms only), and kept
+      const [, who, id] = name.split(':');
+      const i = Number(who);
+      if (PAINTS[id] && i >= 0 && i < this.paints.length) {
+        this.paints[i] = id;
+        keep(PAINT_KEYS[i], id);
+        this.racers[i]?.car.setPaint(id);
+        if (i === 0) this.ghostCar?.setPaint(id);
+      }
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
@@ -1177,6 +1198,8 @@ export class Game {
       map: this.mapShown,
       assists: this.assists,
       assistLevels: Object.keys(ASSISTS.levels),
+      paints: PAINT_ORDER,
+      paint: this.paints.slice(),
       throttle: this.throttle,
       steering: this.steering,
       hand: this.hand,
