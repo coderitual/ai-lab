@@ -125,7 +125,7 @@ const TAIL_GLINT = { across: 0.05, along: 0.3, radiance: 1.6, brake: 3, gain: 0.
  * behind the car, softened within about `soft` m (m^2 added to the squared distance: the lamp is not a point, and the
  * road right under the bumper must not burn); `color` its red after the asphalt has taken it. Brake lamps triple it, as they do the glint.
  */
-const TAIL_POOL = { power: 2, soft: 2.5, color: [1.0, 0.05, 0.025] };
+const TAIL_POOL = { power: 0.7, soft: 2.5, color: [1.0, 0.05, 0.025] };
 /**
  * (tunnel lane) Under the tunnel's roof the dry asphalt mirrors, softly (TUNNEL_SHEEN): the two lines of luminaires
  * (shading.js BORE_UNIFORMS: where they are and how bright), blurred `blur[0]` m across plus `blur[1]` m for every
