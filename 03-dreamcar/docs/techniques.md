@@ -597,11 +597,11 @@ spaced to keep the cells square) and the fragment stage summing the analytic
 slopes for the normal. Each wave is dropped from the mesh where the mesh has
 fewer than about five vertices per wavelength, and from the normals where it
 is smaller than a pixel (01's rule: at sqrt(570 h L) m for an eye h m over a
-wave L m long). New here: the slope variance a wave stops drawing is added
-to the highlight's (`lost`, alpha^2 = alpha0^2 + 2 sigma^2), and so is the
-ripple map's when it fades with the footprint of the pixel. Close to, the
-sun breaks into glitter on the facets; far out the same light is a smooth,
-wide path: no shimmer, no aliased sparks, with nothing to tune by distance.
+wave L m long). New here: the slope variance a wave stops drawing is handed
+back (`lost`: both axes together, half the square of its steepness), and the
+water keeps it (see the shading, below). Close to, the sun breaks into
+glitter on the facets; far out the same light is a smooth, wide path: no
+shimmer, no aliased sparks, with nothing to tune by distance.
 The swell is long and soft (150, 98, 63 m), the chop and the short waves are
 a light breeze's. (Round 2, frame E1) **Wave groups**: a sum of a few long
 trochoids seen from 100 m up reads as ruled lines. Each wave's amplitude is
@@ -612,26 +612,149 @@ in the mesh's displacement, the normals, the crest test for foam and in
 `sampleWaves` alike (the sea is still defined once); its own slope is left
 out of the normal (it is a hundredth of the wave's).
 
+**The shore map** (water lane; `src/assets/world/seaShore.js`). Everything
+the water does at a coast it does from one texture, baked at start-up from
+the land's own height function (`terrain.heightAt`, what the mesh is made of)
+against the sea's level: 1024 x 1024 texels over the sea map's box (4.7 m a
+texel; 512 on low), four channels. *Depth* of the bed, stored as a square
+root so that the first metre has thirty steps. *Distance to the shoreline*,
+signed (positive on the water, negative for 6 m up the land) so that it runs
+smoothly through the water's edge: a chamfer transform that starts, not from
+texel centres, but from where the bed crosses the level between a wet texel
+and a dry one (the bed taken to run straight between them), so the zero is
+right to a fraction of a texel. *The land's height* over the water, whose
+coarser mip levels are not means but the highest of the four texels below:
+one read of a coarse level answers "does anything in this stretch stand this
+tall". And *sand*: one where the bed shelves gently, zero where it falls
+steeply (a cliff's foot is rock). The height function is asked only within
+70 m of a shoreline (by the sea map's own distance fields) and on every
+fourth texel elsewhere: 105 thousand calls for a million texels, 0.6 s in
+Node. Water is wherever the land lies under the level, nothing else: the
+terrain keeps hollows that are not the sea's above it (`keepDry`), and the
+water is drawn everywhere. Because the map is made from the height function
+and not from anything the coast lane names, a new beach or a moved stack is
+in the water's picture without the water being told.
+
 **The shading** is a MeshStandardMaterial with the surface written into it
-(shading.js `extend`): the sun or moon, the sky's environment map, the fill,
-the shadow map and the haze reach the water as they reach the land, and the
-time of day's light is all the colour it has. 01's analytic sky becomes the
-environment map; 01's rule that a facet tipped past the horizon shows the sky
-just over it, not the ground under it, is kept (the normal is bent). The body
-is an albedo (what comes back up out of the water: deep blue, greener over
-the shallows by the sea map's depth), lighter at the tops of the waves, with
-01's light through the wave's top towards the sun as a small added term.
-Foam is 01's: the swell's Jacobian now and a moment ago leaves streaks behind
-crests; the surf is bands that run in with the swell over the last 14 to
-26 m of water (the sea map's distance to land), warped by the lace texture;
-far away the lace becomes a share of white. At night the six lamps the wet
-road glints with (lamps.js picks them per view) are drawn into the water as
-streaks, a lobe about the mirrored view narrow across the plane of
-incidence and long in it, widened by the roughness. Far out the water fades
-into `hazeColor` of its own direction, which is what the sky dome shows just
-under the horizon, so the disc's edge never shows. Not 01's: the wake, the
-mirror (a planar reflection would be a scene pass: the sea reflects the
-environment map only), caustics and the sandy bed.
+(shading.js `extend`): the sun or moon with its shadow map, the fill and the
+haze reach the water as they reach the land, and the time of day's light is
+all the light it has. What the water adds is in four parts.
+
+*Slopes, and what happens to the ones a pixel cannot draw.* The normal is the
+waves' analytic slopes plus wind ripples: one tiling normal map read at
+several sizes (3.1, 8.3, 23 and 61 m a repeat; its waves are an eighth of
+that and shorter), each layer turned a different way and drifting downwind at
+its own speed, so that no two line up and nothing tiles to the eye. How rough
+the water is at a place is a slow field: gusts (cat's paws, a soft noise drawn
+out three to one along the wind and drifting with it at 3.2 m/s) against
+calmer water between them (0.38 of a gust's ripples), long glassy slicks (the
+noise's cell edges drawn out the same way), the lee of land (the shore map's
+land channel, read 300 m coarse: any land hereabouts), the shallow margin,
+and the time of day's sea state (evenings are calmer). A layer is drawn only
+while a pixel's footprint along the line of sight is a part of its
+wavelength; what is not drawn is not forgotten. Its slope variance (measured
+from the map at start-up, not guessed) is carried in `seaVar` together with
+the waves' own lost slopes and the capillaries nothing draws, and does three
+things. It widens the highlight (alpha^2 = alpha0^2 + variance): the sun's
+path is sparks close to and a wide road far out, with no rule about distance
+and nothing to shimmer. It weakens and lifts the mirror: a rough surface seen
+at a glancing angle shows the eye the facets that lean towards it, so it
+mirrors less than Fresnel's curve says (Bruneton's fit of the mean Fresnel
+factor of a Gaussian sea: 0.78 at 3 degrees on calm water, 0.45 in a gust)
+and what it mirrors is the sky some way above the horizon (2.5 sigma at the
+horizon, nothing looking down). That, and not a tint, is why open water in a
+breeze is darker and bluer than the sky it lies under, why a calm bay is
+paler, and why a gust shows as a dark patch. And it softens the edge of
+whatever is mirrored.
+
+*The body, by depth.* What comes back out of the water is the bed seen
+through the column over the deep colour of the time of day: per channel,
+`deep * (1 - T) + bed * T` with `T = exp(-k * depth * path)`, k =
+(0.42, 0.085, 0.058) per metre for red, green and blue and `path` the mean
+of the way down and the refracted way back (longer at a glancing look). Red
+is gone in two or three metres, green in twenty: the same pale sand reads
+sand at 0.3 m, green at one, turquoise at three to six, teal at twelve and
+is lost in the deep blue by forty, with nothing but the map's depth saying
+which. The bed is modelled in the shader (the ground under the water is not
+drawn: the water is opaque): pale sand with ripples, dark reef and weed in
+patches of two noise octaves, more of it where the map says the bed is rock,
+none on the beach's margin; it is looked up where the refracted line of sight
+meets it and wobbles with the surface's normal, and close to the light the
+ripples gather plays over it (the minimum of two drifting copies of the
+noise's cell edges, raised to a power).
+
+*The mirror.* The sky is the environment map, clouds and all, read along the
+lifted ray and blurred by the spread. On medium and high the mirrored ray is
+also marched across the shore map's land heights: six or eight steps, each
+2.3 (2.1) times the last from 9 m out, each reading the mip level whose
+texels are about 0.4 of its distance, which holds the highest land of that
+stretch; where `height / distance` stands over the ray's own slope the water
+shows land instead of sky: dark (a coast's albedo under the time of day's
+light), hazed by its distance, soft by the slopes' spread. Because the ray is
+the pixel's own, the ripples draw the image out towards the eye and break its
+edge, as water does. The viaducts' piers are not land: the eight nearest that
+stand in the water are given to the shader as posts (place, half width, top)
+and the same ray is tested against each. The march is skipped where the
+coarse level says no land is near. On high the world also draws a planar
+mirror for the water (`PlanarMirror`, 0.3 of the view's height, 3 km deep,
+the scene from the eye mirrored in the water's level, without the water, the
+ground cover, the kerbs and the studs): the pixel looks up where its lifted
+ray, taken some way out, lands in that picture, mixes in the mirror's
+streaked copy by the roughness, and falls back on the map and the march where
+the ray leaves the picture. Nothing in it may be brighter than four whites
+(the sun's disc is not mirrored twice: its glitter is the light's highlight).
+
+*The sun's glitter.* The directional light's highlight is right in the mean
+and wrong in kind: a real path is made of points. After the lights, the
+highlight is multiplied by a field of sparks with mean one: the water is cut
+into cells about a pixel and a half across (two neighbouring power-of-two
+sizes, blended, so that no line shows where the size changes), each cell
+flashes for a share of its own beat, and the share is the highlight's
+radiance over a spark's (1.6 times the sun's irradiance). Where the path is
+strong every cell is lit and it is solid; at its edges it thins into single
+points that the bloom picks up; far out, where a pixel holds many facets,
+less than half of the breaking-up is kept. The hash is the engine's integer
+one, the clock the run's.
+
+*White water*, all from the shore map. Where the bed shelves gently and is
+less than 1.25 m down (and within 46 m), lines of surf come in 6.5 m apart
+every 4.6 s: the phase is the distance to the shore over the spacing plus
+time, plus a slow wander along the shore (two crossed sines) so that a line
+is an arc, not a ring round the whole bay. A line is a front (solid white
+for a tenth of the cycle), lace behind it that thins as the water ages (the
+foam mask lowers the threshold of a bubble-and-thread noise), a face ahead of
+it where the water is thin and milky turquoise, and on medium and high a
+crest in the normal, pointing down the map's gradient. The same phase lifts
+the water's edge in the vertex stage (`seaSheet`: up quickly as a line
+arrives, back slowly, 0.16 m), so a sheet runs up the sand and drains; where
+the water over the bed is a few centimetres it carries foam at its edge and
+bubbles behind. Where the bed falls steeply (rock, a cliff's foot, a stack)
+there is a slap that breathes with the swell within 5 m and a wash to 15 m;
+round each pier a ring. A pixel that covers more than a part of the lines'
+spacing sees their mean, so nothing crawls. Out at sea the swell's Jacobian
+leaves streaks behind crests, in the gusts.
+
+At night the six lamps the wet road glints with (lamps.js picks them per
+view) and the cars' tail lamps (the `beams` the world is given) are drawn
+into the water as streaks: a lobe about the mirrored view, narrow across the
+plane of incidence and long in it, widened by the roughness.
+
+**To the horizon.** The disc reaches 14 km. The views' far plane is at 5 km:
+the vertex stage keeps the vertices beyond it just inside the depth range
+(`z = w (1 - 2e-6)`, in front of far.js's ridges at `1 - 1e-6`, behind
+everything real), and towards the mainland's bearings (read off
+`terrain.sea.sector`) pulls them back to where the disc always ended, so no
+water shows behind the far land. The water goes into the haze by its true
+distance (the atmosphere's own patch), and over the last third of the disc
+into `hazeColor` of its direction, which is what the sky dome shows under
+the horizon. Not done: the wake of a car's splash, refraction of what stands
+in the water, the bed under the open sea's swell.
+
+**For the ground.** `SEA_SHORE_GLSL` (sea.js) gives any material that carries
+`SEA_UNIFORMS` the shore map (`shoreAt`, `shoreDepth`, `shoreDist`,
+`shoreLand`) and the sheet's level at a place and time (`seaSheet(xz, t)`,
+with `uSeaTime`; never more than `SEA_SHEET_TOP`): sand lower than the level
+plus `SEA_SHEET_TOP` has been wet, and how long ago is in the same function.
 
 **The coast road's cliff** (round 2, `COAST` in terrain.js). The near
 profile beyond a sea side's solid edge (`nearAt`) is replaced, by the side's
