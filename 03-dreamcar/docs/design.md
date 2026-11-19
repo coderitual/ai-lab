@@ -93,8 +93,9 @@ A second car, in a different paint, is the second player's.
 
 ## The road
 
-A racing circuit, not a public road: 5.14 km, driven clockwise, 108 m between
-the lake shore and the top (110 m above the water). Paved 12 m wide (three
+A racing circuit, not a public road: 5.14 km, driven clockwise, 69 m between
+the lake shore and the top (71 m above the water; round 5: it was 108 m, on
+the crest, until the coast after the tunnel was brought down to the bay). Paved 12 m wide (three
 lanes, `HALF_WIDTH` 6), a 1.2 m strip beyond each edge line that is a red and
 white kerb in the bends and a paved margin elsewhere, then mown grass 3 to 10 m
 wide (widest on the outside of the fast bends) to a barrier: a steel rail by
@@ -147,16 +148,18 @@ line, m; speeds are the autopilot's at full pace):
 | Shore bend | 250 to 657 | a banked right of 220 m radius (9 degrees) away from the water, starting to climb; about 200 km/h |
 | Forest esses | 657 to 1409 | right 260 m, left 330 m, right 240 m, climbing at 5 to 6 per cent; 205 to 240 km/h |
 | The tunnel | 1409 to 2006 | a rock cutting faced in concrete at its end, the lit box (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out between retaining walls with acoustic screens; up to 255 km/h |
-| The sky road | 2006 to 2582 | on piers: a 576 m left of 300 m radius, banked 10 degrees, the valley 42 m under its middle; about 230 to 257 km/h |
-| The carousel | 2582 to 2915 | a 150 m climb, then 190 degrees right round a spur at 55 m radius, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
-| The crest | 2915 to 3115 | the top (108 m), in the open, the sea far below on the left; the car goes light over it at about 160 km/h |
-| The plunge | 3115 to 3394 | 8 per cent down a 400 m right into a compression; to 215 km/h |
-| The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m on the hillside, rock on one side; 216 to 257 km/h |
-| Gully bridge | 3778 to 4115 | 337 m straight on piers, 26 m over the gully, 8 per cent down; to 282 km/h |
+| The sky road | 2006 to 2582 | on piers over the sea: a 576 m left of 300 m radius, banked 10 degrees, coming down at 8 per cent from 54 m to 12 m over the line, the bay inside the loop on the right and the open sea on the left; about 230 to 260 km/h |
+| The carousel | 2582 to 2915 | the low point by the water (12 m over the line), a 150 m climb, then 190 degrees right at 55 m radius, banked 8 degrees, water on both sides: the only heavy braking of the lap, 90 km/h |
+| The crest | 2915 to 3115 | a 200 m straight climbing at 6.5 per cent on a shelf between the open sea and the bay, the volcano ahead and to the right; about 110 to 165 km/h |
+| The plunge | 3115 to 3394 | a 400 m right still climbing at 6.5 per cent (the name is the old road's); to 200 km/h |
+| The ledge | 3394 to 3778 | a left of 300 m over the lap's top (69 m), a right of 350 m 7.5 per cent down onto the gully bridge as before; 203 to 238 km/h |
+| Gully bridge | 3778 to 4115 | 337 m straight on piers, 26 m over the gully, 8 per cent down; to 271 km/h |
 | The long right | 4115 to 4686 | 90 degrees at 300 m radius, banked 9 degrees, onto the straight; 234 to 283 km/h |
 
-The autopilot laps in 85.1 s at full pace (217 km/h on average), 92.9 s at
-0.9, 117.1 s at 0.7. Sector lines at 1882 m (just out of the tunnel) and
+The autopilot laps in 85.8 s at full pace, 94.1 s at 0.9, 118.6 s at 0.7
+(round 5; 85.1, 92.9 and 117.1 before the coast ran low: the lap's heights
+from the tunnel's portal to the gully bridge changed, the plan and the length
+did not; the road rejoins its old height at the gully bridge's start, 63.7 m). Sector lines at 1882 m (just out of the tunnel) and
 3420 m (the start of the ledge).
 
 The Track says where everything of a circuit goes, as data the world reads
@@ -359,9 +362,9 @@ bottom (as given, whatever the picture's shape); the HUD is hidden unless
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
-day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 76.6 s),
+day, t 101 s), `?photo=d3` (the ledge's first bend, day, t 77 s; round 5: 100 and 76.6 before the coast ran low),
 `?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green),
-`?photo=k5` (frame K5, strict spec at dusk: t 88.7 s, the end of the sweepback's first piece, a chase camera
+`?photo=k5` (frame K5, strict spec at dusk: t 89.7 s (round 5: 88.7 before the coast ran low), the end of the sweepback's first piece, a chase camera
 6.2 m back and 2.3 m up, pitched 9 degrees down, lens 50 degrees) and
 `?photo=e1` (frame E1, strict spec for the coast stretch: day, t 64.9 s, the car coming out of the carousel,
 the camera on the crest looking back at it; a `roll` of 7 degrees tilts the horizon as the frame's does); a name
@@ -603,8 +606,9 @@ driver sees them, from the tunnel's cutting, the sky road and the climb.
 stands out in the sea off the headland as scenery (viaduct.js `SEA_SPAN`,
 no road on it), crossing the water behind the hairpin from E1's camera; the
 camera stands low and close (2.2 m up, 7.5 m ahead of the car); round the
-hairpin three red and white boards stand, not a hoarding; and the coast
-road's asphalt is older and sun-bleached, a mid grey (`COAST_PALE`). And
+hairpin three red and white boards stand, not a hoarding (the coast road's
+paler asphalt of round 3 went when the road lane's new asphalt came, which is
+the mid grey the frame asks for everywhere). And
 our day sun is fixed: 16 degrees up, due east (down the start straight); from
 E1's camera, looking a little east of north, it stands about 80 degrees to
 the left and very slightly ahead, so the cut face (facing west) is in its own
