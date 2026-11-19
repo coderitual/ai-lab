@@ -353,7 +353,9 @@ needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
 day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 76.6 s),
-`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green) and
+`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green),
+`?photo=k5` (frame K5, strict spec at dusk: t 88.7 s, the end of the sweepback's first piece, a chase camera
+6.2 m back and 2.3 m up, pitched 9 degrees down, lens 50 degrees) and
 `?photo=e1` (frame E1, strict spec for the coast stretch: day, t 64.9 s, the car coming out of the carousel,
 the camera on the crest looking back at it; a `roll` of 7 degrees tilts the horizon as the frame's does); a name
 brings its own moment of the autopilot's run and its time of day unless the
@@ -505,7 +507,27 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   wet road mirrors; the last warm side light with long shadows across the
   road and a lit snowy mountain against a clear pale sky.
 
-Day answers to D1, D3, E1 and A; golden hour to D4, D2 and the twilight references; the wet night to two
+- **K5**, one of those twilight frames made strict spec for one place ("treat
+  it as spec of one of the place on the track; beside the car everything is
+  spec"): after sunset, a chase camera low behind the car on a wide dark road
+  high over the water, curving gently right. The sky deep blue overhead
+  through pale turquoise and yellow to an orange-rose band on the horizon,
+  clear. Across the left and the middle a pale sheet of water with a bright
+  gleam, dark blue mountains beyond it with a few snow-capped cones. On the
+  left a guard rail, low scrub, small warm lamps far off, a yellow chevron
+  board and two tall dark feather flags on poles; on the right a guard rail
+  curving with the road and a big dark round tower with a railing round its
+  top and one warm lit window. The road dark, its white lines catching the
+  sky, the tail lamps' red glow on the asphalt behind the car. Our place is
+  the end of the sweepback's first piece, where the road comes off the gully
+  bridge high over the bay, due south, and begins its long right turn down to
+  the shore (`?photo=k5`; landmarks.js `K5`): the bay and the open sea to the
+  west lie ahead and to the left, the golden-hour sun stands 35 degrees to the
+  right behind the tower, the far cones (far.js) stand across the sea, and the
+  tower, the flags, the chevron and the lamps are k5.js's. Our flags are plain;
+  the tower is our own.
+
+Day answers to D1, D3, E1 and A; golden hour to D4, D2 and the twilight references (K5 strictly); the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
 light, the materials, the vegetation, the composition and the sense of speed:

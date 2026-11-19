@@ -9,7 +9,58 @@
 // stretch of road; it faces the bend.
 
 /** Where to look from, and how: degrees left of the road's heading, metres off. */
-const HALL = { along: 105, angles: [14, 48], prefer: 28, range: [600, 1100], clear: 70 };
+const HALL = { along: 105, angles: [14, 66], prefer: 28, range: [400, 1100], clear: 70 };
+
+/**
+ * (day lane) THE PLACE OF FRAME K5 (the owner's strict spec at dusk): the end of the sweepback's first piece, where the
+ * road, high over the bay, has run due south off the gully bridge and begins its long right turn down to the shore.
+ * `along` m into the section `sweepback` is where the car stands; seen from there, bearings `view` (degrees on the
+ * map, 0 = +Z, clockwise towards +X... as atan2(x, z)) out to `reach` m are the frame's: the bay and the open sea to
+ * the horizon, the far shore, the far cones. Nothing built for another frame may stand there (the hall moves out of
+ * it), and K5's own scenery (k5.js) is placed from here: the drum `tower` beyond the right edge (`ahead` m past the
+ * place, its wall `beyond` m behind the solid edge, radius and height), two feather `flags` and a `chevron` board
+ * beyond the left edge, warm `lamps` far below on the left, and the far `cones` across the sea (far.js: bearing from
+ * the place, distance, height, base radius).
+ */
+export const K5 = {
+  section: 'sweepback',
+  along: 101,
+  view: [128, 238],
+  reach: 3000,
+  tower: { ahead: 14, beyond: 6, r: 11, h: 18 },
+  flags: [{ ahead: 18, beyond: 2, h: 7 }, { ahead: 55, beyond: 2.5, h: 7 }],
+  chevron: { ahead: 28, beyond: 0.8 },
+  lamps: { count: 16, near: 260, far: 1600, bearings: [150, 235] },
+  cones: [
+    { bearing: 210, dist: 15000, h: 1150, r: 3800 },
+    { bearing: 198, dist: 16500, h: 1050, r: 3400 },
+    { bearing: 168, dist: 15000, h: 1350, r: 3600 },
+  ],
+};
+
+/**
+ * @param {object} track
+ * @returns {{ s: number, x: number, y: number, z: number, heading: number } | null} the place (on the centre line) and
+ *   the road's bearing there (degrees, atan2(x, z))
+ */
+export function k5Site(track) {
+  const sec = track.sections.find((x) => x.id === K5.section);
+  if (!sec) return null;
+  const s = track.wrap(sec.s0 + K5.along);
+  const f = track.frameAt(s, {});
+  return { s, x: f.pos.x, y: f.pos.y, z: f.pos.z, heading: (Math.atan2(f.tan.x, f.tan.z) * 180) / Math.PI };
+}
+
+/** Whether a point of the map lies in frame K5's view (and so must not carry another frame's landmark). */
+export function inK5View(track, x, z) {
+  const k = k5Site(track);
+  if (!k) return false;
+  const d = Math.hypot(x - k.x, z - k.z);
+  if (d > K5.reach) return false;
+  if (d < 260) return true;
+  const b = ((Math.atan2(x - k.x, z - k.z) * 180) / Math.PI + 360) % 360;
+  return b > K5.view[0] && b < K5.view[1];
+}
 
 const cache = new WeakMap();
 
@@ -37,6 +88,7 @@ export function hallSite(track, heightAt) {
         track.locate(x, z, -1, spot);
         const side = spot.lat >= 0 ? 1 : -1;
         if (Math.abs(spot.lat) - track.edgeAt(spot.s, side) < HALL.clear) continue;
+        if (inK5View(track, x, z)) continue;
         const y = heightAt(x, z);
         let flat = 0;
         for (const [dx, dz] of [[25, 0], [-25, 0], [0, 25], [0, -25]]) flat = Math.max(flat, Math.abs(heightAt(x + dx, z + dz) - y));
@@ -57,30 +109,6 @@ export function hallSite(track, heightAt) {
   }
   cache.set(track, best);
   return best;
-}
-
-/**
- * (day lane) The green hill of frame D3: from the ledge's first bend the frame has a big wooded hill over the hall at
- * the top left, where our massif would otherwise stand bare. Seen from `along` m into the ledge it rises `left`
- * degrees left of the road's heading, `dist` m off, `height` m high, a long ridge across the line of sight, `radius` m
- * its half depth and one and a half times that its half length (far.js
- * builds it). Placed where it hides nothing of the start: from the start line it stands behind the left shoulder,
- * well clear of the golden-hour sun over the lake.
- */
-const HILL = { along: 25, left: 41, dist: 1900, height: 470, radius: 720 };
-
-/**
- * @param {object} track
- * @returns {{ x: number, z: number, height: number, radius: number, view: number[] } | null} `view`: the level unit
- *   vector from the bend towards it
- */
-export function greenHill(track) {
-  const ledge = track.sections.find((sec) => sec.id === 'ledge');
-  if (!ledge) return null;
-  const f = track.frameAt(track.wrap(ledge.s0 + HILL.along), {});
-  const ang = Math.atan2(f.tan.x, f.tan.z) + leftTurn(f, HILL.left);
-  const view = [Math.sin(ang), Math.cos(ang)];
-  return { x: f.pos.x + view[0] * HILL.dist, z: f.pos.z + view[1] * HILL.dist, height: HILL.height, radius: HILL.radius, view };
 }
 
 /** The turn (rad, as a change of map heading) of `deg` degrees towards the road's left in frame f. */

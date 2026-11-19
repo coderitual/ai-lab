@@ -36,6 +36,7 @@ import { TIMES, placeLights } from './lighting.js';
 import { createGroundMaterial } from './groundMaterial.js';
 import { createSea } from './sea.js';
 import { createFar } from './far.js';
+import { createK5 } from './k5.js';
 import { CASTER_LAYER, createForest } from './forest.js';
 import { createGroundCover } from './groundCover.js';
 import { selectBake } from './shading.js';
@@ -178,6 +179,10 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   const far = createFar({ track, terrain, caps, tier, rng: rng.fork('far'), atmosphere });
   far.setPixelRatio(renderer.getPixelRatio());
   lap('far');
+  // (day lane) the scenery of frame K5's place: the drum tower, the flags, the chevron, the far lamps
+  const k5 = createK5({ track, terrain, caps, tier, rng: rng.fork('k5'), atmosphere });
+  k5.setPixelRatio(renderer.getPixelRatio());
+  lap('k5');
   const structures = createStructures({ track, terrain, caps, tier, atmosphere, rng: rng.fork('structures'), glints: road.glints });
   lap('structures');
   const studs = createStuds({ track, caps });
@@ -200,7 +205,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   }
   const smallReach = SMALL_REACH[tier] ?? SMALL_REACH.medium;
   const eye = new THREE.Vector3();
-  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, sea.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, sea.mesh, forest.group, cover.group, far.group, k5.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -260,7 +265,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
     /** The trees (forest.js): where they stand (woodAt, turnedAt), single trees for the viewer (specimen). */
     forest,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, sea: sea.stats, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
+    stats: { ms, sea: sea.stats, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, k5: k5.stats, cover: cover.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -287,6 +292,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       scene.environmentIntensity = time.env.intensity;
       forest.setTime(time);
       far.setTime(time);
+      k5.setTime(time);
       sea.setTime(time);
       structures.setTime(time);
       studs.setTime(time);
@@ -376,6 +382,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       sky.dispose();
       forest.dispose();
       far.dispose();
+      k5.dispose();
       cover.dispose();
       terrain.dispose();
       road.dispose();
