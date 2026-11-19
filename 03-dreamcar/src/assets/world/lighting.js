@@ -247,7 +247,8 @@ export const TIMES = {
       horizon: [0.17, 0.11, 0.06],
       falloff: 0.2,
       phase: 0.3,
-      glow: { color: [1.0, 0.58, 0.26], wide: [0.45, 0.6], tight: [18, 0.985] },
+      // (day lane, frame K5) a tight, weak wide glow: 35 degrees from the sun the dome's own bands show, not a gold wash
+      glow: { color: [1.0, 0.58, 0.26], wide: [0.12, 0.82], tight: [18, 0.985] },
       disc: { size: 0.45, radiance: 600, limb: 0.6, phase: 1, tilt: 0, seas: 0 },
       // (dusk lane, the owner's twilight references) the whole dome, not one tint (sky.js twiColumn): under the sun
       // a rose and orange horizon rising through gold and pale yellow into turquoise and deep blue overhead; opposite
@@ -272,7 +273,8 @@ export const TIMES = {
     ambient: { sky: [0.95, 0.78, 0.6], ground: [1.0, 0.62, 0.34], intensity: 0.014 },
     // (dusk lane) the haze is the horizon's: blue-violet away from the sun (the far land stands in layered blue
     // silhouettes), gold and rose towards it
-    fog: { color: [0.02, 0.022, 0.048], sun: [0.3, 0.13, 0.045], sunLobe: 5, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
+    // (frame K5: the thin air 3e-5, was 8e-5: the far cones across the sea stand dark against the band, not lost in gold)
+    fog: { color: [0.02, 0.022, 0.048], sun: [0.25, 0.1, 0.035], sunLobe: 24, density: 0.00025, heightFalloff: 0.011, air: 0.00003 },
     exposure: 4.2,
     tunnelExposure: 6,
     shadeEv: 0.6,

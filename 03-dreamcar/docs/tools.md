@@ -280,6 +280,16 @@ machine without a GPU, and only what is listed here.
   staged towards it looked into the stand). Not looked at on `high`, in
   motion, in split screen or in the chase view; the playtest, the soundtest
   and the docs' screenshots were not run.
+- **Frame K5's place** (k5.js, landmarks.js `K5`, the far cones, the
+  massif's west end lowered beyond D1's left edge, the D3 green hill removed,
+  the pale hall kept out of K5's view, the dusk haze and glow tightened):
+  stills on software WebGL, four rounds on `low` and two at `medium`
+  1280x720 at `?photo=k5` beside the frame, the same place by day and by
+  night, a 393x852 `--mobile` chase still there, and d1, d3, d4 once at
+  `medium` afterwards; `node tools/unit.mjs` passed. The chevron was turned
+  to point into the bend after the last still. Not looked at on `high`, in
+  motion or in split screen; draw calls at K5: 142 medium dusk (121 at phone
+  shape), 158 by day, 183 at night.
 - **The dusk lane's changes** (the twilight dome, dusk clouds lit on the
   sun's side, first stars, the horizon-coloured haze, the dusk grade, lamps
   and windows on with halos, the tail lamps' red pool on the road): chase

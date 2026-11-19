@@ -353,17 +353,16 @@ only where the baked sun reaches): a thin bright line along the ridges on the
 sun's side, as in D1. Its skyline: the ridge left of the main peak stays about
 21 degrees high and the shoulder climbs gently out of the frame.
 
-`far.js` also builds **the green hill** of frame D3 (`greenHill` in
-landmarks.js): a wooded ridge 470 m high with three summits beyond the west
-end of the lake, 41 degrees left of the road 1.9 km out from the ledge's
-first bend and lying across the line of sight from there, so that a green
-hill, not the massif's bare rock, stands over the pale hall. It is inside the
-far plane and drawn as an ordinary surface (12 x 40 cells on low, 24 x 96
-otherwise), wood with clumps of lighter crowns and the odd pale outcrop. From
-the start line it stands behind the left shoulder; its end towards the start
-is kept short and low, so that the golden-hour sun (bearing 215, 2 degrees
-up) sets just clear of it (worked out on paper: the ridge stays under the
-horizon there up to 3 degrees right of the sun).
+`far.js` also builds **the far cones** of frame K5 (`K5.cones` in
+landmarks.js): across the open sea from K5's place, 14 to 17 km out, a long
+low range with three volcano-like cones (1600 to 1800 m: lower ones hid behind the bay's far shore) on it, snow on
+their upper flanks, built like a ring (a strip of faces from under the sea's
+horizon to the crest, facing the place, drawn first at the back of the depth
+range; 90 x 6 cells on low, 220 x 10 otherwise). At dusk they are a dark
+blue silhouette under the horizon's band; by day blue in the thin air with
+white tops. (The green hill this file built for D3 was taken out: every place
+on its line of sight from the ledge lies in K5's view, which is the stricter
+spec; `landmarks.js` `inK5View` now keeps the pale hall out of that view too.)
 
 The sun and moon are placed against the straight's heading
 (`lighting.js` `PLACES`, `placeLights`), not on the map: move the straight and
@@ -378,6 +377,25 @@ to 200 m across (finite differences of smooth 3D noise, not screen
 derivatives, so it does not speckle), so that under the low sun facets light
 up and turn away between the gullies. Each fades out where a pixel covers
 more than its scale.
+
+## Frame K5's place
+
+`landmarks.js` `K5` and `k5Site`: the place is a distance into the section
+`sweepback` (101 m: where the road, due south off the gully bridge, begins
+its right turn), and everything of the frame is placed from it: the drum
+tower beyond the right edge, the flags and the chevron beyond the left one
+(metres past the place and beyond the solid edge, so a change of the corridor
+moves them with it), the far lamps on the low shore below (bearings and
+distances from the place, kept where the ground is just above the water),
+and the far cones across the sea (far.js). `inK5View` says whether a point of
+the map lies in the frame's view (bearings 128 to 238 from the place, within
+3 km, or within 260 m of it): the pale hall of D3 is kept out of it.
+`k5.js` builds the scenery as one mesh of coloured triangles (the drum in dark
+ribbed panels, its walkway, roof and railing, the flags' poles and bowed
+sails, the chevron board), one pane for the window and a cloud of points for
+the lamps: three draw calls where it is in view, about 1300 triangles on low.
+The window and the lamps are emissive, switched by `lamps.windows` and
+`lamps.street`; no light is added.
 
 ## The sun's shadow
 
@@ -775,7 +793,7 @@ and railing, the banner as a colour.
 ## The staging camera
 
 `setPhoto` in `src/game/Game.js`, `_photo` in `src/game/Cameras.js`.
-`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, which also set the moment of the autopilot's run and the time of day) places every view's
+`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, `e1`, `k5`, `waves`, which also set the moment of the autopilot's run and the time of day) places every view's
 camera `back` m behind, `right` m right of and `up` m above the car's origin
 in the car's level frame (its heading only, not its pitch or roll), turned
 `yaw` degrees left of the heading and `pitch` degrees up, with a lens of
