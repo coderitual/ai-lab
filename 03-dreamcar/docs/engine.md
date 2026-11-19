@@ -303,6 +303,12 @@ beside D1 and A, golden hour beside D4 and D2, night beside B):
 | `ao` | 0.8 (fades out on sunlit surfaces brighter than white anyway) | 1.0 | 0.9 |
 | split toning | none | shadows [0.97, 0.99, 1.05], highlights [1.05, 1.0, 0.88], balance 0.45 (cool shade, gold in the light) | none |
 
+Twilight (after sunset, frame K5): contrast 1.18, saturation 1.15, tint
+[1.0, 1.0, 1.02], lift [0.0003, 0.0004, 0.0009], vignette 0.3, grain 0.8,
+bloom 0.13, halo 0.12, no flare, ghosts or glare (the sun is down), star
+0.015, ao 0.9, split toning shadows [0.97, 0.99, 1.05], highlights
+[1.04, 1.0, 0.92], balance 0.45.
+
 Split toning tried for the old wet violet dusk: `splitShadows`
 [1.1, 0.98, 0.92], `splitHighlights` [0.9, 1.02, 1.15], `splitBalance` 0.45.
 For that old dusk, the split toning moved the measured road from (65, 56, 69) to

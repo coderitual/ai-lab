@@ -20,7 +20,7 @@ import { K5, k5Site } from './landmarks.js';
 import { GLSL_TARGET, targetDefines } from '../../engine/glsl.js';
 
 /** Segments round the drum, per tier. */
-const ROUND = { low: 24, medium: 48, high: 64 };
+const ROUND = { low: 40, medium: 72, high: 96 };
 /** The window: its width and height (m), how far down from the top, its radiance at full (times lamps.windows). */
 const WINDOW = { w: 4.2, h: 1.7, down: 4.2, radiance: [0.55, 0.34, 0.16] };
 /** The far lamps: their radiance at a kilometre (times lamps.street). */
@@ -30,13 +30,16 @@ const LAMP = { radiance: [1.0, 0.62, 0.3], gain: 0.5 };
 function writer() {
   const pos = [];
   const col = [];
-  const tri = (a, b, c, rgb) => {
+  /** per vertex: a normal given by hand (the drum's round wall), or null for the facet's */
+  const given = [];
+  const tri = (a, b, c, rgb, na = null, nb = null, nc = null) => {
     pos.push(...a, ...b, ...c);
     for (let k = 0; k < 3; k++) col.push(...rgb);
+    given.push(na, nb, nc);
   };
-  const quad = (a, b, c, d, rgb) => {
-    tri(a, b, c, rgb);
-    tri(a, c, d, rgb);
+  const quad = (a, b, c, d, rgb, n = null) => {
+    tri(a, b, c, rgb, n?.[0], n?.[1], n?.[2]);
+    tri(a, c, d, rgb, n?.[0], n?.[2], n?.[3]);
   };
   /** A box from its centre, three half-axes (arrays). */
   const box = (c, ax, ay, az, rgb) => {
@@ -49,6 +52,8 @@ function writer() {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     g.computeVertexNormals();
+    const nrm = g.attributes.normal;
+    given.forEach((n, v) => n && nrm.setXYZ(v, n[0], n[1], n[2]));
     g.computeBoundingSphere();
     return g;
   };
@@ -96,9 +101,13 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
     const a0 = (k / n) * Math.PI * 2;
     const a1 = ((k + 1) / n) * Math.PI * 2;
     // dark concrete in vertical ribs, a shade lighter every other panel; a dark band under the walkway
-    const rib = k % 2 ? [0.028, 0.031, 0.038] : [0.036, 0.04, 0.048];
-    solid.quad(at(a0, T.r, foot), at(a1, T.r, foot), at(a1, T.r, top - 1.4), at(a0, T.r, top - 1.4), rib);
-    solid.quad(at(a0, T.r, top - 1.4), at(a1, T.r, top - 1.4), at(a1, T.r, top), at(a0, T.r, top), [0.03, 0.032, 0.036]);
+    // (smooth: the wall's normals point straight out from the axis, so the drum shades round, not in facets)
+    const rib = k % 4 === 0 ? [0.026, 0.029, 0.035] : [0.034, 0.038, 0.046];
+    const n0 = [Math.sin(a0), 0, Math.cos(a0)];
+    const n1 = [Math.sin(a1), 0, Math.cos(a1)];
+    const round = [n0, n1, n1, n0];
+    solid.quad(at(a0, T.r, foot), at(a1, T.r, foot), at(a1, T.r, top - 1.4), at(a0, T.r, top - 1.4), rib, round);
+    solid.quad(at(a0, T.r, top - 1.4), at(a1, T.r, top - 1.4), at(a1, T.r, top), at(a0, T.r, top), [0.022, 0.024, 0.028], round);
     // the walkway round the top, overhanging, and the roof
     const R = T.r + 1.1;
     solid.quad(at(a0, T.r, top), at(a1, T.r, top), at(a1, R, top), at(a0, R, top), [0.06, 0.06, 0.065]);
@@ -140,7 +149,8 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
     // the sail: a tall blade along the pole, its far edge bowed out, its head curling over; dark olive both sides
     const H = f.h - 1.1;
     const y0 = base + 1.1;
-    const width = (t) => 0.95 * Math.sin(Math.PI * Math.min(1, 0.15 + 0.85 * t)) ** 0.6 * (1 - 0.35 * t);
+    // a feather: narrow at the foot, widest high up, its head rounded over (frame K5's are about 1.2 by 4 m)
+    const width = (t) => 1.25 * Math.sin(Math.PI * Math.min(1, 0.08 + 0.92 * t)) ** 0.45 * (0.4 + 0.6 * t);
     const steps = 8;
     for (let k = 0; k < steps; k++) {
       const t0 = k / steps;

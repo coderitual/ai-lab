@@ -280,6 +280,19 @@ machine without a GPU, and only what is listed here.
   staged towards it looked into the stand). Not looked at on `high`, in
   motion, in split screen or in the chase view; the playtest, the soundtest
   and the docs' screenshots were not run.
+- **Twilight, the fourth time of day** (lighting.js `twilight`, K5 at
+  twilight, the drum smooth, feather flags, nearer cones, no trees on K5's
+  banks): stills on software WebGL at `medium`, K5 at 1280x720 beside the
+  frame and at 393x852 `--mobile`, a lap's highlights at twilight (grid,
+  forest, tunnel, its exit, coast, K5), d1 and d4 at day, dusk and night
+  and d4 at twilight; one round on `low`; `node tools/unit.mjs` passed; the
+  playtest's keys, results, board, options and tiers sections passed
+  against this lane's preview (117 checks, 0 failed, 75 min, most of it
+  tiers). The docs' screenshots (a twilight one was added to
+  tools/screenshots.cjs) were not regenerated. The tunnel's interior in
+  stills still shows the outside exposure for the first seconds (stills
+  fast-forward without drawing; the exposure eases while drawing): not judged
+  in motion.
 - **Frame K5's place** (k5.js, landmarks.js `K5`, the far cones, the
   massif's west end lowered beyond D1's left edge, the D3 green hill removed,
   the pale hall kept out of K5's view, the dusk haze and glow tightened):

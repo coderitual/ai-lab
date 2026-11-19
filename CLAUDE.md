@@ -125,7 +125,7 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
   and must find the same run, and `?manual&t=…` must be the same picture
   every time.
 - The times of day are whatever `TIMES` in `lighting.js` holds, in that
-  order (day, dusk, night; the demo opens on the first). Code iterates over them
+  order (day, dusk, twilight, night; the demo opens on the first). Code iterates over them
   and never assumes how many there are. Best laps, the board and the ghost are
   kept per time of day.
 - The scene is one render call per view into the multisampled HDR target;
