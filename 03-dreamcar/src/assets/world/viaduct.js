@@ -241,7 +241,8 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
     row(capital, pierConcrete, caps, { name: 'viaduct-pier-caps' }),
   );
   if (spanParts.length) {
-    const deck = new THREE.Mesh(mergeGeometries(spanParts), pierFinish(atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xc9c2b2, roughness: 0.88 }))));
+    // (a plain material: the piers' finish reads the instance matrix, which a merged mesh has not)
+    const deck = new THREE.Mesh(mergeGeometries(spanParts), atmosphere.patch(new THREE.MeshStandardMaterial({ color: 0xc9c2b2, roughness: 0.88 })));
     deck.name = 'sea-span';
     deck.castShadow = true;
     deck.receiveShadow = true;
