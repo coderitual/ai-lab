@@ -238,7 +238,8 @@ gGrass *= 0.78 + 0.44 * gDet.r;
 gGrass = mix( gGrass, ${v3(GRASS.straw)} * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.6, 0.85, gMid.b ) * 0.5 );
 gGrass *= 0.72 + 0.56 * gMid.r;
 // forest floor near, the canopy's colour far away
-vec3 gFloor = vec3( 0.04, 0.034, 0.024 ) * ( 0.7 + 0.6 * gDet.a );
+// (lead) leaf litter, not soot: at 0.04 the floor of the wood behind a barrier was a black void
+vec3 gFloor = vec3( 0.085, 0.072, 0.05 ) * ( 0.7 + 0.6 * gDet.a );
 vec3 gCanopy = vec3( 0.02, 0.034, 0.017 ) * ( 0.7 + 0.5 * gLarge.b ) * ( 0.75 + 0.5 * gMid.r );
 vec3 gForestCol = mix( gFloor, gCanopy, smoothstep( 120.0, 400.0, gDist ) );
 vec3 gScreeCol = vec3( 0.17, 0.162, 0.145 ) * ( 0.6 + 0.8 * gDet.b );

@@ -69,7 +69,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; the walkways' kerb faces in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
 | structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
-| tyre walls | 8 runs, on the outside of the fast bends |
+| tyre walls | 8 runs, on the outside of the fast bends, painted white and red by blocks of five stacks |
 | trackside boards | 10 runs: the outsides of the run-off bends, and two groups on the straight's lake-side wall (229 to 189 m and 82 to 44 m before the line); none on its land side |
 | distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel |
 | marshal posts | 12 |

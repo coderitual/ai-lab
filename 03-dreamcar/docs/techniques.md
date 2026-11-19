@@ -80,7 +80,24 @@ It is drawn in three pieces that meet without cracks: a **band** that follows
 the road row by row with the Track's samples, its columns on the corridor's
 own kinks (so it is exact where the eye is closest); a **grid** of square
 cells over the course with the band's cells dropped; the **far land** in
-100 m cells. The road's outermost vertices are the band's innermost ones.
+100 m cells (140 m on the low tier). The road's outermost vertices are the
+band's innermost ones. The far land has a hole where the grid is: the lines
+of its lattice nearest the grid's border are moved onto the border, their
+heights read there from the same lattice the grid's border eases onto, and no
+triangle is made inside them. (It used to run on under the grid, sunk 150 m
+in the middle but at its own height for two cells in from the border. Where
+the road stood within those two cells, in a cutting lower than the land, one
+of its triangles lay over the road, visible only from above: a dark slab over
+the car in the tall picture of a phone held upright, at the esses.)
+
+**Light in baked shade** (`shading.js`). The sky's share never falls under
+`BAKE_SKY_FLOOR` (0.7) of the open sky's, and by day and at golden hour the
+indirect light where the baked sun is gone is multiplied by up to
+1 + `BAKE_BOUNCE` (1.0): what the sunlit surroundings throw back. Without it
+the grass run-off inside a bend under the trees was a featureless dark sheet.
+The wood's floor is leaf litter of albedo about 0.07 (it was 0.04 and read as
+a black void behind the barrier), and the tyre walls are painted white and
+red by blocks of five stacks, so a long wall in shade is not a black band.
 
 **Baked sun shadows** (`shading.js`, `terrain.js`). At a low sun whole
 valleys lie in the shade of a ridge kilometres away, far beyond the shadow
