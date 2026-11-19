@@ -26,8 +26,15 @@ import { RANGE } from './atlas.js';
 import { ARCHES, GRILLE_STARS, INTAKE_CENTRE, INTAKE_SIDE } from './features.js';
 import { BORE_UNIFORMS } from '../world/shading.js';
 import { LUMINAIRE } from '../world/tunnel.js';
+import { LIVERY } from './livery.js';
 
-/** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
+/**
+ * The paints, defined once (the game's options, `?paint=`, the viewer): base colour (linear), metalness and roughness
+ * of the flake layer, how dark it gets edge-on (flop), how much flake shows, the clear coat (`coat`: 1 a gloss
+ * lacquer, 0 none, as on a matte wrap; `coatRough` its roughness), the wheels' dark finish if not the black one
+ * (`wheels`, linear), and a livery drawn over it (`livery`: livery.js). Changed on a built car by CarModel.setPaint:
+ * uniforms only, nothing is rebuilt or recompiled.
+ */
 export const PAINTS = {
   // high-tech silver: this car. A metallic paint, not polished metal: a bright flake layer rough enough to shade
   // softly from light to dark across a panel (light silver-white in the sun, mid grey turned away from it), part
@@ -35,12 +42,19 @@ export const PAINTS = {
   // coat above it carries the only sharp reflection, a lacquer's, strong at grazing angles only. At metalness 0.92
   // and roughness 0.27 the layer mirrored everything and the car read as chrome.
   silver: { color: [0.59, 0.615, 0.675], metal: 0.86, rough: 0.33, flop: 0.22, flake: 1 },
-  graphite: { color: [0.16, 0.17, 0.18], metal: 1, rough: 0.34, flop: 0.45, flake: 1 },
+  // a deep black: almost no flake, all of its look the clear coat's mirror
+  black: { color: [0.006, 0.006, 0.007], metal: 0.4, rough: 0.28, flop: 1, flake: 0.25 },
+  white: { color: [0.78, 0.79, 0.78], metal: 0, rough: 0.35, flop: 1, flake: 0 },
   blue: { color: [0.018, 0.045, 0.19], metal: 0.85, rough: 0.32, flop: 0.35, flake: 1 },
   red: { color: [0.36, 0.014, 0.014], metal: 0.35, rough: 0.3, flop: 0.6, flake: 0.5 },
-  white: { color: [0.78, 0.79, 0.78], metal: 0, rough: 0.35, flop: 1, flake: 0 },
-  black: { color: [0.012, 0.012, 0.014], metal: 0.3, rough: 0.3, flop: 1, flake: 0.3 },
+  // a matte grey wrap: no clear coat, a rough, faintly metallic film
+  matte: { color: [0.13, 0.135, 0.14], metal: 0.3, rough: 0.62, flop: 0.8, flake: 0, coat: 0, coatRough: 0.5 },
+  graphite: { color: [0.16, 0.17, 0.18], metal: 1, rough: 0.34, flop: 0.45, flake: 1 },
+  // the night race: a black metallic base under the livery's neon graphics, magenta wheels
+  night: { color: [0.012, 0.011, 0.016], metal: 0.6, rough: 0.3, flop: 0.6, flake: 0.6, wheels: [0.42, 0.012, 0.16], livery: true },
 };
+/** The order the options list the paints in (the first is the default). */
+export const PAINT_ORDER = ['silver', 'black', 'white', 'blue', 'red', 'matte', 'graphite', 'night'];
 
 /**
  * Uniforms every car material shares (one object, so that setReflections and setLights touch one place).
@@ -503,6 +517,9 @@ export function createPaintMaterial(shared, caps, paintName = 'silver', { should
     paintRough: { value: paint.rough },
     paintFlop: { value: paint.flop },
     paintFlake: { value: paint.flake },
+    paintCoat: { value: paint.coat ?? 1 },
+    paintLiveryOn: { value: 0 },
+    paintLivery: { value: null },
   };
   patch(material, { ...shared, ...own }, caps, {
     fragmentPars: /* glsl */ `${GLSL_SOFT_PROBE}
@@ -519,6 +536,9 @@ uniform float paintMetal;
 uniform float paintRough;
 uniform float paintFlop;
 uniform float paintFlake;
+uniform float paintCoat;
+uniform float paintLiveryOn;
+uniform sampler2D paintLivery;
 vec3 cBase; float cMetal; float cRough; float cCoat; vec3 cEmit; float cShut; float cPaint; vec3 cTilt;
 // the rounding of the panels' edges into the shut lines: the slope there, and which way it falls (see carGrad)
 float cEdge; float cEdgeD;
@@ -726,7 +746,26 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   if (abs(vCarNormal.x) > 0.25 && carArchHole(p)) discard;
   float ndv = abs(dot(normalize(vNormal), normalize(vViewPosition)));
   cBase = paintColor * mix(1.0, paintFlop, pow(1.0 - ndv, 1.15));
-  cMetal = paintMetal; cRough = paintRough; cCoat = 1.0; cEmit = vec3(0.0); cPaint = 1.0; cTilt = vec3(0.0);
+  cMetal = paintMetal; cRough = paintRough; cCoat = paintCoat; cEmit = vec3(0.0); cPaint = 1.0; cTilt = vec3(0.0);
+  // the livery (livery.js): its picture in car space, a flank seen from its own side, the top from above
+  if (paintLiveryOn > 0.5) {
+    vec3 n = vCarNormal;
+    float sideW = smoothstep(0.3, 0.55, abs(n.x));
+    float topW = smoothstep(0.3, 0.6, n.y) * (1.0 - sideW);
+    float u = (${f4(LIVERY.front)} - vCarPos.z) / ${f4(LIVERY.front - LIVERY.back)};
+    float vs = clamp((${f4(LIVERY.top)} - vCarPos.y) / ${f4(LIVERY.top - LIVERY.bottom)}, 0.001, 0.999) * ${f4(LIVERY.band)};
+    vec4 L = vec4(0.0);
+    if (sideW > 0.0) {
+      vec2 uv = vCarPos.x > 0.0 ? vec2(u, ${f4(LIVERY.bands[0])} + vs) : vec2(1.0 - u, ${f4(LIVERY.bands[1])} + vs);
+      L += sideW * texture2D(paintLivery, uv);
+    }
+    if (topW > 0.0) {
+      float vt = clamp((vCarPos.x + ${f4(LIVERY.half)}) / ${f4(2 * LIVERY.half)}, 0.001, 0.999) * ${f4(LIVERY.band)};
+      L += topW * texture2D(paintLivery, vec2(u, ${f4(LIVERY.bands[2])} + vt));
+    }
+    // vinyl over the paint: its own colour, not metal, a little rougher, under the same clear coat
+    cBase = mix(cBase, L.rgb, L.a); cMetal = mix(cMetal, 0.0, L.a); cRough = mix(cRough, 0.35, L.a);
+  }
   cHeight = 0.0;
   cAO = carOcclusion(p, vec3(abs(vCarNormal.x), vCarNormal.yz));
   // the tail lamps' own light on the paint round them (the lamp spot in lamps.js cannot reach the car's own
@@ -749,6 +788,14 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   CAR_REGION(carCover(glass - 0.004), vec3(0.012), 0.0, 0.55, 0.0);
   // gloss black: window surround, belt strip, B-pillar, the frit under the glass's edge, the corner slits
   CAR_REGION(max(carCover(A.g), carCover(glass)), vec3(0.01, 0.01, 0.012), 0.0, 0.06, 1.0);
+  // (round 9, from the owner's photographs) the side windows' outline is a bright trim, 11 mm wide, along the top
+  // of the frames and the belt: the outer part of the black band (the B-pillar and the divider stay black)
+  if (p.y > 0.85 && abs(vCarNormal.x) > 0.2) CAR_REGION(carCover(A.g) * (1.0 - carCover(A.g + 0.011)), vec3(0.8, 0.81, 0.83), 1.0, 0.1, 0.6);
+  // and the side skirt carries a bright strip between the arches, on its blade
+  if (abs(vCarNormal.x) > 0.55 && p.z > -1.0 && p.z < 0.95) {
+    float strip = carInside(p.y - 0.226) * (1.0 - carInside(p.y - 0.208)) * smoothstep(-1.0, -0.94, p.z) * smoothstep(0.95, 0.89, p.z);
+    CAR_REGION(strip, vec3(0.8, 0.81, 0.83), 1.0, 0.12, 0.6);
+  }
   // red reflectors
   CAR_REGION(carCover(B.g), vec3(0.30, 0.01, 0.015), 0.0, 0.1, 1.0);
   // the rear bumper's corner scoops (6.4): a shallow triangular recess, darker inside, with a lit lower edge
@@ -771,6 +818,8 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
     float diffuser = carInside(p.y - top) * carInside(p.x - 0.72);
     CAR_REGION(diffuser, vec3(0.02, 0.02, 0.022), 0.0, 0.6, 0.0);
     CAR_REGION(diffuser * (1.0 - carInside(p.y - top + 0.02)), vec3(0.01, 0.01, 0.012), 0.0, 0.06, 1.0);
+    // (round 9) a bright blade along the diffuser's top, the whole width, joining the pipe trims
+    CAR_REGION(diffuser * (1.0 - carInside(p.y - top + 0.013)), vec3(0.8, 0.81, 0.83), 1.0, 0.1, 0.6);
   }
   // the number plates' black carriers (the plates are geometry, details.js), and the rear plate's recess
   if (p.z < -2.3 && vCarNormal.z < -0.5) {

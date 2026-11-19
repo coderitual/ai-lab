@@ -216,8 +216,29 @@ layer of metal flake under a clear coat.
   on the low tier, its stars (`GRILLE_STARS`, shared with `details.js`), red reflectors, the
   plate carriers, the parking sensors. The fuel flap, on the right only, is
   analytic.
-- The other paints (`graphite`, `blue`, `red`, `white`, `black`) are the
-  same material with other numbers: `?paint=NAME`.
+- **The other paints** (`PAINTS`, listed in the options in `PAINT_ORDER`):
+  black (almost no flake: its look is the clear coat's), white, blue, red,
+  a matte grey wrap (no clear coat, a rough film), graphite and the
+  night-race livery. They are the same material with other numbers
+  (`paintCoat` for the clear coat), changed on a built car by
+  `CarModel.setPaint(name)`: uniforms only, nothing rebuilt or recompiled;
+  the body-coloured trim (the mirror caps) and the wheels' dark finish
+  (`wheels`, `setFinish`) follow. `?paint=NAME`, the options, `paint=` in the
+  viewer.
+- **The night-race livery** (`night`, `livery.js`): an original
+  street-racing livery for the dark: a black metallic base, magenta blades
+  along the lower flanks kicking up over the rear wheels with a cyan line
+  beside them, acid-yellow slashes, a big number 01 on the front doors,
+  made-up marks (YORU SPEED, DOMI RACING), katakana of the file's own strokes
+  (ドリームカー "dream car" on the rear doors, ヨル "night" on the bonnet), a
+  magenta and cyan twin stripe over the bonnet, roof and boot, magenta wheels.
+  Nothing of any team, brand, film or game. It is a picture drawn at
+  start-up the first time the paint is chosen (2048 / 1024 / 512 px wide on
+  high / medium / low, three bands: each flank seen from its own side, so
+  the words are never mirrored, and the top), read by the paint in car space
+  (`LIVERY`), so it does not depend on the skin's layout; vinyl over the
+  paint (not metal), under the same clear coat. Off, the paint skips it (a
+  branch on a uniform): no cost to the other paints.
 
 Every patched material has its own `customProgramCacheKey`: without it three
 handed materials each other's programs (the gloss trim rendered white).
