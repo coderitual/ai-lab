@@ -328,7 +328,7 @@ sun's side, as in D1. Its skyline: the ridge left of the main peak stays about
 
 `far.js` also builds **the far cones** of frame K5 (`K5.cones` in
 landmarks.js): across the open sea from K5's place, 14 to 17 km out, a long
-low range with three volcano-like cones (about 1000 to 1150 m) on it, snow on
+low range with three volcano-like cones (1600 to 1800 m: lower ones hid behind the bay's far shore) on it, snow on
 their upper flanks, built like a ring (a strip of faces from under the sea's
 horizon to the crest, facing the place, drawn first at the back of the depth
 range; 90 x 6 cells on low, 220 x 10 otherwise). At dusk they are a dark

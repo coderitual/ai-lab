@@ -171,7 +171,7 @@ export function createK5({ track, terrain, caps, tier, rng, atmosphere }) {
     const pt = (u, v, out = 0) => [p.x + right[0] * u + fwd[0] * out, cy + v, p.z + right[2] * u + fwd[2] * out];
     solid.box([p.x, cy, p.z], right.map((x) => x * half), [0, half, 0], fwd.map((x) => x * 0.02), [0.62, 0.42, 0.02]);
     // the chevron, black, a hair in front (pointing to the board's right as the driver sees it: the road's right)
-    const k = -1; // the driver looks along -fwd: his right is -right
+    const k = 1; // (seen from the road it must point to the right, into the bend)
     const ink = [0.01, 0.01, 0.01];
     solid.quad(pt(k * -0.2, 0.26, 0.025), pt(k * 0.14, 0, 0.025), pt(k * 0.03, 0, 0.025), pt(k * -0.31, 0.26, 0.025), ink);
     solid.quad(pt(k * 0.03, 0, 0.025), pt(k * 0.14, 0, 0.025), pt(k * -0.2, -0.26, 0.025), pt(k * -0.31, -0.26, 0.025), ink);

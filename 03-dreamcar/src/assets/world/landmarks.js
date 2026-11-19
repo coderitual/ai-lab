@@ -27,14 +27,14 @@ export const K5 = {
   along: 101,
   view: [128, 238],
   reach: 3000,
-  tower: { ahead: 14, beyond: 6, r: 11, h: 18 },
+  tower: { ahead: 24, beyond: 6, r: 11, h: 18 },
   flags: [{ ahead: 18, beyond: 2, h: 7 }, { ahead: 55, beyond: 2.5, h: 7 }],
   chevron: { ahead: 28, beyond: 0.8 },
   lamps: { count: 16, near: 260, far: 1600, bearings: [150, 235] },
   cones: [
-    { bearing: 210, dist: 15000, h: 1150, r: 3800 },
-    { bearing: 198, dist: 16500, h: 1050, r: 3400 },
-    { bearing: 168, dist: 15000, h: 1350, r: 3600 },
+    { bearing: 210, dist: 15000, h: 1750, r: 4600 },
+    { bearing: 198, dist: 16500, h: 1600, r: 4200 },
+    { bearing: 168, dist: 15000, h: 1800, r: 4600 },
   ],
 };
 
