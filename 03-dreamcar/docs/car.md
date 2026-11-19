@@ -654,6 +654,39 @@ The cameras fitted to the earlier photographs (`pin=`) no longer land the
 car where it stood in round 2 (the stand moved with the world), so no
 pixel-on-pixel overlay was made this round.
 
+### Round ten: the window line, measured
+
+Three of the owner's daylight photographs (from ahead and to the right, from
+ahead, from behind) have cameras fitted by least squares to 12 to 17
+landmarks of known place (rim edges and ground contacts, door handles, the
+mirror, the lamps' corners, the plate): 5.4, 5.7 and 11.2 px of mean
+residual on 1932 x 2576 and 2576 x 1932 pictures. The car was drawn
+through each camera and, along each line of the body, the nearest strong
+edge was found the same way in our picture and in the photograph; their
+distance, taken back to metres at that depth, is the error (as a share of
+the wheelbase, median over the line; the lane's tools, in its scratchpad
+with the photographs):
+
+| line (camera) | before | after |
+| --- | --- | --- |
+| belt (ahead right) | 0.6 % | 0.7 % |
+| side windows' upper edge (ahead right) | 2.3 % | 1.3 % |
+| roof's edge (ahead right) | 2.3 % | 1.3 % |
+| tail lamps (behind) | 0.2 / 0.4 % | 0.2 / 0.4 % |
+| boot lid's lip (behind) | 0.5 % | 0.5 % |
+| head lamps (ahead) | 1.0 / 0.8 % | 1.0 / 0.8 % |
+
+The side windows were too low under the roof: their upper edge
+(`DLO_TOP`) is raised 30 mm over the cabin (easing to nothing at the
+A-pillar's foot and to 12 mm at the rear tip), the A-pillar's line moved
+20 mm forward and the rear arc 30 mm back; the roof's side edge (`TOP_EDGE`)
+rose 22 mm with it, so the cant rail stays a slim band; the B-pillar's
+black applique and the quarter light's divider were lengthened to the new
+edge. The belt, the lamps, the boot and the bumpers agreed within the
+measurement and were left; no dimension of `spec.js` moved. What the
+measurement cannot see: the shoulder's highlight and the lower crease (no
+edge in a photograph), the bonnet's centre line (hidden from these cameras).
+
 ## What each tier costs
 
 Re-measured after round six (the arches' flare moves the net's points and
