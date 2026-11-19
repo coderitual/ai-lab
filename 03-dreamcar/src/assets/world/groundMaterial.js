@@ -267,6 +267,12 @@ if ( uSeaBox.w > -1000.0 ) {
 float gGullyX = texture2D( uLarge, vec2( ( vGroundPos.x - vGroundPos.z ) / 31.0, vGroundPos.y / 260.0 ) ).g;
 float gGully = smoothstep( 0.35, 0.65, gGullyX + 0.25 * ( gDetRock.g - 0.5 ) );
 vec3 gOchre = mix( vec3( 0.2, 0.105, 0.05 ), vec3( 0.3, 0.175, 0.085 ), 0.6 * gBedTone * 0.35 + 0.65 * gGully ) * ( 0.72 + 0.4 * gDetRock.g ) * ( 1.0 - 0.3 * gStreak );
+// (sea lane, the low coast: "rock must be rock") beds a hand or two thick that read from across the bay, pits weathered
+// out of the softer beds, and a dark wet foot over the water
+float gBedLine = smoothstep( 0.35, 0.5, abs( fract( vGroundPos.y / 1.6 + 0.35 * gDet.g ) - 0.5 ) );
+float gPit = smoothstep( 0.62, 0.78, gDetRock.g * 0.6 + gDet2.b * 0.6 ) * smoothstep( 0.3, 0.7, gBedTone );
+gOchre *= ( 0.78 + 0.32 * gBedLine ) * ( 1.0 - 0.5 * gPit );
+gOchre *= mix( 0.45, 1.0, smoothstep( 0.5, 6.0, vGroundPos.y - uSeaBox.w ) );
 gRockCol = mix( gRockCol, mix( gOchre * ( 0.75 + 0.25 * gLarge.g ), gOchre, gCut ), gCoast );
 gScreeCol = mix( gScreeCol, vec3( 0.46, 0.255, 0.14 ) * ( 0.82 + 0.36 * gDet.b ), gCoast );
 // the coast's grass is dry: olive and straw, sun-bleached (frame E1)
