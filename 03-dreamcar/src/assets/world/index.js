@@ -123,7 +123,8 @@ const DETAIL_SHED = 0.7;
  * @property {import('./atmosphere.js').Atmosphere} atmosphere the haze; `atmosphere.patch(material)` makes a
  *   material of one's own fade into it
  * @property {(shed: boolean) => void} setDetail the ladder's `detail` rung (caps.js LADDER): shed, the trees go to
- *   their simpler forms at DETAIL_SHED of the tier's distances and the wood's floor reaches that much less far
+ *   their simpler forms at DETAIL_SHED of the tier's distances and the wood's floor reaches that much less far; the
+ *   water mirrors the land less far, draws fewer ripple layers and has no planar mirror (sea.js SEA_TIERS `shed`)
  * @property {() => void} refresh apply the numbers of lighting.js again after they were changed by hand
  * @property {() => void} restore draw again what only lived on the GPU, after a lost WebGL context has come back
  * @property {() => void} dispose
@@ -418,6 +419,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
 
     setDetail(shed) {
       forest.setDetail(shed ? DETAIL_SHED : 1);
+      // (water lane) the water is the world's detail too: what it gives up while the rung is shed is sea.js's
+      sea.setShed(shed);
     },
 
     setStartLights(n) {

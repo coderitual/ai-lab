@@ -99,13 +99,17 @@ const DEG = Math.PI / 180;
  *   relief    the surf's lines have a crest in the normal; clouds: their shade; caustics: light on a shallow bed
  *   lamps     lamps mirrored at night; tails: tail lamps (two a car)
  *   piers     the nearest piers standing in the water (foam round their feet; with `land`, their reflections)
+ *   shed      what is left while the quality ladder's `detail` rung is shed (engine/caps.js LADDER; setShed): the
+ *             march's steps and stride then; and then only the ripple layers `mobile` draws are drawn, with one gust
+ *             sample, no slicks, no clouds' shade, no relief on the surf, no caustics and no planar mirror. All by
+ *             uniforms: no shader is compiled when the rung goes or comes back.
  * The planar mirror is the world's to give (createSea's `mirror`: on high).
  */
 export const SEA_TIERS = {
-  low: { segments: 32, displace: false, waves: 7, normals: 4, ripples: [1, 4], lean: true, land: 0, stride: 2, probe: false, shore: 512, relief: false, clouds: false, caustics: false, lamps: 6, piers: 4, tails: 2 },
-  mobile: { segments: 64, displace: true, waves: 7, normals: 4, ripples: [1, 4], lean: true, land: 4, stride: 3.8, probe: true, shore: 512, relief: false, clouds: false, caustics: false, lamps: 6, piers: 4, tails: 2 },
-  medium: { segments: 96, displace: true, waves: 9, normals: 4, ripples: [0, 1, 4], lean: false, land: 6, stride: 2.9, probe: true, shore: 1024, relief: true, clouds: true, caustics: false, lamps: 6, piers: 8, tails: 4 },
-  high: { segments: 160, displace: true, waves: WAVES.length, normals: 4, ripples: [0, 1, 2, 3, 4], lean: false, land: 8, stride: 2.2, probe: false, shore: 1024, relief: true, clouds: true, caustics: true, lamps: 6, piers: 8, tails: 4 },
+  low: { segments: 32, displace: false, waves: 7, normals: 4, ripples: [1, 4], lean: true, land: 0, stride: 2, probe: false, shore: 512, relief: false, clouds: false, caustics: false, lamps: 6, piers: 4, tails: 2, shed: null },
+  mobile: { segments: 64, displace: true, waves: 7, normals: 4, ripples: [1, 4], lean: true, land: 4, stride: 3.8, probe: true, shore: 512, relief: false, clouds: false, caustics: false, lamps: 6, piers: 4, tails: 2, shed: { land: 0, stride: 3.8 } },
+  medium: { segments: 96, displace: true, waves: 9, normals: 4, ripples: [0, 1, 4], lean: false, land: 6, stride: 2.9, probe: true, shore: 1024, relief: true, clouds: true, caustics: false, lamps: 6, piers: 8, tails: 4, shed: { land: 4, stride: 3.8 } },
+  high: { segments: 160, displace: true, waves: WAVES.length, normals: 4, ripples: [0, 1, 2, 3, 4], lean: false, land: 8, stride: 2.2, probe: false, shore: 1024, relief: true, clouds: true, caustics: true, lamps: 6, piers: 8, tails: 4, shed: { land: 4, stride: 3.8 } },
 };
 
 /**
@@ -123,8 +127,9 @@ export const SEA_LOOK = {
   /** the bed: wet pale sand, and the reef, rock and weed that lie on it in patches */
   sand: [0.4, 0.36, 0.27],
   reef: [0.035, 0.045, 0.03],
-  /** water whipped full of bubbles under the surf: a milky pale turquoise */
+  /** water whipped full of bubbles under the surf: a milky pale turquoise; `surf`: the water between the lines of surf */
   milk: [0.2, 0.36, 0.35],
+  surfBody: [0.09, 0.3, 0.32],
   /** the light that comes through the top of a wave towards the eye, per unit of the sun's */
   scatter: [0.0, 0.0045, 0.0036],
   foam: [0.78, 0.81, 0.82],
@@ -148,7 +153,7 @@ export const SEA_LOOK = {
    * The wind: where it blows towards (degrees, 0 = +X, 90 = +Z, as WAVES' directions), how rough the water is
    * between gusts (a share of a gust's ripples), in a slick, and in the lee of land; how fast the gusts drift (m/s).
    */
-  wind: { dir: 10, calm: 0.28, slick: 0.3, lee: 0.45, speed: 3.2 },
+  wind: { dir: 10, calm: 0.28, slick: 0.5, lee: 0.45, speed: 3.2 },
   /** how far the disc reaches (m): the horizon. The views' far plane is nearer; see the header. */
   horizon: 14000,
   /** a spark of the sun's glitter is this many times the sun's irradiance bright; `far`: the share of the breaking-up kept far out */
@@ -158,9 +163,9 @@ export const SEA_LOOK = {
    * down and no further than `reach` m out; `height`: the crest's height (m) for the relief of its normal. The
    * sheet runs `runup` m up over the still level and back.
    */
-  surf: { spacing: 6.5, period: 4.6, depth: 1.25, reach: 46, height: 0.26, runup: 0.16 },
+  surf: { spacing: 6.5, period: 4.6, depth: 1.25, reach: 46, height: 0.34, runup: 0.16 },
   /** what land looks like in the water (a dark wooded or rocky coast's albedo; lit by the time of day's light) */
-  land: [0.075, 0.085, 0.055],
+  land: [0.1, 0.115, 0.08],
   /** and a concrete pier; `reach`: piers further from the eye than this (m) are left to the haze */
   pier: { albedo: [0.33, 0.32, 0.3], reach: 700 },
   /**
@@ -169,10 +174,11 @@ export const SEA_LOOK = {
    * (1: a breeze; evenings are calmer). A time not named keeps 1, `deep` and 1.
    */
   byTime: {
-    day: { sky: 0.82, deep: [0.004, 0.02, 0.058], wind: 1 },
+    day: { sky: 0.82, deep: [0.006, 0.028, 0.07], wind: 1 },
     dusk: { sky: 0.6, deep: [0.0016, 0.0105, 0.0115], wind: 0.75 },
     // after the sun: the water dark and deep, the afterglow given back a little brighter than golden hour's
-    twilight: { sky: 0.55, deep: [0.0012, 0.006, 0.012], wind: 0.6 },
+    // (frame K5's water reads 31 50 95: a still of ours read 13 16 43 with 0.55 and [0.0012, 0.006, 0.012])
+    twilight: { sky: 0.8, deep: [0.002, 0.011, 0.024], wind: 0.6 },
     night: { sky: 1, wind: 0.7 },
   },
   /**
@@ -346,6 +352,7 @@ function mainlandOf(sea) {
  * @property {THREE.Mesh} mesh
  * @property {(time: import('./lighting.js').TimeOfDay) => void} setTime
  * @property {(simTime: number) => void} update the run's clock (fixed step)
+ * @property {(shed: boolean) => void} setShed the quality ladder's `detail` rung, the water's share of it
  * @property {(cube: THREE.Texture | null) => void} setProbe the car's reflection probe for the next view (or null)
  * @property {(at: THREE.Vector3) => boolean} mirrored whether the planar mirror is worth drawing for an eye there
  * @property {(beams: Array<object> | null | undefined) => void} setBeams the cars' lamps (their tail lamps streak in the water)
@@ -465,6 +472,9 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
     // the car's reflection probe (the game's, per view) and whether there is one now
     uSeaProbe: { value: /** @type {THREE.CubeTexture | null} */ (null) },
     uSeaProbeOn: { value: 0 },
+    // the ladder's `detail` rung: 1 while it is shed; the march's steps and stride as they are now
+    uSeaShed: { value: 0 },
+    uSeaMarch: { value: new THREE.Vector2(spec.land, spec.stride) },
     ...(mirror ? mirror.uniforms : {}),
   };
   const lamps = glints ? Math.min(spec.lamps, glints.pos.value.length) : 0;
@@ -485,8 +495,10 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
     const dx = (Math.cos(da) * c + Math.sin(da) * s) * layer.drift;
     const dz = (-Math.cos(da) * s + Math.sin(da) * c) * layer.drift;
     const amp = layer.rms / Math.sqrt(rippleVar);
+    // a layer the leanest level does not draw goes (into the roughness) while the ladder's rung is shed
+    const always = SEA_TIERS.mobile.ripples.includes(i);
     layerCode.push(/* glsl */ `
-  {
+  ${always ? '' : `if ( uSeaShed > 0.5 ) sRipLost += ${f(layer.rms * layer.rms, 5)}; else`} {
     vec2 uv = vec2( ${f(c)} * vSeaBase.x + ${f(s)} * vSeaBase.y, ${f(-s)} * vSeaBase.x + ${f(c)} * vSeaBase.y ) * ${f(1 / layer.repeat, 5)} - sT * vec2( ${f(dx / layer.repeat, 5)}, ${f(dz / layer.repeat, 5)} );
     vec2 n = texture2D( uRipple, uv ).xy * 2.0 - 1.0;
     // its waves are ${f(layer.repeat / 8, 2)} m and shorter: drawn while a pixel is smaller than a part of one
@@ -503,7 +515,6 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
     const defines = [
       spec.displace ? '#define SEA_DISPLACE' : '',
       `#define SEA_LAND ${spec.land}`,
-      `#define SEA_STEP ${f(spec.stride ?? 2, 2)}`,
       spec.relief ? '#define SEA_RELIEF' : '',
       spec.clouds ? '#define SEA_CLOUDS' : '',
       spec.caustics ? '#define SEA_CAUSTICS' : '',
@@ -550,9 +561,18 @@ export function createSea({ caps, tier, atmosphere, sea, heightAt, far, glints =
   let piers = [];
   return {
     mesh,
+    /**
+     * The quality ladder's `detail` rung (engine/caps.js LADDER; World.setDetail): shed, the water keeps its colour, its glitter, its
+     * surf and its nearest reflections and gives up the rest (SEA_TIERS' `shed`). No shader is compiled.
+     */
+    setShed(shed) {
+      const on = !!shed && !!spec.shed;
+      uniforms.uSeaShed.value = on ? 1 : 0;
+      uniforms.uSeaMarch.value.set(on ? spec.shed.land : spec.land, on ? spec.shed.stride : spec.stride);
+    },
     /** Whether there is water for the mirror to be seen in from `at` (an eye): within reach of the sea, above it. */
     mirrored(at) {
-      if (at.y < sea.level + 0.4) return false;
+      if (uniforms.uSeaShed.value > 0.5 || at.y < sea.level + 0.4) return false;
       const i = Math.floor(((at.x - m.x0) / m.extent) * m.size);
       const j = Math.floor(((at.z - m.z0) / m.extent) * m.size);
       if (i < 0 || j < 0 || i >= m.size || j >= m.size) return true;
@@ -688,6 +708,8 @@ uniform float uSeaSky;     // what turns the environment map's light on things b
 uniform float uSeaGain;    // how much of the mirrored sky the water gives back at this time of day (SEA_LOOK.byTime)
 uniform vec3 uSeaDeep;     // the open water's body at this time of day
 uniform vec4 uSeaWind;     // where the wind blows towards (x, z), the sea state, the clouds' shade
+uniform float uSeaShed;    // 1 while the quality ladder's detail rung is shed
+uniform vec2 uSeaMarch;    // the mirrored ray's steps over the land, and how much longer each is than the last
 uniform vec3 uSeaLandTint; // land as the water mirrors it (a radiance)
 uniform vec3 uSeaPierTint; // and a concrete pier: under the sky,
 uniform vec3 uSeaPierSun;  // and what the sun adds on a face square to it
@@ -793,25 +815,25 @@ float sAmp = 0.35 + 0.65 * smoothstep( 0.0, 14.0, sDepth );
 // ---- the wind: gusts (cat's paws) and slicks, slow fields long in the wind's direction, drifting with it
 vec2 sWp = ${windAlong};
 vec4 sN1 = texture2D( uSeaNoise, sWp * vec2( ${f(1 / 930, 6)}, ${f(1 / 270, 6)} ) - vec2( sT * ${f(SEA_LOOK.wind.speed / 930, 6)}, 0.0 ) );
-#ifdef SEA_LEAN
 float sGust = smoothstep( 0.32, 0.68, sN1.a );
 float sSlick = 0.0;
-#else
-vec4 sN2 = texture2D( uSeaNoise, vec2( 0.921 * sWp.x + 0.391 * sWp.y, - 0.391 * sWp.x + 0.921 * sWp.y ) * vec2( ${f(1 / 330, 6)}, ${f(1 / 95, 6)} ) - vec2( sT * ${f((SEA_LOOK.wind.speed * 0.8) / 330, 6)}, 0.0 ) + 0.43 );
-float sGust = smoothstep( 0.32, 0.68, 0.6 * sN1.a + 0.4 * sN2.b );
-// slicks: long narrow bands of glassy water lying downwind (windrows), here and there: the soft noise drawn out
-// forty to one
-float sSlick = smoothstep( 0.6, 0.7, texture2D( uSeaNoise, sWp * vec2( ${f(1 / 760, 6)}, ${f(1 / 19, 5)} ) - vec2( sT * ${f((SEA_LOOK.wind.speed * 0.5) / 760, 6)}, 0.0 ) + 0.71 ).b ) * ( 1.0 - 0.6 * sGust );
+#ifndef SEA_LEAN
+if ( uSeaShed < 0.5 ) {
+  vec4 sN2 = texture2D( uSeaNoise, vec2( 0.921 * sWp.x + 0.391 * sWp.y, - 0.391 * sWp.x + 0.921 * sWp.y ) * vec2( ${f(1 / 330, 6)}, ${f(1 / 95, 6)} ) - vec2( sT * ${f((SEA_LOOK.wind.speed * 0.8) / 330, 6)}, 0.0 ) + 0.43 );
+  sGust = smoothstep( 0.32, 0.68, 0.6 * sN1.a + 0.4 * sN2.b );
+  // slicks: long narrow bands of glassy water lying downwind (windrows), here and there: the soft noise drawn out
+  // forty to one; they wander (the gusts' own field pushes them sideways)
+  sSlick = smoothstep( 0.6, 0.72, texture2D( uSeaNoise, ( sWp + vec2( 0.0, 60.0 * sN2.a + 25.0 * sN1.b ) ) * vec2( ${f(1 / 760, 6)}, ${f(1 / 19, 5)} ) - vec2( sT * ${f((SEA_LOOK.wind.speed * 0.5) / 760, 6)}, 0.0 ) + 0.71 ).b ) * ( 1.0 - 0.6 * sGust );
+}
 #endif
 // how rough the water is, as a share of a gust's ripples
 float sWind = uSeaWind.z * mix( ${f(SEA_LOOK.wind.calm)}, 1.0, sGust ) * mix( 1.0, ${f(SEA_LOOK.wind.slick)}, sSlick ) * mix( 1.0, ${f(SEA_LOOK.wind.lee)}, seaLee );
 // and the shallow margin is glassier still
 sWind *= 0.45 + 0.55 * smoothstep( 0.0, 1.5, sThick );
+seaShade = 1.0;
 #ifdef SEA_CLOUDS
 // clouds' shade: slow, large, drifting (not the sky's own clouds: theirs have no place over the water)
-seaShade = 1.0 - uSeaWind.w * 0.55 * smoothstep( 0.5, 0.72, texture2D( uSeaNoise, vSeaBase * ${f(1 / 5200, 7)} - sT * vec2( ${f(6 / 5200, 6)}, ${f(2.5 / 5200, 6)} ) ).a );
-#else
-seaShade = 1.0;
+if ( uSeaShed < 0.5 ) seaShade = 1.0 - uSeaWind.w * 0.55 * smoothstep( 0.5, 0.72, texture2D( uSeaNoise, vSeaBase * ${f(1 / 5200, 7)} - sT * vec2( ${f(6 / 5200, 6)}, ${f(2.5 / 5200, 6)} ) ).a );
 #endif
 
 // ---- the slopes: the waves', then the wind ripples in layers
@@ -834,7 +856,7 @@ vec4 sLace2 = texture2D( uSeaNoise, vSeaBase.yx * 0.31 + 0.37 - sT * vec2( 0.006
 float sBeat = seaSurfBeat( vSeaBase, sT ) + ( sShore + ( sLace.b - 0.5 ) * 2.2 ) / ${f(S.spacing)};
 float sU = fract( sBeat );
 #ifdef SEA_RELIEF
-if ( sZone > 0.02 && sAlong < 5.0 ) {
+if ( sZone > 0.02 && sAlong < 5.0 && uSeaShed < 0.5 ) {
   // which way the shore lies, from the map; the line's crest stands just behind its front, its face towards the land
   float e = 2.4 * uSeaBox.z;
   float s0 = shoreDist( textureLod( uSeaShore, sUv, 0.0 ) );
@@ -878,7 +900,7 @@ sCrest *= ( 0.35 + 0.65 * sGust ) * ( 1.0 - 0.7 * seaLee );
 // the surf: a front, a solid band of white a hand's breadth of the cycle wide; behind it lace that thins as it ages;
 // the lines grow as they come in, and break up along the shore
 float sFront = 1.0 - smoothstep( 0.02, 0.17, sU );
-float sTrail = pow( 1.0 - sU, 1.6 );
+float sTrail = pow( 1.0 - sU, 0.7 );
 float sGrow = 0.6 + 0.4 * ( 1.0 - smoothstep( 0.0, ${f(0.7 * S.reach)}, sShore ) );
 // (a pixel that covers most of the lines' spacing sees their mean, a third of white: no moire)
 // (the front's mask is over one: solid white whatever the lace says)
@@ -917,10 +939,9 @@ vec3 sClear = exp( - ${v3(SEA_LOOK.absorb)} * ( sCol * 0.5 * ( 1.0 + 1.0 / sCosT
 vec2 sBedAt = vSeaBase - normalize( sV.xz + vec2( 1.0e-5 ) ) * ( sCol * sqrt( 1.0 - sCosT * sCosT ) / sCosT ) + sN.xz * sCol * 0.6;
 // (two sizes turned against each other: neither's repeat shows)
 vec4 sBedA = texture2D( uSeaNoise, vec2( 0.891 * sBedAt.x + 0.454 * sBedAt.y, - 0.454 * sBedAt.x + 0.891 * sBedAt.y ) * ${f(1 / 113, 5)} + 0.19 );
-#ifdef SEA_LEAN
 vec4 sBedB = sLace;
-#else
-vec4 sBedB = texture2D( uSeaNoise, vec2( 0.588 * sBedAt.x - 0.809 * sBedAt.y, 0.809 * sBedAt.x + 0.588 * sBedAt.y ) * ${f(1 / 19.7, 5)} + 0.63 );
+#ifndef SEA_LEAN
+if ( uSeaShed < 0.5 ) sBedB = texture2D( uSeaNoise, vec2( 0.588 * sBedAt.x - 0.809 * sBedAt.y, 0.809 * sBedAt.x + 0.588 * sBedAt.y ) * ${f(1 / 19.7, 5)} + 0.63 );
 #endif
 // reef, rock and weed lie in patches, mostly where the bed is not sand; never on the beach's own margin
 float sReef = smoothstep( 0.5, 0.6, 0.45 * sBedA.b + 0.25 * sBedA.a + 0.3 * sBedB.b + 0.3 * ( 1.0 - sSand ) ) * smoothstep( 0.25, 1.2, sCol + 0.9 * ( 1.0 - sSand ) );
@@ -929,8 +950,10 @@ float sSandRip = 0.93 + 0.07 * sin( dot( sBedAt, vec2( 4.1, 2.3 ) ) + 5.0 * sBed
 vec3 sBed = mix( ${v3(SEA_LOOK.sand)} * sSandRip * ( 0.86 + 0.28 * sBedB.a ), ${v3(SEA_LOOK.reef)} * ( 0.6 + 0.9 * sBedB.r ), sReef );
 // the light the ripples gather on a shallow bed (high)
 #ifdef SEA_CAUSTICS
+if ( uSeaShed < 0.5 ) {
 float sCaust = pow( 1.0 - min( sLace2.g, texture2D( uSeaNoise, sBedAt * 0.23 - sT * vec2( 0.013, 0.021 ) ).g ) , 6.0 );
 sBed *= 1.0 + 1.4 * sCaust * sWind * smoothstep( 0.05, 0.6, sCol ) * exp( - 0.35 * sCol ) * ( 1.0 - smoothstep( 0.15, 0.6, sAlong ) );
+}
 #endif
 vec3 sBody = uSeaDeep * ( 1.0 - sClear ) + sBed * sClear;
 // a wave's top is thinner: lighter, and lit through when looking towards the sun
@@ -941,6 +964,8 @@ seaScatter = uSeaSun * ${v3(SEA_LOOK.scatter)} * ( 0.3 + 0.7 * sTop ) * ( 0.25 +
 // the face of a line of surf about to break is thin water with the light in it; bubbles turn the water milky
 float sFace = sZone * sGrow * smoothstep( 0.8, 0.97, sU ) * ( 1.0 - smoothstep( ${f(0.45 * S.spacing)}, ${f(1.0 * S.spacing)}, sAlong ) );
 float sMilk = max( smoothstep( 0.05, 0.7, min( sMask, 1.0 ) ), 0.6 * sFace );
+// (between the lines the water is full of fine bubbles and sand: a brighter turquoise than its depth alone gives)
+sBody = mix( sBody, ${v3(SEA_LOOK.surfBody)}, 0.55 * sZone * sGrow * smoothstep( 0.1, 0.5, sCol ) );
 sBody = mix( sBody, ${v3(SEA_LOOK.milk)}, 0.62 * sMilk );
 diffuseColor.rgb = mix( sBody * ( 1.0 - seaF ), ${v3(SEA_LOOK.foam)} * ( 0.8 + 0.3 * sLace2.r ), seaFoam );
 seaRough = mix( seaRough, 0.6, seaFoam );
@@ -1000,7 +1025,7 @@ reflectedLight.directDiffuse += seaScatter;
   #if SEA_LAND > 0
   // ---- the land in the mirror: the mirrored ray marched over the shore map's land heights, each step looking at a
   // coarser level (which holds the highest land of the stretch it covers)
-  if ( seaLee > 0.0 || shoreLand( textureLod( uSeaShore, ( vSeaBase - uSeaBox.xy ) * uSeaBox.z, SEA_LEE_LOD + 2.0 ).b ) > 2.0 ) {
+  if ( uSeaMarch.x > 0.5 && ( seaLee > 0.0 || shoreLand( textureLod( uSeaShore, ( vSeaBase - uSeaBox.xy ) * uSeaBox.z, SEA_LEE_LOD + 2.0 ).b ) > 2.0 ) ) {
     vec2 hDir = hRe.xz / max( length( hRe.xz ), 1.0e-4 );
     float hTan = hRe.y / max( length( hRe.xz ), 1.0e-4 );
     // the skyline is as soft as the slopes are spread
@@ -1010,20 +1035,22 @@ reflectedLight.directDiffuse += seaScatter;
     float hTop = 0.0;
     float d = 9.0;
     for ( int i = 0; i < SEA_LAND; i ++ ) {
+      if ( float( i ) >= uSeaMarch.x ) break;
       vec2 q = ( vSeaBase + hDir * d - uSeaBox.xy ) * uSeaBox.z;
-      float h = shoreLand( textureLod( uSeaShore, q, log2( max( 1.0, 0.5 * d * uSeaBox.z * SEA_SHORE_SIZE ) ) ).b );
-      float over = smoothstep( - hSoft, hSoft, h / d - hTan ) * step( 0.3, h );
+      float h = shoreLand( textureLod( uSeaShore, q, log2( max( 1.0, 0.3 * d * uSeaBox.z * SEA_SHORE_SIZE ) ) ).b );
+      // (far land is a soft, paler presence: a coarse level's highest land is wider than the land)
+      float over = smoothstep( - hSoft, hSoft, h / d - hTan ) * step( 0.3, h ) * ( 1.0 - 0.35 * smoothstep( 400.0, 1800.0, d ) );
       if ( over > hLand ) {
         hLand = over;
         hAt = d;
         hTop = h;
       }
-      d *= SEA_STEP;
+      d *= uSeaMarch.y;
     }
     if ( hLand > 0.0 ) {
       // (land that barely clears the water is a beach: pale)
       vec3 hOwn = uSeaLandTint * mix( ${v3(SEA_LOOK.sand.map((c, i) => c / SEA_LOOK.land[i]))}, vec3( 1.0 ), smoothstep( 0.6, 3.5, hTop ) );
-      vec3 hTint = mix( hOwn, hazeColor( vec3( hDir.x, 0.0, hDir.y ) ), hazeBetween( uSeaBox.w + 1.0, vec3( hDir.x, 0.0, hDir.y ) * hAt ) );
+      vec3 hTint = mix( hOwn, hazeColor( vec3( hDir.x, 0.0, hDir.y ) ), hazeBetween( uSeaBox.w + 1.0, vec3( hDir.x, 0.0, hDir.y ) * ( hAt + length( cameraPosition - vSeaWorld ) ) ) );
       hSky = mix( hSky, hTint, hLand );
     }
   }

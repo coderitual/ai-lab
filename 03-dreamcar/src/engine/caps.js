@@ -56,7 +56,8 @@ export const TIERS = {
  * is). The names are all the engine knows; each rung belongs to whoever draws the thing:
  *   probe    the car's reflection probe redraws its faces half as often (the game)
  *   blur     half the motion blur's samples (FramePipeline)
- *   detail   trees go to their simpler forms sooner and the wood's floor is drawn less far (the world)
+ *   detail   trees go to their simpler forms sooner and the wood's floor is drawn less far; the water mirrors the
+ *            land less far, draws fewer ripple layers and has no planar mirror (the world: forest.js, sea.js)
  *   ao       no ambient occlusion: four passes less (FramePipeline)
  *   msaa     two samples in the scene target instead of four (FramePipeline)
  */

@@ -888,6 +888,19 @@ into `hazeColor` of its direction, which is what the sky dome shows under
 the horizon. Not done: the wake of a car's splash, refraction of what stands
 in the water, the bed under the open sea's swell.
 
+**Less of it.** `SEA_TIERS` (sea.js) has four levels of detail: the three
+tiers and `mobile`, which is what the medium tier means on a phone
+(`caps.mobile`; `?sea=` picks one by name): a coarser mesh, two ripple
+layers, four march steps, a quarter of the shore map. Those are compiled in.
+The quality ladder's `detail` rung (`World.setDetail`, with the trees) is
+not: while it is shed the same shader skips, on one uniform, the ripple
+layers the leanest level does not draw (their slopes go into the roughness,
+so the glitter keeps its width), the second gust sample, the slicks, the
+clouds' shade, the surf's relief and the caustics, and marches four steps
+instead of six or eight; on high the planar mirror is not drawn. The colour
+by depth, the glitter, the surf and the nearest reflections stay. A rung can
+come and go at any moment, so nothing about it may compile a shader.
+
 **For the ground.** `SEA_SHORE_GLSL` (sea.js) gives any material that carries
 `SEA_UNIFORMS` the shore map (`shoreAt`, `shoreDepth`, `shoreDist`,
 `shoreLand`) and the sheet's level at a place and time (`seaSheet(xz, t)`,
