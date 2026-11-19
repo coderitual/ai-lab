@@ -351,8 +351,8 @@ export const PHOTOS = {
   d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
   d3: { back: 7, right: -0.3, up: 1.6, yaw: 12, pitch: -8, fov: 52, t: 76.6, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
-  // (day lane) frame K5, the owner's strict spec at dusk: the end of the sweepback's first piece, high over the bay
-  k5: { back: 6.2, right: 0, up: 2.3, yaw: 0, pitch: -9, fov: 50, t: 88.7, time: 'dusk' },
+  // (day lane) frame K5, the owner's strict spec at twilight: the end of the sweepback's first piece, high over the bay
+  k5: { back: 6.2, right: 0, up: 2.3, yaw: 0, pitch: -9, fov: 50, t: 88.7, time: 'twilight' },
   e1: { back: -10, right: 2.5, up: 3.8, yaw: 162, pitch: -10, fov: 38, roll: 7, t: 64.9, time: 'day' },
   waves: { back: 7, right: 3, up: 2.2, yaw: -30, pitch: -4, fov: 55, t: 94.4, time: 'day' },
 };
@@ -362,7 +362,7 @@ export const PHOTOS = {
  * correctly exposed whatever the time of day: `default`, or a time of day's own value. Eased in and out over
  * `ease` s through the same exposure the game drives.
  */
-export const SHOWCASE = { default: 0.5, day: 0.3, dusk: 0.9, night: 0.6, ease: 0.6 };
+export const SHOWCASE = { default: 0.5, day: 0.3, dusk: 0.9, twilight: 0.7, night: 0.6, ease: 0.6 };
 
 /**
  * How the eye follows the light: time constants (s) of the exposure closing down (towards brighter light: fast)

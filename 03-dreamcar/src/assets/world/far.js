@@ -41,7 +41,7 @@ const ROWS = 14;
 const DEG = Math.PI / 180;
 /** (day lane) How bright the massif's back-lit rim is (see mountainMaterial): set per time of day in setTime. */
 const RIM = { value: 1 };
-const RIM_BY_TIME = { day: 1, dusk: 0.6, night: 0.4 };
+const RIM_BY_TIME = { day: 1, dusk: 0.6, twilight: 0.3, night: 0.4 };
 /**
  * (sky lane) The limestone massif: how far it is turned from the start straight's heading towards the land side
  * (degrees), its nearest distance from the start line and how far it stands clear of the course's bounds (m), its
@@ -972,7 +972,7 @@ void main() {
       const s = (0.8 * e) / Math.PI;
       shared.uMistColor.value.set(s * (0.75 + 0.25 * time.sun.color[0]), s * (0.8 + 0.2 * time.sun.color[1]), s * (0.85 + 0.15 * time.sun.color[2]));
       // (day lane: 0.65 by day laid a pale sheet like snow over the valley seen from the ledge's bend, frame D3)
-      shared.uMistOpacity.value = night ? 0.15 : time.name === 'dusk' ? 0.45 : 0.35;
+      shared.uMistOpacity.value = night ? 0.15 : time.name === 'dusk' ? 0.45 : time.name === 'twilight' ? 0.25 : 0.35;
       const lamps = time.lamps.windows;
       lightPoints.material.uniforms.uRadiance.value = 0.6 * lamps;
       lightPoints.visible = lamps > 0;

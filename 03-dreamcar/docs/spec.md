@@ -337,22 +337,22 @@ Read once by `src/engine/params.js`.
 
 ## Times of day
 
-`TIMES` in `src/assets/world/lighting.js`, in order: day, dusk, night. The sun
-and the moon are placed against the start straight's heading by
-`placeLights`.
+`TIMES` in `src/assets/world/lighting.js`, in order: day, dusk, twilight,
+night. The sun and the moon are placed against the start straight's heading
+by `placeLights`.
 
-| | day | dusk (golden hour) | night |
-| --- | --- | --- | --- |
-| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | the moon 8° left, 17° up; 0.12 |
-| exposure (tunnel) | 0.68 (5.6) | 4.2 (6) | 22 (5) |
-| sky's light on the scene: environment / fill | 0.6 / 0.13 | 0.6 / 0.014 | 1 / 0.013 |
-| sky at the zenith (radiance) | [0.22, 0.38, 0.78] | [0.02, 0.034, 0.068] | [0.0007, 0.0014, 0.0038] |
-| wetness | 0 | 0 | 0.8 |
-| street lamps and floodlights / tunnel / windows / cones in the air / the tunnel's entrance and exit zones | 0 / 1 / 0 / 0 / 1 | 1 / 1 / 0.7 / 0 / 0.5 | 1 / 1 / 1 / 1 / 0 |
-| car lamps | running lights | low beam | low beam |
-| clouds cover | 0.45 | 0.45 | 0.3 |
-| bloom / glare / ghosts | 0.05 / 0.015 / 0.00015 | 0.09 / 0.03 / 0.0002 | 0.15 / 0 / 0 |
-| contrast / saturation | 1.14 / 1.18 | 1.2 / 1.16 | 1.12 / 0.94 |
+| | day | dusk (golden hour) | twilight (after sunset) | night |
+| --- | --- | --- | --- | --- |
+| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | the same bearing, 5° under the horizon; no direct light, no sun shadows | the moon 8° left, 17° up; 0.12 |
+| exposure (tunnel) | 0.68 (5.6) | 4.2 (6) | 9 (7) | 22 (5) |
+| sky's light on the scene: environment / fill | 0.6 / 0.3 | 0.6 / 0.014 | 1 / 0.012 | 1 / 0.013 |
+| sky | zenith [0.15, 0.33, 0.86] | the twilight dome (sky.js), zenith [0.008, 0.022, 0.085] | the twilight dome, zenith [0.0018, 0.006, 0.034] | zenith [0.0007, 0.0014, 0.0038] |
+| wetness | 0 | 0 | 0 | 0.8 |
+| street lamps and floodlights / tunnel / windows / cones in the air / the tunnel's entrance and exit zones | 0 / 1 / 0 / 0 / 1 | 1 / 1 / 1 / 0.35 / 0.5 | 1 / 1 / 1 / 0.6 / 0.25 | 1 / 1 / 1 / 1 / 0 |
+| car lamps | running lights | low beam | low beam | low beam |
+| clouds cover | 0.36 | 0.28 | 0.05 | 0.3 |
+| bloom / glare / ghosts | 0.05 / 0.015 / 0.00015 | 0.11 / 0.03 / 0.0002 | 0.13 / 0 / 0 | 0.15 / 0 / 0 |
+| contrast / saturation | 1.14 / 1.18 | 1.24 / 1.22 | 1.18 / 1.15 | 1.12 / 0.94 |
 
 N, or the title's choice, fades to black and back (0.25 s each way) to switch.
 

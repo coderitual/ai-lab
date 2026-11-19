@@ -37,6 +37,7 @@ import { createGroundMaterial } from './groundMaterial.js';
 import { createSea } from './sea.js';
 import { createFar } from './far.js';
 import { createK5 } from './k5.js';
+import { k5NoTrees } from './landmarks.js';
 import { CASTER_LAYER, createForest } from './forest.js';
 import { createGroundCover } from './groundCover.js';
 import { selectBake } from './shading.js';
@@ -90,7 +91,7 @@ const SMALL = new Map([
  * @typedef {object} World
  * @property {THREE.Scene} scene
  * @property {import('./lighting.js').TimeOfDay} time the time of day now showing
- * @property {(name: 'day'|'night') => import('./lighting.js').TimeOfDay} setTime switch the whole world: sun or moon,
+ * @property {(name: string) => import('./lighting.js').TimeOfDay} setTime switch the whole world: sun or moon,
  *   sky, haze, environment map, fill, lamps
  * @property {(dt: number, simTime: number) => void} update fixed step, deterministic (anything animated)
  * @property {(camera: THREE.Camera, focus: THREE.Vector3, beams?: Beam[], hidden?: THREE.Object3D[]) => void} prepareView
@@ -171,7 +172,9 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
   // no tree where the pit building, the stand and the towns stand (startPlan.js), nor where the caller says
   const built = startKeepOut(track, terrain.heightAt);
-  const noTrees = keepOut ? (x, z) => built(x, z) || keepOut(x, z) : built;
+  // (day lane) and none on the banks in front of frame K5's place (landmarks.js)
+  const k5Bare = k5NoTrees(track);
+  const noTrees = keepOut ? (x, z) => built(x, z) || k5Bare(x, z) || keepOut(x, z) : (x, z) => built(x, z) || k5Bare(x, z);
   const forest = createForest({ renderer, track, terrain, tier, coverage, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high, keepOut: noTrees });
   // the trees' shadow-only proxies live on a layer only the sun's shadow camera sees
   sun.light.shadow.camera.layers.enable(CASTER_LAYER);
