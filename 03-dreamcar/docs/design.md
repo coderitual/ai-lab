@@ -103,11 +103,18 @@ beside the pits (the rest of the land side is a rail), rock where the road is
 cut into the hill, parapets on the bridges, the walkways' kerbs in the tunnel. Trees stand
 behind the barrier, never as it.
 
-How the ground is drawn (src/assets/world): the asphalt (road.js) is
-dark, fine racing asphalt with a polished, darker racing line and rubber in
+How the ground is drawn (src/assets/world): the asphalt (road.js) is an
+old mountain road's kept for racing, as in frames E2 and E5 (below): a pale
+to mid grey in sun, a shade warm (albedo 0.11 new to 0.22 a generation old),
+a cooler grey in the woods' shade that still shows its stones; fine stone
+grain close by fading to a clean tone; each lane's wheel paths darker and
+smoother, the crown and the edges lighter, long faint streaks along the road;
+small dark grit off the line and towards the edges, a thin band of dust
+along the edge; a polished, darker racing line and rubber in
 the bends and the braking zones (corridor.js), runs of surfacing of different
-ages with joints, the paver's seams 2 m either side of the middle, a few
-patches and sealed cracks, tyre marks before the carousel (roadHistory.js);
+ages with joints, the paver's seams 2 m either side of the middle, patches
+(about one per 300 m) and cracks sealed with tar (about one per 90 m), tyre
+marks before the carousel (roadHistory.js);
 its markings are a solid white line inside each edge (0.28 m), the start line
 and twelve grid boxes from `track.grid`, nothing else. A second, anisotropic
 specular lobe stretched along the line of sight lays the low sun's glare on it
@@ -489,6 +496,22 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   in low warm light, with rust in their shade and dark trunks below; a gantry
   over the road carrying columns of round start lamps; boards, a tyre wall, a
   low concrete wall; the asphalt in shade, the car's tail lamps lit.
+- **E2** and **E5** (road lane; the owner: "Road should be like that
+  exactly"; the spec for the asphalt everywhere on the lap): a two-lane road
+  through pines, by day. In sun the asphalt is a pale to mid grey, a shade
+  warm (sampled: sRGB about 100 to 150, luma; the lane seen across the light
+  about 100, patches lit straight on about 145), in the trees' shade a cool
+  dark grey (about [34, 43, 51]) that still shows its texture; fine stone
+  grain close to the camera fading smoothly to a clean tone; a soft sheen
+  towards the sun at grazing angles, no mirror; darker, smoother bands where
+  the tyres run, the crown and edges lighter, long faint streaks along the
+  road; thin dark meandering cracks, some sealed with tar, an occasional
+  rectangular patch a different grey, a few per hundred metres; small dark
+  stones scattered off the line and near the edges (E5); crisp but slightly
+  worn paint: white edge lines and a double yellow centre line; a clean
+  asphalt edge meeting a low concrete kerb or the verge with a thin band of
+  dust along it. Only the road is answered to; the cars, people and captions
+  in them are not ours to copy.
 - **E1** (sea lane; strict spec for the coast stretch, preset `e1`): a road
   winding in an S round a cut hill on a headland high above an open sea; the
   whole frame is described under "The sea".
@@ -505,7 +528,7 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   wet road mirrors; the last warm side light with long shadows across the
   road and a lit snowy mountain against a clear pale sky.
 
-Day answers to D1, D3, E1 and A; golden hour to D4, D2 and the twilight references; the wet night to two
+Day answers to D1, D3, E1 and A (and the asphalt everywhere to E2 and E5; D1's "dark smooth asphalt" gave way to them); golden hour to D4, D2 and the twilight references; the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
 light, the materials, the vegetation, the composition and the sense of speed:
