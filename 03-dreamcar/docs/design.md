@@ -409,8 +409,7 @@ with a short `advance` after loading.
   with halos against the lit sky (`halo` 0.1, a faint cone in the air); the
   cars run on low beam, their head lamps pooling on the road ahead and their
   tail lamps laying a red pool on the asphalt behind them (road.js
-  `TAIL_POOL`). The tunnel's interior is exposed for its lamps (3.6), so its
-  white lining no longer burns flat.
+  `TAIL_POOL`).
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about

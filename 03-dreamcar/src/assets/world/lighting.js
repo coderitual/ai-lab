@@ -274,8 +274,7 @@ export const TIMES = {
     // silhouettes), gold and rose towards it
     fog: { color: [0.02, 0.022, 0.048], sun: [0.3, 0.13, 0.045], sunLobe: 5, density: 0.00025, heightFalloff: 0.011, air: 0.00008 },
     exposure: 4.2,
-    // (dusk lane: 6 burnt the box's white lining flat; at 3.6 the luminaires glow against it)
-    tunnelExposure: 3.6,
+    tunnelExposure: 6,
     shadeEv: 0.6,
     look: {
       flare: { dir: DUSK_SUN, light: 0.6, reach: 0.5, sky: 0.1 },
