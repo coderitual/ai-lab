@@ -13,6 +13,7 @@
 //   eye=x,y,z   where the camera stands (m; the water's level is the Track's lake level, about -1.8)
 //   at=x,y,z    what it looks at          fov=50   the lens, top to bottom
 //   look={"surf":{"spacing":8}}   other numbers for SEA_LOOK (sea.js), merged into it before the sea is made
+//   shed=1      as while the quality ladder's `detail` rung is shed (sea.js setShed)
 //   t=12        the waves' clock (s)      time, q, sea, manual, dpr, post, ldr, ev: as in the game (engine/params.js)
 //
 // The handle: __sealab.read(x, y, half) the picture's colour round a CSS pixel ([r, g, b], 0..255);
@@ -204,6 +205,8 @@ scene.onBeforeRender = (_renderer, _scene, camera) => sun.beforeRender(camera);
 const mirror = tier === 'high' && caps.hdr ? new PlanarMirror(engine.renderer, caps, { scale: 0.3, far: 3000, streak: 0.4, clipBias: 0.3 }) : null;
 const sea = createSea({ caps, tier, atmosphere, sea: coast.sea, heightAt: coast.heightAt, far: 5000, mirror, detail: params.sea });
 if (coast.piers) sea.setPiers(coast.piers);
+// ?shed=1: as while the quality ladder's detail rung is shed
+sea.setShed(query.get('shed') === '1');
 scene.add(coast.group, sea.mesh, sky.dome, sky.stars, ...sun.objects);
 scene.fog = atmosphere.fog;
 
