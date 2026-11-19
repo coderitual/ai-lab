@@ -325,6 +325,18 @@ machine without a GPU, and only what is listed here.
   Not looked at on `high` in the game, at dusk, in split screen or in motion
   (the probe's easing and the lines streaming were not seen moving); the
   playtest was not run.
+- **The car lane's round 9** (the paints and the options' Paint rows, the
+  night-race livery, the window, sill and apron trims, the showroom's bands,
+  the tunnel lines' widening): the playtest's `options` and `params` sections
+  against a production build: 72 checks, 0 failed (with the new paint
+  checks: the row offers every paint, silver by default, the second
+  player's row hidden solo, a choice kept under `dreamcar.paint` and on the
+  car at once, `?paint=night` not kept, an unknown name silver). Stills on
+  software WebGL at `medium`: the livery at the night start, in the tunnel
+  and by day (1280x720), every paint in the viewer's showroom, the car at the
+  newest photographs' angles. `node tools/unit.mjs` passed. Not run: the
+  split-screen paint row with two players, the `keys` section, high tier in
+  the game, phones.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.

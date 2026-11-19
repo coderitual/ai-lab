@@ -17,8 +17,7 @@ every number there is marked published, measured or estimated. The viewer
 car alone under the world's light; `pin=` puts its camera exactly where one of
 three photographs was taken from, so a still can be laid over the photograph
 pixel on pixel; `studio=1` stands it in a showroom (dark walls, a soft box overhead, two
-long strip lights either side; with `sun=0&ev=0` the dome is the only light,
-as in a product render) and `stripes=1` in a light tunnel (with `mirror=1`:
+broad bands of light either side; the world's sun stays as the key light) and `stripes=1` in a light tunnel (with `mirror=1`:
 the paint as a plain mirror), for judging surfaces.
 
 Axes (car space, `spec.js`): origin on the ground, on the centre line, midway
