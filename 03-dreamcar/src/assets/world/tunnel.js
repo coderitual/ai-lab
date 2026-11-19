@@ -39,6 +39,7 @@
 
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE } from '../../engine/glsl.js';
+import { CONCRETE, concreteFinish } from './concrete.js';
 import { PROBE_LAYER } from '../../engine/ReflectionProbe.js';
 import { levelFrame } from './furniture.js';
 import { LAMP_KINDS, SPOT_GLSL } from './lamps.js';
@@ -181,6 +182,8 @@ class Parts {
     this.pos = [];
     this.nor = [];
     this.col = [];
+    /** (nearfield lane) where on a concrete wall each point is (concrete.js aConc), (0, 0, 0, 0) where unknown */
+    this.conc = [];
     this.index = [];
   }
   get empty() {
@@ -200,25 +203,31 @@ class Parts {
       else v.set(0, 1, 0);
       this.nor.push(v.x, v.y, v.z);
       this.col.push(color[0], color[1], color[2]);
+      this.conc.push(0, 0, 0, 0);
     }
     if (geometry.index) for (let i = 0; i < geometry.index.count; i++) this.index.push(base + geometry.index.getX(i));
     else for (let i = 0; i < p.count; i++) this.index.push(base + i);
   }
-  /** A flat convex polygon (corners in order), one colour, its normal from the corners. */
-  poly(points, color) {
+  /** A flat convex polygon (corners in order), one colour, its normal from the corners; `conc` per corner, if known. */
+  poly(points, color, conc = null) {
     if (points.length < 3) return;
     const a = points[0];
     const nrm = new THREE.Vector3().subVectors(points[1], a).cross(new THREE.Vector3().subVectors(points[2], a)).normalize();
     const base = this.pos.length / 3;
-    for (const q of points) {
+    points.forEach((q, i) => {
       this.pos.push(q.x, q.y, q.z);
       this.nor.push(nrm.x, nrm.y, nrm.z);
       this.col.push(color[0], color[1], color[2]);
-    }
+      if (conc) this.conc.push(conc[i][0], conc[i][1], conc[i][2], 2);
+      else this.conc.push(0, 0, 0, 0);
+    });
     for (let k = 1; k < points.length - 1; k++) this.index.push(base, base + k, base + k + 1);
   }
-  /** A strip of rows of points (each row the same count; a point doubled is a crease), normals from the winding. */
-  strip(rows, color) {
+  /**
+   * A strip of rows of points (each row the same count; a point doubled is a crease), normals from the winding;
+   * `conc` the same rows of [along, up, down] (concrete.js), if known.
+   */
+  strip(rows, color, conc = null) {
     const m = rows[0].length;
     const base = this.pos.length / 3;
     const a = new THREE.Vector3();
@@ -235,6 +244,8 @@ class Parts {
         this.pos.push(row[k].x, row[k].y, row[k].z);
         this.nor.push(nrm.x, nrm.y, nrm.z);
         this.col.push(color[0], color[1], color[2]);
+        if (conc) this.conc.push(conc[r][k][0], conc[r][k][1], conc[r][k][2], 2);
+        else this.conc.push(0, 0, 0, 0);
       }
     }
     for (let r = 0; r < rows.length - 1; r++) {
@@ -249,6 +260,7 @@ class Parts {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    g.setAttribute('aConc', new THREE.Float32BufferAttribute(this.conc, 4));
     g.setIndex(this.index);
     g.computeBoundingSphere();
     return g;
@@ -703,10 +715,13 @@ function buildCuttings({ track, terrain, t, Wb, cast, paint, screens, low }) {
   ]) {
     for (const side of [1, -1]) {
       const rows = [];
+      const conc = [];
+      const ribs = [];
       const screenRows = [];
       const n = Math.ceil((s1 - s0) / step);
       for (let r = 0; r <= n; r++) {
-        const s = track.wrap(s0 + ((s1 - s0) * r) / n);
+        const a = s0 + ((s1 - s0) * r) / n;
+        const s = track.wrap(a);
         const f = levelFrame(track, s, {});
         // beside the mouth the walls stand back a little towards the box's own (but never behind the foot of the
         // terrain's cliff, which would then stand in front of them), and stand upright, leaning back further out
@@ -719,9 +734,29 @@ function buildCuttings({ track, terrain, t, Wb, cast, paint, screens, low }) {
         if (kind === 'slope') {
           const lean = CUT.slope * h * Math.min(1, fromFace / CUT.upright);
           rows.push([at(0, yE - 0.5), at(0, yE + 0.15), at(lean, yE + h), at(lean, yE + h), at(lean + 0.6, yE + h + 0.05), at(lean + 0.6, yE + h + 0.05), at(lean + 1.2, yE + h - 1.2)]);
+          // (nearfield lane) where on the wall each point is, for the concrete's panels, cap and foot (concrete.js)
+          conc.push([[a, -0.5, h + 0.5], [a, 0.15, h - 0.15], [a, h, 0], [a, h, 0], [a, h, 0], [a, h, 0], [a, h - 1.2, 1.2]]);
         } else {
           const top = yE + h;
-          rows.push([at(0.02, yE - 0.5), at(0.02, top), at(0.02, top), at(0.62, top), at(0.62, top), at(0.62, top - 1.5)]);
+          // (nearfield lane) the wall's face stands back under a cap that overhangs it (a line of shade along the top),
+          // and buttress ribs as deep as the overhang stand out from it, every other panel; never so far back that the
+          // terrain's cliff (from FOOT behind the solid edge) could show in front of it
+          const recess = Math.max(0, Math.min(0.25, 0.68 - (edge - solid)));
+          const capH = Math.min(0.35, 0.4 * h);
+          rows.push([
+            at(0.02 + recess, yE - 0.5),
+            at(0.02 + recess, top - capH),
+            at(0.02 + recess, top - capH),
+            at(0.02, top - capH),
+            at(0.02, top - capH),
+            at(0.02, top),
+            at(0.02, top),
+            at(0.62, top),
+            at(0.62, top),
+            at(0.62, top - 1.5),
+          ]);
+          conc.push([[a, -0.5, h + 0.5], [a, h - capH, capH], [a, h - capH, capH], [a, h - capH, capH], [a, h - capH, capH], [a, h, 0], [a, h, 0], [a, h, 0], [a, h, 0], [a, h - 1.5, 1.5]]);
+          if (recess > 0.05 && h > 1.5) ribs.push({ a, recess, yE, top: top - capH, h, capH });
           // the screen's height: lowest at the portal, a step up every SCREEN.step m
           const away = track.delta(t.s1, s);
           const hs = Math.min(SCREEN.top, SCREEN.screen + SCREEN.rise * Math.floor(Math.max(0, away) / SCREEN.step));
@@ -729,7 +764,34 @@ function buildCuttings({ track, terrain, t, Wb, cast, paint, screens, low }) {
           else screenRows.push(null);
         }
       }
-      cast.strip(rows, kind === 'slope' ? [0.34, 0.33, 0.3] : [0.56, 0.55, 0.52]);
+      cast.strip(rows, kind === 'slope' ? [0.34, 0.33, 0.3] : [0.56, 0.55, 0.52], conc);
+      // the ribs, at every other joint of the panels (CONCRETE.wall.panel), as tall as the face under the cap
+      const pitch = 2 * CONCRETE.wall.panel;
+      for (const rib of ribs) {
+        const k = Math.round(rib.a / pitch);
+        const at = k * pitch;
+        if (Math.abs(at - rib.a) > step / 2 || track.delta(s0 + 1, at) < 0 || track.delta(at, s1 - 1) < 0) continue;
+        const w = 0.28;
+        const P = (along, d, y) => {
+          const f = levelFrame(track, track.wrap(along), {});
+          const solid = track.edgeAt(track.wrap(along), side);
+          const edge = solid + Math.min(CUT.back, Math.max(0, Wb - solid));
+          return new THREE.Vector3(f.pos.x + f.flat.x * side * (edge + d), y, f.pos.z + f.flat.z * side * (edge + d));
+        };
+        const y0 = rib.yE - 0.5;
+        const y1 = rib.top;
+        // its faces read as the middle of a panel (no joint drawn down the rib)
+        const c = (along, y) => [along + CONCRETE.wall.panel / 2, y - rib.yE, rib.top + rib.capH - y];
+        const front = [P(at - w, 0.02, y0), P(at + w, 0.02, y0), P(at + w, 0.02, y1), P(at - w, 0.02, y1)];
+        const backs = [P(at - w, 0.02 + rib.recess, y0), P(at + w, 0.02 + rib.recess, y0), P(at + w, 0.02 + rib.recess, y1), P(at - w, 0.02 + rib.recess, y1)];
+        const tint = [0.53, 0.52, 0.49];
+        const cf = [c(at - w, y0), c(at + w, y0), c(at + w, y1), c(at - w, y1)];
+        // wound to face the road on either side
+        const order = (q) => (side > 0 ? q : [q[0], q[3], q[2], q[1]]);
+        cast.poly(order(front), tint, order(cf));
+        cast.poly(order([backs[0], front[0], front[3], backs[3]]), tint, order([cf[0], cf[0], cf[3], cf[3]]));
+        cast.poly(order([front[1], backs[1], backs[2], front[2]]), tint, order([cf[1], cf[1], cf[2], cf[2]]));
+      }
       // the blue sign on the exit's wall, on the right of whoever looks into the mouth from outside, facing the road
       if (kind === 'screen' && side > 0) {
         const s = track.wrap(t.s1 + 10);
@@ -932,27 +994,9 @@ vec3 boreLampLight(vec3 P, vec3 N) {
   });
 }
 
-/** Cast concrete for the portals and the cuttings: board marks, soft stains and weathering running down. */
+/** Cast concrete for the portals and the cuttings: (nearfield lane) concrete.js's finish. */
 export function concreteDetail(material) {
-  return extend(material, 'portal-concrete', (shader) => {
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vPortalWorld;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPortalWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${GLSL_HASH}\n${GLSL_NOISE}\nvarying vec3 vPortalWorld;`)
-      .replace(
-        '#include <color_fragment>',
-        `#include <color_fragment>
-{
-  vec3 p = vPortalWorld;
-  float boards = 0.95 + 0.05 * hash11(floor(p.y / 0.3));
-  float stain = valueNoise(vec2(p.x * 0.25 + p.z * 0.25, p.y * 0.08)) * valueNoise(vec2((p.x - p.z) * 1.3, p.y * 0.05));
-  // streaks of weathering running down from the tops: fine across, long down
-  float run = valueNoise(vec2((p.x + p.z) * 2.1, p.y * 0.18));
-  diffuseColor.rgb *= boards * (1.0 - 0.4 * stain) * (0.86 + 0.22 * run);
-}`,
-      );
-  });
+  return concreteFinish(material, { key: 'tunnel', kind: 'wall' });
 }
 
 /**

@@ -67,6 +67,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | structures | the tunnel's bore 349 m, ceiling 6.4 m over the road (`TUNNEL`); two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
 
 | barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; the walkways' kerb faces in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
+| rock | cut faces in beds 1.35 m thick (`BED`), blocks 2.6 to 6.8 m long set back 0.06 to 0.62 m and swelling up to 0.38 m (rock.js); a natural arch over the road at 1972 m (`ARCH`: underside about 11 m over the road, never under 9 m over the corridor, feet 5.2 m and crown 2.9 m thick) |
 | structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
 | tyre walls | 8 runs, on the outside of the fast bends, painted white and red by blocks of five stacks |
@@ -493,6 +494,22 @@ tunnel changed and still is.
 before and after): low by day 129 / 143 calls and 302 / 327 k triangles before, 132 / 144 and 270 / 291 k after (the
 drowned ground left out more than pays for the sea's flat disc); medium by night 214 / 228 calls and 0.91 / 1.00 M
 before, 216 / 230 and 0.89 / 0.95 M after (the sea one call, 19.9 k triangles, in the scene).
+
+**Beside the road** (nearfield lane, 2026-11-19: `stats()` of one frame in
+the stills tool, autopilot run by day, `?seed=1`; before and after the lane):
+
+| t (place) | low 393x852: calls, triangles | medium 393x852 | medium 1280x720 |
+| --- | --- | --- | --- |
+| 8 (start straight) | 149, 320 k / 149, 329 k | 200, 1.141 M / 200, 1.149 M | 151, 936 k / 151, 941 k |
+| 43.8 (out of the tunnel, the arch ahead) | 157, 262 k / 158, 277 k | 198, 808 k / 197, 819 k | 169, 691 k / 166, 701 k |
+| 56 (the climb, the coast road) | 88, 166 k / 89, 173 k | 112, 514 k / 110, 513 k | 156, 699 k / 155, 704 k |
+
+Draw calls are unchanged within one or two (the rock is one mesh now, cut into
+400 m pieces, which pays for the arch); triangles grew by up to 6 % on low
+and 1.4 % on medium. The low tier's triangles were over its 250 k budget
+before and still are; medium's were over 600 k before and still are. The
+wall's grooves are on the high tier only (on medium they cost about 100 k
+triangles at the start straight, all passes counted).
 
 None of these was measured on a real GPU or phone.
 

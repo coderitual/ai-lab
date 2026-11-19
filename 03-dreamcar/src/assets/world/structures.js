@@ -44,7 +44,7 @@ export function createStructures({ track, terrain, caps, tier, atmosphere, rng, 
   lap('tunnel');
   const rails = createRails({ track, tier, atmosphere });
   lap('rails');
-  const walls = createWalls({ track, atmosphere });
+  const walls = createWalls({ track, atmosphere, tier });
   lap('walls');
   // (a circuit has no guide posts, chevrons or warning signs: posts.js is kept for a public road)
   const posts = { group: new THREE.Group(), stats: { posts: 0 } };
