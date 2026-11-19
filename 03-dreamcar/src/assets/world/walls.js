@@ -203,8 +203,9 @@ float wBand = step( wFace, 0.5 ) * smoothstep( 0.1 + wRag, 0.12 + wRag + wYa, wY
 float wKept = vWallPaint > ${(PAINT.DARK - 0.5).toFixed(1)} ? 1.0 : 0.0;
 wBand = max( wBand, wKept * step( wFace, 1.5 ) * step( 0.1, wY ) );
 // chipped and worn through: in flakes, most low down and at the arrises and the block's ends
-float wFlake = wallNoise( vec2( wS * 11.0, wY * 23.0 ) ) * 0.55 + wallNoise( vec2( wS * 2.3, wY * 5.0 ) ) * 0.45;
-float wChip = smoothstep( 0.74, 0.78, wFlake + 0.3 * ( 1.0 - smoothstep( 0.1, 0.35, wY ) ) + 0.35 * smoothstep( 1.3, 1.48, abs( wU ) ) + 0.2 * smoothstep( 0.8, 0.86, wY ) );
+// (round 2) flakes a few centimetres across, not blotches: the fine noise leads, the coarse only gathers them
+float wFlake = wallNoise( vec2( wS * 16.0, wY * 34.0 ) ) * 0.72 + wallNoise( vec2( wS * 4.1, wY * 9.0 ) ) * 0.28;
+float wChip = smoothstep( 0.79, 0.82, wFlake + 0.3 * ( 1.0 - smoothstep( 0.1, 0.35, wY ) ) + 0.35 * smoothstep( 1.3, 1.48, abs( wU ) ) + 0.2 * smoothstep( 0.8, 0.86, wY ) );
 wChip *= 1.0 - 0.75 * wKept;
 vec3 wCol = mix( wConcrete, wPaint, wBand * ( 1.0 - wChip ) );
 // rain streaks hanging from the top edge, road dirt sprayed up the foot, black tyre scuffs along the sloped foot

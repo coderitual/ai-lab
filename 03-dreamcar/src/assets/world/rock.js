@@ -93,9 +93,11 @@ export function createRockFaces({ track, terrain, tier, rng, except = null }) {
       const room = (t) => 0.8 * c.rock + 0.3 * t - 0.12;
       const off = bedOffset(s, side);
       // a block swells out towards its middle, up and along (a rounded mass, not a brick)
+      // (round 2) not on the low tier: its columns are 3 m apart, and the swell made stripes of them
+      const swells = tier !== 'low';
       const back = (j, t, swell = 0) => {
         const b = blockAt(j, s, side);
-        const set = SET_BACK[0] + (SET_BACK[1] - SET_BACK[0]) * b.back - swell * (0.1 + 0.28 * b.swell) * Math.sin(Math.PI * b.u) ** 0.7;
+        const set = SET_BACK[0] + (SET_BACK[1] - SET_BACK[0]) * b.back - (swells ? swell : 0) * (0.1 + 0.28 * b.swell) * Math.sin(Math.PI * b.u) ** 0.7;
         return Math.max(0.05, Math.min(room(t), LEAN * t + set));
       };
       const rows = [];
@@ -193,7 +195,8 @@ export function createRockFaces({ track, terrain, tier, rng, except = null }) {
     const mesh = new THREE.Mesh(merged, terrain.material);
     mesh.name = 'rock';
     mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    // (round 2) on the low tier its coarse shadow map laid blotches over the faces' own overhangs: the bake shades them
+    mesh.receiveShadow = tier !== 'low';
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
   }

@@ -38,6 +38,18 @@ export const TEXT = {
   map: 'Map',
   shown: 'Shown',
   hidden: 'Hidden',
+  /** The performance readout: its option, and the one small line it shows (numbers, so that a screenshot carries them). */
+  stats: 'Readout',
+  statsNote: 'One small line at the bottom: tier, picture size, frames a second (mean/slowest), what is switched off to keep them',
+  /**
+   * @param {{ tier: string, width: number, height: number, ratio: number, scale: number, aa: string, fps: number,
+   *   low: number, shed: string[], cap: number|null, trial: boolean, gpu: string }} p `aa`: how edges are smoothed
+   *   (msaa4, msaa2, fxaa); `fps`: the mean of the last seconds, `low`: the slowest frame of them as frames a second;
+   *   `shed`: the ladder's rungs given up; `cap`: frames a second the browser holds; `gpu`: what the browser calls it
+   */
+  statsLine: (p) =>
+    `${p.tier} ${p.width}×${p.height}@${p.ratio} ×${p.scale.toFixed(2)} ${p.aa} ${p.fps}/${p.low}fps ` +
+    `${p.cap ? `cap${p.cap} ` : ''}${p.trial ? 'testing' : p.shed.length ? `off:${p.shed.join(',')}` : 'all on'}${p.gpu ? ` ${p.gpu}` : ''}`,
 
   lap: 'Lap',
   finalLap: 'Final lap',

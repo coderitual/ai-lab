@@ -75,6 +75,8 @@ const MASSIF = {
   depth: 6200, // from the foot to the far edge
   cols: { low: 170, medium: 420, high: 560 },
   rows: { low: 50, medium: 110, high: 150 },
+  /** (perf lane) [columns, rows] on a phone (caps.mobile), by tier: none yet. */
+  mobile: {},
 };
 
 /**
@@ -328,8 +330,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   // that the nearer spurs paint over what lies behind them.
   let massifTriangles = 0;
   {
-    const cols = MASSIF.cols[tier] ?? MASSIF.cols.high;
-    const rows = MASSIF.rows[tier] ?? MASSIF.rows.high;
+    const [cols, rows] = (caps?.mobile && MASSIF.mobile[tier]) || [MASSIF.cols[tier] ?? MASSIF.cols.high, MASSIF.rows[tier] ?? MASSIF.rows.high];
     const n = (cols + 1) * (rows + 1);
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);

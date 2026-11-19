@@ -10,8 +10,9 @@ that no longer matches the source is a bug.
 
 ```
 src/engine/            reusable; knows nothing about cars or roads
-  Engine.js            renderer, canvas, fixed-step loop, manual stepping, resize, lost context, adaptive render scale
-  caps.js              capability probe, tier guess, TIERS (the pipeline's numbers per tier), createTarget / resizeTarget
+  Engine.js            renderer, canvas, fixed-step loop, manual stepping, resize, lost context; runs the governor
+  governor.js          the quality governor: a pure function of frame times (the ladder, the floors, the frame-rate cap)
+  caps.js              capability probe, tier guess, TIERS (the pipeline's numbers per tier), LADDER, createTarget / resizeTarget
   params.js            URL parameters, read once (including the grade overrides used to match a picture)
   glsl.js              GLSL_COMMON (hashes, noise, luma, sRGB, toneCurve, toTarget / fromTarget), GLSL_PROBE, TONE
   FullscreenPass.js    one big triangle; createPassMaterial
@@ -22,6 +23,8 @@ src/engine/            reusable; knows nothing about cars or roads
   rng.js math.js noise.js Input.js Audio.js
 tools/frametest.cjs    the tone curve's numbers; frame times and frame pairs of any page (see below)
 tools/shot.cjs         one screenshot of any URL
+tools/perfcount.cjs    what a frame costs, counted per pass (spec.md, "What a frame costs")
+tools/unit/governor.test.mjs   the governor, run through made-up phones
 ```
 
 ## One view, pass by pass
@@ -45,8 +48,9 @@ road's mirror; the car's reflection probe is updated just before the call.
 | 7 | flare source (the sun) | 1 x 1 | half-float | medium, high, when ghosts or glare > 0 |
 | 8 | star of the glints | 1/4 (the second level) | half-float | medium, high, when `look.star > 0` |
 | 9 | bloom: back up the pyramid | 1/2 ... | half-float | as 6 |
-| 10 | final: lens, bloom mix, exposure, tint, vignette, tone curve, saturation, split toning, lift, sRGB, grain, dither | the canvas rectangle | canvas (low: an RGBA8 target) | all |
-| 11 | FXAA and grain | the canvas rectangle | canvas | low (no MSAA) |
+| 10 | final: lens, bloom mix, exposure, tint, vignette, tone curve, saturation, split toning, lift, sRGB, grain, dither | the canvas rectangle; the view x render scale when 11 or 12 follows | canvas; an RGBA8 target when 11 or 12 follows | all |
+| 11 | FXAA (and the grain, when it is the last) | as 10 | canvas; an RGBA8 target when 12 follows | low (no MSAA) |
+| 12 | the sharpening upscale, grain, dither | the canvas rectangle | canvas | all, only while the render scale is below 1 |
 
 "Half-float" means the 8-bit encoding of glsl.js where `caps.hdr` is false
 (`?ldr` forces it). The road mirror is not made at all then.
@@ -200,8 +204,14 @@ far over any lamp, so a single wild pixel cannot light a blob.
 ### Lens: flare source, ghosts, glare, star (7, 8, in 10)
 
 Only on medium and high. The flare source is one pixel that sums, over the
-first pyramid level no more than 48 texels wide, the light above 30 times
-white: where it is and how much. Only the sun gets there. Ghosts (discs and
+first pyramid level no more than 48 texels wide (all of it: up to 128 texels
+each way, `FLARE_MAX`), the light above 30 times white: where it is and how
+much. (Until 2026-11-19 only the lower 64 rows were summed. On an upright
+phone such a level is up to 105 texels tall, so at some canvas sizes and
+render scales a sun in the top of the picture was not counted and flared by
+the rule for a sun outside the frame instead, more than twice as bright: at
+804x1748 the haze of the day changed when the render scale went from 1 to
+0.85 or 0.72, sky 77 to 104 of 255.) Only the sun gets there. Ghosts (discs and
 rings on the line from it to the middle, all on its side of the middle, so
 that none lands on the car a chase view is centred on) and the glare veil round it are
 drawn in the final pass as shapes from that pixel. `look.flare` lets a sun
@@ -510,12 +520,175 @@ target is clamped to the view's last texel (`uTexels.zw`), so a filtered read
 at a view's edge never picks up what another view left beyond it. The AO's
 half-size grid is clamped the same way (`uHalf`).
 
-The render scale (Engine.js: 1, 0.85, 0.72, 0.6, 0.5; it steps down when frames
-run long and back up when they are short again) shrinks only the off-screen
-targets; the final pass stretches the picture back to the canvas rectangle.
-Everything that has a size in the frame (bloom lobes, AO radius, star length,
-streak clamp) is an angle or a share of the view, so it looks the same at
-every scale.
+The render scale (the governor's last resort, below) shrinks only the
+off-screen targets; the picture is then graded at its own size and the
+sharpening upscale brings it to the canvas rectangle. Everything that has a
+size in the frame (bloom lobes, AO radius, star length, streak clamp) is an
+angle or a share of the view, so it looks the same at every scale.
+
+## The quality ladder
+
+What is given up when frames run long, and in what order. Before this there
+was one knob, the render scale, stepping 1, 0.85, 0.72, 0.6, 0.5: a phone that
+could not hold the frame rate ended at half the pixel ratio's resolution in
+each direction and was stretched back plainly. On a 3x screen at the pixel
+ratio cap of 2 that is one drawn pixel per CSS point, three device pixels
+wide. The owner's screenshots of 2026-11-19 are softer still: put beside
+stills of this build they are the **low** tier at its old floor (pixel ratio
+1.5 x 0.5: 0.75 pixels per point, no multisampling, the FXAA's dotted
+stair-steps four device pixels wide), not medium. Resolution is now the last
+thing to go, and it stops at a floor.
+
+That governor was also a ratchet. It added every slow frame's whole length to
+its count (one 1.6 s stall, a batch of shaders compiled on entering a new
+place, was a step down by itself), judged the step against a smoothed frame
+time the stall had just poisoned (so the step always "helped"), and emptied
+its count of steady time at any single frame over 1/48 s (so it never stepped
+back up on a page that has one long frame every second or so, as every real
+page has). Fed a made-up phone that draws every frame in 8 ms, with stalls
+and hitches, it is at 0.5 after 65 s and stays there (the same input is a
+unit test of the new one: nothing shed in ten minutes, and from the bottom
+back to the top in 90 s). Whether that, or a phone really short of time, put
+the owner's iPhone at the floor is not known: the readout will say.
+
+**The ladder** (`LADDER` in caps.js: names only; each rung belongs to whoever
+draws the thing and asks `engine.isShed(name)`). Least visible first; what a
+rung saves is counted, not timed (spec.md, "What a frame costs"):
+
+| # | rung | what changes | what it saves (medium) | why here |
+| --- | --- | --- | --- | --- |
+| 1 | `probe` | the car's reflection probe redraws its faces half as often (game: `probeEvery` x 2) | a face is a whole second view of the world, about 220 to 250 k triangles and 30 draw calls: one every 4th frame instead of every 2nd is 55 to 60 k triangles a frame on average, and half as many frames that carry one | the cube is eased in over 0.05 s and read through the paint's roughness: a reflection a few frames older is not seen |
+| 2 | `blur` | half the motion blur's samples: 12 to 6 (18 to 9, low 6 to 3), by a uniform | up to 12 of the pass's 30 lookups a pixel, with their box tests, where the streak is long: the roadside at speed, which is where frames are slowest | the samples are jittered per pixel: fewer of them is more noise inside a streak, which is already a smear |
+| 3 | `detail` | trees keep their full and their reduced form to 0.7 of the tier's distances, the wood's floor reaches 0.7 as far (world: `DETAIL_SHED`, forest.js `setDetail`) | the full trees are the scene's largest item in the woods (spec.md); the impostor that replaces one is two triangles | one visible change when it is taken (the trees between 41 and 58 m change form at once), none after |
+| 4 | `ao` | no ambient occlusion | four passes: about 18 texture lookups a pixel and a full-size half-float target written | the shade at the foot of walls and under the car goes; the car keeps its contact shadow from the sun's map by day, and at night the pass matters least |
+| 5 | `msaa` | two samples in the scene target instead of four (the target is made again; no shader depends on the count) | half of the multisampled half-float colour and depth: 68 MB to 34 MB at 804x1748 | edges and the trees' alpha-to-coverage get two levels instead of four: visible on thin things |
+| 6, 7 | render scale 0.85, then 0.72 (low: 0.85, 0.72, 0.6) | every off-screen target shrinks; the sharpening upscale reconstructs | 28 %, then 48 % of every pixel shaded (low: to 64 %) | last, and no further: `TIERS.scaleFloor` |
+
+Not on the ladder, and why: the bloom's levels (the fifth and sixth are 1/1024
+and 1/4096 of the picture's pixels: dropping them saves nothing that can be
+counted); ambient-occlusion samples (8 to 4 would take 1 of the passes' 18
+lookups a pixel: the cost is the blur and the full-size apply, so the rung is
+the whole pass); the shadow map's size and which trees cast (a shadow that
+changes its edge or disappears across the road is the most visible change
+there is: these are fixed per tier and device, sun.js and forest.js); the wet
+road's mirror (it is the look of the night).
+
+**The floors.** `TIERS.scaleFloor`: 0.72 on medium and high, 0.6 on low. With
+the pixel ratio capped at 2 (medium, high), a 3x phone never draws fewer than
+1.44 pixels per CSS point (it was 1.0); on low (cap 1.5) 0.9 (it was 0.75).
+
+**The governor** (governor.js; `Engine._tick` feeds it each frame's real
+time). A pure function of the frame times and its own state: no clock, no
+renderer.
+
+- *Down.* Frames longer than 1/48 s for 1.5 s (net: a fast frame takes twice
+  its time off the count; half as long while frames take more than twice the
+  limit) shed one level. A slow frame counts for 0.1 s at most; a frame over
+  0.25 s is a hiccup and is not counted at all; the first 30 frames are not
+  counted.
+- *The frame-rate cap.* A browser that limits the frame rate itself (Safari
+  in Low Power Mode draws 30 a second whatever is drawn) would drag
+  everything to the bottom for nothing. One rung is too small to tell: under
+  vsync a frame takes a whole number of refresh intervals, so shedding 2 ms of
+  a 26 ms frame changes nothing that can be measured. So the first time frames
+  are slow the governor makes one **trial**: the bottom of the ladder for 40
+  frames (10 to settle, the trimmed mean of 30), against the trimmed mean of
+  the 30 frames before. If the frame time is not at least 7 % shorter,
+  nothing on the ladder buys frame rate here: the level goes back to where it
+  was, the frame time is remembered as the cap, and only frames more than
+  1.25 times the cap count as slow from then on. If it is shorter, the device
+  is short of time (`proven`): it lands one level below where it was and
+  steps on in order.
+- *A cap that comes on later.* Every step down is measured the same way
+  against the frame time when the steps began. Three steps in a row that
+  gained nothing together bring the trial again: it helps, and the steps
+  stand; or it does not, they are undone and the cap is known.
+- *The best a device does* is the same thing: when the last step down gains
+  nothing, the frame time reached is remembered as the cap and the level goes
+  back up one. A phone that reaches 30 frames a second at the floor and no
+  more is then held at the highest level that still gives 30.
+- *The cap is forgotten* when frames shorter than 0.8 of it add up to a second
+  (about one frame in six must be: a true cap gives none).
+- *Up.* There is no way to measure spare time under vsync, so after 6 s of
+  steady frames (a slow frame takes four times its length off the count; it
+  does not empty it) the next level up is tried. Slow again within 10 s: it is
+  taken back at once, without a trial, and the wait doubles (to 120 s at
+  most).
+
+- *The next visit* starts at the level this one ended on (the game keeps it
+  under `dreamcar.level.v1`, for the same tier only; `startGovernorAt`): no
+  slow first seconds, no trial; it climbs from there if it has the time now.
+
+A page stepped by hand (`?manual`), one that does not draw (`?nodraw`) and
+one whose address asks for an exact picture (`?dpr=`, `?scale=`, `?shed=`)
+have no governor: stills and tests are the same picture every time.
+`engine.setQualityStep(level)` and `engine.setRenderScale(scale)` place the
+ladder by hand (the stills of this document were made so).
+
+**No shader is compiled by any of it.** A rung is a uniform (the blur's
+sample limit, `uSplit` in the final pass), a pass that is not run (the
+occlusion), a number the CPU reads (the probe's cadence, the forest's
+distances) or a target made again (the samples, the scale). The upscale's
+program is made when the pipeline is (`FullscreenPass.compile`), not when the
+scale first drops. The playtest's `ladder` section walks every level of low
+and medium and checks that `renderer.info.programs` does not grow.
+
+**What it cannot know.** After a cap goes away (Low Power Mode switched off
+in the middle of a run) the governor has usually climbed to a level this
+device draws in more than one refresh interval but less than the cap; frames
+then stay at the cap's rate with no cap, and nothing tells the two apart
+until some frames come in faster. A reload clears it.
+
+## The sharpening upscale
+
+Whenever a view is drawn below the canvas's size, the final pass (10) writes
+the graded picture at the scene's own size into an 8-bit target (sRGB values,
+dithered, as the low tier always did for its edge smoothing) and one more
+pass (12, `UPSCALE_FRAGMENT`) brings it to the canvas rectangle. Exposure,
+the tone curve and the sRGB curve are still pass 10's: the upscale works on
+finished display values, where a difference means what the eye sees, never
+on scene light (a sharpening kernel on linear light rings round every lamp).
+At render scale 1 the pass does not run and the frame is exactly what it was.
+
+It is AMD's contrast-adaptive sharpening with scaling (FidelityFX CAS,
+Timothy Lottes), with a limit added. Twelve lookups, one pass:
+
+    . a b .      d e i j   the four texels round the pixel
+    c d e g      a .. m    the crosses round each of the four
+    h i j k
+    . l m .
+
+- **Sharpen each of the four** by its own cross: itself minus a share of the
+  four beside it. The share is `amount x sqrt(min(lo, 1 - hi) / hi)` of the
+  cross's brightness range `lo..hi`: most where the picture is even (texture,
+  the plate's letters), little on an edge that is hard already, none where
+  there is no room left to black or to white. The peak share is
+  `-s / mix(8, 5, s)` for strength `s`.
+- **Mix the four** by their bilinear shares, each divided by `1/32 +` its own
+  range: across an edge the pixel takes after the calmer side, so the edge
+  stays about as thin as it was drawn instead of being smeared over a
+  texel's width.
+- **Hold the result** inside what the four texels themselves hold, each
+  channel widened by 8 % of their spread (`UPSCALE.over`): an edge gets
+  steeper, nothing gets a bright or a dark line beside it. This is what CAS
+  does not have, and it is why the strength can be high.
+- **Strength follows the scale** (`sharpnessAt`): 0.35 just under 1, rising
+  to 1 at 0.6 and below: 0.59 at 0.85, 0.81 at 0.72. `?sharp=` replaces it;
+  `?upscale=0` is the plain stretch, for comparing.
+- Grain and dither are added by this pass, at the canvas's own pixels, as the
+  last pass always adds them.
+
+Every weight is a continuous function of the position and of the picture, so
+something that moves a fraction of a texel changes the result by a fraction:
+the filter has no shimmer of its own (measured below).
+
+On low the edge smoothing comes first: final, FXAA into a second 8-bit
+target (without grain), then the upscale: one pass and one target more than
+at scale 1, on 72 % of the pixels or fewer.
+
+Cost, counted: 12 lookups of an 8-bit texture per canvas pixel and one 8-bit
+target of the scene's size. It replaces nothing: it is an extra pass, paid
+for by every other pass running on fewer pixels (at 0.72, 52 % of them).
 
 ## How to add a pass
 
@@ -579,6 +752,13 @@ every scale.
   from `world.prepareView` like the road's, before the view, with shadow maps
   left as they are; it hides the water itself, the ground cover, the kerbs
   and the studs. The road's mirror hides the sea; the sea's shows the road.
+- **Nothing is compiled in the middle of a run.** A switch that can change
+  while the game runs (a rung of the ladder, the render scale) is a uniform or
+  a pass that is skipped, never a define; a pass first needed in the middle
+  of a run has its program made with the others (`FullscreenPass.compile`).
+- **Exposure, the tone curve and the sRGB curve are the final pass's** (10),
+  whatever follows it. The passes after it (FXAA, the upscale) read and write
+  display values and only move them about.
 - **Determinism.** Every pattern (blur jitter, AO rotation, dither) is a
   function of the pixel position; grain changes with the run's own time. No
   `Math.random`, no clock: `?manual&t=N` is the same picture every time.
