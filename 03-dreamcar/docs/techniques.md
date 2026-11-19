@@ -108,6 +108,99 @@ Patched materials multiply the directional light by the channel of the time
 showing and the sky's light by the share of sky seen. The shadow map still
 draws everything near; where both say "no light" they agree.
 
+## Near the road: rock in beds, the ground in patches, concrete in panels
+
+(nearfield lane.) What stands within about 40 m of the road and is not the
+asphalt or a tree is drawn in one language (design.md, "Beside the road"):
+clear forms, a few tones per material stepped rather than ramped, crisp lit
+edges and soft contact shade, and every detail finer than a few pixels
+faded to its average with distance (`fwidth`), so nothing shimmers at speed.
+It adds no draw call: it is geometry in meshes that were already drawn (the
+rock faces are now one mesh, cut into 400 m pieces like the kerbs, where
+every 120 m of a run was a call of its own) and shading in materials that
+were already there.
+
+**Rock faces in beds and blocks** (`rock.js`, `groundMaterial.js`). A cut
+face is built of beds `BED` (1.35 m) thick whose lines wave gently along the
+road (`bedOffset`), each bed cut into blocks 2.6 to 6.8 m long, each block set
+back from the face's lean by its own amount (`SET_BACK`, 0.06 to 0.62 m,
+never behind the terrain's cliff) and swelling out towards its middle by up to
+0.38 m, so it is a rounded mass and not a brick. The strip's rows are laid on
+the bed lines themselves, three per bed, so where a bed stands further back
+than the one under it there is a ledge facing up, and where it stands further
+out an overhang facing down. The vertices carry where they are (`aVerge`:
+metres up the face, s, the side; `aMask.y`: 2 plus the share of the face's
+height), and the ground's shader works out the same beds and blocks from the
+same integer hash (`rockHash` in both, so the painted joints fall on the
+geometry's steps). It paints each block one of three tones of the stone (grey
+inland, ochre sandstone on the coast), big patches of staining, the lip of a
+block pale and lit where the bed above stands back and shaded where it stands
+out, broken joints, pits (hollows 10 to 30 cm across in a jittered grid, dense
+in some patches of the face and absent in others, dark under their upper lip
+and lit on their lower one), crusts of orange and yellow lichen, a damp mossy
+foot and a paler worn top; it tilts each block's normal a little (its own
+plane), bevels its lip and foot and dents the pits; it gives the rock a wet
+sheen (roughness 0.36 to 0.62, 0.3 in the damp foot, where it was 0.82
+everywhere); facets that face up grow grass and scrub in ragged tufts, and
+the fold over the top is grass. The land's own steep rock (the coast's
+cliffs, the hillsides) gets the same blocks from the world's axes within
+about 200 m, at its old darker tone, and is what it was further away.
+
+**The arch** (`rock.js`, `ARCH`). A natural arch of the same stone spans the
+cutting where it opens onto the sky road: a tube swept along a curved spine
+from beyond one face's top to beyond the other's, its rings lumpy with noise,
+thick at its feet (5.2 m) and thinner at its crown (2.9 m), skewed across the
+road, its underside about 11 m over the road and never under 9 m anywhere
+over the corridor; its feet are buried in the ground beyond both tops. It is
+drawn and lit as a cut face (the same material, its own bake), in the rock's
+one mesh: no draw call.
+
+**The ground in patches** (`groundMaterial.js`, `groundCover.js`). On the
+verge: beyond the mower's last pass, longer grass with a ragged but definite
+edge; blades streaking the mown grass; tufts left at the road's edge; dry
+patches; worn earth where cars cut over the edge, with two wheel tracks in it;
+at the foot of whatever stands at the solid edge a strip of drainage gravel
+about 0.6 m wide with a dark line of dirt along it, in the barrier's soft
+shade. Beyond the barriers, within about 45 m: carpets of low plants in
+clusters with crisp edges, heather, bilberry, gorse and bracken colours (sedum
+and thrift on the coast); on the steeper banks grey rock breaking through the
+turf in outcrops with a dark rim; tufts; the big soft blotches of tone held
+down near the road. The shrubs of the ground cover (medium and high) take the
+same colours in clusters 22 m long, half of them. On the coast the loose stone
+beside the road and the beaches (a strip within a few metres of the water's
+edge) are sand sculpted by light (`sandRelief`): swells 6.5 m long across the
+wind with a sharp crest and a steep lee, ripples about 0.3 m in the normal
+that fade before they are a pixel, pebbles and scrub; darker where wet; pale
+under the shallows, so the water over it reads clear.
+
+**Concrete** (`concrete.js`, `concreteFinish`). One finish for the tunnel's
+cuttings and portals, the bridges' decks, parapets and abutments, and the
+piers: panels at a pitch (`CONCRETE`: 4.5 m on the retaining walls, 3 m on the
+parapets) each one of three shades, a dark joint with a pale arris beside it,
+lifts of the formwork, board marks, rows of tie holes, a paler cap with a dark
+drip line under it and streaks hanging below (longest under the joints), a
+damp foot with moss, a weep hole low in every panel of a tall wall with its
+stain, and now and then a drain outlet, a pair of bolt plates, a painted band
+at hand height and a stencilled panel number in seven bars on the tall walls.
+It needs to know where on the wall a point is: `aConc` (metres along, up from
+the foot, down from the top, 2) on the tunnel's strips, worked out from the
+strips' own (s, h) on the decks and from the instance's height and the angle
+round the shaft on the piers; parts that do not carry it get the world's axes
+and no foot, cap or decoration. The retaining walls out of the tunnel stand
+back 0.25 m under their cap (a line of shade along the top) with buttress
+ribs as deep as that at every other joint.
+
+**The low walls** (`walls.js`). A precast safety barrier in section: a
+chamfered foot, a sloped lower face, a near-upright upper face, chamfered
+arrises, a top 0.2 m wide, every corner a crease; on medium and high a groove
+5 cm wide and 3.5 cm deep round every joint between blocks (rows in the
+strip; the low tier paints it). The paint is a band on the road's face over
+cast concrete, chipped and worn through most at the foot, the arrises and the
+blocks' ends; formwork lines and air holes; rain streaks from the top edge,
+road dirt up the foot, black tyre scuffs along the sloped foot; lifting slots
+in each block's top, an anchor recess near the top of each face, a drain
+slot at the foot of every third.
+
 ## The vehicle
 
 `src/game/vehicle/` (Vehicle.js, tyre.js, drivetrain.js, params.js). A rigid
@@ -796,6 +889,37 @@ The plume (volcano.js) is an open tube bent downwind by the square of its
 height in the vertex stage, its alpha broken into wisps by value noise that
 rises with the run's clock; the glow is an additive disc whose radiance is
 set from the time of day's sun strength, never by name.
+
+**No ground over the road** (sea lane). The grid leaves out a cell only where all its corners lie under the band. Where
+the band stops short (on a deck and at its abutments, where another stretch is nearer, inside a tight bend) a cell can
+have corners under the band at the road's height and others beyond it at the top of a rock cut or under a deck: its
+plane then stands over the road inside the corridor (the owner's "dark slab" across the lane at the sky road's end,
+1.99 m over the road at s = 2590 m on the low tier, and at the gully bridge's start on medium). Every triangle with a
+corner within two cells of a corridor is now sampled at eleven points and left out if any point inside the solid edges
+(outside a bore) stands over the road; `tools/unit/ground.test.mjs` walks every triangle of the built grid and far land
+near the course on the low and medium tiers and fails if one does.
+
+**No furniture inside the edges** (sea lane). Something placed from the edge at its own s stands inside the corridor
+wherever the edge widens across the thing's own width, as it does past the viaduct's end, where the edge slews from the
+parapet (7.5 m) to the coast's rail (9.9 m). The marshal huts and the distance boards now stand beyond the widest edge
+within their own reach (trackside.js `edgeNear`); marshal posts keep 40 m clear of a structure's ends and 150 m from
+each other (two had landed on one spot after the viaduct), and a parapet's board hangs from a bar that starts at the
+parapet's outer face instead of reaching over it onto the deck. `tools/unit/trackside.test.mjs` builds trackside.js's
+furniture and the forest lane's signs, chevrons and kerbstones with stand-ins for the atlas and the ground, locates every
+vertex on the course, and fails if any lies inside the solid edge on its side (the bar did, 0.58 m, before this); it
+checks every lamp's foot the same way.
+
+**No structure over the road** (sea lane). A bridge's abutment is a block under each end of the deck. Its top was set
+level, 0.3 m under the road's centre line at the deck's end. But the road falls away to its edges (crown, bank and
+drains): past the deck's ends the shoulder lies up to 0.6 m under the centre. So three of the four abutments' tops
+stood over the shoulder inside the edges: 0.33 m at the sea viaduct's start, 0.32 m at its end (the owner's pale
+plate on the left shoulder at lap 0:49) and 0.27 m at the gully bridge's start. The top is now 0.3 m under the lowest
+of the road over the block's own footprint. The expansion joints' plates were laid as eight straight chords across the
+road and stood up to 5 cm over its crown; they now follow `track.profile()` in 32 steps, 12 mm over it.
+`tools/unit/structures.test.mjs` samples every triangle of the viaducts' and tunnels' meshes, as built for low and
+medium (the tunnels on low only: the medium tier's banner needs a canvas), at points no more than 0.5 m apart. It
+fails if any point inside the solid edges stands more than 25 mm over the road, leaving out what hangs more than 4 m
+over it and the daylight's veil in a tunnel's mouth.
 
 **Per-piece road markings** (round 2, road.js `PIECE_MARKS`). A scheme per
 piece id, each scheme one channel of a per-metre RGBA texture (`uMarks`,

@@ -121,6 +121,21 @@ probe").
 Only in headless Chromium on software WebGL (SwiftShader), on one Linux
 machine without a GPU, and only what is listed here.
 
+- **Beside the road** (nearfield lane, 2026-11-19): judged in stills of
+  the chase camera by day at 393x852 and 1280x720 on the medium and low
+  tiers (the start straight, a forest bend, the revetments into the tunnel,
+  the walls out of it with the arch ahead, the sky road, the climb, the
+  carousel), in one staged view under the viaduct, at golden hour and at
+  night out of the tunnel and in the carousel (medium, 393x852), and on the
+  high tier at 1280x720 (the climb), before and after.
+  `node tools/unit.mjs` passed; the playtest's keys, photo and determinism
+  sections against the lane's production build: 49 of 49, and after merging the twilight time of day: 54 of 54 (a twilight still out of the tunnel looked right on low). Not verified:
+  motion (every still is one frame: whether the rock's joints, the pits,
+  the verge's blades and the sand's ripples crawl at speed is not known),
+  a real GPU or phone, Safari, the frame rate's cost of the longer ground
+  shader, the low walls' grooves (high tier) seen close, the arch from the
+  sky road's far side.
+
 - **The road** (`tools/unit.mjs`, track): closes on itself; samples every
   metre; `frameAt` and `locate` invert each other; the surface the wheels
   read equals the profile exactly; vertical acceleration at the fastest
@@ -144,6 +159,9 @@ machine without a GPU, and only what is listed here.
   stills of `e1` at the medium tier (day, golden hour, night) beside the
   owner's frame E1, and in the chase camera every 2 s from the tunnel's exit
   to the end of the plunge on the low tier (1280x720 and 393x700).
+- **The furniture** (`tools/unit.mjs`, trackside; sea lane): no vertex of the boards, tyre walls, distance boards, marshal posts, bend signs, chevron boards or kerbstones and no lamp's foot inside the solid edges anywhere on the lap, and no two marshal posts on one spot (it failed before the fix: a parapet board's bar 0.58 m inside at s = 2510 m).
+- **The structures** (`tools/unit.mjs`, structures; sea lane): no point of a bridge's deck, abutments, pier caps or joints, nor of a tunnel's floor, walls or portals, more than 25 mm over the road inside the solid edges, on both bridges (low and medium) and the tunnel (low). It failed before the fix: an abutment's top 0.30 m over the shoulder at s = 2006 m.
+- **The ground** (`tools/unit.mjs`, ground; sea lane): no triangle of the grid or the far land over the road inside the solid edges, low and medium tiers (it failed on 005dc86: 1.99 m at s = 2590 m on low, 0.66 m at s = 3774 m on medium).
 - **The feel** (`tools/unit.mjs`, drift): 8 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
