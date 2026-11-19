@@ -203,10 +203,19 @@ vec4 fromTarget(vec4 e) {
   return vec4(x / (1.0 - x), e.a);
 }
 #else
-// The clamp guards the half-float range: a NaN or an infinity written once
-// would be smeared over the whole picture by the blurs that follow.
-vec4 toTarget(vec4 c) { return vec4(clamp(c.rgb, 0.0, 6.0e4), c.a); }
-vec4 fromTarget(vec4 e) { return e; }
+// This guards the half-float range: a NaN or an infinity written once would be smeared over the whole picture by
+// the blurs that follow. A clamp alone does not: what min and max make of a NaN is left to the GPU, and real ones
+// (unlike the software rasteriser the tests run on) hand it straight back. So the test is spelled out, on the way
+// in as well as on the way out: the scene itself is written by materials that do not pass through toTarget.
+vec3 finiteLight(vec3 x) {
+  return vec3(
+    isnan(x.r) || isinf(x.r) ? 0.0 : x.r,
+    isnan(x.g) || isinf(x.g) ? 0.0 : x.g,
+    isnan(x.b) || isinf(x.b) ? 0.0 : x.b
+  );
+}
+vec4 toTarget(vec4 c) { return vec4(clamp(finiteLight(c.rgb), 0.0, 6.0e4), c.a); }
+vec4 fromTarget(vec4 e) { return vec4(clamp(finiteLight(e.rgb), 0.0, 6.0e4), e.a); }
 #endif
 `;
 

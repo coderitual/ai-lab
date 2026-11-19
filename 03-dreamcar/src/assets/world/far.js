@@ -29,6 +29,7 @@ import { ATMOSPHERE_PARS } from './atmosphere.js';
 import { extend, planeNoise, smoothstep, withBake } from './shading.js';
 import { TIMES } from './lighting.js';
 import { PROBE_LAYER } from '../../engine/ReflectionProbe.js';
+import { greenHill } from './landmarks.js';
 
 /** The rings: distance from the middle of the course (m), the ridge's height range (m), columns round. */
 const RINGS = [
@@ -38,6 +39,9 @@ const RINGS = [
 ];
 const ROWS = 14;
 const DEG = Math.PI / 180;
+/** (day lane) How bright the massif's back-lit rim is (see mountainMaterial): set per time of day in setTime. */
+const RIM = { value: 1 };
+const RIM_BY_TIME = { day: 1, dusk: 0.6, night: 0.4 };
 /**
  * (sky lane) The limestone massif: how far it is turned from the start straight's heading towards the land side
  * (degrees), its nearest distance from the start line and how far it stands clear of the course's bounds (m), its
@@ -52,7 +56,10 @@ const MASSIF = {
     // the frame's centre) a great shoulder climbing out of the frame's left edge, a saddle at 40 left, the main
     // pyramid at 15 left (58 % across the frame) nearly as high, then the ridge falling to the right under the sun
     [-75, 3], [-40, 6], [-25, 8], [-15, 10], [-9, 11.6], [-2, 13], [5, 17], [10, 20.5], [15, 23.6], [19, 21.5],
-    [26, 20.6], [33, 18], [40, 17], [46, 19], [50, 21], [56, 26], [64, 29], [80, 24], [95, 12],
+    // (day lane) the saddle and the shoulder re-read from D1's camera: the frame's ridge left of the peak stays high
+    // (about 21 degrees from 26 to 40 left, 22 at 45) and the shoulder climbs more gently out of the frame (25 at 53
+    // left, 27 at 60); ours fell to 17 and rose to 29
+    [26, 21], [33, 20.6], [40, 21.2], [46, 22.4], [52, 24.6], [58, 26.4], [66, 27.5], [80, 24], [95, 12],
   ],
   // (round three: the angles of the table times this; set from the D1 camera's still beside the frame, where the
   // main peak stood too low)
@@ -86,7 +93,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   const lowTier = tier === 'low';
 
   // ---------------------------------------------------------------- mountains
-  const mountainMaterial = (order, relief = false) => {
+  const mountainMaterial = (order, relief = false, rim = false) => {
     const m = atmosphere.patch(
       extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 }), `far-mountain${relief ? '-relief' : ''}`, (shader) => {
         // at the back of the depth range, in front of the sky only (see above)
@@ -118,7 +125,8 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   float bedTone = hash11(floor(bedAt) + 7.0);
   float ledge = smoothstep(0.78, 0.97, fract(bedAt));
   float beds = ((bedTone - 0.5) * 0.42 - 0.3 * ledge) * (1.0 - smoothstep(6.0, 16.0, footprint));
-  float streakN = fbm(vec2(dot(vRockWorld.xz, vec2(0.71, 0.7)) / 34.0, vRockWorld.y / 520.0), 3);
+  // (day lane: y / 520 drew streaks the whole height of the face, a curtain; now they run a hundred metres or two)
+  float streakN = fbm(vec2(dot(vRockWorld.xz, vec2(0.71, 0.7)) / 34.0, vRockWorld.y / 170.0), 3);
   float streak = smoothstep(0.56, 0.8, streakN) * (1.0 - smoothstep(5.0, 14.0, footprint));
   float pine = smoothstep(0.55, 0.85, flatness) * smoothstep(0.56, 0.7, fbm(vRockWorld.xz / 45.0, 3)) * (1.0 - smoothstep(10.0, 30.0, footprint));
   vec3 rockCol = diffuseColor.rgb * (1.0 + beds) * (1.0 - 0.28 * streak);
@@ -127,6 +135,29 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   diffuseColor.rgb = mix(diffuseColor.rgb, rockCol, rockShare);
 }`,
           );
+        if (rim) {
+          // (day lane) D1's bright rim: against a sun standing behind the ridge, rock and grass seen edge-on near the
+          // skyline send light forwards (the sheen of a rough surface at a grazing angle, and the haze's own glow over
+          // it), so the ridges on the sun's side are drawn by a thin bright line while the faces below are in shade.
+          // Only where the sun's baked light reaches, and only looking towards it. (The massif only: it needs aBake.)
+          shader.uniforms.uRim = RIM;
+          shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', '#include <common>\nuniform float uRim;')
+            .replace(
+              '#include <lights_fragment_end>',
+              `#include <lights_fragment_end>
+#if NUM_DIR_LIGHTS > 0
+{
+  vec3 Lv = directionalLights[0].direction;
+  vec3 Vv = normalize(vViewPosition);
+  float graze = 1.0 - clamp(dot(normal, Vv), 0.0, 1.0);
+  float fwd = max(dot(-Vv, Lv), 0.0);
+  float lift = smoothstep(-0.15, 0.35, dot(normal, Lv));
+  reflectedLight.directDiffuse += directionalLights[0].color * bakedSun() * uRim * (graze * graze * graze) * (fwd * fwd * fwd * fwd) * lift * 0.3;
+}
+#endif`,
+            );
+        }
         if (relief) {
           // (render lane) the faces' relief in the light: the normal tipped by the slope of a world-space field of
           // ridges and buttresses some 60 to 200 m across (finite differences of smooth noise in world space, not
@@ -146,7 +177,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     vec3 g = vec3(fbm(q + vec3(e, 0.0, 0.0), 3) - h0, fbm(q + vec3(0.0, e, 0.0), 3) - h0, fbm(q + vec3(0.0, 0.0, e), 3) - h0) / e;
     vec3 gv = (viewMatrix * vec4(g, 0.0)).xyz;
     gv -= normal * dot(gv, normal);
-    normal = normalize(normal - 0.55 * reliefFade * gv);
+    normal = normalize(normal - 0.8 * reliefFade * gv);
   }
 }`,
           );
@@ -160,6 +191,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     // depth either, and the sky dome, drawn last into whatever is still empty, painted over every ring
     m.depthFunc = THREE.AlwaysDepth;
     m.name = `far-mountains-${order}`;
+    if (rim) m.customProgramCacheKey = ((key) => () => `${key()}|rim`)(m.customProgramCacheKey.bind(m));
     return m;
   };
   // (sky lane) THE MASSIF (reference D1): one great limestone mountain ahead and to the land side of the start
@@ -210,7 +242,9 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       const h = ring.lo + (ring.hi - ring.lo) * Math.min(1, Math.max(0, 0.15 + 1.1 * ridge * (0.5 + broad)));
       // (sky lane) the near rings stand aside where the massif is: they would be in front of it but drawn behind
       // (all of them, round two: the farthest showed over the massif's low right-hand ridge as pale hills)
-      const aside = smoothstep(0.3, 0.6, inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a)));
+      // (sea lane) and where the sea runs to the horizon: no far shore (terrain.sea's bearings)
+      const open = terrain.sea ? terrain.sea.sector(mid.x + Math.cos(a) * ring.r, mid.z + Math.sin(a) * ring.r) : 0;
+      const aside = Math.max(smoothstep(0.3, 0.6, inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a))), smoothstep(0.05, 0.5, open));
       heights.push(h * (1 - aside) - 300 * aside);
     }
     for (let i = 0; i <= cols; i++) {
@@ -330,21 +364,28 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const crestR = MASSIF.crest * (1 + 0.12 * (crestNoise.fbm(o * 0.06 + 3, 0.7, 3) - 0.5));
         // (the jag is smooth and only touches the top of the face: a jag that changed from column to column tilted
         // whole columns of the face and striped it like a curtain in a raking light)
-        const jag = 0.1 * (crestNoise.ridged(o * 0.22 + 1, 2.3, 3) - 0.5) + 0.03 * (crestNoise.ridged(o * 0.9 + 4, 1.1, 2) - 0.5);
+        // (day lane: 0.1 and 0.03 cut the skyline into a row of little spikes; D1's ridge is a few big forms)
+        const jag = 0.07 * (crestNoise.ridged(o * 0.22 + 1, 2.3, 3) - 0.5) + 0.012 * (crestNoise.ridged(o * 0.9 + 4, 1.1, 2) - 0.5);
         const crestH = eyeY + crestR * Math.tan(profile(o) * MASSIF.lift * DEG);
         // gullies across the face (about one per 1.5 degrees, i.e. 150 m), wandering, deeper low on the face
         const along = (o * DEG * crestR) / 160;
         // (warped, so they wander and fork instead of hanging like a curtain)
         const down = (crestR - r) / 1400;
         const warp = 1.6 * (crestNoise.fbm(along * 0.12 + 5, down * 1.3, 3) - 0.5);
-        const g = crestNoise.ridged(along * 0.5 + 7 + warp, down + 0.4 * warp, 4);
-        const fine = crestNoise.ridged(along * 1.7 + 2, (crestR - r) / 500, 3);
+        // (day lane) the gullies change as they run down (down * 2.2, was 1): they fork and end instead of hanging
+        // the whole height of the face as a curtain
+        const g = crestNoise.ridged(along * 0.5 + 7 + warp, down * 2.2 + 0.4 * warp, 4);
+        const fine = crestNoise.ridged(along * 1.7 + 2, (crestR - r) / 300, 3);
+        // (day lane) buttresses: a few great spurs, 600 to 1000 m apart, that stand out of the face towards the
+        // valley with deep hollows between them, so that their flanks turn towards the low sun or away from it (D1's
+        // ribs, lit on the right and dark on the left)
+        const spur = crestNoise.ridged(along * 0.17 + 3 + 0.5 * warp, down * 0.6 + 11, 3);
         let y;
         if (r <= crestR) {
           const t = Math.max(0, (r - massifNear) / (crestR - massifNear)); // 0 at the foot, 1 at the crest
           const face = t ** 1.7 * 0.82 + 0.18 * t;
           // the gullies bite deepest mid-face and fade out at the crest, so the ridge line stays whole
-          const cut = 1 - (0.2 * (1 - g) + 0.05 * (1 - fine)) * Math.sin(Math.PI * Math.min(1, t * 1.05)) ** 0.7;
+          const cut = 1 - (0.13 * (1 - g) + 0.04 * (1 - fine) + 0.2 * (1 - spur)) * Math.sin(Math.PI * Math.min(1, t * 1.05)) ** 0.7;
           y = -60 + (crestH + 60) * face * cut * (1 + jag * t ** 3);
         } else {
           const t = Math.min(1, (r - crestR) / 2600);
@@ -352,7 +393,11 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         }
         // the ends of the field fade into the land, so it never ends in a wall
         const edge = smoothstep(0, 0.06, u) * smoothstep(1, 0.94, u) * smoothstep(1, 0.92, v);
-        y = -60 + (y + 60) * edge;
+        // (sea lane, round 2) where the column's bearing from the course's middle is wholly the sea's (its far end on
+        // the land side, 60 to 75 degrees off the straight: outside frame D1, which sees -13 to 63) it sinks under the
+        // horizon: from the coast road (frame E1) it stood across the open sea as a far shore
+        const sink = terrain.sea ? smoothstep(0.85, 1, terrain.sea.sector(start.pos.x + Math.cos(a) * MASSIF.crest, start.pos.z + Math.sin(a) * MASSIF.crest)) : 0;
+        y = -60 + (y + 60) * edge * (1 - sink);
         const p = at(i, j);
         pos[p * 3] = x;
         pos[p * 3 + 1] = y;
@@ -427,16 +472,23 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const scree = smoothstep(0.6, 0.85, up) * (1 - forest) * smoothstep(treeLine - 50, treeLine + 250, y);
         const stain = 0.85 + 0.3 * crestNoise.fbm(x / 160, z / 260, 3);
         // (round three: pale limestone, darker in the gullies and on the ledges)
-        const lime = [0.3 * stain, 0.297 * stain, 0.29 * stain];
-        const scr = [0.34, 0.33, 0.31];
-        const green = [0.035, 0.05, 0.026];
-        const c = lime.map((l, k) => l * (1 - scree) + scr[k] * scree);
+        // (day lane) darker (0.3 was a mid-grey mass against D1's deep blue-grey shade), the ribs paler than the
+        // gullies between them, and pale fans of scree where the gullies open onto the gentler ground at the foot
+        const rr = massifNear + MASSIF.depth * (1 - j / rows);
+        const along = ((MASSIF.right + (i / cols) * span) * DEG * MASSIF.crest) / 160;
+        const gully = crestNoise.ridged(along * 0.5 + 7, (MASSIF.crest - rr) / 640, 3);
+        const rib = 0.55 + 0.9 * gully * gully;
+        const lime = [0.19 * stain * rib, 0.19 * stain * rib, 0.188 * stain * rib];
+        const fan = smoothstep(0.72, 0.9, up) * smoothstep(treeLine - 220, treeLine - 40, y) * smoothstep(treeLine + 260, treeLine + 60, y) * smoothstep(0.55, 0.25, gully);
+        const scr = [0.3, 0.295, 0.28];
+        const green = [0.026, 0.038, 0.022];
+        const c = lime.map((l, k) => l * (1 - Math.max(scree, fan)) + scr[k] * Math.max(scree, fan));
         for (let k = 0; k < 3; k++) col[p * 3 + k] = c[k] * (1 - forest) + green[k] * forest;
       }
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
     massifTriangles = index.length / 3;
-    const mesh = new THREE.Mesh(geometry, withBake(mountainMaterial(3, !lowTier)));
+    const mesh = new THREE.Mesh(geometry, withBake(mountainMaterial(3, !lowTier, true)));
     mesh.name = 'far-massif';
     mesh.renderOrder = -26; // after the rings: it stands in front of them
     mesh.frustumCulled = false;
@@ -475,6 +527,94 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     mountains.push(probeMesh);
   }
 
+  // ---------------------------------------------------------------- the green hill (frame D3)
+  // (day lane) A big wooded hill beyond the west end of the lake (landmarks.js greenHill), the one that stands over
+  // the pale hall at the top left of frame D3 from the ledge's first bend. Unlike the rings it lies inside the far
+  // plane, so it is drawn as an ordinary surface with depth: a round foot sunk below the land, two summits, a few
+  // spurs, wood all over with clumps of lighter crowns and the odd pale outcrop of rock.
+  let hillTriangles = 0;
+  const hill = greenHill(track);
+  if (hill) {
+    const RADIAL = lowTier ? 12 : 24;
+    const AROUND = lowTier ? 40 : 96;
+    const pos = [];
+    const col = [];
+    const index = [];
+    const hn = planeNoise(rng.int(1 << 30));
+    for (let j = 0; j <= RADIAL; j++) {
+      for (let i = 0; i <= AROUND; i++) {
+        const a = (i / AROUND) * Math.PI * 2;
+        const rq = (j / RADIAL) ** 1.3;
+        // a long ridge across the line of sight from the bend: u along it (+ towards the right as seen from there,
+        // which is towards the start: kept lower there), v away from the bend
+        // (its right-hand end, towards the start, short: from the grid the golden-hour sun sets just right of it)
+        const u = Math.cos(a) * rq * (Math.cos(a) > 0 ? 0.75 : 1.5);
+        const v = Math.sin(a) * rq;
+        const x = hill.x + (-hill.view[1] * u + hill.view[0] * v) * hill.radius;
+        const z = hill.z + (hill.view[0] * u + hill.view[1] * v) * hill.radius;
+        // the body: a broad ridge whose flank wanders in and out (spurs); three summits along it, the highest left of
+        // the middle
+        const wob = 1 + 0.2 * (hn.fbm(Math.cos(a) * 1.6 + 3, Math.sin(a) * 1.6, 3) - 0.5) * 2;
+        const q = Math.min(1, rq / wob);
+        const body = Math.cos((q * Math.PI) / 2) ** 1.2;
+        let tops = 0;
+        for (const [at, h, w] of [[-0.2, 1, 0.55], [-0.85, 0.82, 0.45], [0.55, 0.62, 0.5]]) tops = Math.max(tops, h * Math.exp(-(((u - at) / w) ** 2) - (v / 0.75) ** 2));
+        const rough = 0.04 * (hn.ridged(x / 160, z / 160, 3) - 0.5);
+        const dome = body;
+        const y = -45 + (hill.height + 45) * Math.min(1, body * (0.45 + 0.55 * tops) + rough * body);
+        pos.push(x, j === RADIAL ? -60 : y, z);
+        const clump = hn.fbm(x / 90, z / 90, 3);
+        const rock = smoothstep(0.72, 0.82, hn.fbm(x / 140 + 9, z / 140, 3)) * smoothstep(0.3, 0.6, dome);
+        const g = 0.85 + 0.5 * clump;
+        const wood = [0.032 * g, 0.05 * g, 0.022 * g];
+        col.push(...wood.map((c, k) => c * (1 - rock) + [0.22, 0.215, 0.2][k] * rock));
+      }
+    }
+    for (let j = 0; j < RADIAL; j++) {
+      for (let i = 0; i < AROUND; i++) {
+        const v = j * (AROUND + 1) + i;
+        const w = v + AROUND + 1;
+        index.push(v, w, v + 1, v + 1, w, w + 1);
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geometry.setIndex(index);
+    geometry.computeVertexNormals();
+    if (geometry.attributes.normal.getY(AROUND + 3) < 0) {
+      for (let k = 0; k < index.length; k += 3) [index[k + 1], index[k + 2]] = [index[k + 2], index[k + 1]];
+      geometry.setIndex(index);
+      geometry.computeVertexNormals();
+    }
+    geometry.computeBoundingSphere();
+    hillTriangles = index.length / 3;
+    const material = atmosphere.patch(
+      extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }), 'far-hill', (shader) => {
+        // crowns in clumps, faded out where a pixel covers more than they do
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying vec3 vHillWorld;')
+          .replace('#include <project_vertex>', '#include <project_vertex>\nvHillWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', `#include <common>\n${GLSL_HASH}\n${GLSL_NOISE}\nvarying vec3 vHillWorld;`)
+          .replace(
+            '#include <color_fragment>',
+            `#include <color_fragment>
+{
+  float fp = length(fwidth(vHillWorld));
+  float crowns = fbm(vHillWorld.xz / 22.0, 3) - 0.5;
+  diffuseColor.rgb *= 1.0 + 0.7 * crowns * smoothstep(30.0, 6.0, fp);
+}`,
+          );
+      }),
+    );
+    material.name = 'far-hill';
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = 'far-hill';
+    mesh.matrixAutoUpdate = false;
+    group.add(mesh);
+  }
+
   // ---------------------------------------------------------------- mist
   const shared = {
     uTime: { value: 0 },
@@ -499,6 +639,8 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       track.locate(x, z, -1, spot);
       if (Math.abs(spot.lat) < 260) continue;
       if (h > 60) continue;
+      // (sea lane) not over the open sea, where from the coast road a sheet read as a blot on the water
+      if (terrain.sea && terrain.sea.at(x, z) > 0.3) continue;
       if (sheets.some((s) => Math.hypot(s.x - x, s.z - z) < 500)) continue;
       sheets.push({ x, z, y: Math.max(terrain.lake.level, h) + mistRng.range(14, 30), radius: mistRng.range(380, 650) });
     }
@@ -819,17 +961,19 @@ void main() {
 
   return {
     group,
-    stats: { mountainTriangles, massifTriangles, massif: { near: Math.round(massifNear), x: Math.round(massifCentre.x), z: Math.round(massifCentre.y) }, sheets: sheets.length, lights: lights.length, village: { x: Math.round(village.x), z: Math.round(village.z) }, ms: Math.round(performance.now() - started) },
+    stats: { mountainTriangles, massifTriangles, hillTriangles, massif: { near: Math.round(massifNear), x: Math.round(massifCentre.x), z: Math.round(massifCentre.y) }, sheets: sheets.length, lights: lights.length, village: { x: Math.round(village.x), z: Math.round(village.z) }, ms: Math.round(performance.now() - started) },
     setTime(time) {
       const night = time.name === 'night';
       // (look lane) the far ranges by moonlight: snow under a three-quarter moon read as dusk at the night's exposure;
       // reference B's far hills are near black, so they are let down to a dim silhouette
       for (const mesh of mountains) mesh.material.color.setScalar(night ? 0.15 : 1);
+      RIM.value = RIM_BY_TIME[time.name] ?? 1;
       // the mist: lit from above by the sun or moon and the sky, albedo about 0.8
       const e = time.sun.intensity * Math.max(0.1, time.sun.dir[1]) + Math.PI * (0.7 * time.sky.zenith[1] + 0.3 * time.sky.horizon[1]) * 1.2;
       const s = (0.8 * e) / Math.PI;
       shared.uMistColor.value.set(s * (0.75 + 0.25 * time.sun.color[0]), s * (0.8 + 0.2 * time.sun.color[1]), s * (0.85 + 0.15 * time.sun.color[2]));
-      shared.uMistOpacity.value = night ? 0.15 : time.name === 'dusk' ? 0.45 : 0.65;
+      // (day lane: 0.65 by day laid a pale sheet like snow over the valley seen from the ledge's bend, frame D3)
+      shared.uMistOpacity.value = night ? 0.15 : time.name === 'dusk' ? 0.45 : 0.35;
       const lamps = time.lamps.windows;
       lightPoints.material.uniforms.uRadiance.value = 0.6 * lamps;
       lightPoints.visible = lamps > 0;

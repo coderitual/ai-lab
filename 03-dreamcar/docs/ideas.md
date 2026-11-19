@@ -137,9 +137,9 @@ from straight behind, the silver going warm in a low sun.
   red arc at 74), `HANDS.thumb` (curve and the 22 to 50 ms follow), the
   slider's travel and the pedals' sizes were set in headless Chromium and by
   the scripted thumb in `tools/unit`; an afternoon with an iPhone and a
-  mid-range Android, both ways up, should set them. The pad could also learn
-  where the thumb rests (a centre that settles to the thumb's habit between
-  runs, never during one).
+  mid-range Android, both ways up, should set them. The pad now appears under the thumb, in
+  either hand; whether the edge rule (60 % travel, a 6 px hold) feels right
+  at a real phone's edges is for a real thumb to say.
 - **The second half's wet road in split screen** (tools.md, "water on the
   track"): at night one half of a split can show the wet road as a sheet of
   water where the other does not; it follows the camera's place. Look at

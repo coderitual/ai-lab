@@ -59,6 +59,30 @@ export function hallSite(track, heightAt) {
   return best;
 }
 
+/**
+ * (day lane) The green hill of frame D3: from the ledge's first bend the frame has a big wooded hill over the hall at
+ * the top left, where our massif would otherwise stand bare. Seen from `along` m into the ledge it rises `left`
+ * degrees left of the road's heading, `dist` m off, `height` m high, a long ridge across the line of sight, `radius` m
+ * its half depth and one and a half times that its half length (far.js
+ * builds it). Placed where it hides nothing of the start: from the start line it stands behind the left shoulder,
+ * well clear of the golden-hour sun over the lake.
+ */
+const HILL = { along: 25, left: 41, dist: 1900, height: 470, radius: 720 };
+
+/**
+ * @param {object} track
+ * @returns {{ x: number, z: number, height: number, radius: number, view: number[] } | null} `view`: the level unit
+ *   vector from the bend towards it
+ */
+export function greenHill(track) {
+  const ledge = track.sections.find((sec) => sec.id === 'ledge');
+  if (!ledge) return null;
+  const f = track.frameAt(track.wrap(ledge.s0 + HILL.along), {});
+  const ang = Math.atan2(f.tan.x, f.tan.z) + leftTurn(f, HILL.left);
+  const view = [Math.sin(ang), Math.cos(ang)];
+  return { x: f.pos.x + view[0] * HILL.dist, z: f.pos.z + view[1] * HILL.dist, height: HILL.height, radius: HILL.radius, view };
+}
+
 /** The turn (rad, as a change of map heading) of `deg` degrees towards the road's left in frame f. */
 function leftTurn(f, deg) {
   // which way round is "left": the sign of the turn that takes the heading to `left`

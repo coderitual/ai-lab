@@ -40,9 +40,10 @@ const GALAXY_POLE = new THREE.Vector3(-0.62, 0.55, 0.56).normalize();
 const SKY_PARS = /* glsl */ `
 uniform vec3 uSunDir;       // towards the sun or the moon
 uniform sampler2D uCloudMap; // r: billows  g: fine detail  b: streaks  a: where the sky is cloudy at all
-uniform vec4 uCloud;        // cover, wisps, silver, unused
+uniform vec4 uCloud;        // cover, wisps, silver, sunward (dusk lane: 0..1, how much the clouds' light gathers on the sun's side)
 uniform vec2 uCloudDrift;
 uniform vec4 uDisc;         // angular radius (rad), radiance, limb darkening, seas
+uniform vec4 uCloudGroup;   // (day lane) the group of heaps: its middle on the cloud sheet, 1 / radius^2, amount
 
 // A lookup in the cloud map at so many repeats per unit of the cloud sheet. The fragment stage hands over the
 // screen-space slope of the sheet's coordinates itself (cloudSlope, set once at the top of main): the lookups sit
@@ -78,8 +79,13 @@ float cumulus(vec2 p) {
   float billow = cloudTex(p * 0.48 + uCloudDrift * 2.0, 0.48).r;
   float detail = cloudTex(p * 1.8 + uCloudDrift * 4.0, 1.8).g;
   float shape = 0.52 * patches + 0.4 * billow + 0.08 * detail;
+  // (day lane) the group of heaps that stands where the frame has it (lighting.js clouds.group): the noise is pushed
+  // up round one place, so that its billows there are whole clouds, wherever the drift has carried the texture
+  vec2 g = p - uCloudGroup.xy;
+  shape += uCloudGroup.w * exp(-dot(g, g) * uCloudGroup.z) * (0.75 + 0.5 * billow);
   float edge = 0.8 - 0.5 * uCloud.x;
-  float body = smoothstep(edge, edge + 0.12, shape);
+  // (day lane) a crisper rim (was 0.12 wide): D1's heaps are cut sharp against the blue
+  float body = smoothstep(edge, edge + 0.07, shape);
   return body * body * (3.0 - 2.0 * body);
 }
 
@@ -132,9 +138,35 @@ uniform float uDiscOn;
 uniform vec3 uCloudLit;     // a cloud face square to the light
 uniform vec3 uCloudShade;
 uniform vec4 uBand;         // (look lane, dusk) the twilight band: radiance (rgb) at the horizon under the set sun, height (a)
+uniform vec3 uTwiSun[5];    // (dusk lane) the twilight dome on the sun's side: radiance at the heights uTwiAt
+uniform vec3 uTwiAnti[5];   // and opposite it
+uniform vec4 uTwiAt;        // the heights (sine of the elevation) of the 2nd to 5th colours (the 1st is the horizon)
+uniform float uTwiOn;
 varying vec3 vDir;
 
+// (dusk lane) One of the dome's two columns of colour at height h: the five colours eased into each other.
+vec3 twiColumn(vec3 c0, vec3 c1, vec3 c2, vec3 c3, vec3 c4, float h) {
+  vec3 c = mix(c0, c1, smoothstep(0.0, uTwiAt.x, h));
+  c = mix(c, c2, smoothstep(uTwiAt.x, uTwiAt.y, h));
+  c = mix(c, c3, smoothstep(uTwiAt.y, uTwiAt.z, h));
+  return mix(c, c4, smoothstep(uTwiAt.z, uTwiAt.w, h));
+}
+
 vec3 clearSky(vec3 d, float mu) {
+  if (uTwiOn > 0.0) {
+    // (dusk lane) the twilight dome as two columns of colour, one under the sun (rose and orange on the horizon,
+    // gold, pale yellow, turquoise, deep blue) and one opposite it (the blue-violet shadow of the earth, the pink belt
+    // over it, blue), blended round the sky by how far the direction is turned towards the sun, plus the sun's glow
+    float h = max(d.y, 0.0);
+    vec2 level = normalize(d.xz + 1.0e-5);
+    vec2 sunFlat = normalize(uSunDir.xz + 1.0e-5);
+    float side = 0.5 + 0.5 * dot(level, sunFlat);
+    side = side * side * (3.0 - 2.0 * side);
+    vec3 sunward = twiColumn(uTwiSun[0], uTwiSun[1], uTwiSun[2], uTwiSun[3], uTwiSun[4], h);
+    vec3 away = twiColumn(uTwiAnti[0], uTwiAnti[1], uTwiAnti[2], uTwiAnti[3], uTwiAnti[4], h);
+    vec3 twi = mix(away, sunward, side);
+    return twi + uGlowColor * (uGlow.x * lobe(mu, uGlow.y) + uGlow.z * lobe(mu, uGlow.w));
+  }
   float mass = airMass(max(d.y, 0.0));
   float low = 1.0 - exp(-uAir.x * (mass - 1.0));
   vec3 col = mix(uZenith, uHorizon, low);
@@ -203,10 +235,13 @@ void main() {
     float sunlit = exp(-2.2 * behind) * 0.55 + exp(-2.6 * over) * 0.45;
     // the silver lining: forward scattering through the thin edge, strongest round the sun
     float rim = uCloud.z * lobe(mu, 0.75) * (1.0 - thick) * 2.0;
-    vec3 lit = uCloudLit * (sunlit * (1.0 + 0.6 * uCloud.z * lobe(mu, 0.6)) + rim);
+    // (dusk lane) with the sun on the horizon only the clouds on its side catch its light (orange-rose undersides);
+    // the rest stand dark blue-grey against the sky
+    float sunSide = mix(1.0, smoothstep(-0.35, 0.85, mu) * (0.35 + 0.65 * smoothstep(0.3, 0.97, mu)), uCloud.w);
+    vec3 lit = uCloudLit * sunSide * (sunlit * (1.0 + 0.6 * uCloud.z * lobe(mu, 0.6)) + rim);
     // the base: the sky's blue from below and around, darker the more cloud stands over it
     vec3 base = uCloudShade * (1.0 - 0.45 * over * thick);
-    col = mix(col, uCloudShade + uCloudLit * (0.55 + rim), cover.x);
+    col = mix(col, uCloudShade + uCloudLit * sunSide * (0.55 + rim), cover.x);
     col = mix(col, base + lit, cover.y);
   }
 
@@ -225,6 +260,7 @@ ${ATMOSPHERE_PARS}
 ${SKY_PARS}
 attribute vec2 aStar;       // brightness relative to magnitude 0, colour (0 warm, 1 blue)
 uniform float uStarLight;   // what a star of magnitude 0 lays on the lens
+uniform float uStarAway;    // (dusk lane) 1: only the first stars, high and opposite the sun, in a sky still lit
 uniform float uViewHeight;  // pixels
 varying vec3 vColor;
 varying vec2 vSpot;         // the spot's size in pixels, and 1 / (2 sigma^2)
@@ -239,6 +275,7 @@ void main() {
   vec2 cover = cloudCover(d);
   float seen = smoothstep(-0.01, 0.04, d.y) * exp(-0.1 * (airMass(up) - 1.0)) * (1.0 - hazeToSky(cameraPosition.y, up));
   seen *= (1.0 - cover.x) * (1.0 - cover.y) * step(uDisc.x * 1.1, length(d - uSunDir));
+  seen *= mix(1.0, smoothstep(0.1, -0.5, dot(d, uSunDir)) * smoothstep(0.35, 0.8, d.y), uStarAway);
 
   // A star is a point: all its light falls into a spot whose size the lens decides, not the star. The brighter
   // ones get a slightly wider spot, as a lens gives them, and the spot grows slowly with the picture's size.
@@ -364,6 +401,7 @@ export function createSky({ tier, rng, atmosphere }) {
     uCloud: { value: new THREE.Vector4() },
     uCloudDrift: { value: new THREE.Vector2() },
     uDisc: { value: new THREE.Vector4(0.01, 0, 0, 0) },
+    uCloudGroup: { value: new THREE.Vector4(0, 0, 1, 0) },
   };
   const domeUniforms = {
     ...shared,
@@ -382,6 +420,10 @@ export function createSky({ tier, rng, atmosphere }) {
     uCloudLit: { value: new THREE.Vector3() },
     uCloudShade: { value: new THREE.Vector3() },
     uBand: { value: new THREE.Vector4() },
+    uTwiSun: { value: Array.from({ length: 5 }, () => new THREE.Vector3()) },
+    uTwiAnti: { value: Array.from({ length: 5 }, () => new THREE.Vector3()) },
+    uTwiAt: { value: new THREE.Vector4(0.03, 0.08, 0.2, 0.5) },
+    uTwiOn: { value: 0 },
   };
   const domeMaterial = (discOn) =>
     new THREE.ShaderMaterial({
@@ -410,7 +452,7 @@ export function createSky({ tier, rng, atmosphere }) {
   envDome.frustumCulled = false;
   const envScene = new THREE.Scene().add(envDome);
 
-  const starUniforms = { ...shared, uStarLight: { value: 0 }, uViewHeight: { value: 720 } };
+  const starUniforms = { ...shared, uStarLight: { value: 0 }, uStarAway: { value: 0 }, uViewHeight: { value: 720 } };
   const stars = new THREE.Points(
     createStarGeometry(STARS[tier], rng.fork('stars')),
     new THREE.ShaderMaterial({
@@ -444,9 +486,17 @@ export function createSky({ tier, rng, atmosphere }) {
       const { sky, sun } = time;
       sunDir.fromArray(sun.dir).normalize();
       shared.uSunDir.value.copy(sunDir);
-      shared.uCloud.value.set(sky.clouds.cover, sky.clouds.wisps, sky.clouds.silver, 0);
+      shared.uCloud.value.set(sky.clouds.cover, sky.clouds.wisps, sky.clouds.silver, sky.clouds.sunward ?? 0);
       shared.uDisc.value.set(sky.disc.size * DEG, sky.disc.radiance, sky.disc.limb, sky.disc.seas);
       drift = sky.clouds.drift;
+      // the group's middle on the cloud sheet (cloudPlane in the shader)
+      const group = sky.clouds.group;
+      if (group) {
+        const g = group.dir;
+        const l = Math.hypot(g[0], g[1], g[2]);
+        const k = 1 / (Math.max(g[1] / l, 0) + 0.1);
+        shared.uCloudGroup.value.set((g[0] / l) * k, (g[2] / l) * k, 1 / (group.size * group.size), group.amount);
+      } else shared.uCloudGroup.value.set(0, 0, 1, 0);
 
       const u = domeUniforms;
       u.uZenith.value.fromArray(sky.zenith);
@@ -461,6 +511,13 @@ export function createSky({ tier, rng, atmosphere }) {
       u.uCloudLit.value.fromArray(sun.color).multiplyScalar(sun.intensity * sky.clouds.lit);
       // (look lane, dusk) a sun under the horizon lights the clouds' undersides with its own colour, not its light
       if (sky.clouds.light) u.uCloudLit.value.fromArray(sky.clouds.light);
+      const twi = sky.twilight;
+      u.uTwiOn.value = twi ? 1 : 0;
+      if (twi) {
+        twi.sun.forEach((c, k) => u.uTwiSun.value[k].fromArray(c));
+        twi.away.forEach((c, k) => u.uTwiAnti.value[k].fromArray(c));
+        u.uTwiAt.value.fromArray(twi.at);
+      }
       if (sky.band) u.uBand.value.set(...sky.band.color, sky.band.height);
       else u.uBand.value.set(0, 0, 0, 0);
       u.uCloudShade.value.fromArray(sky.clouds.shade);
@@ -474,6 +531,7 @@ export function createSky({ tier, rng, atmosphere }) {
       u.uDiscLight.value.set(Math.sin(phaseAngle) * Math.sin(tilt), -Math.sin(phaseAngle) * Math.cos(tilt), Math.cos(phaseAngle));
 
       starUniforms.uStarLight.value = sky.stars;
+      starUniforms.uStarAway.value = sky.starsAway ? 1 : 0;
       stars.visible = sky.stars > 0;
     },
 
