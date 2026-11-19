@@ -285,6 +285,24 @@ export class ViewHud {
     };
     this.tell.high.el.innerHTML = `<svg viewBox="0 0 24 24" role="img" aria-label="${TEXT.lamps.high}">${ICONS.lights}</svg>`;
 
+    // the pedal gauge: two slim bars beside the speed, the throttle (green) and the brake (amber, red) as the car got
+    // them, and a mark for the handbrake (setGauge)
+    this.gauge = cell('div', 'gauge', cluster);
+    this.gaugeFill = {};
+    for (const [name, label] of [['brake', TEXT.gauge.brake], ['hand', TEXT.gauge.hand], ['throttle', TEXT.gauge.throttle]]) {
+      const bar = make('div', `bar ${name}`, this.gauge.el);
+      bar.setAttribute('role', 'meter');
+      bar.setAttribute('aria-label', label);
+      bar.setAttribute('aria-valuemin', '0');
+      bar.setAttribute('aria-valuemax', '100');
+      bar.setAttribute('aria-valuenow', '0');
+      if (name !== 'hand') {
+        for (const t of ['t50', 't100']) make('i', `tick ${t}`, bar);
+        this.gaugeFill[name] = make('b', 'fill', bar);
+      }
+      this.gaugeFill[`${name}Bar`] = bar;
+    }
+    this._gaugeKey = '';
     // the drift readout (designed, not yet wired: the HANDLING lane's slide angle and score feed setDrift): over
     // the road above the car, only while the car slides beyond about 15 degrees, fading out after
     this.drift = cell('div', 'slide', el);
@@ -299,14 +317,23 @@ export class ViewHud {
     const ctl = this.controls.el;
     const named = (c, name) => make('span', 'name', c.el, name);
     // the one-thumb pad: its glass base and marks (SVG), the knob over it
+    // (two: the live pad, drawn under the thumb that placed it, and the ghost, a faint hint at the home place while no
+    // thumb is down)
     this.stick = cell('div', 'stick', ctl);
     const base = make('svg:svg', 'face', this.stick.el);
     base.setAttribute('viewBox', '-112 -112 224 224');
     base.innerHTML = stickSvg();
+    this.stickFace = base;
     this.brakeFill = [...base.querySelectorAll('.brakefill')];
     this.stickKnob = make('i', 'knob', this.stick.el);
-    named(this.stick, TEXT.pads.pad);
     this._stickKey = '';
+    this.ghost = cell('div', 'stick ghost', ctl);
+    const gbase = make('svg:svg', 'face', this.ghost.el);
+    gbase.setAttribute('viewBox', '-112 -112 224 224');
+    gbase.innerHTML = stickSvg();
+    make('i', 'knob', this.ghost.el);
+    named(this.ghost, TEXT.pads.pad);
+    this._placedKey = '';
     this.slider = cell('div', 'slider', ctl);
     make('b', 'rail', this.slider.el);
     make('b', 'mid', this.slider.el);
@@ -490,6 +517,23 @@ export class ViewHud {
     this.speed.text(Math.round(Math.abs(kmh) * UNITS[this.units]));
   }
 
+  /** The pedal gauge: the throttle and the brake the car got (0..1, eased in the fixed step) and whether the handbrake is on. */
+  setGauge(throttle, brake, hand) {
+    const t = Math.round(Math.max(0, Math.min(1, throttle)) * 50) * 2;
+    const b = Math.round(Math.max(0, Math.min(1, brake)) * 50) * 2;
+    const key = `${t},${b},${hand ? 1 : 0}`;
+    if (key === this._gaugeKey) return;
+    this._gaugeKey = key;
+    const g = this.gaugeFill;
+    g.throttle.style.transform = `scaleY(${t / 100})`;
+    g.brake.style.transform = `scaleY(${b / 100})`;
+    g.throttleBar.setAttribute('aria-valuenow', String(t));
+    g.brakeBar.setAttribute('aria-valuenow', String(b));
+    g.handBar.setAttribute('aria-valuenow', hand ? '100' : '0');
+    this.gauge.flag('hand', !!hand).flag('braking', b > 60);
+    writes++;
+  }
+
   /** The rev arc filled to `rpm`, red at the limiter; the gear beside the speed. */
   setRev(rpm, gear) {
     const f = Math.min(1, Math.round((Math.max(0, rpm) / (SCALE_K * 1000)) * 200) / 200);
@@ -539,8 +583,10 @@ export class ViewHud {
       const vs = this.el.style;
       if (pad) {
         const p = L.pad;
-        place(this.stick, p.cx, p.cy, 2 * p.r, 2 * p.r);
+        place(this.ghost, p.cx, p.cy, 2 * p.r, 2 * p.r);
+        this.ghost.el.style.setProperty('--knob', `${p.knob.toFixed(1)}px`);
         this.stick.el.style.setProperty('--knob', `${p.knob.toFixed(1)}px`);
+        this._placedKey = '';
         // where the readouts may stand: above the pad on its side, above the handbrake button on the other (px from the view's bottom)
         const d = L.drift;
         const right = L.hand === 'right';
@@ -559,6 +605,7 @@ export class ViewHud {
         ])
           place(a, b.x, b.y, 2 * b.r, 2 * b.r);
       }
+      this.ghost.show(pad);
       this.stick.show(pad);
       this.slider.show(!pad && !arrows);
       this.arrowL.show(arrows);
@@ -575,6 +622,20 @@ export class ViewHud {
       // pulled; with no thumb, back at the centre (an eased spring, hud.css), or across by the tilt
       const p = L.pad;
       const k = c.knob;
+      // under the thumb: the pad is where the thumb landed (it keeps the last place while it fades out)
+      const pl = c.placed;
+      if (pl) {
+        const key = `${pl.cx.toFixed(1)},${pl.cy.toFixed(1)},${pl.r.toFixed(1)},${pl.ox.toFixed(1)},${pl.oy.toFixed(1)}`;
+        if (key !== this._placedKey) {
+          this._placedKey = key;
+          const st = this.stick.el.style;
+          st.left = `${(pl.cx - pl.r).toFixed(1)}px`;
+          st.top = `${(pl.cy - pl.r).toFixed(1)}px`;
+          st.width = st.height = `${(2 * pl.r).toFixed(1)}px`;
+          this.stickFace.style.transform = `translate(${pl.ox.toFixed(1)}px, ${pl.oy.toFixed(1)}px)`;
+          writes++;
+        }
+      }
       let x = 0;
       let y = 0;
       if (k) {
@@ -593,7 +654,7 @@ export class ViewHud {
           y *= most / len;
         }
       } else if (c.tilt !== null && c.tilt !== undefined) x = c.tilt * TOUCH.pad.steer * p.s;
-      const brake = k && !k.tripped ? Math.max(0, Math.min(1, (k.dy / (TOUCH.pad.brake * p.s) - TOUCH.pad.lift) / (1 - TOUCH.pad.lift))) : 0;
+      const brake = k && !k.tripped ? Math.max(0, Math.min(1, (k.ey / (TOUCH.pad.brake * p.s) - TOUCH.pad.lift) / (1 - TOUCH.pad.lift))) : 0;
       const key = `${x.toFixed(1)},${y.toFixed(1)},${brake.toFixed(2)},${!!k}`;
       if (key !== this._stickKey) {
         this._stickKey = key;
@@ -602,6 +663,7 @@ export class ViewHud {
         for (const f of this.brakeFill) f.setAttribute('stroke-dasharray', dash);
         writes++;
       }
+      this.ghost.flag('away', !!k);
       this.stick.flag('held', !!k).flag('tripped', !!k && k.tripped).flag('braking', brake > 0);
     } else {
       // the slider's knob: where the thumb asks, at the centre when there is none
