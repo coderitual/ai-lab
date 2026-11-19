@@ -437,13 +437,16 @@ and 45 (the sky road); per frame):
 | low, before | 10 to 14 | 34 to 38 k | none (hardware mips) | 132 to 163 |
 | medium, before (a face every other frame) | 15 to 18 | 109 to 126 k | none | 176 to 216 |
 | medium, a face every frame (tried) | 28 to 34 | 216 to 252 k | 18 | 199 to 236 |
+| low, after (128, 8 samples) | 10 to 13 | 33 to 37 k | 6 | 144 to 170 |
+| medium, as committed (a face every other frame) | as before: 15 to 18 (not measured again) | 109 to 126 k | 9 | about 185 to 225 |
 
 A face costs about the same as before (the far plane of 300 m instead of 400
 cuts little: most of a face's 220 to 250 k triangles are drawn at infinity
 or reach it, the mountains 50 k, the massif's stand-in 23 k, the far terrain 18
 k, the terrain's grid 27 to 46 k), so medium keeps its cadence of a face every
 other frame and gains the cube, the filter and the easing for 9 tiny draws a
-frame. The resolution costs fill only: a 256 face is 65 k pixels, a fortieth of
+frame. Low gains them for 6 tiny draws a frame (its faces cost what they did:
+the filter's passes are the only addition; its frame time was not measured). The resolution costs fill only: a 256 face is 65 k pixels, a fortieth of
 a phone's screen. Memory: two cubes of half floats with their mips, 2.1 MB at
 128, 8.4 MB at 256, 34 MB at 512 (plus the raw cube's depth).
 
