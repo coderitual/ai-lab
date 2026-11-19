@@ -811,9 +811,22 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
   const projView = new THREE.Matrix4();
   const sphere = new THREE.Sphere();
   const eye = new THREE.Vector3();
-  // trees cast round the car: the shade on the road ahead and beside it is what is seen (the shadow square reaches
-  // further, but what falls there is mostly the forest's own floor)
+  // Without the sun's box (no shadow map): trees cast round the car, as far as the square reaches.
+  // (split-bug lane) With it, every tree whose crown is inside the map's box casts, wherever it stands. Chosen by
+  // distance from the car instead, the trees 50 to 100 m towards a 17 degree moon or sun, whose shadows lie across
+  // the road at the car, were left out: the wet road there lay in full moonlight, a pale sheet broken by the
+  // shadows of the nearer trees, and which trees were left out moved with the car, so the two halves of a split
+  // screen a few metres apart showed one road dark and the other a sheet of water.
   const shadowR = Math.min(shadow.reach * 1.1, CAST_REACH);
+  /** Whether a sphere (centre c, radius r) is inside the sun's shadow box. @param {import('./sun.js').ShadowBox} b */
+  const inBox = (b, c, r) => {
+    const x = c.x * b.right.x + c.y * b.right.y + c.z * b.right.z - b.x;
+    if (Math.abs(x) > b.halfX + r) return false;
+    const y = c.x * b.up.x + c.y * b.up.y + c.z * b.up.z - b.y;
+    if (Math.abs(y) > b.halfY + r) return false;
+    const z = c.x * b.dir.x + c.y * b.dir.y + c.z * b.dir.z - b.z;
+    return z < b.towards + r && z > -b.away - r;
+  };
   const counts = { full: 0, reduced: 0, impostors: 0, casters: 0, triangles: 0, casterTriangles: 0 };
   const fullTris = models.map((m) => m.triangles[0]);
   const reducedTris = models.map((m) => m.triangles[1]);
@@ -849,7 +862,12 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
     }
   }
 
-  function prepareView(camera, focus) {
+  /**
+   * @param {THREE.Camera} camera
+   * @param {THREE.Vector3} focus the view's car
+   * @param {import('./sun.js').ShadowBox} [box] the sun's shadow box, already placed for this view
+   */
+  function prepareView(camera, focus, box = null) {
     viewCamera = camera;
     camera.updateMatrixWorld();
     projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -866,7 +884,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
       if (cellStart[k] === cellStart[k + 1]) continue;
       const cs = cellSphere[k];
       const dEye = flat ? 0 : cs.center.distanceTo(eye) - cs.radius;
-      const caster = casterMeshes.length > 0 && Math.hypot(cs.center.x - focus.x, cs.center.z - focus.z) - cs.radius < shadowR;
+      const caster = casterMeshes.length > 0 && (box?.on ? inBox(box, cs.center, cs.radius) : Math.hypot(cs.center.x - focus.x, cs.center.z - focus.z) - cs.radius < shadowR);
       const seenCell = dEye < T.far && frustum.intersectsSphere(cs);
       if (!caster && !seenCell) continue;
       for (let j = cellStart[k]; j < cellStart[k + 1]; j++) {
@@ -874,7 +892,7 @@ export function createForest({ renderer, track, terrain, tier, coverage, rng, at
         const v = trees[i].variant;
         sphere.center.set(spheres[i * 4], spheres[i * 4 + 1], spheres[i * 4 + 2]);
         sphere.radius = spheres[i * 4 + 3];
-        if (caster && Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR) write(casterMeshes[0], i, 1);
+        if (caster && (box?.on ? inBox(box, sphere.center, sphere.radius) : Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR)) write(casterMeshes[0], i, 1);
         if (!seenCell || !frustum.intersectsSphere(sphere)) continue;
         // (small things, the undergrowth and young trees, go to the simpler levels sooner)
         // the floor under it

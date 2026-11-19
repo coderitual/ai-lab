@@ -97,7 +97,9 @@ const SMALL = new Map([
  *   `focus` (the view's car) and asks for it to be drawn again, sets the fog for this camera, shuts the sky's light
  *   out where the car is in the tunnel and draws the wet road's mirror, leaving out `hidden` as well (what lies on
  *   the road and would hide the cars' own reflections: their contact shadows, smoke, spray). A view drawn without
- *   it has last view's shadows.
+ *   it has last view's shadows. The trees that cast into the map are chosen by the map's box (forest.js), never by
+ *   where the car stands, so two views of the same place shade it alike.
+ * @property {import('./sun.js').ShadowBox} shadowBox the shadow map's box as prepareView last placed it (for tests)
  * @property {(n: number) => void} setStartLights the gantry's countdown lamps, 0..5 lit
  * @property {THREE.Object3D[]} probeHidden what to hide while a reflection probe is drawn
  * @property {number} wetness 0..1 road wetness: the time of day's (lighting.js), unless ?wet= or a setter overrides it
@@ -257,6 +259,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     terrain,
     /** The trees (forest.js): where they stand (woodAt, turnedAt), single trees for the viewer (specimen). */
     forest,
+    /** The sun's shadow map's box as the last prepareView placed it (sun.js), for tests. */
+    shadowBox: sun.box,
     /** Start-up milliseconds per part, and the terrain's own counts. */
     stats: { ms, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
 
@@ -303,7 +307,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       eye.setFromMatrixPosition(camera.matrixWorld);
       for (const p of small) p.object.visible = p.sphere.center.distanceTo(eye) - p.sphere.radius < smallReach * p.reach;
       sun.prepareView(camera, focus);
-      forest.prepareView(camera, focus);
+      forest.prepareView(camera, focus, sun.box);
       cover.prepareView(camera);
       road.setBeams(beams);
       structures.prepareView(camera, focus, beams);
