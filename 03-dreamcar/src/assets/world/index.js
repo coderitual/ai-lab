@@ -11,6 +11,7 @@
 //   kerbs.js        the red and white kerbs on the margins, from track.kerbs
 //   rock.js         the cut rock faces at the rock edges
 //   sea.js          the sea beyond the coast road and the bay beside the straight (the waves: engine/waves.js)
+//   volcano.js      the plume over the volcano's island and the glow in its crater (the island: terrain.js)
 //   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
 //   forest.js       the trees (treeGeometry.js, forestTextures.js), planted from the Track and the ground
 //   groundCover.js  grass, bushes and rocks along the verges and under the trees
@@ -35,6 +36,7 @@ import { createEnvironment } from './environment.js';
 import { TIMES, placeLights } from './lighting.js';
 import { createGroundMaterial } from './groundMaterial.js';
 import { createSea } from './sea.js';
+import { createVolcano } from './volcano.js';
 import { createFar } from './far.js';
 import { CASTER_LAYER, createForest } from './forest.js';
 import { createGroundCover } from './groundCover.js';
@@ -164,6 +166,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   // (sea lane) the sea, where terrain.sea says it is; at night it mirrors the lamps the wet road glints with
   const sea = createSea({ caps, tier, atmosphere, sea: terrain.sea, far: viewFar, glints: road.glints });
   lap('sea');
+  // (sea lane, round 3) the volcano's plume and the glow in its crater (its island is the terrain's)
+  const volcano = createVolcano({ volcano: terrain.volcano, atmosphere, tier });
   // (the trees' alpha becomes coverage where the scene target is multisampled: the pipeline's rule, caps.js)
   const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
   // no tree where the pit building, the stand and the towns stand (startPlan.js), nor where the caller says
@@ -200,7 +204,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   }
   const smallReach = SMALL_REACH[tier] ?? SMALL_REACH.medium;
   const eye = new THREE.Vector3();
-  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, sea.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, sea.mesh, volcano.group, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -213,7 +217,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   };
   let startLights = 0;
   /** What the wet road's mirror leaves out: the road itself and what lies under or far beyond it. */
-  const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, sea.mesh, cover.group, far.group, ...structures.mirrorHidden];
+  const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, sea.mesh, volcano.group, cover.group, far.group, ...structures.mirrorHidden];
   /** mirrorHidden and what the caller of prepareView adds (the cars' contact shadows, smoke and spray). */
   const mirrorHiddenAll = [];
   const mirrorPoint = new THREE.Vector3();
@@ -288,6 +292,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       forest.setTime(time);
       far.setTime(time);
       sea.setTime(time);
+      volcano.setTime(time);
       structures.setTime(time);
       studs.setTime(time);
       groundMaterial.setTime(time);
@@ -297,6 +302,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
     update(dt, simTime) {
       sky.update(dt, simTime);
       sea.update(simTime);
+      volcano.update(simTime);
       forest.update(dt, simTime);
       far.update(dt, simTime);
       structures.update(dt);
@@ -380,6 +386,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       terrain.dispose();
       road.dispose();
       sea.dispose();
+      volcano.dispose();
       rock.dispose();
       structures.dispose();
       studs.dispose();

@@ -91,6 +91,12 @@ export const SIDES = {
   // the presets it had (lowRun, lowUp) with nothing growing behind the rails, so the water shows on both sides
   shoreRun: { kind: 'rail', edge: [8, 10], slope: -0.02, far: -0.2, verge: 'grass', wood: null },
   shoreUp: { kind: 'rail', edge: [3, 5], slope: 0.04, far: 0.3, verge: 'grass', wood: null },
+  // (sea lane, round 3: the owner, "seaside should be on the right side with some island and volcano") the RIGHT side
+  // of the sky road and the plunge as sea too: an inner sound of the sea reaching in under the sky road, the volcano's
+  // island out in it (terrain.js VOLCANO). The presets they replace (parapet, highUp) with nothing growing and the
+  // coast's cliff beyond the edge; the corridor (edges, slopes, kinds, verges) exactly theirs.
+  parapetSea: { kind: 'parapet', edge: [VIADUCT.parapetOffset, VIADUCT.parapetOffset], slope: 0, far: -2.5, verge: 'asphalt', wood: null, coast: true },
+  coastUp: { kind: 'rail', edge: [3, 5], slope: 0.05, far: 0.45, verge: 'grass', wood: null, coast: true },
   coastDown: { kind: 'rail', edge: [3, 5], slope: -0.03, far: -0.35, verge: 'grass', wood: null, coast: true },
   // (sea lane, round 2: frame E1) round the carousel and over the crest the verge is a broad apron of ochre gravel
   // (run-off: the grip and the sound of gravel) out to the rail; beyond the rail terrain.js puts a lip of dry grass and
@@ -159,7 +165,7 @@ const SEGMENTS = [
 
   // The sky road: out of the mountain onto piers, a long banked left across an inlet of the sea (sea lane, round 2:
   // the ground under the middle of the deck is 96 m down, under the water: the piers stand in the sea).
-  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapet', bridge: true, drop: 96 },
+  { id: 'viaduct', sec: 'viaduct', r: 300, deg: 110, ease: 80, bank: 10, g: 3, L: 'parapet', R: 'parapetSea', bridge: true, drop: 96 },
 
   // The carousel: a climb along the far side, then a right round the spur, the slow corner of the lap.
   // (sea lane) the coast road: from here to the foot of the plunge the sea lies below on the left, the land cut on the right
@@ -170,7 +176,7 @@ const SEGMENTS = [
   { id: 'crest', sec: 'crest', len: 200, ease: 45, g: 0, gk: [[0.78, 3]], L: 'coastTop', R: 'open' },
 
   // The plunge: 8 per cent down into a compression.
-  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'coastDown', R: 'highUp' },
+  { id: 'plunge', sec: 'plunge', r: -400, deg: 40, ease: 100, bank: 5, g: -1, gk: [[0.13, -8], [0.72, -8]], L: 'coastDown', R: 'coastUp' },
 
   // The ledge: fast downhill sweepers along the hillside. The first, a left, has the valley open on its inside over
   // a low wall and a wooded bank on its outside (and no kerb on its inside: a white line, the paved margin and

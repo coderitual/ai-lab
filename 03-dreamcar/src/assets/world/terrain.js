@@ -116,6 +116,16 @@ const SEA = {
  * straight (frames D1 and D4 look over the bay further east). The course is untouched (what lies inside the solid edges is the Track's).
  */
 const CAUSEWAY = { piece: 'back', from: 0.5, to: 0.93, ease: 50, lip: 2.5, steep: 0.6, below: 5, lagoon: 120, floor: 9, surf: { at: 0.75, out: 70, r: 360 } };
+/**
+ * (sea lane, round 3: the owner's "seaside should be on the right side with some island and volcano") THE VOLCANO: an
+ * island cone out in the inner sound to the right of the sky road (`piece`, `at` of the way along it, `out` m to its
+ * right): `h` m over the water at the rim, `r` m to its foot under the water, the flanks concave (`concave`: the power
+ * of the profile), a crater `crater` m across at the rim and `depth` m deep, gullies down its flanks. Scenery only:
+ * its foot stands well beyond every solid edge (unit-tested). volcano.js draws its plume and the glow in its crater.
+ * `sound`: round it, out to `r` m, the land is drowned to `floor` m under the water (so the island stands free of the
+ * massif inside the loop), except within `keep` m of a solid edge, where the road's own ground stays.
+ */
+const VOLCANO = { piece: 'viaduct', at: 0.05, out: -300, h: 165, r: 190, concave: 1.7, crater: 34, depth: 26, sound: { r: 560, floor: 16, keep: [60, 120] } };
 const COAST = {
   lip: [1.5, 4],
   steep: [1.6, 2.6],
@@ -143,6 +153,8 @@ const COAST = {
  * @property {{ level: number, extent: { x0: number, x1: number, z0: number, z1: number } }} lake the bay beside the
  *   straight (the lake it was): its surface and the box of its old ellipse (far.js puts the town's lights round it)
  * @property {SeaShape} sea where the sea is (sea.js draws it; far.js keeps the far ridges off it)
+ * @property {{ x: number, z: number, top: number, r: number, crater: number, depth: number } | null} volcano the
+ *   volcano's island in the inner sound (VOLCANO; volcano.js draws its plume)
  * @property {object} stats vertices, triangles, milliseconds
  * @property {() => void} dispose
  *
@@ -280,7 +292,8 @@ const FOOT = 0.8;
       const u = (i * ds - b.s0) / (b.s1 - b.s0);
       const v = Math.max(0, Math.sin(Math.PI * u));
       const notch = gully ? 2.5 * Math.exp(-Math.pow(((u - 0.5) * (b.s1 - b.s0)) / 5, 2)) : 0;
-      ravine[i % n] = Math.max(1.5, drop * Math.pow(v, gully ? 1.4 : 0.6) + notch);
+      // (sea lane, round 3: a long deck's valley is the sea's sound, nearly as deep out to its ends: 0.25, was 0.6)
+      ravine[i % n] = Math.max(1.5, drop * Math.pow(v, gully ? 1.4 : 0.25) + notch);
     }
   }
   /** On a bridge long enough to span a valley along it (the sky road), not a gully across it. */
@@ -370,6 +383,43 @@ const FOOT = 0.8;
     }
     return () => 0;
   })();
+  /** (sea lane, round 3) The volcano's island (VOLCANO): where it stands, and its height at a point (-Infinity off it). */
+  const volcano = (() => {
+    let s0 = 0;
+    for (const seg of track.layout?.segments ?? []) {
+      const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
+      if (seg.id === VOLCANO.piece) {
+        const p = track.pointAt(s0 + len * VOLCANO.at, VOLCANO.out, new THREE.Vector3());
+        return { x: p.x, z: p.z, top: lakeLevel + VOLCANO.h, r: VOLCANO.r, crater: VOLCANO.crater, depth: VOLCANO.depth };
+      }
+      s0 += len;
+    }
+    return null;
+  })();
+  const volcanoAt = (x, z) => {
+    if (!volcano) return -Infinity;
+    const dx = x - volcano.x;
+    const dz = z - volcano.z;
+    const q = Math.hypot(dx, dz);
+    if (q > volcano.r * 1.15) return -Infinity;
+    const a = Math.atan2(dz, dx);
+    // gullies down the flanks and a ragged foot
+    const wob = 1 + 0.08 * (noise.fbm(Math.cos(a) * 3 + 5, Math.sin(a) * 3, 3) - 0.5) + 0.05 * Math.sin(a * 11 + 2 * noise.fbm(q / 40, a, 2));
+    const t = Math.min(1, Math.max(0, (volcano.r * wob - q) / (volcano.r - volcano.crater / 2)));
+    const foot = lakeLevel - 12;
+    let y = foot + (volcano.top - foot) * Math.pow(t, VOLCANO.concave);
+    const rim = volcano.crater / 2;
+    if (q < rim) y = volcano.top - volcano.depth * (1 - (q / rim) ** 2);
+    return y;
+  };
+  /** (sea lane, round 3) The inner sound round the volcano: ground `h`, `d` m beyond the nearest solid edge, drowned. */
+  const sound = (x, z, h, d) => {
+    if (!volcano) return h;
+    const q = Math.hypot(x - volcano.x, z - volcano.z);
+    const S = VOLCANO.sound;
+    const k = (1 - smoothstep(0.7 * S.r, 1.05 * S.r, q)) * smoothstep(S.keep[0], S.keep[1], d);
+    return k > 0 ? h + (Math.min(h, lakeLevel - S.floor) - h) * k : h;
+  };
   /** The valley with the bay and the open sea far from the road. */
   const valley = (x, z) => {
     const h = valleyLand(x, z);
@@ -501,6 +551,11 @@ const FOOT = 0.8;
     // (sea lane, round 2) off the coast road the cliff stays a cliff (after the smoothing, which would make it a slope)
     for (let k = 0; k < macro.length; k++) {
       if (coastCell[k] > 0) macro[k] += (Math.min(macro[k], coastCellY[k]) - macro[k]) * coastCell[k];
+      // (round 3) the inner sound round the volcano
+      const x = minX + (k % mx) * MACRO;
+      const z = minZ + Math.floor(k / mx) * MACRO;
+      macro[k] = sound(x, z, macro[k], macroD[k]);
+      if (macro[k] < lakeLevel - 4 && volcano && Math.hypot(x - volcano.x, z - volcano.z) < VOLCANO.sound.r * 0.8) seaSeed[k] = 1;
     }
   }
   const bilinear = (arr, w, h, x0, z0, cell, x, z) => {
@@ -597,7 +652,7 @@ const FOOT = 0.8;
   /** The small hills on top of the land's shape, and fewer of them on the seabed, so it raises no islets by chance. */
   const detailAt = (x, z) => detail(x, z) * (1 - 0.8 * seaAt(x, z));
   /** The land's shape with its hills: what the ground is far from any road. */
-  const land = (x, z) => keepDry((inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z), x, z);
+  const land = (x, z) => keepDry(Math.max(sound(x, z, (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z), 1e3), volcanoAt(x, z)), x, z);
 
   const phases = { macro: Math.round(performance.now() - started) };
   // the far land's heights, on its own coarse grid (the bake marches over them too)
@@ -745,7 +800,7 @@ const FOOT = 0.8;
     const w = smoothstep(10, 100, d) * reach * (1 - sea) + sea * smoothstep(NEAR_REACH - 40, NEAR_REACH, d);
     if (w <= 0) return near;
     const far = (inMacro(x, z) ? bilinear(macro, mx, mz, minX, minZ, MACRO, x, z) : valley(x, z)) + detailAt(x, z) * smoothstep(15, 150, d);
-    const h = near + (far - near) * w;
+    const h = Math.max(sound(x, z, near + (far - near) * w, d), volcanoAt(x, z));
     return sea > 0.5 ? Math.max(h, stackAt(x, z)) : keepDry(h, x, z);
   }
   const near = (x, z) => (inMacro(x, z) ? bilinear(macroD, mx, mz, minX, minZ, MACRO, x, z) : 1e9) < NEAR_REACH;
@@ -1323,6 +1378,7 @@ const FOOT = 0.8;
     material,
     lake: { level: lakeLevel, extent: { x0: LAKE.x - LAKE.rx * 1.1, x1: LAKE.x + LAKE.rx * 1.1, z0: LAKE.z - LAKE.rz * 1.1, z1: LAKE.z + LAKE.rz * 1.1 } },
     sea: { level: lakeLevel, at: seaAt, sector: seaSector, map: seaMap, stacks, surf },
+    volcano,
     heightAt,
     heightOnTrack,
     normalAt(x, z, out = normal) {

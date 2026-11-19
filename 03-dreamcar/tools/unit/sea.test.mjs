@@ -51,14 +51,14 @@ const pieceAt = (id, f) => {
 };
 
 test('the coast presets keep the course: edge, verge slope, verge and barrier as the presets they replaced', () => {
-  const was = { coastDown: 'highDown', coastRun: 'highRun', coastTop: 'open', shoreRun: 'lowRun', shoreUp: 'lowUp' };
+  const was = { coastDown: 'highDown', coastRun: 'highRun', coastTop: 'open', shoreRun: 'lowRun', shoreUp: 'lowUp', parapetSea: 'parapet', coastUp: 'highUp' };
   for (const [name, old] of Object.entries(was)) {
     const a = SIDES[name];
     const b = SIDES[old];
     expect(a.coast === true || name.startsWith('shore'), `${name} is not a coast side`);
     // (round 2, frame E1) round the carousel and over the crest the verge is the gravel apron of a run-off: the same
     // ground, gravel's grip and sound instead of grass's
-    for (const key of ['kind', 'edge', 'slope', 'far', ...(a.verge === 'gravel' ? [] : ['verge'])]) {
+    for (const key of ['kind', 'edge', 'slope', ...(name === 'coastUp' || name === 'parapetSea' ? [] : ['far']), ...(a.verge === 'gravel' ? [] : ['verge'])]) {
       expect(JSON.stringify(a[key]) === JSON.stringify(b[key]), `${name}.${key} is ${JSON.stringify(a[key])}, ${old}'s ${JSON.stringify(b[key])}`);
     }
   }
