@@ -1268,6 +1268,8 @@ const SECTIONS = {
         await p.page.evaluate((layout) => {
           const g = window.__dreamcar.game;
           const parts = layout.split('-');
+          // (the performance readout on: it must stand clear of everything in every layout)
+          g.action('stats:on');
           g.action(parts.includes('manual') ? 'throttle:manual' : 'throttle:auto');
           g.action(parts.includes('slider') ? 'steering:slider' : 'steering:pad');
           g.action(parts.includes('left') ? 'hand:left' : 'hand:right');
@@ -1369,6 +1371,17 @@ const SECTIONS = {
                 if (gz && shown(gz)) boxes.push({ name: 'gauge', r: gz.getBoundingClientRect() });
               }
               const over = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
+              // the performance readout is the page's, not a view's: one line at the bottom edge, which must not
+              // touch anything of any view (nor the car)
+              const perf = document.querySelector('.hud .perf');
+              if (!perf || !shown(perf) || !/fps/.test(perf.textContent)) out.push(`view ${vi}: no performance readout`);
+              else {
+                const q = perf.getBoundingClientRect();
+                const page = document.querySelector('.hud').getBoundingClientRect();
+                if (q.left < page.left - 1 || q.right > page.right + 1 || q.bottom > page.bottom + 1) out.push('the readout does not fit the page');
+                for (const b of boxes) if (over(b.r, q)) out.push(`view ${vi}: the readout over ${b.name}`);
+                if (over(q, car)) out.push(`view ${vi}: the readout over the car`);
+              }
               for (const b of boxes) {
                 // the banner and the gap are moments over the sky, never over the car
                 const rr = (q) => `${Math.round(q.left - vr.left)},${Math.round(q.top - vr.top)}-${Math.round(q.right - vr.left)},${Math.round(q.bottom - vr.top)}`;
@@ -1416,6 +1429,18 @@ const SECTIONS = {
     await clickText(p, 'Hidden', '.options');
     await p.advance(0.1);
     check('the map can be hidden (kept under dreamcar.map)', (await p.page.evaluate(`localStorage.getItem('dreamcar.map')`)) === 'off');
+    // the performance readout: off until asked for, kept under dreamcar.stats, one line with the tier and the frame rate
+    const statsRow = `[...document.querySelectorAll('.hud .options .optrow')].find((r) => /readout/i.test(r.querySelector('.optlabel').textContent))`;
+    check('the readout is offered, and is off with nothing chosen', (await p.page.evaluate(`!!${statsRow} && ${statsRow}.querySelector('button[data-value="off"]').classList.contains('on')`)) && !(await visible(p, '.hud .perf')));
+    await p.page.evaluate(`${statsRow}.querySelector('button[data-value="on"]').click()`);
+    await p.advance(0.1);
+    const line = await p.page.evaluate(`document.querySelector('.hud .perf').textContent`);
+    check('Readout: Shown is kept under dreamcar.stats and shows one line: tier, canvas, scale, edge smoothing, frames a second, the ladder',
+      (await p.page.evaluate(`localStorage.getItem('dreamcar.stats')`)) === 'on' && (await visible(p, '.hud .perf')) && new RegExp(`^${tier0} \\d+×\\d+@[\\d.]+ ×1\\.00 (msaa\\d|fxaa) \\d+/\\d+fps all on`).test(line), line);
+    check('the readout is one line no taller than 12 px, at the bottom edge', await p.page.evaluate(`(() => { const r = document.querySelector('.hud .perf').getBoundingClientRect(); return r.height <= 12 && r.bottom >= innerHeight - 14; })()`));
+    await p.page.evaluate(`${statsRow}.querySelector('button[data-value="off"]').click()`);
+    await p.advance(0.1);
+    check('and hidden again', !(await visible(p, '.hud .perf')) && (await p.page.evaluate(`localStorage.getItem('dreamcar.stats')`)) === 'off');
     // sound
     if (await visible(p, '.hud .options .optrow:nth-of-type(3)')) {
       await clickText(p, 'Off', '.options');
@@ -1656,6 +1681,87 @@ const SECTIONS = {
       }
       await p.close(`?${q}`);
     }
+    // ?stats: the readout without the option, not kept; ?scale= and ?shed=: an exact picture, the governor off
+    {
+      const p = await open('?manual&q=low&auto&ap&time=day&stats', { w: 320, h: 180 });
+      await p.advance(0.2);
+      check('?stats: the readout shows and is not kept', (await visible(p, '.hud .perf')) && (await p.page.evaluate(`localStorage.getItem('dreamcar.stats')`)) === null,
+        await p.page.evaluate(`document.querySelector('.hud .perf').textContent`));
+      await p.close('?stats');
+    }
+  },
+
+  /**
+   * (perf lane) The quality ladder (engine/governor.js; its decisions are tested in tools/unit/governor.test.mjs):
+   * every level of a tier draws, sheds what its name says and nothing else, never goes under the tier's floor, and
+   * compiles no shader; a page stepped by hand has no governor; ?scale= and ?shed= give an exact picture; a page
+   * that runs by itself has one and stays inside the ladder.
+   */
+  async ladder() {
+    const read = (p) => p.page.evaluate(`(() => { const s = window.__dreamcar.stats(); return { q: s.quality, p: s.pipeline, programs: s.programs, buffer: s.buffer, scale: s.renderScale }; })()`);
+    for (const tier of ONLY.includes('ladder-low') ? ['low'] : ['low', 'medium']) {
+      const p = await open(`?manual&q=${tier}&auto&ap&time=day&t=9`, { w: 240, h: 135 });
+      await p.advance(0.2, 30);
+      const top = await read(p);
+      const rungs = top.q.rungs;
+      check(`${tier}: a page stepped by hand has no governor, nothing shed, full resolution`,
+        top.q.adaptive === false && top.q.level === 0 && top.q.shed.length === 0 && top.scale === 1 && top.p.upscaled === false, JSON.stringify(top.q));
+      check(`${tier}: the ladder is ${rungs.join(', ')}, then the render scale down to ${top.q.floor}`, rungs.length >= 3 && rungs[0] === 'probe' && top.q.max > rungs.length && top.q.floor >= 0.6);
+      const wrong = [];
+      let last = top;
+      for (let level = 1; level <= top.q.max; level++) {
+        await p.page.evaluate(`window.__dreamcar.engine.setQualityStep(${level})`);
+        await p.advance(3 / 30, 30);
+        const s = await read(p);
+        const shed = Math.min(level, rungs.length);
+        const say = (what) => wrong.push(`level ${level}: ${what}`);
+        if (s.q.shed.join() !== rungs.slice(0, shed).join()) say(`sheds ${s.q.shed.join()}`);
+        if (shed < rungs.length && s.scale !== 1) say(`scale ${s.scale} with rungs left`);
+        if (s.scale < top.q.floor - 1e-6) say(`scale ${s.scale} under the floor`);
+        if (level > rungs.length && !(s.scale < last.scale)) say(`scale ${s.scale} after ${last.scale}`);
+        if (s.p.upscaled !== s.scale < 1) say(`upscale ${s.p.upscaled} at scale ${s.scale}`);
+        if (Math.abs(s.p.targets.scene[0] - Math.round(s.buffer[0] * s.scale)) > 1) say(`scene ${s.p.targets.scene} of ${s.buffer} at ${s.scale}`);
+        const has = (name) => s.q.shed.includes(name);
+        if (s.p.blurTaps !== (has('blur') ? Math.max(2, Math.ceil(top.p.blurTaps / 2)) : top.p.blurTaps)) say(`${s.p.blurTaps} blur taps`);
+        if (s.p.aoSamples !== (has('ao') ? 0 : top.p.aoSamples)) say(`${s.p.aoSamples} occlusion samples`);
+        if (s.p.samples !== (has('msaa') ? Math.min(2, top.p.samples) : top.p.samples)) say(`${s.p.samples} samples`);
+        if (s.programs !== top.programs) say(`${s.programs} programs, ${top.programs} before`);
+        last = s;
+      }
+      check(`${tier}: each of its ${top.q.max} levels sheds its own rung, resolution last and never under the floor, and compiles nothing`, wrong.length === 0, wrong.join('; '));
+      check(`${tier}: the bottom is all ${rungs.length} rungs and scale ${top.q.floor}, through the upscale (strength ${last.p.sharp.toFixed(2)})`,
+        last.q.shed.length === rungs.length && last.scale === top.q.floor && last.p.upscaled && last.p.sharp > 0.3 && last.p.sharp <= 1);
+      await p.page.evaluate('window.__dreamcar.engine.setQualityStep(0)');
+      await p.advance(3 / 30, 30);
+      const back = await read(p);
+      check(`${tier}: back at the top everything is as it was`, back.scale === 1 && back.q.shed.length === 0 && JSON.stringify(back.p.targets.scene) === JSON.stringify(top.p.targets.scene)
+        && back.p.samples === top.p.samples && back.p.blurTaps === top.p.blurTaps && back.p.aoSamples === top.p.aoSamples && back.programs === top.programs && !back.p.upscaled,
+        JSON.stringify(back.p).slice(0, 200));
+      await p.close(`${tier} ladder`);
+    }
+    {
+      const p = await open('?manual&q=low&auto&ap&time=day&t=9&scale=0.6&shed=2', { w: 240, h: 135 });
+      await p.advance(0.1, 30);
+      const s = await read(p);
+      check('?scale=0.6&shed=2: that scale, those two rungs, no governor', s.scale === 0.6 && s.q.shed.length === 2 && s.q.adaptive === false && s.p.upscaled, JSON.stringify(s.q));
+      await p.go('?manual&q=low&auto&ap&time=day&t=9&scale=0.6&upscale=0');
+      await p.advance(0.1, 30);
+      check('?upscale=0: the plain stretch', (await read(p)).p.upscaled === false);
+      await p.close('?scale=');
+    }
+    {
+      // a page that runs by itself: the governor is on, and whatever this machine makes it do stays on the ladder
+      const p = await open('?q=low&auto&ap&time=day&mute', { w: 240, h: 135 });
+      await p.page.waitForTimeout(12000);
+      const s = await read(p);
+      check('a running page has a governor', s.q.adaptive === true, JSON.stringify(s.q));
+      check('and it stays on the ladder, at or above the floor', s.q.level >= 0 && s.q.level <= s.q.max && s.scale >= s.q.floor - 1e-6 && s.q.shed.length <= s.q.rungs.length, JSON.stringify(s.q));
+      await p.go('?q=low&auto&ap&time=day&mute&dpr=1');
+      await p.page.waitForTimeout(3000);
+      const f = await read(p);
+      check('?dpr= switches it off: nothing shed, full resolution', f.q.adaptive === false && f.q.level === 0 && f.scale === 1, JSON.stringify(f.q));
+      await p.close('the governor running');
+    }
   },
 
   /** Every tier draws a frame of every time of day without a WebGL error or warning. */
@@ -1687,7 +1793,7 @@ const fmt = (ms) => {
 (async () => {
   const started = Date.now();
   browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const names = Object.keys(SECTIONS).filter((n) => ONLY.length === 0 || ONLY.includes(n));
+  const names = Object.keys(SECTIONS).filter((n) => ONLY.length === 0 || ONLY.includes(n) || (n === 'ladder' && ONLY.includes('ladder-low')));
   const times = [];
   for (const name of names) {
     section = name;

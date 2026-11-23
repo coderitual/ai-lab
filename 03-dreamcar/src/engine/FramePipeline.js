@@ -1,7 +1,7 @@
 // From a scene and a camera to finished pixels in a rectangle of the canvas.
 //
 //   scene -> [ambient occlusion] -> [motion blur] -> bloom pyramid (-> flare source, star) -> final
-//         (-> edge smoothing) -> canvas
+//         (-> edge smoothing) (-> sharpening upscale) -> canvas
 //
 // One view at a time: split screen calls render() once per rectangle and the
 // same targets serve every view. docs/engine.md walks through the passes;
@@ -35,6 +35,10 @@
 // surfaces within a metre or so cover, after McGuire's Scalable Ambient Obscurance. It is multiplied into the
 // scene's light before anything else reads it, except where a pixel is far brighter than lit surfaces get
 // (lamps and their mirror images): what emits light is not occluded.
+//
+// A scene drawn below the canvas's size (the governor's render scale) is graded at its own size and then
+// enlarged by one pass that sharpens as it enlarges (UPSCALE_FRAGMENT): on finished display values, where
+// contrast means what the eye sees, never on scene light.
 //
 // Bloom has no threshold and adds nothing. The picture is mixed with a
 // blurred copy of itself; what glows is whatever is much brighter than its
@@ -158,6 +162,25 @@ const BLOOM = {
  */
 const STAR = { floor: 4, length: 0.06, turn: 0.26 };
 
+/**
+ * The sharpening upscale (UPSCALE_FRAGMENT), used whenever the scene is drawn below the canvas's size. Its strength
+ * follows the render scale: none is needed at 1, `strength[1]` from `scales[1]` down. `over`: how far outside the
+ * range of the four nearest texels the result may go, as a share of that range (0: never: no halo at all).
+ */
+const UPSCALE = { scales: [1, 0.6], strength: [0.35, 1], over: 0.08 };
+
+/** The upscale's strength at a render scale. */
+export function sharpnessAt(scale) {
+  const t = Math.min(1, Math.max(0, (UPSCALE.scales[0] - scale) / (UPSCALE.scales[0] - UPSCALE.scales[1])));
+  return UPSCALE.strength[0] + (UPSCALE.strength[1] - UPSCALE.strength[0]) * t;
+}
+
+/**
+ * The flare source sums a small pyramid level (the first no more than 48 texels wide): at most this many texels each
+ * way. An upright phone's level is over twice as tall as wide.
+ */
+const FLARE_MAX = 128;
+
 /** Edge smoothing (only where the scene is not multisampled): how much single odd pixels are softened, and the contrast below which nothing is done. */
 const FXAA = { subpixel: 0.3, threshold: 0.1, steps: 7 };
 
@@ -204,6 +227,7 @@ uniform mat4 uReproject[5];      // clip space now -> clip space a frame ago: of
 uniform mat4 uToBox[4];          // clip space now -> the box's own space, scaled so that inside is |x|, |y|, |z| < w
 uniform int uBoxes;
 uniform vec2 uBlur;              // exposure time / time between the two frames, the longest streak in texels
+uniform int uBlurTaps;           // samples along the streak, at most (BLUR_TAPS, or fewer while the ladder's rung is shed)
 #define BLUR_EDGE 1.45            // ...times this in the picture's corners (see streakOf)
 
 float depthAt(vec2 p) { return texture(uDepth, min(p, uTexels.zw) * uTexels.xy).r; }
@@ -268,7 +292,7 @@ vec3 motionBlur(vec2 p, vec3 centre) {
 
   float here = distanceOf(depth);
   // no more samples than the streak has room for: most of the picture moves little
-  int taps = clamp(int(ceil(len / 2.0)), 2, BLUR_TAPS);
+  int taps = clamp(int(ceil(len / 2.0)), 2, uBlurTaps);
   float jitter = interleavedNoise(gl_FragCoord.xy);
   vec3 sum = centre;
   float total = 1.0;
@@ -519,9 +543,12 @@ uniform vec4 uSun;       // uv (x, y), light, 0..1 fade for lying outside the fr
 uniform float uSunSky;
 void main() {
   vec3 sum = vec3(0.0);
-  for (int j = 0; j < 64; j++) {
+  // (perf lane) the whole view, FLARE_MAX texels each way at most. It was 64: an upright phone's level 37 texels
+  // wide is 79 tall, and a sun in the top fifth of the picture was not counted at all (it then flared by the rule
+  // for a sun outside the frame, more than twice as bright: the picture's haze changed with the render scale).
+  for (int j = 0; j < FLARE_MAX; j++) {
     if (j >= uSize.y) break;
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < FLARE_MAX; i++) {
       if (i >= uSize.x) break;
       float w = max(luma(fromTarget(texelFetch(uTex, ivec2(i, j), 0)).rgb) - uFloor, 0.0);
       sum += vec3(w, w * (vec2(i, j) + 0.5) / vec2(uSize));
@@ -607,7 +634,9 @@ vec3 grain(vec3 s) {
 `;
 
 // The last pass: everything that turns light into a picture.
-//   SPLIT        write an 8-bit picture with its brightness in alpha for the edge smoothing, which then adds the grain
+//   uSplit       write an 8-bit picture with its brightness in alpha for the pass that follows (the edge smoothing,
+//                the upscale), which then adds the grain. A uniform, not a define: the scene's size can change in
+//                the middle of a run, and no shader may be compiled then.
 //   INLINE_BLUR  do the motion blur here, while reading the scene
 //   LENS         chromatic aberration and ghosts
 const FINAL_FRAGMENT = /* glsl */ `
@@ -627,6 +656,7 @@ uniform vec3 uLift;
 uniform vec3 uSplitLo;        // split toning: the shadows' and the highlights' multipliers (brightness kept)
 uniform vec3 uSplitHi;
 uniform float uSplitBalance;  // the display brightness neither touches; 0: split toning off
+uniform bool uSplit;          // another pass follows (see above)
 #ifdef LENS
 uniform sampler2D uGhostTex;  // the flare source: one pixel (FLARE_FRAGMENT)
 uniform vec3 uGhosts;         // ghosts' share each, the glare veil's strength, the view's width over its height
@@ -635,9 +665,7 @@ uniform vec4 uStarTexels;     // 1 / its target's size (xy), the centre of the v
 uniform float uStar;          // Look.star
 #endif
 ${DITHER_GLSL}
-#ifndef SPLIT
 ${GRAIN_GLSL}
-#endif
 
 #ifdef LENS
 // LOOK LANE (day stage): lens ghosts and glare, drawn from the flare source (its centroid f on the view and its
@@ -722,13 +750,13 @@ void main() {
   c += uLift * (1.0 - c) * (1.0 - c);
   vec3 s = linearToSrgb(c);
 
-#ifdef SPLIT
-  // cut to 8 bits here, so dithered here; the edge smoothing reads the brightness nine times a pixel or more
-  s += dither();
-  outColor = vec4(s, dot(s, vec3(0.299, 0.587, 0.114)));
-#else
-  outColor = vec4(grain(s) + dither(), 1.0);
-#endif
+  if (uSplit) {
+    // cut to 8 bits here, so dithered here; the edge smoothing reads the brightness nine times a pixel or more
+    s += dither();
+    outColor = vec4(s, dot(s, vec3(0.299, 0.587, 0.114)));
+  } else {
+    outColor = vec4(grain(s) + dither(), 1.0);
+  }
 }
 `;
 
@@ -738,6 +766,7 @@ uniform sampler2D uTex;   // the graded picture (sRGB values), brightness in alp
 uniform vec4 uTexels;     // 1 / its target's size (xy), the centre of the view's last texel (zw)
 uniform vec2 uView;       // the view's size in its texels
 uniform vec2 uFxaa;       // how much single odd pixels are softened, contrast below which nothing is done
+uniform bool uLast;       // this is the picture's last pass (false: the upscale follows, and the grain is its)
 ${DITHER_GLSL}
 ${GRAIN_GLSL}
 
@@ -810,6 +839,73 @@ vec3 smoothEdges(vec2 p) {
 
 void main() {
   vec3 s = smoothEdges(vUv * uView);
+  outColor = uLast ? vec4(grain(s) + dither(), 1.0) : vec4(s, 1.0);
+}
+`;
+
+// The sharpening upscale: from a graded picture (sRGB values) drawn below the canvas's size to the canvas, in one
+// pass of twelve lookups. After AMD's contrast-adaptive sharpening with scaling (FidelityFX CAS, Timothy Lottes):
+//
+//  - Each of the four texels round the pixel is sharpened by its own cross of neighbours (itself minus a share of
+//    the four beside it), by an amount that follows the local contrast: most where the picture is even (texture, a
+//    plate's letters), little on an edge that is hard already, none where there is no room left to black or white.
+//  - The four are then mixed by their bilinear shares, each divided by its own contrast: across an edge a pixel
+//    takes after the calmer side, so the edge is not smeared over a texel's width as plain stretching smears it.
+//  - The result is held inside what the four texels themselves hold, widened by UPSCALE.over of their spread: an
+//    edge gets steeper, nothing gets a bright or dark line beside it.
+//
+// Every weight is a continuous function of the position and of the picture, so a thing that moves a fraction of a
+// texel changes the result by a fraction: no shimmer of the filter's own. Grain and dither are added here, at the
+// canvas's own pixels, as the last pass always adds them.
+const UPSCALE_FRAGMENT = /* glsl */ `
+uniform sampler2D uTex;   // the graded picture (sRGB values)
+uniform vec4 uTexels;     // 1 / its target's size (xy), the centre of the view's last texel (zw)
+uniform vec2 uView;       // the view's size in its texels
+uniform vec2 uSharp;      // the sharpening's peak (0: none, 1: the most), how far outside the four texels' range the result may go
+${DITHER_GLSL}
+${GRAIN_GLSL}
+vec3 texel(ivec2 p) { return texelFetch(uTex, clamp(p, ivec2(0), ivec2(uTexels.zw)), 0).rgb; }
+float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+// How hard a texel is sharpened (0..1), from the brightness of itself and the four beside it; and their spread.
+float room(float a, float b, float c, float d, float e, out float spread) {
+  float lo = min(min(a, b), min(c, min(d, e)));
+  float hi = max(max(a, b), max(c, max(d, e)));
+  spread = hi - lo;
+  return sqrt(clamp(min(lo, 1.0 - hi) / max(hi, 1.0e-4), 0.0, 1.0));
+}
+void main() {
+  vec2 pp = vUv * uView - 0.5;
+  vec2 corner = floor(pp);
+  vec2 f = pp - corner;
+  ivec2 ip = ivec2(corner);
+  //     a b
+  //   c d e g
+  //   h i j k
+  //     l m
+  vec3 a = texel(ip + ivec2(0, -1)), b = texel(ip + ivec2(1, -1));
+  vec3 c = texel(ip + ivec2(-1, 0)), d = texel(ip), e = texel(ip + ivec2(1, 0)), g = texel(ip + ivec2(2, 0));
+  vec3 h = texel(ip + ivec2(-1, 1)), i = texel(ip + ivec2(0, 1)), j = texel(ip + ivec2(1, 1)), k = texel(ip + ivec2(2, 1));
+  vec3 l = texel(ip + ivec2(0, 2)), m = texel(ip + ivec2(1, 2));
+  float ld = lum(d), le = lum(e), li = lum(i), lj = lum(j);
+  float sd, se, si, sj;
+  float peak = -uSharp.x / mix(8.0, 5.0, uSharp.x);
+  float wd = room(lum(a), lum(c), ld, le, li, sd) * peak;
+  float we = room(lum(b), ld, le, lum(g), lj, se) * peak;
+  float wi = room(ld, lum(h), li, lj, lum(l), si) * peak;
+  float wj = room(le, li, lj, lum(k), lum(m), sj) * peak;
+  float qd = (1.0 - f.x) * (1.0 - f.y) / (0.03125 + sd);
+  float qe = f.x * (1.0 - f.y) / (0.03125 + se);
+  float qi = (1.0 - f.x) * f.y / (0.03125 + si);
+  float qj = f.x * f.y / (0.03125 + sj);
+  vec3 sum = (a + c) * (qd * wd) + (b + g) * (qe * we) + (h + l) * (qi * wi) + (k + m) * (qj * wj)
+    + d * (qd + qe * we + qi * wi) + e * (qe + qd * wd + qj * wj)
+    + i * (qi + qd * wd + qj * wj) + j * (qj + qe * we + qi * wi);
+  float total = qd * (1.0 + 4.0 * wd) + qe * (1.0 + 4.0 * we) + qi * (1.0 + 4.0 * wi) + qj * (1.0 + 4.0 * wj);
+  vec3 s = sum / total;
+  vec3 lo = min(min(d, e), min(i, j));
+  vec3 hi = max(max(d, e), max(i, j));
+  vec3 slack = (hi - lo) * uSharp.y;
+  s = clamp(s, lo - slack, hi + slack);
   outColor = vec4(grain(s) + dither(), 1.0);
 }
 `;
@@ -908,6 +1004,10 @@ export class FramePipeline {
     this.ev = overrides.ev || 0;
     /** The shutter in place of the view's (null: the view's). */
     this.shutter = overrides.shutter ?? null;
+    /** false: a scene drawn below the canvas's size is stretched the plain way (?upscale=0), for comparing. */
+    this.upscale = overrides.upscale !== false;
+    /** The upscale's strength in place of the render scale's own (null: sharpnessAt). */
+    this.sharp = overrides.sharp ?? null;
     this._look = {};
     this.engine = Engine.of(renderer);
     if (!this.engine) throw new Error('FramePipeline: this renderer was not made by an Engine');
@@ -927,6 +1027,7 @@ export class FramePipeline {
       uToBox: { value: Array.from({ length: 4 }, () => new THREE.Matrix4()) },
       uBoxes: { value: 0 },
       uBlur: { value: new THREE.Vector2() },
+      uBlurTaps: { value: 1 },
     };
     this._grain = { value: new THREE.Vector3() };
     this._aoHalf = { value: new THREE.Vector2() };
@@ -997,13 +1098,17 @@ export class FramePipeline {
     if (this.lens) {
       this._flareTarget = keep(createTarget(caps));
       resizeTarget(this._flareTarget, 1, 1);
-      this._flare = pass(FLARE_FRAGMENT, {
-        uTex: { value: null },
-        uSize: { value: new THREE.Vector2() },
-        uFloor: { value: 30 },
-        uSun: { value: new THREE.Vector4() },
-        uSunSky: { value: 1 },
-      });
+      this._flare = pass(
+        FLARE_FRAGMENT,
+        {
+          uTex: { value: null },
+          uSize: { value: new THREE.Vector2() },
+          uFloor: { value: 30 },
+          uSun: { value: new THREE.Vector4() },
+          uSunSky: { value: 1 },
+        },
+        { FLARE_MAX },
+      );
     }
     // the glints' star (only where the lens is drawn), at the second level's size
     this._starTarget = null;
@@ -1075,7 +1180,6 @@ export class FramePipeline {
     }
 
     const finalDefines = {};
-    if (this.fxaa) finalDefines.SPLIT = 1;
     if (this.blurInline) Object.assign(finalDefines, motionDefines, { INLINE_BLUR: 1 });
     if (this.lens) finalDefines.LENS = 1;
     this._final = pass(
@@ -1095,6 +1199,7 @@ export class FramePipeline {
         uSplitLo: { value: new THREE.Vector3(1, 1, 1) },
         uSplitHi: { value: new THREE.Vector3(1, 1, 1) },
         uSplitBalance: { value: 0 },
+        uSplit: { value: this.fxaa },
         uGhostTex: { value: null },
         uGhosts: { value: new THREE.Vector3() },
         uStarTex: { value: null },
@@ -1105,11 +1210,11 @@ export class FramePipeline {
       finalDefines,
     );
 
-    this._gradeTarget = null;
-    this._finish = null;
-    if (this.fxaa) {
-      // The graded picture. Always 8-bit: it is already tone-mapped, sRGB-encoded and dithered.
-      this._gradeTarget = keep(
+    // The graded picture, for the passes that work on finished values: the edge smoothing where the scene is not
+    // multisampled, and the upscale whenever the scene is drawn below the canvas's size. Always 8-bit: it is
+    // already tone-mapped, sRGB-encoded and dithered. (4 x 4 until a frame needs it: _allocate.)
+    const graded = () =>
+      keep(
         new THREE.WebGLRenderTarget(4, 4, {
           type: THREE.UnsignedByteType,
           format: THREE.RGBAFormat,
@@ -1121,6 +1226,12 @@ export class FramePipeline {
           stencilBuffer: false,
         }),
       );
+    this._gradeTarget = graded();
+    this._finish = null;
+    /** The smoothed picture, between the edge smoothing and the upscale (only where both run). */
+    this._smoothTarget = null;
+    if (this.fxaa) {
+      this._smoothTarget = graded();
       this._finish = pass(
         FINISH_FRAGMENT,
         {
@@ -1128,11 +1239,24 @@ export class FramePipeline {
           uTexels: this._texels,
           uView: this._viewSize,
           uFxaa: { value: new THREE.Vector2(FXAA.subpixel, FXAA.threshold) },
+          uLast: { value: true },
           uGrain: this._grain,
         },
         { FXAA_STEPS: FXAA.steps },
       );
     }
+    this._upscale = pass(UPSCALE_FRAGMENT, {
+      uTex: { value: this._gradeTarget.texture },
+      uTexels: this._texels,
+      uView: this._viewSize,
+      uSharp: { value: new THREE.Vector2() },
+      uGrain: this._grain,
+    });
+    // The upscale is first needed in the middle of a run, when the governor lowers the render scale: its program
+    // is made now, with the others, so that nothing is compiled then.
+    this._upscale.compile(this.renderer);
+    /** Whether the frame drawn last went through the upscale. */
+    this._upscaled = false;
 
     this._present = pass(
       PRESENT_FRAGMENT,
@@ -1150,6 +1274,7 @@ export class FramePipeline {
       motionDefines,
     );
     this._motion.uDepth.value = this.sceneTarget.depthTexture;
+    this._motion.uBlurTaps.value = Math.max(1, T.blurTaps);
   }
 
   /**
@@ -1157,7 +1282,7 @@ export class FramePipeline {
    * that two halves of a split screen that differ by a pixel do not reallocate it twice a frame; a size that is
    * no longer needed is given up a frame later.
    */
-  _allocate(w, h) {
+  _allocate(w, h, graded) {
     const now = this._sizeNow;
     const before = this._sizeBefore;
     if (this.engine.frame !== this._frame) {
@@ -1173,7 +1298,12 @@ export class FramePipeline {
     let th = Math.max(now.h, before.h);
     resizeTarget(this.sceneTarget, tw, th);
     if (this._blurTarget) resizeTarget(this._blurTarget, tw, th);
-    if (this._gradeTarget) resizeTarget(this._gradeTarget, tw, th);
+    // (the graded picture only where a pass reads it: the edge smoothing, the upscale)
+    if (graded || this._gradeTarget.width > 4) resizeTarget(this._gradeTarget, graded ? tw : 4, graded ? th : 4);
+    if (this._smoothTarget) {
+      const both = graded && this._upscaling;
+      if (both || this._smoothTarget.width > 4) resizeTarget(this._smoothTarget, both ? tw : 4, both ? th : 4);
+    }
     if (this._ao) {
       resizeTarget(this._ao.picture, tw, th);
       resizeTarget(this._ao.a, Math.ceil(tw / 2), Math.ceil(th / 2));
@@ -1398,8 +1528,19 @@ export class FramePipeline {
     const debug = this.post ? DEBUG_MODES[this.debug] : DEBUG_MODES.scene;
     const w = Math.max(2, Math.round(rect.w * engine.renderScale));
     const h = Math.max(2, Math.round(rect.h * engine.renderScale));
-    this._allocate(w, h);
     const exact = w === rect.w && h === rect.h;
+    // a scene drawn below the canvas's size is graded at its own size, then enlarged by the sharpening upscale
+    const upscaling = (this._upscaling = !exact && this.upscale && this.post && debug === undefined);
+    // (two views of a split screen can differ by a pixel: the graded target, once made, serves both)
+    this._allocate(w, h, this.fxaa || upscaling);
+    // The ladder's rung: two samples instead of four. The target is made again with the new count (as a change of
+    // size makes it again); no shader depends on the count.
+    const samples = this.samples > 2 && engine.isShed('msaa') ? 2 : this.samples;
+    if (sceneTarget.samples !== samples) {
+      sceneTarget.samples = samples;
+      sceneTarget.dispose();
+    }
+    this._motion.uBlurTaps.value = engine.isShed('blur') ? Math.max(2, Math.ceil(this.blurTaps / 2)) : Math.max(1, this.blurTaps);
 
     // ---- the scene, in one call
     sceneTarget.viewport.set(0, 0, w, h);
@@ -1417,7 +1558,8 @@ export class FramePipeline {
     let picture = sceneTarget;
     const aoShown = debug === DEBUG_MODES.ao;
     // (the debug view shows the term at full strength when the Look has none)
-    const occlusion = this._ao ? Math.max(0, look.ao || (aoShown ? 1 : 0)) : 0;
+    // (the ladder's rung: none while it is shed; the debug view still shows the term)
+    const occlusion = this._ao && (aoShown || !engine.isShed('ao')) ? Math.max(0, look.ao || (aoShown ? 1 : 0)) : 0;
     if (occlusion > 0 && this.post && camera.isPerspectiveCamera && (debug === undefined || aoShown)) {
       picture = this._occlude(camera, w, h, occlusion, exposure, aoShown);
     }
@@ -1484,7 +1626,7 @@ export class FramePipeline {
       while (level < this._levels.length - 1 && this._levels[level].w > 48) level++;
       const fu = this._flare.material.uniforms;
       fu.uTex.value = this._down[level].texture;
-      fu.uSize.value.set(Math.min(64, this._levels[level].w), Math.min(64, this._levels[level].h));
+      fu.uSize.value.set(Math.min(FLARE_MAX, this._levels[level].w), Math.min(FLARE_MAX, this._levels[level].h));
       fu.uFloor.value = 30 / Math.max(exposure, 1e-6);
       fu.uSun.value.set(0, 0, 0, 0);
       const fl = look.flare;
@@ -1527,15 +1669,34 @@ export class FramePipeline {
     // grain, and its cells keep their size on a dense screen.
     this._grain.value.set((look.grain || 0) / 255, Math.max(1, Math.floor(renderer.getPixelRatio() + 0.25)), Math.round(engine.renderTime * 240) % 65536);
 
-    if (this._finish) {
+    this._upscaled = upscaling;
+    if (this._finish || upscaling) {
+      // graded at the picture's own size; then the edge smoothing (where the scene has no samples of its own)
+      // and, below the canvas's size, the upscale
       u.uOrigin.value.set(0, 0);
       u.uExact.value = true;
+      u.uSplit.value = true;
       this._final.render(renderer, this._gradeTarget, region);
-      this._finish.render(renderer, null, rect);
-      this._passes += 2;
+      this._passes++;
+      let graded = this._gradeTarget;
+      if (this._finish) {
+        const fu = this._finish.material.uniforms;
+        fu.uLast.value = !upscaling;
+        this._finish.render(renderer, upscaling ? this._smoothTarget : null, upscaling ? region : rect);
+        this._passes++;
+        graded = this._smoothTarget;
+      }
+      if (upscaling) {
+        const uu = this._upscale.material.uniforms;
+        uu.uTex.value = graded.texture;
+        uu.uSharp.value.set(this.sharp ?? sharpnessAt(Math.min(w / rect.w, h / rect.h)), UPSCALE.over);
+        this._upscale.render(renderer, null, rect);
+        this._passes++;
+      }
     } else {
       u.uOrigin.value.set(rect.x, rect.y);
       u.uExact.value = exact;
+      u.uSplit.value = false;
       this._final.render(renderer, null, rect);
       this._passes++;
     }
@@ -1544,14 +1705,17 @@ export class FramePipeline {
   /**
    * What the pipeline is made of and what the last frame used.
    * @returns {{ tier: string, hdr: boolean, samples: number, fxaa: boolean, blurTaps: number, blurInline: boolean,
-   *   bloomLevels: number, aoSamples: number, renderScale: number, passes: number, targets: Record<string, number[]|number[][]> }}
+   *   bloomLevels: number, aoSamples: number, renderScale: number, upscaled: boolean, sharp: number, passes: number,
+   *   targets: Record<string, number[]|number[][]> }}
+   *   `samples`, `blurTaps`, `aoSamples`: as drawn now (the ladder's rungs can take from the tier's own);
+   *   `upscaled`: the last frame went through the sharpening upscale, at strength `sharp`;
    *   `passes`: full-screen passes of the frame drawn last, over all its views (the scene itself not counted)
    */
   stats() {
     const size = (target) => [target.width, target.height];
     const targets = { scene: size(this.sceneTarget), bloom: this._down.map(size) };
     if (this._blurTarget) targets.blur = size(this._blurTarget);
-    if (this._gradeTarget) targets.grade = size(this._gradeTarget);
+    if (this._gradeTarget.width > 4) targets.grade = size(this._gradeTarget);
     if (this._starTarget) targets.star = size(this._starTarget);
     if (this._ao) {
       targets.ao = size(this._ao.a);
@@ -1560,13 +1724,15 @@ export class FramePipeline {
     return {
       tier: this.tier,
       hdr: this.caps.hdr,
-      samples: this.samples,
+      samples: this.sceneTarget.samples,
       fxaa: this.fxaa,
-      blurTaps: this.blurTaps,
+      blurTaps: this.blurTaps > 0 ? this._motion.uBlurTaps.value : 0,
       blurInline: this.blurInline,
       bloomLevels: this.levels,
-      aoSamples: this.aoSamples,
+      aoSamples: this.engine.isShed('ao') ? 0 : this.aoSamples,
       renderScale: this.engine.renderScale,
+      upscaled: this._upscaled,
+      sharp: this._upscaled ? this._upscale.material.uniforms.uSharp.value.x : 0,
       passes: this._passes,
       targets,
     };

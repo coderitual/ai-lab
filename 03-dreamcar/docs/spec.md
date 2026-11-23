@@ -298,8 +298,21 @@ Sport, Off: `ASSISTS` in config.js, applied at once to every car and to every
 car made later), Steering (Pad, Slider, Arrows or Tilt; under it what the
 choice does, or why tilt is not steering), Resting hand (Right or Left: where the pad's ghost and the HANDBRAKE button sit; with the pad
 or tilt) and Throttle (auto or manual), shown on touch screens; Recentre tilt
-on the pause sheet while tilt steers; units
-(km/h, mph), the map shown or hidden.
+on the pause sheet while tilt steers; units (km/h, mph), the map shown or hidden, the readout shown or hidden (off
+until asked for; `?stats` shows it without the option). The readout is one
+line of small type (9 px, less on a narrow screen so that it fits) at the
+page's bottom edge, inside the home bar's strip on a phone, written three
+times a second:
+
+    medium 804×1748@2 ×0.85 msaa4 58/41fps off:probe,blur,detail apple gpu
+
+the tier; the canvas in device pixels and its pixel ratio; the render scale;
+how edges are smoothed (`msaa4`, `msaa2`, or `fxaa` where the scene has no
+samples); the mean frame rate of the last 3 s and its slowest frame as a
+rate; the ladder's rungs given up (`all on`: none; `testing`: the governor's
+trial; `cap30` before it: the frame rate the browser holds, once found);
+what the browser calls the GPU (`ldr` before it: the 8-bit fallback). A
+screenshot with it on says what the phone was drawing.
 
 ## URL parameters
 
@@ -312,7 +325,13 @@ Read once by `src/engine/params.js`.
 | `?laps=N` | laps per run |
 | `?cam=chase\|far\|bonnet\|bumper` | the camera |
 | `?q=low\|medium\|high` | the quality tier (wins over the stored choice) |
-| `?dpr=` | the device pixel ratio |
+| `?dpr=` | the device pixel ratio (and no governor) |
+| `?scale=` | the render scale: the share of the canvas's size the scene is drawn at (and no governor) |
+| `?shed=N` | N rungs of the tier's ladder shed (and no governor) |
+| `?upscale=0`, `?sharp=0..1` | the plain stretch instead of the sharpening upscale; its strength in place of the scale's own |
+| `?maxdpr=`, `?floor=` | the pixel ratio's cap and the render scale's floor in place of the tier's, the governor left on (to try on a phone: `?maxdpr=3&floor=0.5&stats`) |
+| `?mobile=1\|0` | take the device for a phone, or for a desk (the tiers' numbers for phones) |
+| `?stats` | the performance readout (`?stats=0`: off whatever the option says) |
 | `?plate=`, `?plate2=` | the number plates (capitals, digits, spaces, hyphens; 9 at most) |
 | `?paint=` | the first car's paint: silver (default), graphite (the second car's), blue, red, white, black |
 | `?wet=0..1` | the road's wetness instead of the time of day's |
@@ -361,6 +380,9 @@ pass with their sizes. In short:
 | | low | medium | high |
 | --- | --- | --- | --- |
 | pixel ratio cap | 1.5 | 2 | 2 |
+| render scale floor (`TIERS.scaleFloor`) | 0.6 | 0.72 | 0.72 |
+| drawn pixels per CSS point at the floor, on a 3x phone | 0.9 | 1.44 | 1.44 |
+| the ladder, shed in this order before any resolution (`LADDER`) | probe, blur, detail | probe, blur, detail, ao, msaa | as medium |
 | scene MSAA | none (FXAA on the finished picture) | 4 | 4 |
 | motion blur | inside the last pass, 6 taps, streak ≤ 4 % | own pass, 12 taps, ≤ 7.5 % | 18 taps, ≤ 9 % |
 | bloom levels | 4 | 5 | 6 |
@@ -371,14 +393,22 @@ pass with their sizes. In short:
 | forest: full / reduced / impostor trees to | 0 / 60 / 650 m | 34 / 95 / 900 m | 50 / 130 / 1200 m |
 | effects: skid quads / soft particles / sparks | 800 / 192 / 48 | 1500 / 320 / 96 | 2000 / 400 / 128 |
 
-The adaptive render scale (1, 0.85, 0.72, 0.6, 0.5) steps down when frames run
-long and back up when they are short; it shrinks only the off-screen targets.
+When frames run long the governor (`src/engine/governor.js`; engine.md, "The
+quality ladder") sheds the tier's ladder one rung at a time, and only then
+lowers the render scale (0.85, 0.72, on low also 0.6), never under the
+floor; it steps back up when frames have been steady for a while. A browser
+that caps the frame rate itself (Low Power Mode: 30 a second) makes it shed
+nothing, after one trial of about a second. A scene drawn below the canvas's
+size is brought to it by a sharpening upscale (engine.md), not stretched.
+Before 2026-11-19 the render scale was the only thing shed and went to 0.5:
+a 3x phone on medium ended at 1.0 drawn pixel per CSS point.
 
 ## Quality tiers and budgets
 
 `auto` takes the capability probe's guess (`src/engine/caps.js`): software
-WebGL and unknown phone GPUs start `low`; recent Apple, Adreno 640+ and
-Mali-G71+ phones `medium`; Intel graphics other than Arc and Xe `medium`;
+WebGL and unknown phone GPUs start `low`; every iPhone and iPad (whatever
+the browser says of its GPU, or hides), Adreno 640+ and Mali-G71+ phones
+`medium`; Intel graphics other than Arc and Xe `medium`;
 other desktop GPUs `high`. The choice is stored and applied by reloading.
 
 Budgets set by the rework for a chase frame: low 150 draw calls and 250 k
@@ -452,6 +482,82 @@ tunnel changed and still is.
 
 None of these was measured on a real GPU or phone.
 
+## What a frame costs
+
+Counted, not timed: this machine draws with software WebGL, so no number here
+says how long anything takes on a GPU. `node tools/perfcount.cjs` (tools.md)
+wraps the renderer in the page and counts what each pass is asked to draw;
+the full-screen passes are counted from their shaders. Autopilot run by day,
+`?seed=1`, an upright phone's shape (402x874), four frames averaged; page
+seconds (the lap clock is about 5.2 s less).
+
+**Medium, by day, before the perf lane** (b786f90, 2026-11-19):
+
+| place | draw calls | triangles | the scene | the sun's shadow map | probe faces (a face every 2nd frame) | trees: full / reduced / impostors | tree cards over the picture | caster cards in the shadow map |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| start straight, t = 8 | 171 | 973 k | 87 calls, 662 k | 43, 182 k | 24, 129 k | 40 / 22 / 1829 | 4.0 layers | 198 trees, 40 M texels |
+| forest, t = 26 | 201 | 1038 k | 128, 777 k | 30, 135 k | 26, 126 k | 43 / 13 / 2326 | 12.3 layers | 451 trees, 77 M texels |
+| into the tunnel, t = 36 | 178 | 792 k | 106, 565 k | 32, 132 k | 23, 96 k | 0 / 0 / 426 | 0 | 196 trees, 27 M texels |
+| coast road, t = 56 | 132 | 607 k | 63, 369 k | 31, 146 k | 22, 92 k | 0 / 0 / 4 | 0 | none |
+
+The budget is 300 calls and 600 k triangles. What the triangles are (t = 8 /
+t = 26): the full trees 204 k / 181 k (40 and 43 trees: about 5 k each; on
+the start straight `detail` stretches the full form to 127 m for the wall of
+maples); the massif 92 k, in every frame wherever the camera looks; the car
+55 k and its wheels 29 k, and again 36 k + 21 k + 4 k in the shadow map; the
+terrain's band and grid 59 k / 142 k, and 79 k / 48 k in the shadow map; the
+three rings of far mountains 50 k; the sea 20 k; the road 14 k / 53 k. A
+probe face is about 190 to 260 k triangles (a third of it the reduced trees
+on the start straight).
+
+Two things the triangle count does not show, both larger than it:
+
+- **Tree cards over the picture.** The area of every tree card the view
+  draws, as seen, over the picture's area: 12 layers in the forest, 10 of
+  them the 43 full trees. Each is alpha-tested (alpha to coverage on the
+  multisampled tiers), so the GPU cannot reject what is hidden before
+  shading it as it does for solid things. An upper bound: depth rejects what
+  lies behind something already drawn.
+- **Caster cards in the shadow map.** Every tree whose crown is in the
+  light's way is drawn into the sun's map as one card turned to the light,
+  and every texel of the card runs an alpha test. Under the day's 16 degree
+  sun the map is fitted to the ground (a texel is 5.5 cm across and 2.8 cm
+  up the light's view), so a crown 8 m wide and 14 m tall is some 70 000
+  texels: 27 to 77 M texels of cards a frame in a map of 4.2 M, 6 to 18
+  times its area, against a picture of 1.4 M pixels. (Cards that hang over
+  the map's edge are counted whole.)
+
+**The full-screen passes** (medium; lookups per pixel of the picture, which is
+the view times the render scale; engine.md lists the passes):
+
+| pass | size | texture lookups per picture pixel | writes |
+| --- | --- | --- | --- |
+| the scene | 1 | (its materials') | half-float colour and 24-bit depth, 4 samples each: 68 MB at 804x1748, resolved to 17 MB |
+| occlusion term | 1/4 | 13 of depth each: 3.3 | 8-bit, 1/4 |
+| its blur, twice | 1/4 each | 10 each: 5 | 8-bit, 1/4, twice |
+| occlusion into the picture | 1 | 10 | half-float, full size |
+| motion blur | 1 | 6 where nothing moves, 2 more per sample: to 30 (to 18 with the `blur` rung shed) | half-float, full size |
+| bloom, 5 halvings | 1/4 ... 1/1024 | 13 each: 4.3 | half-float, 1/3 in all |
+| bloom, 4 enlargements | 1/4 ... 1/256 | 10 each: 3.3 | half-float, 1/3 in all |
+| star | 1/16 | 36 each: 2.3 | half-float, 1/16 |
+| flare source | one texel | (a level of at most 48 x 105 texels, once) | |
+| final | 1 (the canvas's pixels at scale 1) | 6 | the canvas, or 8-bit at the scene's size |
+| upscale (render scale under 1 only) | the canvas's pixels | 12, of the 8-bit picture | the canvas |
+
+40 to 64 lookups a pixel and three full-size half-float targets written
+(the resolve, the occlusion's picture, the blur's) with everything on; 22 to
+46 and two with the `ao` rung shed, 22 to 34 with `blur` shed as well. Low: no occlusion, the blur inside the
+final pass (up to 14 lookups), four bloom levels, then FXAA (9 to 23 lookups
+of the 8-bit picture).
+
+**Fragment shaders as three.js compiled them** (medium, lines of code after
+its includes; texture lookups written in the source, not executed: a loop
+counts once): the asphalt 2071 lines and 73 lookups; the car's paint 2045 and
+65; the terrain 1891 and 69; the sea 1680 and 63; the tunnel 1664 and 61;
+the massif 1632 and 61; concrete and the town 1604 to 1996 and 58. All of
+them carry three.js's physical material (the environment map, the shadow
+map's filter, the lights' loops) under the demo's own code.
+
 ## Sound
 
 Everything is synthesised in `src/game/Sound.js` on `src/engine/Audio.js`:
@@ -475,6 +581,8 @@ stereo picture. Sound starts on the first touch or key (the browsers' rule).
 | `dreamcar.quality` | the chosen tier |
 | `dreamcar.units` | km/h or mph |
 | `dreamcar.map` | the map on or off |
+| `dreamcar.stats` | the performance readout on or off |
+| `dreamcar.level.v1` | where the governor ended on this device, as `tier:level`: the next visit starts there, not at the top |
 | `dreamcar.assists` | the driving help: full, sport or off |
 | `dreamcar.throttle` | the touch throttle: auto or manual |
 | `dreamcar.steering` | the touch steering: pad, slider, arrows or tilt |

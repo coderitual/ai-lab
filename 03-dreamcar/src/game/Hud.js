@@ -801,6 +801,9 @@ export class Hud {
 
     this.veil = cell('div', 'veil', root);
     this.veil.show(false);
+    // the performance readout: one small line at the page's bottom edge, under everything, in nobody's way
+    this.perf = cell('div', 'perf', root);
+    this.perf.show(false);
 
     // the title: the menu beside the car on a wide screen, under it on an upright one
     this.title = cell('div', 'panel title', root);
@@ -851,6 +854,8 @@ export class Hud {
     this.optThrottle = choiceRow(o, TEXT.throttle, ['auto', 'manual'], [TEXT.auto, TEXT.manual], (v) => this.act(`throttle:${v}`));
     this.optUnits = choiceRow(o, TEXT.units, ['kmh', 'mph'], [TEXT.kmh, TEXT.mph], (v) => this.act(`units:${v}`));
     this.optMap = choiceRow(o, TEXT.map, ['on', 'off'], [TEXT.shown, TEXT.hidden], (v) => this.act(`map:${v}`));
+    this.optStats = choiceRow(o, TEXT.stats, ['on', 'off'], [TEXT.shown, TEXT.hidden], (v) => this.act(`stats:${v}`));
+    make('div', 'optnote', o, TEXT.statsNote);
     this.closeButton = button(make('div', 'buttons', o), TEXT.done, () => this.closeOptions(), 'primary');
     this.options.show(false);
     this.optionsOpen = false;
@@ -882,6 +887,12 @@ export class Hud {
     const out = { left: parseFloat(cs.paddingLeft) || 0, right: parseFloat(cs.paddingRight) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };
     probe.remove();
     return out;
+  }
+
+  /** The performance readout's line (null: hidden). Written only when it changes. */
+  setPerf(line) {
+    this.perf.show(line !== null);
+    if (line !== null) this.perf.text(line);
   }
 
   /** DOM writes so far (all views and panels): the HUD's cost, for tests. */
@@ -971,7 +982,7 @@ export class Hud {
    */
   setState(s) {
     const times = s.times || [s.time];
-    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.assists}|${s.throttle}|${s.steering}|${s.hand}|${s.tiltNote}|${this.optionsOpen}`;
+    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.stats}|${s.assists}|${s.throttle}|${s.steering}|${s.hand}|${s.tiltNote}|${this.optionsOpen}`;
     this._s = s;
     if (key === this._state) return;
     const [wasPhase, wasPaused] = this._state.split('|');
@@ -1028,6 +1039,7 @@ export class Hud {
     pick(this.optSound, s.muted ? 'off' : 'on');
     pick(this.optUnits, s.units);
     pick(this.optMap, s.map ? 'on' : 'off');
+    pick(this.optStats, s.stats ? 'on' : 'off');
     this.optSound.row.hidden = !s.canSound;
     this.qualityNote.text(s.qualityFixed ? TEXT.qualityFixed(s.tier) : TEXT.qualityNow(s.tier));
     for (const v of this.views) {

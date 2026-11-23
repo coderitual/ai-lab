@@ -35,6 +35,23 @@
   display: none !important;
 }
 
+/* the performance readout: one line at the bottom edge of the page, inside the home bar's strip where there is one
+   (the touch controls stand 18 px above it; every instrument at least 10 px above the page's edge), 10 px high */
+.hud .perf {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 100%;
+  bottom: max(0px, calc(var(--sb) - 12px));
+  z-index: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  font: 600 min(9px, 2.1vw) / 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 0 2px #000, 0 0 2px #000;
+}
+
 /* ---------------------------------------------------------------- buttons */
 
 .hud button {

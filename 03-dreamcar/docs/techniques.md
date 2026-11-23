@@ -599,3 +599,28 @@ rigs. `?photo=back,right,up,yaw,pitch,fov[,hud]` does the same from the
 address. A camera ahead of the car looking back at it has a negative `back`
 and a `yaw` near 180. `tools/screenshots.cjs` stages every picture of the
 docs with it, at distances along an autopilot run.
+
+## Nothing over the road, nothing inside its edges
+
+Three faults of one kind, each found from a phone screenshot and each now held by a test in `tools/unit/`.
+
+**No ground over the road** (`ground.test.mjs`). The far land has a hole where the grid is, whose rim is the grid's
+border: it used to run on under the grid at its own height for two cells in from the border, and where the road lay in
+a cutting there a far triangle 100 to 140 m across lay over it, seen only from above (a dark slab over the car at the
+esses in a tall picture). And the grid leaves out a cell only where all its corners lie under the band; where the band
+stops short (on a deck and at its abutments, where another stretch is nearer, inside a tight bend) a cell can have
+corners at the road's height and others on top of a rock cut or under a deck, and its plane then stands over the road
+(0.42 m at s = 2590 m on low, 0.66 m at s = 3774 m on medium). Every triangle with a corner within two cells of a
+corridor is sampled at eleven points and left out if any point inside the solid edges, outside a bore, stands over
+`track.profile()`.
+
+**No structure over the road** (`structures.test.mjs`). A bridge's abutment top was set level, 0.3 m under the road's
+centre line at the deck's end; the road falls away to its edges, so the top stood up to 0.33 m over the shoulder. It
+is now 0.3 m under the lowest of the road over the block's own footprint. The expansion joints' plates follow the
+road's profile in 32 steps, 12 mm over it (as eight chords they stood up to 5 cm over the crown).
+
+**Nothing placed inside the edges** (`trackside.test.mjs`). Marshal posts and distance boards were placed from the
+solid edge at their own distance along the road; a thing metres long then reaches inside where the edge widens within
+its length. They stand beyond the widest edge within their own reach (`edgeNear` in trackside.js), a parapet board's
+bar starts at the parapet's outer face, and marshal posts keep 40 m clear of a structure's ends and 150 m from each
+other.

@@ -10,9 +10,11 @@
 // itself is the same on every machine and in every test.
 //
 // Size. The canvas always has the size of its container times the pixel
-// ratio. When frames run long only the off-screen targets shrink
-// (renderScale); the last pass stretches them back, so a step is never a jump
-// in layout, only in sharpness.
+// ratio. When frames run long the governor (governor.js) first sheds the
+// tier's ladder of things that are hard to see (`isShed(name)`: whoever owns
+// a rung asks) and only then shrinks the off-screen targets (renderScale), to
+// the tier's floor and no further; the last pass reconstructs the picture at
+// the canvas's size, so a step is never a jump in layout.
 //
 // The engine does not know what is drawn. Each frame it calls onUpdate once
 // per fixed step, then onRender (pose things between the steps), then onDraw
@@ -25,6 +27,7 @@
 // of the running game.
 
 import * as THREE from 'three';
+import { adaptiveFor, createGovernor, frameTime, governorStep, scaleAt, shedAt, startGovernorAt } from './governor.js';
 
 /** One step of the run, in seconds. */
 export const FIXED_DT = 1 / 120;
@@ -33,10 +36,6 @@ const MAX_FRAME_DT = 0.1;
 /** Never more steps than this in one frame: a machine that cannot keep up slows the run down instead of freezing. */
 const MAX_STEPS = 16;
 
-/** The render scales, largest first. `qualityStep` is the index into this list. */
-const SCALE_STEPS = [1, 0.85, 0.72, 0.6, 0.5];
-/** Below about 48 frames a second for a while: give up some resolution. */
-const SLOW_FRAME = 1 / 48;
 /**
  * More of the run than this between two drawn frames: the next one has no usable predecessor (see the header).
  * More than MAX_STEPS steps, so that a slow frame of the running game is never drawn twice.
@@ -58,9 +57,11 @@ export class Engine {
 
   /**
    * @param {HTMLElement} container element the canvas fills
-   * @param {{ manual?: boolean, pixelRatio?: number|null, maxPixelRatio?: number, draw?: boolean }} [options]
-   *   `manual` never starts the loop (frames come from advance()); `pixelRatio` forces the canvas pixel ratio and
-   *   switches the adaptive scale off; `maxPixelRatio` caps the device's own; `draw: false` never draws at all.
+   * @param {{ manual?: boolean, pixelRatio?: number|null, maxPixelRatio?: number, draw?: boolean, renderScale?: number|null, shed?: number|null }} [options]
+   *   `manual` never starts the loop (frames come from advance()); `pixelRatio` forces the canvas pixel ratio,
+   *   `renderScale` the share of it the scene is drawn at and `shed` how many rungs of the ladder are shed: each of
+   *   the three switches the governor off (a request for an exact picture); `maxPixelRatio` caps the device's own;
+   *   `draw: false` never draws at all.
    */
   constructor(container, options = {}) {
     this.container = container;
@@ -68,8 +69,10 @@ export class Engine {
     this.draws = options.draw !== false;
     this.forcedPixelRatio = options.pixelRatio ?? null;
     this.maxPixelRatio = options.maxPixelRatio ?? 2;
-    // a forced pixel ratio is a request for an exact picture size: leave it alone
-    this.adaptive = !this.manual && this.draws && this.forcedPixelRatio === null;
+    this.forcedScale = options.renderScale ?? null;
+    this.forcedShed = options.shed ?? null;
+    // a forced pixel ratio, scale or ladder is a request for an exact picture: leave it alone
+    this.adaptive = adaptiveFor({ manual: this.manual, draws: this.draws, pixelRatio: this.forcedPixelRatio, renderScale: this.forcedScale, shed: this.forcedShed });
 
     // No antialiasing and no depth on the canvas itself: the scene is drawn
     // into the frame pipeline's own targets (multisampled there), the canvas
@@ -105,9 +108,13 @@ export class Engine {
     this.bufferWidth = 0;
     this.bufferHeight = 0;
     /** Fraction of the canvas resolution the off-screen targets are drawn at. */
-    this.renderScale = 1;
-    /** 0 = full resolution; grows by one each time frames ran long and the render scale was cut. */
+    this.renderScale = this.forcedScale ?? 1;
+    /** The governor's level: 0 = everything at full resolution; one more for each rung shed, then for each step of the render scale. */
     this.qualityStep = 0;
+    /** What decides it (governor.js): which rungs there are and how low the scale may go come from setLadder. */
+    this.governor = createGovernor();
+    /** How many rungs of the ladder are shed now. */
+    this.shed = 0;
 
     /** Seconds of the run so far: `step` fixed steps. */
     this.simTime = 0;
@@ -140,12 +147,10 @@ export class Engine {
     this._sizeDirty = true;
     this._resizeListeners = [];
     this._restoreListeners = [];
-    this._slow = 0;
-    this._steady = 0;
-    this._patience = 6; // seconds of steady frames before trying a step up; doubles after a failed try
-    this._sinceStepUp = Infinity;
-    this._probe = null; // { before, frames, sum } while checking that a step down helped
-    this._capped = false;
+    this._qualityListeners = [];
+    /** The real time of the last frames (ms), newest last: for the readout's average and worst. */
+    this._frameTimes = new Float32Array(120);
+    this._frameCount = 0;
 
     this._tick = this._tick.bind(this);
     this._markDirty = this._markDirty.bind(this);
@@ -225,6 +230,78 @@ export class Engine {
     this._restoreListeners.push(fn);
   }
 
+  /**
+   * The tier's ladder: the names of what is shed when frames run long, least visible first, and the smallest render
+   * scale allowed once all of it is shed. The engine does not know what a rung is; whoever owns one asks `isShed`.
+   * @param {string[]} rungs @param {number} floor
+   */
+  setLadder(rungs, floor) {
+    this.governor = createGovernor({ rungs, floor });
+    this._applyLevel(0);
+  }
+
+  /**
+   * Start the governor at `level` instead of the top (where this device ended last time: whoever keeps that between
+   * visits says so). Nothing happens where the governor does not run.
+   */
+  startAt(level) {
+    if (!this.adaptive) return;
+    startGovernorAt(this.governor, level);
+    this._applyLevel(this.governor.level);
+  }
+
+  /** Is this rung of the ladder shed now? */
+  isShed(name) {
+    const i = this.governor.rungs.indexOf(name);
+    return i >= 0 && i < this.shed;
+  }
+
+  /** The names of the rungs shed now, in the ladder's order. */
+  get shedNames() {
+    return this.governor.rungs.slice(0, this.shed);
+  }
+
+  /** `fn(engine)` is called whenever a rung is shed or taken back, or the render scale changes. */
+  onQuality(fn) {
+    this._qualityListeners.push(fn);
+  }
+
+  /**
+   * Put the ladder at `level` by hand (0: nothing shed; see governor.js) and switch the governor off: for staging
+   * and tests. `null` hands it back to the governor where it may run.
+   */
+  setQualityStep(level) {
+    if (level === null) {
+      this.adaptive = adaptiveFor({ manual: this.manual, draws: this.draws, pixelRatio: this.forcedPixelRatio, renderScale: this.forcedScale, shed: this.forcedShed });
+      return;
+    }
+    this.adaptive = false;
+    this.forcedScale = null;
+    this._applyLevel(level);
+  }
+
+  /** Draw the scene at this share of the canvas's size, by hand, and switch the governor off (null: the level's own). */
+  setRenderScale(scale) {
+    this.adaptive = false;
+    this.forcedScale = scale;
+    this._applyLevel(this.qualityStep, true);
+  }
+
+  /** Real frame times of the last `seconds`: the mean and the worst, in milliseconds (0 before the loop has run). */
+  frameStats(seconds = 3) {
+    const n = Math.min(this._frameCount, this._frameTimes.length);
+    let sum = 0;
+    let worst = 0;
+    let count = 0;
+    for (let i = 1; i <= n && sum < seconds * 1000; i++) {
+      const ms = this._frameTimes[(this._frameCount - i) % this._frameTimes.length];
+      sum += ms;
+      worst = Math.max(worst, ms);
+      count++;
+    }
+    return { mean: count ? sum / count : 0, worst, frames: count };
+  }
+
   /** Change the cap on the device pixel ratio (the quality tier decides it). */
   setMaxPixelRatio(value) {
     this.maxPixelRatio = value;
@@ -282,7 +359,9 @@ export class Engine {
     this._last = now;
     if (!(dt > 0)) dt = 0;
     this.frameMs = this.frameMs ? this.frameMs + (dt * 1000 - this.frameMs) * 0.08 : dt * 1000;
-    if (this.adaptive) this._adapt(dt);
+    if (dt > 0) this._frameTimes[this._frameCount++ % this._frameTimes.length] = dt * 1000;
+    // (the governor's own count of frames starts with the loop; the first of them compile shaders)
+    if (this.adaptive && governorStep(this.governor, dt)) this._applyLevel(this.governor.level);
     this._applySize();
     // a long frame is played as a short one: the picture stutters once instead of jumping ahead
     this.advance(this.paused ? 0 : Math.min(dt, MAX_FRAME_DT), dt);
@@ -330,67 +409,41 @@ export class Engine {
   }
 
   /**
-   * Trades resolution for frame rate.
-   *
-   * Down: when frames have been slow for about a second and a half, take the
-   * next smaller render scale. A browser that limits the frame rate itself
-   * (iOS in Low Power Mode draws 30 a second whatever we do) would drag the
-   * scale to the bottom for nothing, so after each step down the frame time is
-   * compared with before: if it did not get better, the step is undone and no
-   * further steps down are tried.
-   *
-   * Up: there is no way to measure spare time under vsync, so after a long
-   * steady stretch the next larger scale is simply tried. If that brings the
-   * slow frames back soon after, the wait before the next try doubles.
+   * Make `level` of the ladder what is drawn: so many rungs shed, such a render scale (governor.js says which).
+   * Everyone who owns a rung is told; the targets are sized again only if the scale changed.
    */
-  _adapt(dt) {
-    // (not during the first frames: they are slow for another reason, shaders being compiled)
-    if (this.frame < 30 || dt <= 0) return;
-    this._sinceStepUp += dt;
-
-    if (this._probe) {
-      // let the new target sizes settle for a few frames before measuring
-      const p = this._probe;
-      p.frames++;
-      if (p.frames > 10) p.sum += dt;
-      if (p.frames >= 40) {
-        const after = p.sum / 30;
-        this._probe = null;
-        if (after > p.before * 0.93) {
-          this._capped = true;
-          this._setQualityStep(this.qualityStep - 1);
-        }
-      }
-      return;
-    }
-
-    if (dt > SLOW_FRAME) {
-      this._slow += dt;
-      this._steady = 0;
-    } else {
-      this._slow = Math.max(0, this._slow - dt * 2);
-      this._steady += dt;
-    }
-
-    if (this._slow > 1.5 && !this._capped && this.qualityStep < SCALE_STEPS.length - 1) {
-      // slow again right after a step up: that try failed, be more patient next time
-      if (this._sinceStepUp < 10) this._patience = Math.min(120, this._patience * 2);
-      this._probe = { before: this.frameMs / 1000, frames: 0, sum: 0 };
-      this._slow = 0;
-      this._setQualityStep(this.qualityStep + 1);
-    } else if (this._steady > this._patience && this.qualityStep > 0) {
-      this._steady = 0;
-      this._sinceStepUp = 0;
-      this._setQualityStep(this.qualityStep - 1);
-    }
+  _applyLevel(level, force = false) {
+    const g = this.governor;
+    const next = Math.max(0, Math.min(g.max, Math.round(level)));
+    g.level = next;
+    const shed = this.forcedShed !== null ? Math.max(0, Math.min(g.rungs.length, this.forcedShed)) : shedAt(g, next);
+    const scale = this.forcedScale ?? scaleAt(g, next);
+    if (!force && next === this.qualityStep && shed === this.shed && scale === this.renderScale) return;
+    const scaled = scale !== this.renderScale;
+    this.qualityStep = next;
+    this.shed = shed;
+    this.renderScale = scale;
+    for (const fn of this._qualityListeners) fn(this);
+    if (scaled) for (const fn of this._resizeListeners) fn(this);
   }
 
-  _setQualityStep(step) {
-    const next = Math.max(0, Math.min(SCALE_STEPS.length - 1, step));
-    if (next === this.qualityStep) return;
-    this.qualityStep = next;
-    this.renderScale = SCALE_STEPS[next];
-    for (const fn of this._resizeListeners) fn(this);
+  /** What the governor is doing, for the readout and for tests. */
+  qualityState() {
+    const g = this.governor;
+    return {
+      adaptive: this.adaptive,
+      level: this.qualityStep,
+      max: g.max,
+      shed: this.shedNames,
+      rungs: g.rungs.slice(),
+      renderScale: this.renderScale,
+      floor: g.scales[g.scales.length - 1],
+      capMs: g.cap === null ? null : g.cap * 1000,
+      trial: !!g.watch?.trial,
+      trials: g.trials,
+      proven: g.proven,
+      governorMs: frameTime(g) * 1000,
+    };
   }
 
   dispose() {
