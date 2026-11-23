@@ -10,8 +10,7 @@
 //   road.js         the pavement and its asphalt, its wetness and the wet road's mirror (with PlanarMirror)
 //   kerbs.js        the red and white kerbs on the margins, from track.kerbs
 //   rock.js         the cut rock faces at the rock edges
-//   sea.js          the sea beyond the coast road and the bay beside the straight (the waves: engine/waves.js)
-//   volcano.js      the plume over the volcano's island and the glow in its crater (the island: terrain.js)
+//   lake.js         the water beside the straight
 //   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
 //   forest.js       the trees (treeGeometry.js, forestTextures.js), planted from the Track and the ground
 //   groundCover.js  grass, bushes and rocks along the verges and under the trees
@@ -35,11 +34,8 @@ import { createAtmosphere } from './atmosphere.js';
 import { createEnvironment } from './environment.js';
 import { TIMES, placeLights } from './lighting.js';
 import { createGroundMaterial } from './groundMaterial.js';
-import { createSea } from './sea.js';
-import { createVolcano } from './volcano.js';
+import { createLake } from './lake.js';
 import { createFar } from './far.js';
-import { createK5 } from './k5.js';
-import { k5NoTrees } from './landmarks.js';
 import { CASTER_LAYER, createForest } from './forest.js';
 import { createGroundCover } from './groundCover.js';
 import { selectBake } from './shading.js';
@@ -55,7 +51,7 @@ import { createStuds } from './studs.js';
 import { createKerbs } from './kerbs.js';
 import { ROW_STEP, createTerrain } from './terrain.js';
 import { PlanarMirror } from '../../engine/PlanarMirror.js';
-import { TIERS, forDevice } from '../../engine/caps.js';
+import { TIERS } from '../../engine/caps.js';
 
 /**
  * The wet road's planar reflection, per tier: the target's height against the view's, how far it reaches (m), and
@@ -64,12 +60,6 @@ import { TIERS, forDevice } from '../../engine/caps.js';
  * targets.
  */
 const MIRROR = { medium: { scale: 0.35, far: 220, streak: 0.3 }, high: { scale: 0.5, far: 320, streak: 0.3 } };
-/**
- * (water lane) The water's planar reflection, on high only: the target's height against the view's, how far it
- * reaches (m), the length of its streaked copy (what rippled water draws out towards the eye). One more small pass of
- * the scene; sea.js says how it is read and what stands in for it on the other tiers.
- */
-const SEA_MIRROR = { high: { scale: 0.3, far: 3000, streak: 0.4, clipBias: 0.3 } };
 
 /**
  * (finish lane) How far from the eye (m) the small things along the road are drawn, per tier: rail posts and beams,
@@ -89,13 +79,6 @@ const SMALL = new Map([
 ]);
 
 /**
- * (perf lane) The ladder's `detail` rung: what the forest's detail distances are multiplied by while it is shed. On
- * medium the full trees then end at 41 m instead of 58 and the reduced ones at 56 instead of 80; the impostors
- * that take their place are two triangles each.
- */
-const DETAIL_SHED = 0.7;
-
-/**
  * @typedef {object} Beam one car's head lamps, for whatever answers them (reflectors), and its tail lamps (the wet
  *   road's red streaks)
  * @property {THREE.Vector3} pos @property {THREE.Vector3} dir
@@ -106,7 +89,7 @@ const DETAIL_SHED = 0.7;
  * @typedef {object} World
  * @property {THREE.Scene} scene
  * @property {import('./lighting.js').TimeOfDay} time the time of day now showing
- * @property {(name: string) => import('./lighting.js').TimeOfDay} setTime switch the whole world: sun or moon,
+ * @property {(name: 'day'|'night') => import('./lighting.js').TimeOfDay} setTime switch the whole world: sun or moon,
  *   sky, haze, environment map, fill, lamps
  * @property {(dt: number, simTime: number) => void} update fixed step, deterministic (anything animated)
  * @property {(camera: THREE.Camera, focus: THREE.Vector3, beams?: Beam[], hidden?: THREE.Object3D[]) => void} prepareView
@@ -114,17 +97,12 @@ const DETAIL_SHED = 0.7;
  *   `focus` (the view's car) and asks for it to be drawn again, sets the fog for this camera, shuts the sky's light
  *   out where the car is in the tunnel and draws the wet road's mirror, leaving out `hidden` as well (what lies on
  *   the road and would hide the cars' own reflections: their contact shadows, smoke, spray). A view drawn without
- *   it has last view's shadows. The trees that cast into the map are chosen by the map's box (forest.js), never by
- *   where the car stands, so two views of the same place shade it alike.
- * @property {import('./sun.js').ShadowBox} shadowBox the shadow map's box as prepareView last placed it (for tests)
+ *   it has last view's shadows.
  * @property {(n: number) => void} setStartLights the gantry's countdown lamps, 0..5 lit
  * @property {THREE.Object3D[]} probeHidden what to hide while a reflection probe is drawn
  * @property {number} wetness 0..1 road wetness: the time of day's (lighting.js), unless ?wet= or a setter overrides it
  * @property {import('./atmosphere.js').Atmosphere} atmosphere the haze; `atmosphere.patch(material)` makes a
  *   material of one's own fade into it
- * @property {(shed: boolean) => void} setDetail the ladder's `detail` rung (caps.js LADDER): shed, the trees go to
- *   their simpler forms at DETAIL_SHED of the tier's distances and the wood's floor reaches that much less far; the
- *   water mirrors the land less far, draws fewer ripple layers and has no planar mirror (sea.js SEA_TIERS `shed`)
  * @property {() => void} refresh apply the numbers of lighting.js again after they were changed by hand
  * @property {() => void} restore draw again what only lived on the GPU, after a lost WebGL context has come back
  * @property {() => void} dispose
@@ -139,10 +117,9 @@ const DETAIL_SHED = 0.7;
  * @param {import('../../engine/rng.js').Rng} options.rng
  * @param {import('../../engine/params.js').Params} options.params
  * @param {(x: number, z: number) => boolean} [options.keepOut] where no tree may stand (the start area, the town)
- * @param {number} [options.viewFar] the views' far plane (m): the sea reaches just inside it
  * @returns {World}
  */
-export function createWorld({ renderer, caps, tier, track, rng, params, keepOut, viewFar = 5000 }) {
+export function createWorld({ renderer, caps, tier, track, rng, params, keepOut }) {
   const scene = new THREE.Scene();
   /** Start-up milliseconds of each part (world.stats.ms). */
   const ms = {};
@@ -161,7 +138,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   const sky = createSky({ tier, rng: rng.fork('sky'), atmosphere });
   lap('sky');
   const environment = createEnvironment({ renderer, caps, sky, atmosphere });
-  const sun = createSun({ renderer, tier, caps, shadows: params.shadows });
+  const sun = createSun({ renderer, tier, shadows: params.shadows });
   // (look lane) the sun's shadow map is drawn by the view's own render, not by a probe or mirror before it
   scene.onBeforeRender = (_renderer, _scene, camera) => sun.beforeRender(camera);
   const groundMaterial = createGroundMaterial({ caps, tier, atmosphere });
@@ -183,20 +160,14 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   // (the tunnel's cuttings are concrete: tunnel.js builds them where concreteCut says)
   const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock'), except: (s) => !!concreteCut(track, s) });
   lap('rock');
-  // (sea lane) the sea, where terrain.sea says it is; at night it mirrors the lamps the wet road glints with
-  const seaMirror = SEA_MIRROR[tier] && caps.hdr ? new PlanarMirror(renderer, caps, SEA_MIRROR[tier]) : null;
-  const sea = createSea({ caps, tier, atmosphere, sea: terrain.sea, heightAt: terrain.heightAt, far: viewFar, glints: road.glints, mirror: seaMirror, detail: params.sea });
-  lap('sea');
-  // (sea lane, round 3) the volcano's plume and the glow in its crater (its island is the terrain's)
-  const volcano = createVolcano({ volcano: terrain.volcano, atmosphere, tier, track, terrain });
+  const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
+  lap('lake');
   // (the trees' alpha becomes coverage where the scene target is multisampled: the pipeline's rule, caps.js)
   const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
   // no tree where the pit building, the stand and the towns stand (startPlan.js), nor where the caller says
   const built = startKeepOut(track, terrain.heightAt);
-  // (day lane) and none on the banks in front of frame K5's place (landmarks.js)
-  const k5Bare = k5NoTrees(track);
-  const noTrees = keepOut ? (x, z) => built(x, z) || k5Bare(x, z) || keepOut(x, z) : (x, z) => built(x, z) || k5Bare(x, z);
-  const forest = createForest({ renderer, track, terrain, tier, caps, coverage, rng: rng.fork('forest'), atmosphere, shadow: forDevice(SHADOW, tier, caps), keepOut: noTrees });
+  const noTrees = keepOut ? (x, z) => built(x, z) || keepOut(x, z) : built;
+  const forest = createForest({ renderer, track, terrain, tier, coverage, rng: rng.fork('forest'), atmosphere, shadow: SHADOW[tier] ?? SHADOW.high, keepOut: noTrees });
   // the trees' shadow-only proxies live on a layer only the sun's shadow camera sees
   sun.light.shadow.camera.layers.enable(CASTER_LAYER);
   lap('forest');
@@ -205,30 +176,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   const far = createFar({ track, terrain, caps, tier, rng: rng.fork('far'), atmosphere });
   far.setPixelRatio(renderer.getPixelRatio());
   lap('far');
-  // (day lane) the scenery of frame K5's place: the drum tower, the flags, the chevron, the far lamps
-  const k5 = createK5({ track, terrain, caps, tier, rng: rng.fork('k5'), atmosphere });
-  k5.setPixelRatio(renderer.getPixelRatio());
-  lap('k5');
   const structures = createStructures({ track, terrain, caps, tier, atmosphere, rng: rng.fork('structures'), glints: road.glints });
   lap('structures');
-  // (water lane) the viaducts' piers, for the water they stand in (before the pieces below are cut up): each instance
-  // is a unit shaft scaled to its width, height and depth on its foot
-  {
-    const piers = [];
-    const at = new THREE.Matrix4();
-    const foot = new THREE.Vector3();
-    const size = new THREE.Vector3();
-    const turn = new THREE.Quaternion();
-    structures.group.traverse((o) => {
-      if (o.name !== 'viaduct-piers' || !o.isInstancedMesh) return;
-      for (let i = 0; i < o.count; i++) {
-        o.getMatrixAt(i, at);
-        at.premultiply(o.matrixWorld).decompose(foot, turn, size);
-        piers.push({ x: foot.x, z: foot.z, r: 0.25 * (size.x + size.z), top: foot.y + size.y });
-      }
-    });
-    sea.setPiers(piers);
-  }
   const studs = createStuds({ track, caps });
   lap('studs');
 
@@ -249,7 +198,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   }
   const smallReach = SMALL_REACH[tier] ?? SMALL_REACH.medium;
   const eye = new THREE.Vector3();
-  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, sea.mesh, volcano.group, forest.group, cover.group, far.group, k5.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -262,13 +211,9 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
   };
   let startLights = 0;
   /** What the wet road's mirror leaves out: the road itself and what lies under or far beyond it. */
-  const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, sea.mesh, volcano.group, cover.group, far.group, ...structures.mirrorHidden];
+  const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, lake.mesh, cover.group, far.group, ...structures.mirrorHidden];
   /** mirrorHidden and what the caller of prepareView adds (the cars' contact shadows, smoke and spray). */
   const mirrorHiddenAll = [];
-  /** What the water's mirror leaves out: the water, and what is too small or too low to be seen in it. */
-  const seaMirrorHidden = [sea.mesh, cover.group, studs.points, kerbs.mesh, sky.stars];
-  const seaMirrorHiddenAll = [];
-  const seaMirrorUp = new THREE.Vector3(0, 1, 0);
   const mirrorPoint = new THREE.Vector3();
   const mirrorFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
   const drawing = new THREE.Vector2();
@@ -308,21 +253,12 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
     probeHidden: [sky.stars, ...structures.probeHidden, ...probeLeavesOut()],
     /** The wet road's planar reflection (null on the low tier): its target, camera, last cost (`ms`). */
     mirror,
-    /** (water lane) the water's planar reflection (null but on high). */
-    seaMirror,
-    /**
-     * (water lane) The car's reflection probe for the view about to be drawn (its prefiltered cube, or null): the
-     * water mirrors the far land from it where it has no planar mirror (sea.js). Call it with prepareView.
-     */
-    setSeaProbe: (cube) => sea.setProbe(cube),
     atmosphere,
     terrain,
     /** The trees (forest.js): where they stand (woodAt, turnedAt), single trees for the viewer (specimen). */
     forest,
-    /** The sun's shadow map's box as the last prepareView placed it (sun.js), for tests. */
-    shadowBox: sun.box,
     /** Start-up milliseconds per part, and the terrain's own counts. */
-    stats: { ms, sea: sea.stats, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, k5: k5.stats, cover: cover.stats },
+    stats: { ms, chunked, small: small.length, terrain: terrain.stats, structures: structures.stats, studs: studs.stats, kerbs: kerbs.stats, forest: forest.stats, far: far.stats, cover: cover.stats },
 
     setTime(name) {
       const time = TIMES[name];
@@ -349,10 +285,6 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       scene.environmentIntensity = time.env.intensity;
       forest.setTime(time);
       far.setTime(time);
-      road.setSkySheen(time.roadSheen ?? 1, time.headPool ?? 1);
-      k5.setTime(time);
-      sea.setTime(time);
-      volcano.setTime(time);
       structures.setTime(time);
       studs.setTime(time);
       groundMaterial.setTime(time);
@@ -361,8 +293,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
 
     update(dt, simTime) {
       sky.update(dt, simTime);
-      sea.update(simTime);
-      volcano.update(simTime);
+      lake.update(simTime);
       forest.update(dt, simTime);
       far.update(dt, simTime);
       structures.update(dt);
@@ -372,30 +303,19 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       eye.setFromMatrixPosition(camera.matrixWorld);
       for (const p of small) p.object.visible = p.sphere.center.distanceTo(eye) - p.sphere.radius < smallReach * p.reach;
       sun.prepareView(camera, focus);
-      forest.prepareView(camera, focus, sun.box);
+      forest.prepareView(camera, focus);
       cover.prepareView(camera);
       road.setBeams(beams);
       structures.prepareView(camera, focus, beams);
       atmosphere.prepareView(camera);
       renderer.getDrawingBufferSize(drawing);
       const viewHeight = Math.min(drawing.y, drawing.x / (camera.aspect || 1));
-      sea.prepareView(camera, viewHeight);
-      sea.setBeams(beams);
       studs.prepareView(camera, viewHeight);
       // The environment map and the fill are the open sky's light. It does not follow the car into the tunnel
       // (the sun is kept out by its shadow map; these two have none).
       const open = skyOver(camera, focus);
       scene.environmentIntensity = world.time.env.intensity * open;
       sun.setFill(open);
-      // (water lane) the water's own reflection, where there is water to see it in (and never from under a roof)
-      if (seaMirror) {
-        if (sea.mirrored(eye) && open > 0.5) {
-          seaMirrorHiddenAll.length = 0;
-          seaMirrorHiddenAll.push(...seaMirrorHidden);
-          if (hidden) seaMirrorHiddenAll.push(...hidden);
-          seaMirror.render(scene, camera, mirrorPoint.set(eye.x, terrain.sea.level, eye.z), seaMirrorUp, seaMirrorHiddenAll, viewHeight);
-        } else seaMirror.uniforms.uMirrorOn.value = 0;
-      }
       // the wet road's reflection, about the road's plane under this view's car (skyOver has just located it)
       if (mirror) {
         // (tunnel lane) not under the tunnel's roof, where the road is dry and the wet road outside is a patch of light
@@ -415,12 +335,6 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
           structures.halos?.hide();
         } else mirror.uniforms.uMirrorOn.value = 0;
       }
-    },
-
-    setDetail(shed) {
-      forest.setDetail(shed ? DETAIL_SHED : 1);
-      // (water lane) the water is the world's detail too: what it gives up while the rung is shed is sea.js's
-      sea.setShed(shed);
     },
 
     setStartLights(n) {
@@ -458,19 +372,16 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut,
       sky.dispose();
       forest.dispose();
       far.dispose();
-      k5.dispose();
       cover.dispose();
       terrain.dispose();
       road.dispose();
-      sea.dispose();
-      volcano.dispose();
+      lake.dispose();
       rock.dispose();
       structures.dispose();
       studs.dispose();
       kerbs.dispose();
       groundMaterial.dispose();
       mirror?.dispose();
-      seaMirror?.dispose();
     },
   };
 

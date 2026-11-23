@@ -93,8 +93,7 @@ export function roadHistory({ track, rng, tier }) {
     const r = rng.fork('patches');
     for (let s = r.range(5, 30); s < L; ) {
       const a = age[at(s)];
-      // per 100 m (road lane: E2 and E5 show a patch every hundred metres or two of an old forest road)
-      const density = 0.2 + 1.3 * a * a;
+      const density = 0.08 + 0.9 * a * a; // per 100 m: a circuit is kept well
       const len = r.range(1.2, 6) * (r.next() < 0.25 ? 2 : 1);
       if (!kept(s, len) && !inRanges(s, track.bridges, 3)) {
         const side = r.sign();
@@ -142,12 +141,11 @@ export function roadHistory({ track, rng, tier }) {
     for (let s = r.range(0, 20); s < L; ) {
       const a = age[at(s)];
       const len = r.range(3, 14);
-      if (a > 0.2 && !kept(s, len) && !inRanges(s, track.bridges, 2)) {
+      if (a > 0.3 && !kept(s, len) && !inRanges(s, track.bridges, 2)) {
         const lat = r.next() < 0.75 ? r.pick(lines) + r.range(-0.08, 0.08) : r.range(-(half - 0.3), half - 0.3);
         add(FEATURE.CRACK, s, lat, len, r.range(0.06, 0.3), r.next(), r.next() * a);
       }
-      // (road lane: one or two a hundred metres on a run of middle age, as in E2)
-      s += r.range(20, 90) / (0.35 + 2.4 * a * a);
+      s += r.range(20, 90) / (0.12 + 1.9 * a * a);
     }
     for (let s = r.range(0, 30); s < L; ) {
       const a = age[at(s)];

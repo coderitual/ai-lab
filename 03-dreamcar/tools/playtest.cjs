@@ -123,138 +123,6 @@ const visible = (p, selector) => p.page.evaluate((sel) => {
 }, selector);
 const clickText = (p, text, scope = '.title') => p.page.click(`.hud ${scope} button:has-text("${text}")`, { timeout: 60000 });
 
-/** The split-screen night check's places (track metres) and how far apart the halves' road may be (playtest split). */
-const SPLIT_NIGHT = { places: [240, 300, 420], factor: 1.5 };
-
-/**
- * (split-bug lane) "On 2 players there is water on the track": at night one half of a split screen showed the wet
- * road as a pale sheet in the moon's light and the other, a few metres away, dark under the trees, because the trees
- * that cast into each view's shadow map were chosen by where its car stood (forest.js). Side by side on an upright
- * phone, at night: the same patch of road seen from both halves must be about as bright in both; the trees that cast
- * must not depend on where the car stands; and what prepareView sets for a view must be what that view's draw uses.
- */
-async function splitNight() {
-  const p = await open('?manual&q=low&auto&mode=split&time=night', { w: 393, h: 852, mobile: true });
-  await p.page.evaluate(() => {
-    window.__dreamcar.set('view.split', 'wide');
-    window.__dreamcar.game.layout();
-  });
-  // (after go: before it the cameras dive in from the grid's sweep, not from behind the cars)
-  await toGo(p);
-  // under the trees after the start and further on, the cars abreast and one 9 m behind the other; the patch is the
-  // middle of the road 14 m ahead of the leading car, seen by both halves
-  for (const s0 of SPLIT_NIGHT.places) {
-    for (const behind of [0, 9]) {
-      const r = await p.page.evaluate(({ s0, behind }) => {
-        const d = window.__dreamcar;
-        const g = d.game;
-        const { track } = g;
-        const renderer = g.engine.renderer;
-        const spots = [[s0, 2.5], [s0 - behind, -2.5]];
-        g.racers.forEach((racer, i) => {
-          const [s, lat] = spots[i];
-          const at = track.pointAt(s, lat);
-          const f = track.frameAt(s, {});
-          racer.vehicle.reset({ x: at.x, z: at.z, yaw: Math.atan2(f.tan.x, f.tan.z) });
-        });
-        d.skip(0.05);
-        for (const v of g.views) v.rig.snap(v.racer.vehicle);
-        d.advance(0.1);
-        g.engine.advance(0, 0, true);
-        // read straight after the draw, in the same task, before the canvas is handed on
-        const patch = track.pointAt(s0 + 14, 0);
-        const gl = renderer.getContext();
-        renderer.setRenderTarget(null);
-        return g.views.map((v) => {
-          const n = patch.clone().project(v.camera);
-          const x = Math.round(v.rect.x + ((n.x + 1) / 2) * v.rect.w);
-          const y = Math.round(v.rect.y + ((n.y + 1) / 2) * v.rect.h);
-          const R = 7;
-          const buf = new Uint8Array((2 * R + 1) ** 2 * 4);
-          gl.readPixels(x - R, y - R, 2 * R + 1, 2 * R + 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-          let sum = 0;
-          for (let k = 0; k < buf.length; k += 4) sum += 0.2126 * buf[k] + 0.7152 * buf[k + 1] + 0.0722 * buf[k + 2];
-          return Math.round((10 * sum) / (buf.length / 4)) / 10;
-        });
-      }, { s0, behind });
-      const ratio = Math.max(...r) / Math.max(1, Math.min(...r));
-      check(`split at night, s ${s0}, ${behind ? `car two ${behind} m behind` : 'abreast'}: the road ahead as bright in both halves (within ${SPLIT_NIGHT.factor}x)`,
-        ratio <= SPLIT_NIGHT.factor, `luma ${r.join(' / ')}, ${ratio.toFixed(2)}x`);
-    }
-  }
-
-  // what prepareView set for each view is what that view's draw used, and nothing of one view leaks into the other's
-  const used = await p.page.evaluate(() => {
-    const g = window.__dreamcar.game;
-    const w = g.world;
-    const renderer = g.engine.renderer;
-    let shares = null;
-    let road = null;
-    w.scene.traverse((o) => {
-      if (!shares && o.material?.uniforms?.uShares) shares = o.material.uniforms.uShares.value;
-      if (!road && o.material?.name === 'asphalt') road = o.material;
-    });
-    const glints = () => {
-      const u = renderer.properties.get(road).uniforms?.uGlintPos;
-      return u ? u.value.map((v) => [v.x, v.y, v.z, v.w].map((n) => n.toFixed(2)).join(',')).join(';') : 'none';
-    };
-    const box = () => [w.shadowBox.x, w.shadowBox.y, w.shadowBox.z].map((n) => n.toFixed(2)).join(',');
-    const snap = () => ({
-      shares: shares.version,
-      glints: glints(),
-      box: box(),
-      mirror: w.mirror ? w.mirror.uniforms.uMirrorOn.value : -1,
-      casters: w.forest.stats.view.casters,
-    });
-    const set = [];
-    const atDraw = [];
-    const uploaded = [];
-    const shadowFor = [];
-    const sm = renderer.shadowMap;
-    const smRender = sm.render;
-    sm.render = function (lights, scene, camera) {
-      if (sm.needsUpdate) shadowFor.push(g.views.findIndex((v) => v.camera === camera));
-      return smRender.apply(this, arguments);
-    };
-    const prepare = w.prepareView;
-    w.prepareView = function (...a) {
-      const r = prepare.apply(this, a);
-      set.push(snap());
-      return r;
-    };
-    g.pipeline.render = function (...a) {
-      atDraw.push(snap());
-      const r = Object.getPrototypeOf(this).render.apply(this, a);
-      uploaded.push(renderer.properties.get(shares).__version === shares.version);
-      return r;
-    };
-    try {
-      g.engine.advance(0, 0, true);
-    } finally {
-      sm.render = smRender;
-      w.prepareView = prepare;
-      delete g.pipeline.render;
-    }
-    // the trees that cast into a view's map, with the map where that view put it, asked from either car
-    const view = g.views[1];
-    w.prepareView(view.camera, view.racer.car.object.position, g.beams);
-    const own = w.forest.stats.view.casters;
-    w.forest.prepareView(view.camera, g.views[0].racer.car.object.position, w.shadowBox);
-    const other = w.forest.stats.view.casters;
-    return { set, atDraw, uploaded, shadowFor, own, other };
-  });
-  check('split at night: each view\'s draw uses what its own prepareView set (lamp shares, glints, shadow box, mirror, casters)',
-    used.set.length === 2 && JSON.stringify(used.set) === JSON.stringify(used.atDraw) && used.set[0].box !== used.set[1].box,
-    JSON.stringify(used.atDraw.map((s) => ({ ...s, glints: s.glints.slice(0, 40) }))).slice(0, 400));
-  check('split at night: the lamp shares are uploaded anew for each view before its draw',
-    used.uploaded.length === 2 && used.uploaded.every(Boolean) && used.set[1].shares > used.set[0].shares,
-    `uploaded ${used.uploaded.join('/')}, versions ${used.set.map((s) => s.shares).join('/')}`);
-  check('split at night: the shadow map is drawn once for each view, by its own draw', used.shadowFor.join() === '0,1', used.shadowFor.join());
-  check('split at night: the trees casting into a view\'s shadow map do not depend on where its car stands', used.own > 0 && used.own === used.other,
-    `${used.own} from its own car, ${used.other} from the other`);
-  await p.close('split at night');
-}
-
 // ---- sections -----------------------------------------------------------------------------------------------
 
 const SECTIONS = {
@@ -577,7 +445,6 @@ const SECTIONS = {
     await p.advance(0.3);
     check('the results panel is shown', await visible(p, '.hud .results'));
     await p.close('split');
-    await splitNight();
   },
 
   /** Two stand-in gamepads: the first drives car one, the second car two. */
@@ -625,11 +492,9 @@ const SECTIONS = {
 
   /**
    * Touch on phone-sized windows, upright and on its side: the fixed controls (Input's layoutOf, read from the page).
-   * The default, the one-thumb pad: it appears under the thumb (a ghost at the home place at rest), its centre
-   * never moves while the thumb is down; across is the steering, down lifts and then brakes, on into the red arc
-   * pulls the handbrake (with hysteresis); a second finger anywhere, and the HANDBRAKE button, are the handbrake;
-   * held at a standstill it reverses; Hand left moves the ghost and the button; manual makes up the throttle.
-   * Placement is tried at seven places, edges included (compressed travel, the nudge and the hold). A control is drawn pressed at once;
+   * The default, the one-thumb pad: its centre never moves; across is the steering, down lifts and then brakes, on
+   * into the red arc pulls the handbrake (with hysteresis); the HANDBRAKE button for a second thumb; held at a
+   * standstill it reverses; Hand left mirrors it; manual makes up the throttle. A control is drawn pressed at once;
    * the controls step back after a few seconds. Then the slider with its pedals, the arrows, tilt (synthetic
    * deviceorientation events; refused, the pad steers), and split screen on a tablet-sized window.
    */
@@ -644,13 +509,6 @@ const SECTIONS = {
       const o = g.input.read({}, 'all', i);
       return { steer: o.steer, throttle: o.throttle, brake: o.brake, handbrake: o.handbrake };
     }, i);
-    /** The placed pad of zone i (px from the zone's top left) while a thumb is on it. */
-    const padAt = (p, i = 0) => p.page.evaluate((i) => {
-      const st = window.__dreamcar.game.input.touch[i].steer;
-      return st ? [st.cx, st.cy, st.hold, st.fl, st.fr, st.fd] : null;
-    }, i);
-    /** The pedal gauge's readings [brake, handbrake, throttle] in per cent, of view i. */
-    const gauge = (p, i = 0) => p.page.evaluate((i) => [...document.querySelectorAll('.hud .view')[i].querySelectorAll('.gauge .bar')].map((b) => +b.getAttribute('aria-valuenow')), i);
     const hand = (p, i = 0) => p.page.evaluate((i) => window.__dreamcar.game.racers[i].controls.handbrake, i);
     /** The centre (client px) of the first shown element matching `sel` in view `vi`. */
     const centreOf = (p, sel, vi = 0) => p.page.evaluate(([sel, vi]) => {
@@ -660,7 +518,6 @@ const SECTIONS = {
       return [r.left + r.width / 2, r.top + r.height / 2, r.width];
     }, [sel, vi]);
     const near = (a, b, e = 0.02) => Math.abs(a - b) <= e;
-    const near2 = (a, b) => Math.abs(a - b) <= 1.5;
     // (the sensors granted, as Safari does once its prompt is answered yes; whether this Chromium has the prompt or not)
     const grant = () => {
       if (window.DeviceOrientationEvent) window.DeviceOrientationEvent.requestPermission = () => Promise.resolve('granted');
@@ -680,27 +537,20 @@ const SECTIONS = {
       await toGo(p);
       check(`${w}x${h}: the controls are named on the first touch run`, await visible(p, '.hud .view .controls.naming .stick .name'));
       const hint = await p.page.evaluate(`(document.querySelector('.hud .view .hint') || {}).textContent || ''`);
-      check(`${w}x${h}: the first-run hint says how the pad works`, /touch anywhere/i.test(hint) && /pull back to brake/i.test(hint) && /red/i.test(hint), hint);
+      check(`${w}x${h}: the first-run hint says how the pad works`, /pull back to brake/i.test(hint) && /red/i.test(hint), hint);
       await p.advance(2);
       let d = await p.d0();
       check(`${w}x${h}: on auto the car drives from the green light with nothing touched`, d.input === 'touch' && d.throttle > 0.5 && d.kmh > 10, `${d.input} ${d.kmh} km/h`);
-      let gz = await gauge(p);
-      check(`${w}x${h}: the pedal gauge shows the throttle full while the car drives itself on auto (brake ${gz[0]}, throttle ${gz[2]})`, gz[2] >= 90 && gz[0] === 0 && gz[1] === 0, gz.join('/'));
-      const gbox = await p.page.evaluate(() => { const r = document.querySelector('.hud .view .gauge .bar').getBoundingClientRect(); const t = document.querySelector('.hud .view .gauge .bar.throttle').getBoundingClientRect(); return [r.width, r.height, t.width]; });
-      check(`${w}x${h}: the gauge's bars are slim and tall (${gbox[0].toFixed(1)} x ${gbox[1].toFixed(0)} px)`, gbox[0] >= 4 && gbox[0] <= 12 && gbox[1] >= 30 && gbox[1] <= 80);
-      const mid = await centreOf(p, '.stick.ghost');
-      check(`${w}x${h}: the resting ghost is drawn where Input measures the home place from`, !!mid && Math.abs(mid[0] - cx) < 1.5 && Math.abs(mid[1] - cy) < 1.5, mid && `${mid[0]},${mid[1]} vs ${cx},${cy}`);
+      const mid = await centreOf(p, '.stick');
+      check(`${w}x${h}: the pad is drawn where Input measures from`, !!mid && Math.abs(mid[0] - cx) < 1.5 && Math.abs(mid[1] - cy) < 1.5, mid && `${mid[0]},${mid[1]} vs ${cx},${cy}`);
       // a thumb landing off the centre steers at once by that much; above the centre is full power
       const lock = P.pad.steer * s;
       const bra = P.pad.brake * s;
-      await pointer(p, 'pointerdown', 1, cx, cy);
+      await pointer(p, 'pointerdown', 1, cx + lock * 0.5, cy - 10);
       check(`${w}x${h}: the pad is drawn held at once (before the next frame)`, await p.page.evaluate(`!!document.querySelector('.hud .view .stick.held')`));
       await p.steps(1 / 60, 60);
       let c = await hands(p);
-      check(`${w}x${h}: a thumb landing on the centre asks for nothing: straight, full power`, c.steer === 0 && c.throttle === 1 && c.brake === 0 && c.handbrake === 0, JSON.stringify(c));
-      await pointer(p, 'pointermove', 1, cx + lock * 0.5, cy - 10);
-      c = await hands(p);
-      check(`${w}x${h}: half way right steers half right, full power above the centre`, near(c.steer, 0.5) && c.throttle === 1 && c.brake === 0, JSON.stringify(c));
+      check(`${w}x${h}: a thumb landing half way right steers half right at once, full power above the centre`, near(c.steer, 0.5) && c.throttle === 1 && c.brake === 0, JSON.stringify(c));
       await p.advance(0.3);
       d = await p.d0();
       check(`${w}x${h}: and the car steers right`, d.steer > 0.03, `steer ${d.steer}`);
@@ -722,8 +572,6 @@ const SECTIONS = {
       await p.advance(0.3);
       d = await p.d0();
       check(`${w}x${h}: and the car brakes`, d.brake > 0.3 && d.throttle < 0.1, `brake ${d.brake}`);
-      gz = await gauge(p);
-      check(`${w}x${h}: the gauge shows the brake above zero and the throttle zero (${gz[0]}/${gz[2]})`, gz[0] > 0 && gz[2] === 0, gz.join('/'));
       await pointer(p, 'pointermove', 1, cx, cy + bra);
       c = await hands(p);
       check(`${w}x${h}: ${Math.round(bra)} px down: the full brake, no handbrake`, c.brake === 1 && c.handbrake === 0, JSON.stringify(c));
@@ -741,20 +589,17 @@ const SECTIONS = {
       await pointer(p, 'pointermove', 1, cx, cy + (P.pad.untrip - 3) * s);
       c = await hands(p);
       check(`${w}x${h}: back above ${P.pad.untrip} px: let go, the brake again`, c.handbrake === 0 && c.brake === 1, JSON.stringify(c));
-      // a second finger anywhere else is the handbrake while it is held; the pad keeps its own finger and its place
+      // a second thumb on the pad is ignored; touches elsewhere do nothing
       await pointer(p, 'pointermove', 1, cx + lock * 0.4, cy - 20);
-      const idBefore = () => p.page.evaluate(() => window.__dreamcar.game.input.touch[0].steer.id);
       await pointer(p, 'pointerdown', 3, cx - lock * 0.8, cy);
-      c = await hands(p);
-      check(`${w}x${h}: a second finger on the pad's own disc is the handbrake, and the pad still steers`, c.handbrake === 1 && near(c.steer, 0.4) && (await idBefore()) === 1, JSON.stringify(c));
+      check(`${w}x${h}: a second thumb on the pad is ignored`, near(await raw(p), 0.4));
       await pointer(p, 'pointerup', 3, 0, 0);
       await pointer(p, 'pointerdown', 6, w * 0.7, h * 0.3);
-      await pointer(p, 'pointermove', 6, w * 0.2, h * 0.2);
+      await pointer(p, 'pointerdown', 7, w * 0.25, h * 0.2);
       c = await hands(p);
-      check(`${w}x${h}: a second finger far away is the handbrake (no power) and does not move or steal the pad`, c.handbrake === 1 && c.throttle === 0 && near(c.steer, 0.4) && (await idBefore()) === 1 && near((await padAt(p))[0], px0, 0.01) && near((await padAt(p))[1], py0, 0.01), JSON.stringify(c));
+      check(`${w}x${h}: touches outside the controls do nothing to the car`, near(c.steer, 0.4) && c.throttle === 1 && c.brake === 0 && c.handbrake === 0, JSON.stringify(c));
       await pointer(p, 'pointerup', 6, 0, 0);
-      c = await hands(p);
-      check(`${w}x${h}: lifting it lets the handbrake go; the pad's finger kept the pad`, c.handbrake === 0 && c.throttle === 1 && near(c.steer, 0.4), JSON.stringify(c));
+      await pointer(p, 'pointerup', 7, 0, 0);
       // the HANDBRAKE button, for the other thumb
       const hb = at(L, L.drift);
       await pointer(p, 'pointerdown', 4, hb[0], hb[1]);
@@ -771,141 +616,6 @@ const SECTIONS = {
       c = await hands(p);
       check(`${w}x${h}: let go, the knob goes back to the centre, the steering straight and full power`, (await raw(p)) === null && /translate\(0(\.0)?px, 0(\.0)?px\)/.test(tf) && c.steer === 0 && c.throttle === 1,
         `${tf}, ${JSON.stringify(c)}`);
-      // the pad appears under the thumb: at rest a faint ghost at the home place; a thumb landing anywhere else (not on
-      // a HUD button) puts the pad's centre exactly there; it never moves while the thumb moves; the first input is zero
-      await p.page.waitForTimeout(900);
-      const ghost = await p.page.evaluate(() => {
-        const v = document.querySelector('.hud .view');
-        const g = v.querySelector('.stick.ghost');
-        const l = v.querySelector('.stick:not(.ghost)');
-        const r = g.getBoundingClientRect();
-        return { go: parseFloat(getComputedStyle(g).opacity), lv: getComputedStyle(l).visibility, c: [r.left + r.width / 2, r.top + r.height / 2] };
-      });
-      check(`${w}x${h}: at rest the pad is a faint ghost at the home place (opacity ${ghost.go.toFixed(2)}), no live pad`, ghost.go > 0.15 && ghost.go < 0.5 && ghost.lv === 'hidden' && Math.abs(ghost.c[0] - cx) < 1.5 && Math.abs(ghost.c[1] - cy) < 1.5, JSON.stringify(ghost));
-      const sideOf = (x) => (x > w / 2 ? -1 : 1); // the way with room
-      const lockPx = lock;
-      const spots = [
-        ['left low', w * 0.2, h * 0.78],
-        ['right low', w * 0.8, h * 0.78],
-        ['centre', w * 0.5, h * 0.5],
-        ['left high', w * 0.2, h * 0.22],
-        ['right high', w * 0.8, h * 0.18],
-      ];
-      let was = null;
-      for (const [name, x, y] of spots) {
-        await pointer(p, 'pointerdown', 1, x, y);
-        const pa = await padAt(p);
-        const c0 = await hands(p);
-        check(`${w}x${h}: thumb down ${name}: the pad's centre is the landing point`, !!pa && near2(pa[0], x) && near2(pa[1], y) && pa[2] === false, JSON.stringify(pa));
-        check(`${w}x${h}: ${name}: the first input is exactly zero (straight, no brake, no handbrake)`, c0.steer === 0 && c0.brake === 0 && c0.handbrake === 0 && c0.throttle === 1, JSON.stringify(c0));
-        if (was) check(`${w}x${h}: ${name}: a new touch puts it afresh (not where the last one was)`, Math.abs(pa[0] - was[0]) + Math.abs(pa[1] - was[1]) > 20);
-        was = pa;
-        await p.page.waitForTimeout(150);
-        const dr = await centreOf(p, '.stick:not(.ghost)');
-        check(`${w}x${h}: ${name}: and it is drawn there (held, ${dr ? Math.round(dr[2]) : 0} px across)`, !!dr && Math.abs(dr[0] - x) < 1.5 && Math.abs(dr[1] - y) < 1.5 && (await p.page.evaluate(`!!document.querySelector('.hud .view .stick.held')`)));
-        const sd = sideOf(x);
-        await pointer(p, 'pointermove', 1, x + sd * lockPx * 0.5, y);
-        c = await hands(p);
-        check(`${w}x${h}: ${name}: half the lock across reads ${sd * 0.5}`, near(c.steer, sd * 0.5), JSON.stringify(c));
-        const room = h - y;
-        await pointer(p, 'pointermove', 1, x, y + Math.min(bra * 0.5, room));
-        c = await hands(p);
-        check(`${w}x${h}: ${name}: down half the brake travel brakes ${(Math.min(bra * 0.5, room) / bra).toFixed(2)} of the way`, near(c.brake, Math.max(0, (Math.min(bra * 0.5, room) / bra - P.pad.lift) / (1 - P.pad.lift)), 0.03), JSON.stringify(c));
-        await pointer(p, 'pointermove', 1, x + sd * 100, y - 60);
-        const pb = await padAt(p);
-        const dr2 = await centreOf(p, '.stick:not(.ghost)');
-        check(`${w}x${h}: ${name}: dragged 100 px the centre has not moved (no trailing, no rebasing)`, near2(pb[0], x) && near2(pb[1], y) && !!dr2 && Math.abs(dr2[0] - x) < 1.5 && Math.abs(dr2[1] - y) < 1.5, JSON.stringify(pb));
-        check(`${w}x${h}: ${name}: and 100 px across is full lock`, Math.abs((await hands(p)).steer) === 1);
-        await pointer(p, 'pointerup', 1, 0, 0);
-        c = await hands(p);
-        check(`${w}x${h}: ${name}: lifted: straight on, no brake`, c.steer === 0 && c.brake === 0 && c.handbrake === 0);
-      }
-      // (the ghost is back at the home place after 0.4 s, the live pad gone)
-      await p.page.waitForTimeout(1000);
-      const gh2 = await p.page.evaluate(() => {
-        const v = document.querySelector('.hud .view');
-        return [parseFloat(getComputedStyle(v.querySelector('.stick.ghost')).opacity), getComputedStyle(v.querySelector('.stick:not(.ghost)')).visibility];
-      });
-      check(`${w}x${h}: after the thumb lifts the pad fades back to its ghost`, gh2[0] > 0.15 && gh2[0] < 0.5 && gh2[1] === 'hidden', JSON.stringify(gh2));
-      // room at the edges: compressed travel (never under 60 %), else the centre is nudged inward by what is missing
-      // and the input held at zero until the thumb has moved 6 px from where it landed
-      const needSide = P.pad.steer * s;
-      const needDown = P.pad.trip * s;
-      const edges = [
-        ['near the bottom edge', w * 0.5, h - 20, 'down', 20],
-        ['a little short of room below', w * 0.5, h - 60, 'down', 60],
-        ['near the left edge', 25, h * 0.5, 'left', 25],
-        ['near the right edge', w - 25, h * 0.5, 'right', 25],
-        ['a little short of room at the left', 50, h * 0.5, 'left', 50],
-      ];
-      for (const [name, x, y, dir, roomPx] of edges) {
-        await pointer(p, 'pointerdown', 1, x, y);
-        const pa = await padAt(p);
-        const need = dir === 'down' ? needDown : needSide;
-        const nudge = Math.max(0, 0.6 * need - roomPx);
-        const ex = dir === 'left' ? x + nudge : dir === 'right' ? x - nudge : x;
-        const ey = dir === 'down' ? y - nudge : y;
-        const c0 = await hands(p);
-        check(`${w}x${h}: ${name}: ${nudge > 0 ? `centre nudged inward by ${nudge.toFixed(1)} px and the input held` : 'centre at the landing point, travel compressed'}`,
-          !!pa && near2(pa[0], ex) && near2(pa[1], ey) && pa[2] === (nudge > 0), JSON.stringify(pa));
-        check(`${w}x${h}: ${name}: first input zero`, c0.steer === 0 && c0.brake === 0 && c0.handbrake === 0 && c0.throttle === 1, JSON.stringify(c0));
-        const fac = dir === 'down' ? pa[5] : dir === 'left' ? pa[3] : pa[4];
-        check(`${w}x${h}: ${name}: the travel is ${fac.toFixed(2)} of the normal, not under 0.6`, fac >= 0.6 - 1e-9 && fac <= 1 && near(fac, Math.max(0.6, Math.min(1, roomPx / need)), 0.01), `${fac}`);
-        const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
-        const dy = dir === 'down' ? 1 : 0;
-        if (nudge > 0) {
-          await pointer(p, 'pointermove', 1, x + dx * 4, y + dy * 4);
-          c = await hands(p);
-          check(`${w}x${h}: ${name}: 4 px in: still held at zero`, c.steer === 0 && c.brake === 0 && c.handbrake === 0 && c.throttle === 1, JSON.stringify(c));
-          await pointer(p, 'pointermove', 1, x + dx * 7, y + dy * 7);
-          c = await hands(p);
-          check(`${w}x${h}: ${name}: 7 px in: the hold is over and the thumb reads`, (await padAt(p))[2] === false && (dir === 'down' ? c.brake > 0 || c.handbrake === 1 : Math.abs(c.steer) > 0), JSON.stringify(c));
-        }
-        // all the room there is reaches the full travel (the lock, or the handbrake's red)
-        await pointer(p, 'pointermove', 1, x + dx * (roomPx + 0.5), y + dy * (roomPx + 0.5));
-        c = await hands(p);
-        check(`${w}x${h}: ${name}: the whole room there is reaches ${dir === 'down' ? 'the handbrake' : 'full lock'}`, dir === 'down' ? c.handbrake === 1 : Math.abs(c.steer) >= 0.999, JSON.stringify(c));
-        // the disc is drawn inside the safe area
-        await p.page.waitForTimeout(150);
-        const base = await p.page.evaluate(() => {
-          const r = document.querySelector('.hud .view .stick:not(.ghost) .base').getBoundingClientRect();
-          return [r.left, r.top, r.right, r.bottom];
-        });
-        check(`${w}x${h}: ${name}: the disc is drawn inside the screen`, base[0] >= -1 && base[1] >= -1 && base[2] <= w + 1 && base[3] <= h + 1, base.map(Math.round).join(','));
-        await pointer(p, 'pointerup', 1, 0, 0);
-      }
-      // the HUD's own buttons do not place the pad
-      {
-        const b = await p.page.evaluate(() => {
-          const e = document.querySelector('.hud .view .touchcol button');
-          const r = e.getBoundingClientRect();
-          return [r.left + r.width / 2, r.top + r.height / 2];
-        });
-        const camBefore = (await p.d0()).camera;
-        await p.page.touchscreen.tap(b[0], b[1]);
-        await p.advance(0.1);
-        const st = await p.page.evaluate(() => { const z = window.__dreamcar.game.input.touch[0]; return [!!z.steer, z.pedals.size]; });
-        check(`${w}x${h}: a tap on a HUD button (camera) works and places no pad`, !st[0] && st[1] === 0 && (await p.d0()).camera !== camBefore && !(await p.page.evaluate(`!!document.querySelector('.hud .view .stick.held')`)), JSON.stringify(st));
-        await p.page.evaluate((b) => {
-          const e = document.querySelector('.hud .view .touchcol button');
-          e.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 8, pointerType: 'touch', clientX: b[0], clientY: b[1], bubbles: true, cancelable: true }));
-        }, b);
-        const st2 = await p.page.evaluate(() => { const z = window.__dreamcar.game.input.touch[0]; return [!!z.steer, z.pedals.size]; });
-        check(`${w}x${h}: a pointer pressed on a HUD button does not place the pad either`, !st2[0] && st2[1] === 0, JSON.stringify(st2));
-        await p.page.evaluate(() => document.querySelector('.hud .view .touchcol button').dispatchEvent(new PointerEvent('pointerup', { pointerId: 8, pointerType: 'touch', bubbles: true })));
-      }
-      // the handbrake button when no thumb is on the pad does not place it either, and a thumb landing after it does
-      {
-        const hb2 = at(L, L.drift);
-        await pointer(p, 'pointerdown', 4, hb2[0], hb2[1]);
-        let st = await padAt(p);
-        check(`${w}x${h}: the HANDBRAKE button first: it pulls the handbrake and places no pad`, st === null && (await hands(p)).handbrake === 1);
-        await pointer(p, 'pointerdown', 1, w * 0.6, h * 0.5);
-        st = await padAt(p);
-        check(`${w}x${h}: then a thumb elsewhere places the pad and steers from zero`, !!st && near2(st[0], w * 0.6) && (await hands(p)).steer === 0 && (await hands(p)).handbrake === 1);
-        await pointer(p, 'pointerup', 4, 0, 0);
-        await pointer(p, 'pointerup', 1, 0, 0);
-      }
       // a cancelled pointer, a lost focus, a turned device: nothing sticks
       for (const [label, fire] of [
         ['a cancelled pointer', null],
@@ -937,11 +647,7 @@ const SECTIONS = {
       // manual: up is the throttle, the centre coasts, down brakes
       await p.page.evaluate(`window.__dreamcar.game.action('throttle:manual')`);
       check(`${w}x${h}: Throttle manual (kept under dreamcar.throttle): nothing touched is no power`, (await p.page.evaluate(`localStorage.getItem('dreamcar.throttle')`)) === 'manual' && (await hands(p)).throttle === 0);
-      await p.advance(0.4);
-      gz = await gauge(p);
-      check(`${w}x${h}: manual with nothing pressed: the gauge reads zero and zero`, gz[0] === 0 && gz[2] === 0, gz.join('/'));
-      await pointer(p, 'pointerdown', 1, cx, cy);
-      await pointer(p, 'pointermove', 1, cx + lock * 0.2, cy - bra * 0.5);
+      await pointer(p, 'pointerdown', 1, cx + lock * 0.2, cy - bra * 0.5);
       c = await hands(p);
       check(`${w}x${h}: manual: half way up is half the throttle`, near(c.throttle, 0.5) && c.brake === 0, JSON.stringify(c));
       await pointer(p, 'pointermove', 1, cx, cy);
@@ -958,16 +664,10 @@ const SECTIONS = {
       const R = await p.page.evaluate(() => window.__dreamcar.touchLayout(0));
       check(`${w}x${h}: Hand left (kept under dreamcar.hand) mirrors the pad and the HANDBRAKE button`, (await p.page.evaluate(`localStorage.getItem('dreamcar.hand')`)) === 'left'
         && Math.abs(R.pad.cx - (w - px0)) < 1 && R.pad.cy === py0 && Math.abs(R.drift.x - (w - L.drift.x)) < 1 && R.drift.y === L.drift.y);
-      const sm = await centreOf(p, '.stick.ghost');
+      const sm = await centreOf(p, '.stick');
       check(`${w}x${h}: and draws it there`, !!sm && Math.abs(sm[0] - R.x0 - R.pad.cx) < 1.5);
-      await pointer(p, 'pointerdown', 1, R.x0 + R.pad.cx, R.y0 + R.pad.cy);
-      await pointer(p, 'pointermove', 1, R.x0 + R.pad.cx - lock * 0.5, R.y0 + R.pad.cy);
+      await pointer(p, 'pointerdown', 1, R.x0 + R.pad.cx - lock * 0.5, R.y0 + R.pad.cy);
       check(`${w}x${h}: a thumb on the left pad steers (half left)`, near(await raw(p), -0.5));
-      await pointer(p, 'pointerup', 1, 0, 0);
-      // (Hand only moves the ghost and the button: with the left hand a thumb lands on the right side as well)
-      await pointer(p, 'pointerdown', 1, w * 0.8, h * 0.75);
-      const rp = await padAt(p);
-      check(`${w}x${h}: Hand left: a thumb landing on the right side places the pad there too`, !!rp && near2(rp[0], w * 0.8) && near2(rp[1], h * 0.75) && (await hands(p)).steer === 0);
       await pointer(p, 'pointerup', 1, 0, 0);
       await pointer(p, 'pointerdown', 4, R.x0 + R.drift.x, R.y0 + R.drift.y);
       check(`${w}x${h}: the HANDBRAKE button on the right`, (await hands(p)).handbrake === 1);
@@ -1046,8 +746,7 @@ const SECTIONS = {
       await tilt(8 - 45);
       check(`${w}x${h}: tilt: 45 left is full lock left, no more`, (await hands(p)).steer === -1);
       await tilt(8 + 6);
-      await pointer(p, 'pointerdown', 1, cx, cy);
-      await pointer(p, 'pointermove', 1, cx + lock, cy + bra);
+      await pointer(p, 'pointerdown', 1, cx + lock, cy + bra);
       c = await hands(p);
       check(`${w}x${h}: tilt: the pad's thumb brakes, the tilt still steers`, c.brake === 1 && near(c.steer, 0.2), JSON.stringify(c));
       await pointer(p, 'pointerup', 1, 0, 0);
@@ -1088,10 +787,8 @@ const SECTIONS = {
     await toGo(p);
     await p.advance(1.5);
     const lk = Ls.map((L) => L.pad.r * 70 / 80);
-    await pointer(p, 'pointerdown', 1, Ls[0].x0 + Ls[0].pad.cx, Ls[0].y0 + Ls[0].pad.cy);
-    await pointer(p, 'pointerdown', 2, Ls[1].x0 + Ls[1].pad.cx, Ls[1].y0 + Ls[1].pad.cy);
-    await pointer(p, 'pointermove', 1, Ls[0].x0 + Ls[0].pad.cx + lk[0] * 0.6, Ls[0].y0 + Ls[0].pad.cy);
-    await pointer(p, 'pointermove', 2, Ls[1].x0 + Ls[1].pad.cx - lk[1] * 0.6, Ls[1].y0 + Ls[1].pad.cy);
+    await pointer(p, 'pointerdown', 1, Ls[0].x0 + Ls[0].pad.cx + lk[0] * 0.6, Ls[0].y0 + Ls[0].pad.cy);
+    await pointer(p, 'pointerdown', 2, Ls[1].x0 + Ls[1].pad.cx - lk[1] * 0.6, Ls[1].y0 + Ls[1].pad.cy);
     await p.advance(0.3);
     let s = await p.state();
     check('split touch: both cars drive by themselves', s.drivers.every((d) => d.input === 'touch' && d.kmh > 5), s.drivers.map((d) => `${d.input} ${d.kmh}`).join(' / '));
@@ -1101,32 +798,6 @@ const SECTIONS = {
     const hbs = await p.page.evaluate('window.__dreamcar.game.racers.map((r) => r.controls.handbrake)');
     check('split touch: the right half\'s HANDBRAKE is car two\'s', hbs[1] > 0.5 && hbs[0] < 0.5, `hand ${hbs.join('/')}`);
     for (const id of [1, 2, 3]) await pointer(p, 'pointerup', id, 0, 0);
-    // a thumb landing anywhere in a half puts that half's pad there, inside that half (clamped to it at the edges); a
-    // second finger in a half is that half's handbrake
-    const half = (i) => p.page.evaluate((i) => {
-      const st = window.__dreamcar.game.input.touch[i].steer;
-      return st ? { cx: st.cx, cy: st.cy, ox: st.ox, hold: st.hold, fl: st.fl, fr: st.fr } : null;
-    }, i);
-    const Lh = Ls.map((L, i) => [L.x0 + 90, L.y0 + 120, i]);
-    // (left half, 90 px in: 90 px of room at the half's own edge; right half likewise from its own edge)
-    await pointer(p, 'pointerdown', 1, Lh[0][0], Lh[0][1]);
-    await pointer(p, 'pointerdown', 2, Lh[1][0], Lh[1][1]);
-    let h0 = await half(0);
-    let h1 = await half(1);
-    check('split touch: a thumb landing high in each half puts that half\'s pad exactly there', !!h0 && !!h1 && near2(h0.cx, 90) && near2(h0.cy, 120) && near2(h1.cx, 90) && near2(h1.cy, 120), JSON.stringify([h0, h1]));
-    let hh = await p.page.evaluate(() => [0, 1].map((i) => window.__dreamcar.game.input.read({}, 'all', i)).map((o) => [o.steer, o.throttle, o.brake, o.handbrake]));
-    check('split touch: and both start at zero', hh.every((o) => o[0] === 0 && o[1] === 1 && o[2] === 0 && o[3] === 0), JSON.stringify(hh));
-    await pointer(p, 'pointerdown', 4, Ls[0].x0 + 200, Ls[0].y0 + 300);
-    hh = await p.page.evaluate(() => [0, 1].map((i) => window.__dreamcar.game.input.read({}, 'all', i)).map((o) => [o.steer, o.throttle, o.brake, o.handbrake]));
-    check('split touch: a second finger in the left half is the left car\'s handbrake only', hh[0][3] === 1 && hh[1][3] === 0, JSON.stringify(hh));
-    for (const id of [1, 2, 4]) await pointer(p, 'pointerup', id, 0, 0);
-    // a thumb at the right half's own left edge (the half's edge is the room, not the screen's), and at the left half's right edge
-    await pointer(p, 'pointerdown', 1, Ls[1].x0 + 6, Ls[1].y0 + 200);
-    await pointer(p, 'pointerdown', 2, Ls[0].x0 + Ls[0].w - 6, Ls[0].y0 + 200);
-    h1 = await half(1);
-    h0 = await half(0);
-    check('split touch: near a half\'s own edge the pad is nudged inside that half (and held at zero)', !!h1 && !!h0 && h1.cx >= 0.6 * 70 * Ls[1].pad.s - 6 + 5.9 && h0.cx <= Ls[0].w - 0.6 * 70 * Ls[0].pad.s + 6 - 5.9 && h1.hold && h0.hold, JSON.stringify([h0, h1]));
-    for (const id of [1, 2]) await pointer(p, 'pointerup', id, 0, 0);
     await p.close('split touch');
   },
 
@@ -1177,8 +848,7 @@ const SECTIONS = {
       await toGo(q);
       await q.skip(4);
       const kmh = (await q.d0()).kmh;
-      await pointer(q, 'pointerdown', 1, cx, cy);
-      await pointer(q, 'pointermove', 1, cx + T.pad.steer * s, cy - 10);
+      await pointer(q, 'pointerdown', 1, cx + T.pad.steer * s, cy - 10);
       let most = 0;
       let pulled = 0;
       for (let k = 0; k < 30; k++) {
@@ -1268,8 +938,6 @@ const SECTIONS = {
         await p.page.evaluate((layout) => {
           const g = window.__dreamcar.game;
           const parts = layout.split('-');
-          // (the performance readout on: it must stand clear of everything in every layout)
-          g.action('stats:on');
           g.action(parts.includes('manual') ? 'throttle:manual' : 'throttle:auto');
           g.action(parts.includes('slider') ? 'steering:slider' : 'steering:pad');
           g.action(parts.includes('left') ? 'hand:left' : 'hand:right');
@@ -1366,27 +1034,13 @@ const SECTIONS = {
                   continue;
                 }
                 boxes.push({ name, r: e.getBoundingClientRect() });
-                // the pedal gauge stands beside the speed: its own box, clear of everything else
-                const gz = name === 'cluster' && e.querySelector('.gauge');
-                if (gz && shown(gz)) boxes.push({ name: 'gauge', r: gz.getBoundingClientRect() });
               }
               const over = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
-              // the performance readout is the page's, not a view's: one line at the bottom edge, which must not
-              // touch anything of any view (nor the car)
-              const perf = document.querySelector('.hud .perf');
-              if (!perf || !shown(perf) || !/fps/.test(perf.textContent)) out.push(`view ${vi}: no performance readout`);
-              else {
-                const q = perf.getBoundingClientRect();
-                const page = document.querySelector('.hud').getBoundingClientRect();
-                if (q.left < page.left - 1 || q.right > page.right + 1 || q.bottom > page.bottom + 1) out.push('the readout does not fit the page');
-                for (const b of boxes) if (over(b.r, q)) out.push(`view ${vi}: the readout over ${b.name}`);
-                if (over(q, car)) out.push(`view ${vi}: the readout over the car`);
-              }
               for (const b of boxes) {
                 // the banner and the gap are moments over the sky, never over the car
                 const rr = (q) => `${Math.round(q.left - vr.left)},${Math.round(q.top - vr.top)}-${Math.round(q.right - vr.left)},${Math.round(q.bottom - vr.top)}`;
                 if (over(b.r, car)) out.push(`view ${vi}: ${b.name} over the car (${rr(b.r)} against ${rr(car)})`);
-                if (b.r.left < vr.left - 1 || b.r.right > vr.right + 1 || b.r.top < vr.top - 1 || b.r.bottom > vr.bottom + 1) out.push(`view ${vi}: ${b.name} outside its view (${rr(b.r)} in ${Math.round(vr.width)}x${Math.round(vr.height)}, ${views[vi].className})`);
+                if (b.r.left < vr.left - 1 || b.r.right > vr.right + 1 || b.r.top < vr.top - 1 || b.r.bottom > vr.bottom + 1) out.push(`view ${vi}: ${b.name} outside its view`);
               }
               for (let i = 0; i < boxes.length; i++)
                 for (let j = i + 1; j < boxes.length; j++)
@@ -1429,32 +1083,6 @@ const SECTIONS = {
     await clickText(p, 'Hidden', '.options');
     await p.advance(0.1);
     check('the map can be hidden (kept under dreamcar.map)', (await p.page.evaluate(`localStorage.getItem('dreamcar.map')`)) === 'off');
-    // the performance readout: off until asked for, kept under dreamcar.stats, one line with the tier and the frame rate
-    const statsRow = `[...document.querySelectorAll('.hud .options .optrow')].find((r) => /readout/i.test(r.querySelector('.optlabel').textContent))`;
-    check('the readout is offered, and is off with nothing chosen', (await p.page.evaluate(`!!${statsRow} && ${statsRow}.querySelector('button[data-value="off"]').classList.contains('on')`)) && !(await visible(p, '.hud .perf')));
-    await p.page.evaluate(`${statsRow}.querySelector('button[data-value="on"]').click()`);
-    await p.advance(0.1);
-    const line = await p.page.evaluate(`document.querySelector('.hud .perf').textContent`);
-    check('Readout: Shown is kept under dreamcar.stats and shows one line: tier, canvas, scale, edge smoothing, frames a second, the ladder',
-      (await p.page.evaluate(`localStorage.getItem('dreamcar.stats')`)) === 'on' && (await visible(p, '.hud .perf')) && new RegExp(`^${tier0} \\d+×\\d+@[\\d.]+ ×1\\.00 (msaa\\d|fxaa) \\d+/\\d+fps all on`).test(line), line);
-    check('the readout is one line no taller than 12 px, at the bottom edge', await p.page.evaluate(`(() => { const r = document.querySelector('.hud .perf').getBoundingClientRect(); return r.height <= 12 && r.bottom >= innerHeight - 14; })()`));
-    await p.page.evaluate(`${statsRow}.querySelector('button[data-value="off"]').click()`);
-    await p.advance(0.1);
-    check('and hidden again', !(await visible(p, '.hud .perf')) && (await p.page.evaluate(`localStorage.getItem('dreamcar.stats')`)) === 'off');
-    // the paint: one button per paint, the first driver's row only (the second's is for split screen), kept under
-    // dreamcar.paint and on the car at once
-    const paintRow = (i) => `[...document.querySelectorAll('.hud .options .optrow')].filter((r) => r.querySelector('.segment.wrap'))[${i}]`;
-    const paints = await p.page.evaluate(`[...${paintRow(0)}.querySelectorAll('button')].map((b) => b.dataset.value)`);
-    check('Paint offers silver, black, white, blue, red, matte and the night livery', ['silver', 'black', 'white', 'blue', 'red', 'matte', 'night'].every((v) => paints.includes(v)), paints.join());
-    check('with nothing chosen the paint is silver', await p.page.evaluate(`${paintRow(0)}.querySelector('button[data-value="silver"]').classList.contains('on') && window.__dreamcar.game.racers[0].car.paint === 'silver'`));
-    check('solo, the second player\'s paint is not offered', await p.page.evaluate(`!!${paintRow(1)}.closest('[hidden]') || ${paintRow(1)}.hidden`));
-    await p.page.evaluate(`${paintRow(0)}.querySelector('button[data-value="night"]').click()`);
-    await p.advance(0.1);
-    check('Night race is kept under dreamcar.paint and is on the car', (await p.page.evaluate(`localStorage.getItem('dreamcar.paint')`)) === 'night'
-      && (await p.page.evaluate('window.__dreamcar.game.racers[0].car.paint')) === 'night');
-    await p.page.evaluate(`${paintRow(0)}.querySelector('button[data-value="silver"]').click()`);
-    await p.advance(0.1);
-    check('and back to silver', (await p.page.evaluate('window.__dreamcar.game.racers[0].car.paint')) === 'silver');
     // sound
     if (await visible(p, '.hud .options .optrow:nth-of-type(3)')) {
       await clickText(p, 'Off', '.options');
@@ -1676,17 +1304,6 @@ const SECTIONS = {
     }
     check('lap and splits identical at 30, 60 and 144 frames a second', laps[30] === laps[60] && laps[144] === laps[60] && laps[60] !== '',
       `30: ${laps[30]} · 60: ${laps[60]} · 144: ${laps[144]}`);
-    // (day lane) a still is the picture the player gets: a page opened at a moment deep in the tunnel shows the
-    // exposure adapted to the tunnel (eased in the fixed step, so fast-forwarding settles it), the same each time
-    const exposures = [];
-    for (let k = 0; k < 2; k++) {
-      const p = await open('?manual&q=low&auto&ap&time=twilight&nodraw&t=40', { w: 240, h: 135 });
-      exposures.push(await p.page.evaluate('[window.__dreamcar.game.views[0].exposure, window.__dreamcar.times.twilight.tunnelExposure, window.__dreamcar.state().drivers[0].s]'));
-      await p.close(`tunnel exposure ${k}`);
-    }
-    const [[e0, inside, s0], [e1]] = exposures;
-    check('?manual&t=40 in the tunnel: the exposure is the adapted one, the same on every load', e0 === e1 && Math.abs(e0 / inside - 1) < 0.1,
-      `${e0.toFixed(3)} and ${e1.toFixed(3)} against the tunnel's ${inside} (s ${Math.round(s0)})`);
   },
 
   /** Each switch of the URL loads and runs without errors. */
@@ -1705,96 +1322,6 @@ const SECTIONS = {
         check('?mute: the sound is muted', audio && audio.muted !== false, JSON.stringify(audio));
       }
       await p.close(`?${q}`);
-    }
-    // ?stats: the readout without the option, not kept; ?scale= and ?shed=: an exact picture, the governor off
-    {
-      const p = await open('?manual&q=low&auto&ap&time=day&stats', { w: 320, h: 180 });
-      await p.advance(0.2);
-      check('?stats: the readout shows and is not kept', (await visible(p, '.hud .perf')) && (await p.page.evaluate(`localStorage.getItem('dreamcar.stats')`)) === null,
-        await p.page.evaluate(`document.querySelector('.hud .perf').textContent`));
-      await p.close('?stats');
-    }
-    // ?paint=: the first driver's car in that paint, not kept; an unknown name is the kept (or default) paint
-    {
-      const p = await open('?manual&q=low&time=night&paint=night', { w: 320, h: 180 });
-      check('?paint=night: the car in the night livery, not kept', (await p.page.evaluate('window.__dreamcar.game.racers[0].car.paint')) === 'night'
-        && (await p.page.evaluate(`localStorage.getItem('dreamcar.paint')`)) === null);
-      await p.go('?manual&q=low&time=day&paint=nonsense');
-      check('?paint=nonsense: silver', (await p.page.evaluate('window.__dreamcar.game.racers[0].car.paint')) === 'silver');
-      await p.close('?paint=');
-    }
-  },
-
-  /**
-   * (perf lane) The quality ladder (engine/governor.js; its decisions are tested in tools/unit/governor.test.mjs):
-   * every level of a tier draws, sheds what its name says and nothing else, never goes under the tier's floor, and
-   * compiles no shader; a page stepped by hand has no governor; ?scale= and ?shed= give an exact picture; a page
-   * that runs by itself has one and stays inside the ladder.
-   */
-  async ladder() {
-    const read = (p) => p.page.evaluate(`(() => { const s = window.__dreamcar.stats(); return { q: s.quality, p: s.pipeline, programs: s.programs, buffer: s.buffer, scale: s.renderScale }; })()`);
-    for (const tier of ONLY.includes('ladder-low') ? ['low'] : ['low', 'medium']) {
-      const p = await open(`?manual&q=${tier}&auto&ap&time=day&t=9`, { w: 240, h: 135 });
-      await p.advance(0.2, 30);
-      const top = await read(p);
-      const rungs = top.q.rungs;
-      check(`${tier}: a page stepped by hand has no governor, nothing shed, full resolution`,
-        top.q.adaptive === false && top.q.level === 0 && top.q.shed.length === 0 && top.scale === 1 && top.p.upscaled === false, JSON.stringify(top.q));
-      check(`${tier}: the ladder is ${rungs.join(', ')}, then the render scale down to ${top.q.floor}`, rungs.length >= 3 && rungs[0] === 'probe' && top.q.max > rungs.length && top.q.floor >= 0.6);
-      const wrong = [];
-      let last = top;
-      for (let level = 1; level <= top.q.max; level++) {
-        await p.page.evaluate(`window.__dreamcar.engine.setQualityStep(${level})`);
-        await p.advance(3 / 30, 30);
-        const s = await read(p);
-        const shed = Math.min(level, rungs.length);
-        const say = (what) => wrong.push(`level ${level}: ${what}`);
-        if (s.q.shed.join() !== rungs.slice(0, shed).join()) say(`sheds ${s.q.shed.join()}`);
-        if (shed < rungs.length && s.scale !== 1) say(`scale ${s.scale} with rungs left`);
-        if (s.scale < top.q.floor - 1e-6) say(`scale ${s.scale} under the floor`);
-        if (level > rungs.length && !(s.scale < last.scale)) say(`scale ${s.scale} after ${last.scale}`);
-        if (s.p.upscaled !== s.scale < 1) say(`upscale ${s.p.upscaled} at scale ${s.scale}`);
-        if (Math.abs(s.p.targets.scene[0] - Math.round(s.buffer[0] * s.scale)) > 1) say(`scene ${s.p.targets.scene} of ${s.buffer} at ${s.scale}`);
-        const has = (name) => s.q.shed.includes(name);
-        if (s.p.blurTaps !== (has('blur') ? Math.max(2, Math.ceil(top.p.blurTaps / 2)) : top.p.blurTaps)) say(`${s.p.blurTaps} blur taps`);
-        if (s.p.aoSamples !== (has('ao') ? 0 : top.p.aoSamples)) say(`${s.p.aoSamples} occlusion samples`);
-        if (s.p.samples !== (has('msaa') ? Math.min(2, top.p.samples) : top.p.samples)) say(`${s.p.samples} samples`);
-        if (s.programs !== top.programs) say(`${s.programs} programs, ${top.programs} before`);
-        last = s;
-      }
-      check(`${tier}: each of its ${top.q.max} levels sheds its own rung, resolution last and never under the floor, and compiles nothing`, wrong.length === 0, wrong.join('; '));
-      check(`${tier}: the bottom is all ${rungs.length} rungs and scale ${top.q.floor}, through the upscale (strength ${last.p.sharp.toFixed(2)})`,
-        last.q.shed.length === rungs.length && last.scale === top.q.floor && last.p.upscaled && last.p.sharp > 0.3 && last.p.sharp <= 1);
-      await p.page.evaluate('window.__dreamcar.engine.setQualityStep(0)');
-      await p.advance(3 / 30, 30);
-      const back = await read(p);
-      check(`${tier}: back at the top everything is as it was`, back.scale === 1 && back.q.shed.length === 0 && JSON.stringify(back.p.targets.scene) === JSON.stringify(top.p.targets.scene)
-        && back.p.samples === top.p.samples && back.p.blurTaps === top.p.blurTaps && back.p.aoSamples === top.p.aoSamples && back.programs === top.programs && !back.p.upscaled,
-        JSON.stringify(back.p).slice(0, 200));
-      await p.close(`${tier} ladder`);
-    }
-    {
-      const p = await open('?manual&q=low&auto&ap&time=day&t=9&scale=0.6&shed=2', { w: 240, h: 135 });
-      await p.advance(0.1, 30);
-      const s = await read(p);
-      check('?scale=0.6&shed=2: that scale, those two rungs, no governor', s.scale === 0.6 && s.q.shed.length === 2 && s.q.adaptive === false && s.p.upscaled, JSON.stringify(s.q));
-      await p.go('?manual&q=low&auto&ap&time=day&t=9&scale=0.6&upscale=0');
-      await p.advance(0.1, 30);
-      check('?upscale=0: the plain stretch', (await read(p)).p.upscaled === false);
-      await p.close('?scale=');
-    }
-    {
-      // a page that runs by itself: the governor is on, and whatever this machine makes it do stays on the ladder
-      const p = await open('?q=low&auto&ap&time=day&mute', { w: 240, h: 135 });
-      await p.page.waitForTimeout(12000);
-      const s = await read(p);
-      check('a running page has a governor', s.q.adaptive === true, JSON.stringify(s.q));
-      check('and it stays on the ladder, at or above the floor', s.q.level >= 0 && s.q.level <= s.q.max && s.scale >= s.q.floor - 1e-6 && s.q.shed.length <= s.q.rungs.length, JSON.stringify(s.q));
-      await p.go('?q=low&auto&ap&time=day&mute&dpr=1');
-      await p.page.waitForTimeout(3000);
-      const f = await read(p);
-      check('?dpr= switches it off: nothing shed, full resolution', f.q.adaptive === false && f.q.level === 0 && f.scale === 1, JSON.stringify(f.q));
-      await p.close('the governor running');
     }
   },
 
@@ -1827,7 +1354,7 @@ const fmt = (ms) => {
 (async () => {
   const started = Date.now();
   browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const names = Object.keys(SECTIONS).filter((n) => ONLY.length === 0 || ONLY.includes(n) || (n === 'ladder' && ONLY.includes('ladder-low')));
+  const names = Object.keys(SECTIONS).filter((n) => ONLY.length === 0 || ONLY.includes(n));
   const times = [];
   for (const name of names) {
     section = name;

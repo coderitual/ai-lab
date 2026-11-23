@@ -123,11 +123,6 @@ export class FullscreenPass {
     renderer.setRenderTarget(previous);
   }
 
-  /** Make the pass's program now rather than at its first use (for a pass first used in the middle of a run). */
-  compile(renderer) {
-    renderer.compile(this.mesh, camera);
-  }
-
   dispose() {
     this.material.dispose();
   }

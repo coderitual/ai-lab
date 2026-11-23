@@ -35,23 +35,6 @@
   display: none !important;
 }
 
-/* the performance readout: one line at the bottom edge of the page, inside the home bar's strip where there is one
-   (the touch controls stand 18 px above it; every instrument at least 10 px above the page's edge), 10 px high */
-.hud .perf {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 100%;
-  bottom: max(0px, calc(var(--sb) - 12px));
-  z-index: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  font: 600 min(9px, 2.1vw) / 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  letter-spacing: 0;
-  color: rgba(255, 255, 255, 0.82);
-  text-shadow: 0 0 2px #000, 0 0 2px #000;
-}
-
 /* ---------------------------------------------------------------- buttons */
 
 .hud button {
@@ -119,19 +102,6 @@
   color: #061019;
   background: var(--ice);
   border-color: var(--ice);
-}
-
-/* a choice of many (the paints): the buttons wrap onto more lines, each a separate key */
-.hud .segment.wrap {
-  flex-wrap: wrap;
-  gap: 4px;
-  max-width: 100%;
-}
-.hud .segment.wrap button,
-.hud .segment.wrap button:first-child,
-.hud .segment.wrap button:last-child {
-  border-radius: 6px;
-  border-left-width: 1px;
 }
 
 /* ---------------------------------------------------------------- a view */
@@ -573,76 +543,6 @@
   text-transform: uppercase;
   color: var(--dim);
 }
-/* the pedal gauge: two slim bars (brake left, throttle right) and the handbrake's mark between them, beside the
-   speed, on the cluster's open side; it takes no room of the cluster's (absolute), so nothing moves for it */
-.hud .gauge {
-  position: absolute;
-  bottom: 0;
-  right: calc(100% + var(--u) * 1.2);
-  display: flex;
-  align-items: flex-end;
-  gap: calc(var(--u) * 0.45);
-  height: calc(var(--u) * 7);
-  pointer-events: none;
-}
-.hud .view.touch.pad:not(.handleft) .cluster .gauge,
-.hud .view.touch.low .cluster .gauge,
-.hud .view.touch.tall .cluster .gauge,
-.hud .view.touch.thin .cluster .gauge,
-.hud .view.touch.squat.narrow:not(.pad) .cluster .gauge {
-  right: auto;
-  left: calc(100% + var(--u) * 1.2);
-}
-.hud .view.touch.pad.handleft:not(.low):not(.thin) .cluster .gauge {
-  right: calc(100% + var(--u) * 1.2);
-  left: auto;
-}
-.hud .gauge .bar {
-  position: relative;
-  width: var(--u);
-  height: 100%;
-  border-radius: calc(var(--u) * 0.5);
-  background: rgba(3, 7, 11, 0.5);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-  overflow: hidden;
-}
-.hud .gauge .fill {
-  position: absolute;
-  inset: 0;
-  transform: scaleY(0);
-  transform-origin: bottom;
-  background: var(--amber);
-}
-.hud .gauge .throttle .fill {
-  background: #5cf08e;
-}
-.hud .gauge.braking .brake .fill {
-  background: #ff4b3e;
-}
-.hud .gauge .tick {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.55);
-  z-index: 1;
-}
-.hud .gauge .t50 {
-  bottom: 50%;
-}
-.hud .gauge .t100 {
-  bottom: calc(100% - 1px);
-}
-.hud .gauge .hand {
-  align-self: flex-end;
-  height: calc(var(--u) * 1.6);
-  width: calc(var(--u) * 0.8);
-  border-radius: 50%;
-}
-.hud .gauge.hand .bar.hand {
-  background: #ff4b3e;
-  box-shadow: 0 0 8px rgba(255, 60, 40, 0.9);
-}
 .hud .tells {
   display: flex;
   gap: calc(var(--u) * 0.45);
@@ -1066,34 +966,6 @@
   left: 50%;
   transform: translateX(-50%);
   letter-spacing: 0.12em;
-}
-
-/* The pad appears under the thumb: the live pad is out of sight until a thumb lands (an 80 ms scale-in where it is
-   put), and after the thumb lifts it stays 0.4 s, then fades while the ghost, a faint hint of where to put a thumb,
-   comes back at the home place. */
-.hud .stick:not(.ghost) {
-  opacity: 0;
-  visibility: hidden;
-  transform: scale(0.88);
-  transition: opacity 0.2s ease-out 0.4s, transform 0s linear 0.6s, visibility 0s linear 0.6s;
-}
-.hud .stick.held {
-  opacity: 1;
-  visibility: visible;
-  transform: scale(1);
-  transition: opacity 0.08s ease-out, transform 0.08s ease-out;
-}
-.hud .stick.ghost {
-  opacity: 0.3;
-  transition: opacity 0.25s ease-out 0.4s;
-}
-.hud .stick.ghost.away {
-  opacity: 0;
-  transition: opacity 0.08s ease-out;
-}
-.hud .controls.naming .stick:not(.ghost) {
-  outline: none;
-  animation: none;
 }
 
 /* the pedals and the handbrake button: an icon over the word, a glow while pressed */
@@ -1773,10 +1645,4 @@
   .hud * {
     animation: none !important;
   }
-}
-
-/* the paints: as many to a line as fit, at least a thumb wide each */
-.hud .optrow .segment.wrap button {
-  flex: 1 0 auto;
-  min-width: 72px;
 }

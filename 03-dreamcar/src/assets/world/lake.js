@@ -1,0 +1,107 @@
+// The lake beside the straight: one level sheet at the Track's lake level,
+// cut out by the ground itself where the shore rises through it.
+//
+// Cheap on purpose. Its colour is mostly what it reflects: a standard
+// material, nearly smooth, takes the sky from the environment map with the
+// Fresnel rise towards grazing angles that water has, and the sun's or moon's
+// highlight, broken by a ripple normal map that drifts with the run's clock,
+// spreads into a glitter path towards the light. Under the reflection the
+// water darkens with depth (a vertex colour from the ground's height), so the
+// shallows by the shore read a little lighter and greener.
+
+import * as THREE from 'three';
+import { gradientField, normalTexture } from '../../engine/noise.js';
+
+/** Grid of the sheet (m); the shore is drawn by the ground, so it can be coarse. */
+const CELL = 40;
+/** How far the ripples drift, metres per second, and their size (m per repeat). */
+const DRIFT = [0.05, 0.022];
+const RIPPLE = 9;
+
+/**
+ * @param {object} options
+ * @param {import('../../engine/caps.js').Caps} options.caps
+ * @param {import('./atmosphere.js').Atmosphere} options.atmosphere
+ * @param {(x: number, z: number) => number} options.heightAt the ground
+ * @param {number} options.level the water's height
+ * @param {{ x0: number, x1: number, z0: number, z1: number }} options.extent where to lay the sheet
+ */
+export function createLake({ caps, atmosphere, heightAt, level, extent }) {
+  const nx = Math.ceil((extent.x1 - extent.x0) / CELL) + 1;
+  const nz = Math.ceil((extent.z1 - extent.z0) / CELL) + 1;
+  const pos = new Float32Array(nx * nz * 3);
+  const col = new Float32Array(nx * nz * 3);
+  const shallow = [0.03, 0.04, 0.03];
+  const deep = [0.004, 0.009, 0.011];
+  const keep = new Uint8Array(nx * nz);
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const v = j * nx + i;
+      const x = extent.x0 + i * CELL;
+      const z = extent.z0 + j * CELL;
+      const depth = level - heightAt(x, z);
+      keep[v] = depth > -6 ? 1 : 0;
+      const t = Math.min(1, Math.max(0, depth / 4));
+      pos[v * 3] = x;
+      pos[v * 3 + 1] = level;
+      pos[v * 3 + 2] = z;
+      for (let c = 0; c < 3; c++) col[v * 3 + c] = shallow[c] + (deep[c] - shallow[c]) * t;
+    }
+  }
+  const index = [];
+  for (let j = 0; j < nz - 1; j++) {
+    for (let i = 0; i < nx - 1; i++) {
+      const v = j * nx + i;
+      // only cells that have water somewhere under them
+      if (!(keep[v] || keep[v + 1] || keep[v + nx] || keep[v + nx + 1])) continue;
+      index.push(v, v + nx, v + 1, v + 1, v + nx, v + nx + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nx * nz * 3).map((_, k) => (k % 3 === 1 ? 1 : 0)), 3));
+  geometry.setIndex(index);
+
+  const size = 256;
+  const ripples = normalTexture(size, gradientField(size, { seed: 61, cells: 8, octaves: 4 }), {
+    relief: 0.05,
+    anisotropy: Math.min(8, caps.maxAnisotropy ?? 1),
+  });
+  ripples.repeat.set(1 / RIPPLE, 1 / RIPPLE);
+  // world-space texture coordinates: the sheet's own position over the ripple's size, through the map's transform
+  const uvs = new Float32Array(nx * nz * 2);
+  for (let v = 0; v < nx * nz; v++) {
+    uvs[v * 2] = pos[v * 3];
+    uvs[v * 2 + 1] = pos[v * 3 + 2];
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+
+  const material = atmosphere.patch(
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.06,
+      metalness: 0,
+      normalMap: ripples,
+      normalScale: new THREE.Vector2(0.35, 0.35),
+    }),
+  );
+  material.name = 'lake';
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'lake';
+  mesh.receiveShadow = true;
+  mesh.matrixAutoUpdate = false;
+
+  return {
+    mesh,
+    /** @param {number} simTime */
+    update(simTime) {
+      ripples.offset.set((simTime * DRIFT[0]) / RIPPLE, (simTime * DRIFT[1]) / RIPPLE);
+    },
+    dispose() {
+      geometry.dispose();
+      ripples.dispose();
+      material.dispose();
+    },
+  };
+}

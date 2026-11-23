@@ -250,8 +250,8 @@ export function buildFeatures() {
   const dlo = smooth(P('side', [...DLO_TOP].reverse()), false);
   area('dlo', 'side', sideGate, outline([belt, dlo], [0.012, 0.012]));
   // the B-pillar's black applique, and the divider bar in front of the quarter light (2.4)
-  area('bpillar', 'side', sideGate, poly('side', side([[-0.36, 0.982], [-0.457, 1.42], [-0.567, 1.42], [-0.52, 0.982]]), 0));
-  area('divider', 'side', sideGate, poly('side', side([[-1.099, 0.982], [-1.131, 1.37], [-1.153, 1.37], [-1.121, 0.982]]), 0));
+  area('bpillar', 'side', sideGate, poly('side', side([[-0.36, 0.982], [-0.45, 1.375], [-0.56, 1.375], [-0.52, 0.982]]), 0));
+  area('divider', 'side', sideGate, poly('side', side([[-1.099, 0.982], [-1.129, 1.35], [-1.151, 1.35], [-1.121, 0.982]]), 0));
   // windscreen and rear screen in plan (3.4): bowed upper and lower edges, straight sides, rounded corners. The
   // top view's plane has the axes (-x, z).
   const [e1, e2] = viewBasis(VIEWS.top);

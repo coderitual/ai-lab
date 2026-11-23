@@ -110,10 +110,7 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
   `src/game/track.js` from `src/game/trackLayout.js`: read by the physics, by
   everything the world builds along the road, and by the HUD's map), the
   light of each time of day (`src/assets/world/lighting.js`: sky, fog, lamps,
-  wetness, the car's lamps, exposure and the grade all read its tables), the
-  sea (its waves in `src/engine/waves.js`; where the water is, `terrain.sea`
-  from `src/assets/world/terrain.js`, read by the water, the ground's coastal
-  colours and the far ridges; how it looks in `src/assets/world/sea.js`), and
+  wetness, the car's lamps, exposure and the grade all read its tables), and
   the numbers of the run (`src/game/config.js`).
 - Layers: `engine/` knows nothing about cars or roads; `assets/` builds what
   is visible and may import `engine/`, never `game/`; `game/` is the run
@@ -125,7 +122,7 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
   and must find the same run, and `?manual&t=…` must be the same picture
   every time.
 - The times of day are whatever `TIMES` in `lighting.js` holds, in that
-  order (day, dusk, twilight, night; the demo opens on the first). Code iterates over them
+  order (day, dusk, night; the demo opens on the first). Code iterates over them
   and never assumes how many there are. Best laps, the board and the ghost are
   kept per time of day.
 - The scene is one render call per view into the multisampled HDR target;

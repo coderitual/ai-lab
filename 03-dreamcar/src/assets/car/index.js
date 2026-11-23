@@ -15,11 +15,8 @@ import { ATLAS_SIZE, bakeAtlas } from './atlas.js';
 import { MESH_EDGE, createArchGeometry, createLayout, inArch, sampleSkin, skinGeometry, skinIndex } from './body.js';
 import { buildDetails } from './details.js';
 import { createLampLights } from './lamps.js';
-import { createLiveryTexture } from './livery.js';
 import {
   PAINTS,
-  PAPER,
-  copyProxy,
   createDarkMaterial,
   createLampPartMaterial,
   createGhostMaterial,
@@ -28,15 +25,11 @@ import {
   createPlateMaterial,
   createShared,
   createTrimMaterial,
-  boreRows,
 } from './materials.js';
 import { createContactShadow } from './shadow.js';
 import { RAIL, createSkin } from './skin.js';
 import { DIMS, STATIONS, WHEELS } from './spec.js';
 import { createWheel } from './wheel.js';
-
-/** How long the paint's mirror image of the tunnel's luminaires is smeared along the road: the car's travel in this many seconds. */
-const BORE_SHUTTER = 1 / 90;
 
 /** Atlas channels (features.js CHANNELS). */
 const GLASS = 0;
@@ -69,7 +62,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
   object.name = ghost ? 'ghost car' : 'car';
   const disposables = [];
   const keep = (thing) => {
-    if (thing) disposables.push(thing);
+    disposables.push(thing);
     return thing;
   };
   const skin = createSkin();
@@ -97,14 +90,9 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
   keep(archGeometry.liner);
 
   let shared = null;
-  let boreLength = 0;
   let shadow = null;
   let lights = null;
   let ghostMaterial = null;
-  /** What setPaint changes: the paint's material and the body-coloured trim (the mirror caps). */
-  let paintMaterial = null;
-  let bodyTrim = null;
-  let livery = null;
   if (ghost) {
     ghostMaterial = keep(createGhostMaterial());
     skinMesh(() => true, ghostMaterial);
@@ -124,7 +112,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
     const { u, v } = lay;
     const extremes = (channel, i, k) => atlas.extremes(channel, u.coords[i], u.coords[i + 1], v.coords[k], v.coords[k + 1]);
     shared = createShared(textures);
-    paintMaterial = keep(createPaintMaterial(shared, caps, paint, {
+    const paintMaterial = keep(createPaintMaterial(shared, caps, paint, {
       shoulderV: v.atlas[RAIL.shoulder],
       extentV: lay.extent[1],
       texel: Math.max(lay.extent[0] / atlas.width, lay.extent[1] / atlas.height),
@@ -168,7 +156,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       gloss: () => createTrimMaterial(shared, caps, { color: [0.01, 0.01, 0.012], metal: 0, rough: 0.06, coat: 1 }),
       matte: () => createTrimMaterial(shared, caps, { color: [0.02, 0.02, 0.022], metal: 0, rough: 0.65 }),
       glass: () => createTrimMaterial(shared, caps, { color: [0.38, 0.39, 0.4], metal: 1, rough: 0.02 }),
-      body: () => (bodyTrim = createTrimMaterial(shared, caps, { color: numbers.color, metal: numbers.metal, rough: numbers.rough, coat: 1 })),
+      body: () => createTrimMaterial(shared, caps, { color: numbers.color, metal: numbers.metal, rough: numbers.rough, coat: 1 }),
       emit: () => createLampPartMaterial(shared, caps),
       // the cabin: black leather and plastic (0.012: at 0.028 the seats read cream in the low sun through the
       // windscreen), lit by whatever sun comes in through the glass; under its roof it sees
@@ -216,7 +204,7 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
   });
   const level = { drl: 0, low: 0, high: 0, tail: 0, brake: 0, reverse: 0, indicatorL: 0, indicatorR: 0, interior: 0 };
   const middle = (STATIONS.nose + STATIONS.tail) / 2;
-  const car = {
+  return {
     object,
     headlights: lights ? lights.headlights : [],
     taillight: lights ? lights.taillight : null,
@@ -225,36 +213,6 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       half: new THREE.Vector3(DIMS.widthWithMirrors / 2, DIMS.height / 2, DIMS.length / 2),
     },
     paints: Object.keys(PAINTS),
-    /** The paint showing (a key of PAINTS). */
-    paint: null,
-    /**
-     * Repaint the car (a key of PAINTS; an unknown name is silver): the paint's and the trim's uniforms, the wheels'
-     * finish, and the livery's picture, drawn the first time it is wanted and kept. Nothing is rebuilt or recompiled.
-     */
-    setPaint(name) {
-      const key = PAINTS[name] ? name : 'silver';
-      this.paint = key;
-      const p = PAINTS[key];
-      for (const wheel of wheels) wheel.setFinish?.(p.wheels ?? null);
-      if (!paintMaterial) return;
-      const u = paintMaterial.userData.paint;
-      u.paintColor.value.set(...p.color);
-      u.paintMetal.value = p.metal;
-      u.paintRough.value = p.rough;
-      u.paintFlop.value = p.flop;
-      u.paintFlake.value = p.flake;
-      u.paintCoat.value = p.coat ?? 1;
-      paintMaterial.clearcoatRoughness = p.coatRough ?? 0.03;
-      if (p.livery && !livery) livery = keep(createLiveryTexture(tier));
-      u.paintLivery.value = p.livery ? livery : null;
-      u.paintLiveryOn.value = p.livery && livery ? 1 : 0;
-      if (bodyTrim) {
-        bodyTrim.color.setRGB(...p.color, THREE.LinearSRGBColorSpace);
-        bodyTrim.metalness = p.metal;
-        bodyTrim.roughness = p.rough;
-        bodyTrim.clearcoat = p.coat ?? 1;
-      }
-    },
     /** The contact shadow: the game adds it to the scene (it is not part of `object`) and poses it. */
     shadow: shadow ? shadow.mesh : new THREE.Group(),
     poseShadow(point, normal, yaw, strength) {
@@ -273,37 +231,9 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       shared.carLampsB.value.set(level.brake, level.reverse, level.indicatorL, level.indicatorR);
       shared.carLampsC.value.set(level.interior, 0, 0, 0);
     },
-    /**
-     * The tunnel, for the paint's lines of luminaires and its box-projected probe (materials.js GLSL_BORE): the car's
-     * origin in the road's frame (`lat`, `h` over the centre line's grade, `s`), that frame's level heading `ahead`
-     * and level left `flat` and the world's up in car space, the road's `grade`, how far the car is under the roof
-     * (`under`, 0..1), its speed (m/s) and whether a tunnel is near at all (`near`; tunnel.js sets where it is).
-     */
-    setBore({ lat, h, s, under, ahead, flat, up, grade, speed, near }) {
+    setReflections({ cube, sky }) {
+      for (const wheel of wheels) wheel.setReflections({ cube, sky });
       if (!shared) return;
-      const zone = shared.uBoreZone.value;
-      const length = zone.y - zone.x;
-      if (length > 0 && length !== boreLength) {
-        boreLength = length;
-        const { rows, from, span } = boreRows(length);
-        for (let i = 0; i < 4; i++) {
-          const k = Math.min(i, rows.length - 1);
-          shared.carBoreBars.value[i].fromArray(rows[k] ?? [0, 1, 0, 0]);
-          shared.carBoreFrom.value.setComponent(i, i < rows.length ? from[i] : 1e9);
-        }
-        shared.carBoreSpan.value.fromArray(span);
-      }
-      shared.carBoreAt.value.set(lat, h, s, under);
-      shared.carBoreAhead.value.set(ahead.x, ahead.y, ahead.z, grade);
-      shared.carBoreFlat.value.copy(flat);
-      shared.carBoreUp.value.copy(up);
-      shared.carBoreMove.value.set(Math.abs(speed) * BORE_SHUTTER, near && length > 0 ? 1 : 0);
-    },
-    setReflections({ cube, sky, exposure, proxy = null }) {
-      for (const wheel of wheels) wheel.setReflections({ cube, sky, exposure, proxy });
-      if (!shared) return;
-      copyProxy(shared, proxy);
-      if (exposure) shared.carKey.value = PAPER / exposure;
       shared.carProbe.value = cube || null;
       shared.carProbeOn.value = cube ? 1 : 0;
       shared.carSky.value = sky;
@@ -312,6 +242,4 @@ export function createCar({ paint = 'silver', plate = 'K1 DOMI', tier = 'high', 
       for (const thing of disposables) thing.dispose();
     },
   };
-  car.setPaint(paint);
-  return car;
 }

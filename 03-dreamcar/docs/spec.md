@@ -19,16 +19,16 @@ cameras, the HUD's map, the sound) asks the Track.
 | | |
 | --- | --- |
 | length | 5136.1 m on the map, driven clockwise; sampled every 1.000 m (5136 samples) |
-| start | the line at the world's origin, driven towards +X along z = 0; the bay (the sea) on the left (z < 0), the land on the right |
+| start | the line at the world's origin, driven towards +X along z = 0; the lake on the left (z < 0), the land on the right |
 | paved width | 12 m (`HALF_WIDTH` 6) |
 | strip beyond each edge | 1.2 m (`SHOULDER`) in the pavement's banked plane: a kerb where the Track puts one, a paved margin elsewhere |
 | verge to the barrier | 1.5 m (tunnel walls, parapets) to 9.95 m (run-off); grass, wandering inside each side's range (`SIDES`), moving at most 0.12 m per metre |
-| height | 0 to 60.6 m above the line, top at s = 1868 m just out of the tunnel; after it the coast runs low over the bay out and back, 10.9 m over the line at its lowest (s = 2622 m), 23 to 44 m on the way back, rejoining at the gully bridge's end (37.6 m, s = 4115 m); the sea 1.8 m under the line (`lakeLevel`) |
+| height | 0 to 108.2 m above the line, top at s = 3111 m; the lake 1.8 m under the line |
 | gradient | -8.0 to +6.0 per cent |
 | tightest radius | 55 m (the carousel); 11 bends |
 | banking | by rule 9° x tanh(250 m / R), or the piece's own; at most 10° (the sky road) |
-| crest | none made to lift the car: no crest sharper than 1303 m (the gully bridge's, over 43.5 m at s = 3900 m); the sharpest sag 1593 m at s = 4600 m (the long right) |
-| closest approach of two stretches | 85.6 m apart (63.2 m between barriers, 23.5 m of height): the climb and the crest beside the carousel |
+| crest | vertical radius 453 m at s = 3132 m; the compression 1116 m at s = 3333 m; everywhere else at least 1207 m |
+| closest approach of two stretches | 85.6 m apart (63.2 m between barriers, 22.9 m of height): the climb and the crest beside the carousel |
 
 ### Sections
 
@@ -41,13 +41,13 @@ run of `tools/handling.mjs`.
 | `straight` | Lakeside straight | 4686 to 250 (700 m) | finish 340 m, pitIn 110 m, the line, grid 40 m, gridRun 210 m; level | 225 to 279 |
 | `sweep` | Shore bend | 250 to 657 | right R 220 through 80°, banked 9°; 100 m straight climbing to 5 % | 196 to 225 |
 | `esses` | Forest esses | 657 to 1409 | right R 260 55° (bank 8°), left R 330 40° (7°), right R 240 65° (9°); 4 to 5.5 % | 204 to 240 |
-| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens), the lap's top just out of the box (60.6 m), then down to 7.9 % | 216 to 260 |
-| `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers over the sea: left R 300 through 110°, banked 10°, down at 7.9 % from 53.7 m to 11.3 m over the line, easing to 2 % down at its end; ground 60 m under the middle (under the sea) | 228 to 261 |
-| `carousel` | The carousel | 2582 to 2915 | the low point by the water (10.9 m), a 150 m climb to 5.5 %, then right R 55 through 190°, banked 8°, 5 % up (13.9 to 23.5 m), water both sides | 90 to 227 |
-| `crest` | The crest | 2915 to 3115 | 200 m straight on a low shelf between the open sea and the bay, 2 % down (23.5 to 26.5 m: no longer the top) | 108 to 166 |
-| `plunge` | The plunge | 3115 to 3394 | right R 400 through 40°, banked 5°, level (26.5 to 25.1 m; the name is the old road's) | 166 to 203 |
-| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 7°, the bay inside), right R 350 20° (6°), climbing to 4 % and 6.3 % (25.1 to 38.0 m) | 203 to 238 |
-| `gully` | Gully bridge | 3778 to 4115 (337 m) | straight on piers over the bay (ground 45 m under the middle), over a broad top (43.5 m) then 8 % down to its old end height, 37.6 m | 238 to 271 |
+| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens) | 216 to 255 |
+| `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers: left R 300 through 110°, banked 10°, ground 42 m under the middle | 229 to 257 |
+| `carousel` | The carousel | 2582 to 2915 | 150 m climb at 6 %, then right R 55 through 190°, banked 8° | 90 to 229 |
+| `crest` | The crest | 2915 to 3115 | 200 m straight over the top | 108 to 161 |
+| `plunge` | The plunge | 3115 to 3394 | right R 400 through 40°, banked 5°, 8 % down into the compression | 161 to 215 |
+| `ledge` | The ledge | 3394 to 3778 | left R 300 50° (bank 7°; low walls both sides, the valley open inside, a wooded bank outside), right R 350 20° (6°, rock on the inside) | 216 to 257 |
+| `gully` | Gully bridge | 3778 to 4115 (337 m) | straight on piers, ground 26 m under the middle, 8 % down | 257 to 282 |
 | `sweepback` | The long right | 4115 to 4686 | 100 m straight, then right R 300 through 90°, banked 9° | 234 to 283 |
 
 Joints between pieces ease the curvature (and the banking) over 45 to 140 m
@@ -62,22 +62,16 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 
 | | |
 | --- | --- |
-| barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; walls in the tunnel and parapets on the bridges, 1.5 m beyond the pavement; on the sea side of the coast road (the climb, the carousel, the crest and the plunge: `coastDown`, `coastRun`, `coastTop`) the rail stands on white posts, a lip of dry grass and the cliff beyond it, no trees either side; round the carousel and over the crest the verge inside the rail is ochre gravel (surface `GRAVEL`, grip 0.6), no tyre wall; edges and slopes as the presets they replaced; the coast road's kerbs bare concrete, its centre line double yellow (the sky road to the plunge, road.js `PIECE_MARKS`); no floodlights round the carousel and over the crest |
-| the sea | outside the loop at bearings from the course's middle outside -115 to 50 degrees (0: the straight's heading), from 55 to 170 m beyond the solid edge; the bay beside the straight; level -1.8 m; seabed to 45 m; 7 sea stacks; no far shore (terrain.js `SEA`) |
-| structures | the tunnel's bore 349 m, ceiling 6.4 m over the road (`TUNNEL`); two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
-
 | barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; the walkways' kerb faces in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
-| rock | cut faces in beds 1.35 m thick (`BED`), blocks 2.6 to 6.8 m long set back 0.06 to 0.62 m and swelling up to 0.38 m (rock.js); a natural arch over the road at 1972 m (`ARCH`: underside about 11 m over the road, never under 9 m over the corridor, feet 5.2 m and crown 2.9 m thick) |
-| structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 96 m: over an inlet of the sea), `gully` 3778 to 4115 (drop 26 m) |
+| structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
-| tyre walls | 8 runs, on the outside of the fast bends, painted white and red by blocks of five stacks |
-| the asphalt (road.js, road lane) | albedo [0.11, 0.106, 0.101] on new surfacing to [0.22, 0.211, 0.195] a generation old (`ASPHALT`), its stones apart by 1.05 times their tone; wet, 0.25 of that; each lane's wheel paths 0.85 m either side of its middle, 0.42 m wide, up to 16 % darker (`WEAR`); grit on 11 cm cells, odds 0.05 off the line plus 0.2 at the edges, hardly any on paint (`GRIT`); 17 patches and 59 sealed cracks (49 along the road, 10 across) round the lap (roadHistory.js); paint white 0.74, its edges ragged by 1.8 cm up close (`PAINT`) |
-| trackside boards | 10 runs: the outsides of the run-off bends, and two groups on the straight's lake-side wall (229 to 189 m and 82 to 44 m before the line); none on its land side |
-| distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel; each 0.6 m (0.35 m on a parapet) beyond the widest edge across its own width, a parapet's board hung from a bar that starts at the parapet's outer face |
-| marshal posts | 11, 2.5 m beyond the edge, none on a structure or within 40 m of one's ends, none within 150 m of another; the hut's front 1.8 m beyond the widest edge within 2 m of it (trackside.js `MARSHAL`) |
+| tyre walls | 8 runs, on the outside of the fast bends |
+| trackside boards | 11 runs, both walls of the straight included |
+| distance boards | 300 m and 200 m (on the sky road's parapet) and 100 m before the carousel |
+| marshal posts | 12 |
 | start gantry | across the road 8 m beyond the line, feet about 11.5 m left and 12.4 m right of the centre line |
 | street lamps | 23, 9 m high, every 30.4 m on alternating sides along the whole straight |
-| floodlights | 62, 12 m high, every 55 m round the rest of the lap (`lapLamps`): on the inside of bends tighter than 1500 m, alternating elsewhere; none in the tunnel or within 25 m of its portals, none on `ledge1` (frame D3's place) nor on `carousel` and `crest` (frame E1's, round 2); 2.5 m behind the edge where it is a rail (40 of them; a lamp due at a rock face goes to the other side if a rail is there), at the edge in rock cuttings (4) and at parapets (18) |
+| floodlights | 69, 12 m high, every 55 m round the rest of the lap (`lapLamps`): on the inside of bends tighter than 1500 m, alternating elsewhere; none in the tunnel or within 25 m of its portals, none on `ledge1` (frame D3's place); 2.5 m behind the edge where it is a rail (47 of them; a lamp due at a rock face goes to the other side if a rail is there), at the edge in rock cuttings (4) and at parapets (18) |
 | tunnel lamps | 29 rows of two, every 12 m, 0.6 m in from the kerb faces and 0.3 m under the ceiling; gain 2.4 over the first 60 m, easing to 1 by 130 m, 1.4 over the last 36 m (`tunnelLamps`); fittings drawn along both haunches at 95 places each (two bars every 2 m over the first 60 m, one every 3 m to 130 m and over the last 36 m, every 6 m between: 250 bars) |
 | sector lines | s = 1881.8 m (37 %, just out of the tunnel) and 3420.0 m (67 %, the start of the ledge); the third is the line |
 | grid | 12 boxes behind the line (`track.grid`) |
@@ -142,25 +136,26 @@ Laps of the real road (flying laps, Node, no drawing):
 
 | driver | lap | notes |
 | --- | --- | --- |
-| autopilot, pace 1.0 | 85.2 s (85.0 before the coast ran low) | 0 impacts, stability control 5.1 s a lap |
-| autopilot, pace 0.9 (`?ap`) | 93.5 s | 0 impacts |
-| autopilot, pace 0.7 | 118.3 s | 0 impacts |
-| one thumb (full throttle unless braking) | 84.8 s | 0 impacts |
-| pad (analog) | 85.2 s | 0 impacts |
-| keys | 85.1 s | 0 impacts, stability control 7.7 s a lap |
-| ham-fisted keys (flat out, full keys, slow hands) | 90.6 s | 0 impacts, body 2.42 m beyond the pavement at worst |
+| autopilot, pace 1.0 | 85.0 s (218 km/h mean) | 0 impacts, stability control 4.3 s a lap |
+| autopilot, pace 0.9 (`?ap`) | 93.1 s | 0 impacts |
+| autopilot, pace 0.7 | 117.4 s | 0 impacts |
+| one thumb (full throttle unless braking) | 84.5 s | 0 impacts |
+| pad (analog) | 85.0 s | 0 impacts |
+| keys | 85.0 s | 0 impacts, stability control 6.8 s a lap |
+| ham-fisted keys (flat out, full keys, slow hands) | 85.4 s | 0 impacts, body 0.14 m beyond the pavement at worst |
 
 The one-thumb pad (`tools/unit/drift.test.mjs`, the scripted person of
 `manoeuvres.humanDriver` with its thumb on the pad, through Input's
 `padControls`: across and down together, 900 px/s, wavering 3 px, 0.15 s
-late; the low coast's road): a tidy lap 86.4 s against the scripted keys' 86.4 s
-(autopilot 85.2 s), 0 impacts, 9.0 s of braking a lap, 7.5 s of it while
-turning at 0.3 g or more (trailing the brake in); the carousel sideways at
-Sport, thrown in with the handbrake by the steering thumb's red arc: 3.9 s
-beyond 12° at 15° mean, 36° at most (by the HANDBRAKE button the same; both a
-87.8 s lap). A clumsy thumb (600 px/s, 8 px of waver, 0.2 s late) at the
-default level: 88.8 s, no impacts, no spin, the body 1.20 m beyond the
-pavement at worst.
+late): a tidy lap 86.3 s against the scripted keys' 86.3 s (autopilot 85.0
+s), 0 impacts, 9.2 s of braking a lap, 7.8 s of it while turning at 0.3 g or
+more (trailing the brake in); the carousel sideways at Sport, thrown in with
+the handbrake by the steering thumb's red arc: 3.4 s beyond 12° at 15° mean,
+38° at most, no touches (by the HANDBRAKE button: the same 3.4 s, 33° at
+most; both cost 1.4 s on the lap); at the default level the gesture kicks it
+to 22° and the help catches it (+0.6 s). A clumsy thumb (600 px/s, 8 px of
+waver, 0.2 s late) at the default level: 88.1 s, no impacts, no spin, the
+body 1.46 m beyond the pavement at worst.
 
 ### Assists
 
@@ -211,9 +206,9 @@ key lock at speed do not spin the car.
 
 | | keyboard (solo) | split screen | gamepad (standard mapping) | touch |
 | --- | --- | --- | --- | --- |
-| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | Steering Pad (default): the thumb's offset down from the pad's centre (where the thumb landed, fixed until it lifts): at or above the centre full power (Throttle auto, the default: with no thumb on the pad the car drives on too), the first 25 % of 56 px down lifts the throttle, the rest brakes, fully at 56 px; Throttle manual: up is the throttle (full at 56 px), the centre coasts, down brakes. Slider and Arrows: the pedals. Throttle auto: the car drives by itself and lifts while BRAKE or DRIFT is held; manual: only while GAS is held (88 px, in the corner). BRAKE: 80 px, in the corner on auto, left of GAS on manual (where that would shorten the slider below 70 px, as on an upright phone, BRAKE stands up and to the left of GAS, clear of it). Braking held at a standstill reverses |
-| steer | A D or ← → | A D and ← → | left stick | Pad (default): a round pad (radius 0.21 × the view's shorter side, 50 to 80 px: 160 px across on a phone) that appears under the thumb. At rest it is a faint ghost (30 % opacity) at its home place, on the side of the holding hand (Hand: Right, the default, or Left; it decides only where the ghost and the HANDBRAKE button sit, both hands work everywhere): its centre radius + 25 px (scaled with the pad) from that side and 150 px above the bottom on an upright phone (0.176 × the view's height, 150 at most, the radius + 22 at least). A thumb landing anywhere in the view (in a split screen, in the half) that is not a HUD button or the HANDBRAKE button puts the pad's centre exactly at that point (an 80 ms scale-in); the centre stays there, fixed, until that thumb lifts (no trailing, no rebasing), so the first input is always zero; the steering is the offset across from the centre over 70 px, linear, clamped to full lock, no dead step. Room at the edges: the travel needed is 70 px (scaled) to the left and to the right edge of the safe area and 74 px (the handbrake's red) to its bottom edge; with less room than that the pad is still drawn at the thumb and that direction's travel is compressed to the room there is, but never under 60 % of the normal; with less room than 60 % of it the centre is nudged inward by what is missing (the disc is also drawn inside the safe area where it can) and the input is held at zero until the thumb has moved 6 px from where it landed. Let go, the knob springs back, the live pad stays 0.4 s and fades (0.2 s) while the ghost returns at the home place; the next touch places it afresh. Tilt: the device rolled like a wheel, ±30° from how it was held at the start (or at Recentre on the pause sheet) is full lock, upright or on its side (deviceorientation, asked for in the option's click and on the first touch; refused or absent, the pad steers and the options say so); the pad still brakes. Slider: a fixed track at the bottom left; the steering is the thumb's distance from its centre over the half travel (56 + 0.05 × the view's width px, 48 to 92 px). Arrows: two 76 px buttons, held as the A and D keys are. For the pad, tilt and the slider the curve and smoothing are the hands' (`HANDS.thumb`: power 1.15 standing, 1.45 at 216 km/h and above; a critically damped follow, two lags of 22 ms standing to 50 ms at speed). A second finger is the handbrake (below); it never takes the pad |
-| handbrake | Space | Space, right Shift | A or RB | Pad: pulled on down past 74 px (scaled) into the red arc at the pad's foot, let go above 62 px; a second finger anywhere else in the view (not on a HUD button) while the pad's thumb is down, for as long as it is held (power lifts as for the button); and the round HANDBRAKE button (68 px) in the other bottom corner (above the pad where the view is too narrow), held, which stays as the visible target and works with or without a thumb on the pad. Slider and arrows: DRIFT (68 px), above the corner pedal (beside the pedals on a view lower than 330 px or narrower than 300 px), held. A short buzz (`navigator.vibrate(8)`, where there is one: not on iOS) when it is pulled and when a wheel strikes a kerb |
+| drive / brake | W / S or ↑ / ↓ | W / S and ↑ / ↓ | right / left trigger | Steering Pad (default): the thumb's offset down from the pad's fixed centre: at or above the centre full power (Throttle auto, the default: with no thumb on the pad the car drives on too), the first 25 % of 56 px down lifts the throttle, the rest brakes, fully at 56 px; Throttle manual: up is the throttle (full at 56 px), the centre coasts, down brakes. Slider and Arrows: the pedals. Throttle auto: the car drives by itself and lifts while BRAKE or DRIFT is held; manual: only while GAS is held (88 px, in the corner). BRAKE: 80 px, in the corner on auto, left of GAS on manual (where that would shorten the slider below 70 px, as on an upright phone, BRAKE stands up and to the left of GAS, clear of it). Braking held at a standstill reverses |
+| steer | A D or ← → | A D and ← → | left stick | Pad (default): a fixed round pad (radius 0.21 × the view's shorter side, 50 to 80 px: 160 px across on a phone) on the side of the holding hand (Hand: Right, the default, or Left); its centre radius + 25 px (scaled with the pad) from that side and 150 px above the bottom on an upright phone (0.176 × the view's height, 150 at most, the radius + 22 at least). A thumb anywhere in its zone (that half of the view, its lower 45 %, and round the pad) takes the knob; the steering is its offset across from the fixed centre over 70 px, linear, clamped to full lock, no dead step. Tilt: the device rolled like a wheel, ±30° from how it was held at the start (or at Recentre on the pause sheet) is full lock, upright or on its side (deviceorientation, asked for in the option's click and on the first touch; refused or absent, the pad steers and the options say so); the pad still brakes. Slider: a fixed track at the bottom left; the steering is the thumb's distance from its centre over the half travel (56 + 0.05 × the view's width px, 48 to 92 px). Arrows: two 76 px buttons, held as the A and D keys are. For the pad, tilt and the slider the curve and smoothing are the hands' (`HANDS.thumb`: power 1.15 standing, 1.45 at 216 km/h and above; a critically damped follow, two lags of 22 ms standing to 50 ms at speed). A second thumb on the steering is ignored |
+| handbrake | Space | Space, right Shift | A or RB | Pad: pulled on down past 74 px (scaled) into the red arc at the pad's foot, let go above 62 px; and the round HANDBRAKE button (68 px) in the other bottom corner (above the pad where the view is too narrow), held. Slider and arrows: DRIFT (68 px), above the corner pedal (beside the pedals on a view lower than 330 px or narrower than 300 px), held. A short buzz (`navigator.vibrate(8)`, where there is one: not on iOS) when it is pulled and when a wheel strikes a kerb |
 | camera | C | C, `.` | Y | button |
 | look back | B (held) | B, `,` | X | |
 | put back | R | R, `/` | B | button |
@@ -225,7 +220,7 @@ key lock at speed do not spin the car.
 | start, menus | Enter, Tab | | A, d-pad | tap |
 
 Each driver reads whichever of their devices was used last. The touch
-controls are drawn from `layoutOf` (the pad's home place, the ghost's; a placed pad stands where `controlsOf(i).placed` says) (`TOUCH` and `layoutOf` in
+controls are fixed and always drawn (`TOUCH` and `layoutOf` in
 `src/engine/Input.js`; the HUD draws them from the same layout, so a finger
 finds what it sees): 18 px from the edges inside the safe area (the notch and
 the home bar), 12 px apart; the pad's knob 60 px (scaled with the pad), the
@@ -233,8 +228,8 @@ slider's 52 px, resting on that bottom margin. Each control keeps the finger tha
 lifts (sliding off a pedal keeps it; pulled past the pad's rim the knob stops
 at the rim, or clicks into the red arc while the handbrake is pulled; let go,
 it springs back to the centre in 0.16 s); a cancelled pointer, the window losing
-focus, a hidden tab or a turned device lets every control go. With the slider, arrows or pedals a touch
-anywhere else does nothing to the car; with the pad a touch anywhere places it. The HUD's own buttons (camera, lights, reset, pause) keep working and never place it. On
+focus, a hidden tab or a turned device lets every control go. A touch
+anywhere else does nothing to the car; the HUD's own buttons keep working. On
 a view too narrow for the steering and the pedals side by side (half of an
 upright phone) the pedals stand above the steering, in one column. On a tablet in split
 screen each half of the screen is one driver's, with its own controls laid
@@ -245,7 +240,7 @@ controls step back to 45 % opacity while no finger is on any of them. On the
 first run on a touch screen the controls are outlined and the steering named
 (the pad: STEER · BRAKE · DRIFT; the slider: STEER; the pedals carry their
 words always) for the first 3 s of the race clock, then never again
-(`dreamcar.zones.v1`); the first-run hint for the pad reads "Touch anywhere, slide to steer,
+(`dreamcar.zones.v1`); the first-run hint for the pad reads "Slide to steer,
 pull back to brake, pull to the red to drift". Every button can be reached by Tab and Enter, or a
 pad's d-pad and A; the pedals and arrows are at least 64 px, the four small
 buttons 44 px.
@@ -285,7 +280,6 @@ unit per view:
   gear, the ABS / TC / ESC lamps (touch screens: see below);
 - bottom left: a small map (can be hidden; touch screens: see below);
 - just above the speed, only while the car slides 12° or more: the slide's angle and its running score (`vehicle.slide`; `Hud.setDrift`), fading out a second after the slide ends; the best slide of the run is on the results;
-- beside the speed (on the cluster's open side: left of it, or right of it where the cluster is anchored at the left, as with the pad in the right hand, a low view and a tall one; absolute, so no layout moves for it): the pedal gauge (`Hud.setGauge`), for every device and in both halves of a split: two slim vertical bars, 1 unit wide and 7 tall (8 x 56 px at 8 px a unit, scaled with the HUD), the brake at the left (amber, red above 60 %) and the throttle at the right (green), both filling upward with what the car got (`vehicle.throttle` and `vehicle.brake`, after the pad's mapping, the auto throttle, the lift, the traction control and the limiter, so traction control shows as a flicker downward), eased in the fixed step by a 40 ms lag (`Game.update`; the picture only reads it), ticks at 50 % and 100 %, and a small dot between them that lights red while the handbrake is on; each bar is a `role="meter"` with an aria-label and `aria-valuenow` in per cent; no words;
 - touch screens, the pad: the bottom corners are the thumbs' (the pad on the holding hand's side, the HANDBRAKE button on the other) and nothing else stands there. The speed above the HANDBRAKE button at 0.86 of its size (the slide readout above it), the map above the pad, both mirrored for the left hand; a narrow half of a split screen has no map; on an upright view the pad's top stays below 75 % of the height, under the car's tail (133 px up on a 393x852 phone rather than 150); a view lower than 330 px (a stacked half) or narrower than 300 px (half an upright phone): the speed at the top, as for the pedals. Placed by `--sticktop`, `--stickside`, `--handtop`, `--handside` from the layout (`Hud.setControls`);
 - touch screens, the slider and the arrows: the steering left, the pedals right, and nothing else in those corners. A wide view: the speed just left of the pedals (110 px from the right on auto; on manual 108 px from the right and 110 px up, above BRAKE and left of DRIFT), the map 112 px up, above the steering; a narrow wide view (a side-by-side half on a phone): the speed 206 px up, above the pedals; a view lower than 330 px (a stacked half): the speed at the top beside the lap; an upright view: the speed 112 px up at the left, drawn at 0.86 of its size, the map above it; a view narrower than 300 px (half an upright phone): the speed under the lap, no map, DRIFT beside BRAKE;
 - touch screens: four small buttons together (camera, high beam, put back,
@@ -301,27 +295,10 @@ On the title and the pause sheet: quality (auto, low, medium, high; applied
 by reloading the page), sound on or off, time of day, driving help (Full,
 Sport, Off: `ASSISTS` in config.js, applied at once to every car and to every
 car made later), Steering (Pad, Slider, Arrows or Tilt; under it what the
-choice does, or why tilt is not steering), Resting hand (Right or Left: where the pad's ghost and the HANDBRAKE button sit; with the pad
+choice does, or why tilt is not steering), Hand (Right or Left; with the pad
 or tilt) and Throttle (auto or manual), shown on touch screens; Recentre tilt
-on the pause sheet while tilt steers; the paint (Silver, Black, White, Blue,
-Red, Matte grey, Graphite, Night race: `PAINTS` and `PAINT_ORDER` in
-assets/car/materials.js; applied at once, nothing rebuilt; a second row for
-the second player in split screen; the ghost follows the first driver's);
-units (km/h, mph), the map shown or hidden, the readout shown or hidden (off
-until asked for; `?stats` shows it without the option). The readout is one
-line of small type (9 px, less on a narrow screen so that it fits) at the
-page's bottom edge, inside the home bar's strip on a phone, written three
-times a second:
-
-    medium 804×1748@2 ×0.85 msaa4 58/41fps off:probe,blur,detail apple gpu
-
-the tier; the canvas in device pixels and its pixel ratio; the render scale;
-how edges are smoothed (`msaa4`, `msaa2`, or `fxaa` where the scene has no
-samples); the mean frame rate of the last 3 s and its slowest frame as a
-rate; the ladder's rungs given up (`all on`: none; `testing`: the governor's
-trial; `cap30` before it: the frame rate the browser holds, once found);
-what the browser calls the GPU (`ldr` before it: the 8-bit fallback). A
-screenshot with it on says what the phone was drawing.
+on the pause sheet while tilt steers; units
+(km/h, mph), the map shown or hidden.
 
 ## URL parameters
 
@@ -334,15 +311,9 @@ Read once by `src/engine/params.js`.
 | `?laps=N` | laps per run |
 | `?cam=chase\|far\|bonnet\|bumper` | the camera |
 | `?q=low\|medium\|high` | the quality tier (wins over the stored choice) |
-| `?dpr=` | the device pixel ratio (and no governor) |
-| `?scale=` | the render scale: the share of the canvas's size the scene is drawn at (and no governor) |
-| `?shed=N` | N rungs of the tier's ladder shed (and no governor) |
-| `?upscale=0`, `?sharp=0..1` | the plain stretch instead of the sharpening upscale; its strength in place of the scale's own |
-| `?maxdpr=`, `?floor=` | the pixel ratio's cap and the render scale's floor in place of the tier's, the governor left on (to try on a phone: `?maxdpr=3&floor=0.5&stats`) |
-| `?mobile=1\|0` | take the device for a phone, or for a desk (the tiers' numbers for phones) |
-| `?stats` | the performance readout (`?stats=0`: off whatever the option says) |
+| `?dpr=` | the device pixel ratio |
 | `?plate=`, `?plate2=` | the number plates (capitals, digits, spaces, hyphens; 9 at most) |
-| `?paint=` | the first car's paint, over the kept choice and not kept: silver (default), black, white, blue, red, matte, graphite (the second car's default), night (the night-race livery) |
+| `?paint=` | the first car's paint: silver (default), graphite (the second car's), blue, red, white, black |
 | `?wet=0..1` | the road's wetness instead of the time of day's |
 | `?mute` | no sound |
 | `?ui=0` | no HUD |
@@ -351,8 +322,8 @@ Read once by `src/engine/params.js`.
 | `?manual` | the loop does not run: frames come from the page handle |
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
-| `?photo=back,right,up,yaw,pitch,fov[,roll][,hud]` | the staging camera (`roll`: degrees the picture leans clockwise) |
-| `?photo=d1`, `d3`, `d4`, `e1`, `k5`, `waves`, `e2`, `e5` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, e1 the carousel's exit from the crest by day, t 64.9 s, the horizon rolled 7°; k5 the end of the sweepback's first piece at dusk, t 89.1 s, frame K5's chase camera; waves the low crossing by day, t 94.8 s; e2 the forest road of the rise and the first ess by day; e5 the last ess among its granite boulders by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=back,right,up,yaw,pitch,fov[,hud]` | the staging camera |
+| `?photo=d1`, `d3`, `d4` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -361,59 +332,24 @@ Read once by `src/engine/params.js`.
 
 ## Times of day
 
-`TIMES` in `src/assets/world/lighting.js`, in order: day, dusk, twilight,
-night. The sun and the moon are placed against the start straight's heading
-by `placeLights`.
+`TIMES` in `src/assets/world/lighting.js`, in order: day, dusk, night. The sun
+and the moon are placed against the start straight's heading by
+`placeLights`.
 
-| | day | dusk (golden hour) | twilight (after sunset) | night |
-| --- | --- | --- | --- | --- |
-| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | 60° left of the heading, 5° under the horizon; no direct light, no sun shadows | the moon 8° left, 17° up; 0.12 |
-| exposure (tunnel) | 0.68 (5.6) | 4.2 (4.5) | 5 (4.5) | 22 (5) |
-| sky's light on the scene: environment / fill | 0.6 / 0.3 | 0.6 / 0.014 | 0.75 / 0.012 | 1 / 0.013 |
-| sky | zenith [0.15, 0.33, 0.86] | the twilight dome (sky.js), zenith [0.008, 0.022, 0.085] | the twilight dome, zenith [0.008, 0.012, 0.11] | zenith [0.0007, 0.0014, 0.0038] |
-| wetness | 0 | 0 | 0 | 0.8 |
-| street lamps and floodlights / tunnel / windows / cones in the air / the tunnel's entrance and exit zones | 0 / 1 / 0 / 0 / 1 | 1 / 1 / 1 / 0.35 / 0.5 | 1 / 1 / 1 / 0.6 / 0.25 | 1 / 1 / 1 / 1 / 0 |
-| car lamps | running lights | low beam | low beam | low beam |
-| clouds cover | 0.36 | 0.28 | 0.05 | 0.3 |
-| bloom / glare / ghosts | 0.05 / 0.015 / 0.00015 | 0.11 / 0.03 / 0.0002 | 0.13 / 0 / 0 | 0.15 / 0 / 0 |
-| contrast / saturation | 1.14 / 1.18 | 1.24 / 1.22 | 1.18 / 1.15 | 1.12 / 0.94 |
+| | day | dusk (golden hour) | night |
+| --- | --- | --- | --- |
+| sun / moon | 3° right of the straight's heading, 16° up; intensity 7.5 | 125° left (over the lake, behind the driver's left shoulder), 2° up; colour [1, 0.56, 0.24], 2.8 | the moon 8° left, 17° up; 0.12 |
+| exposure (tunnel) | 0.68 (5.6) | 4.2 (6) | 22 (5) |
+| sky's light on the scene: environment / fill | 0.6 / 0.13 | 0.6 / 0.014 | 1 / 0.013 |
+| sky at the zenith (radiance) | [0.22, 0.38, 0.78] | [0.02, 0.034, 0.068] | [0.0007, 0.0014, 0.0038] |
+| wetness | 0 | 0 | 0.8 |
+| street lamps and floodlights / tunnel / windows / cones in the air / the tunnel's entrance and exit zones | 0 / 1 / 0 / 0 / 1 | 1 / 1 / 0.7 / 0 / 0.5 | 1 / 1 / 1 / 1 / 0 |
+| car lamps | running lights | low beam | low beam |
+| clouds cover | 0.45 | 0.45 | 0.3 |
+| bloom / glare / ghosts | 0.05 / 0.015 / 0.00015 | 0.09 / 0.03 / 0.0002 | 0.15 / 0 / 0 |
+| contrast / saturation | 1.14 / 1.18 | 1.2 / 1.16 | 1.12 / 0.94 |
 
 N, or the title's choice, fades to black and back (0.25 s each way) to switch.
-
-## The sea
-
-Defined once: the waves in `src/engine/waves.js`, where the water is in
-`src/assets/world/terrain.js` (`SEA`, `terrain.sea`), how it looks in
-`src/assets/world/sea.js` (`SEA_LOOK`). Tested by `tools/unit/sea.test.mjs`.
-
-| | |
-| --- | --- |
-| level | -1.8 m (`LAYOUT.lakeLevel`), 1.8 m under the start line |
-| coast | outside the loop at bearings from the course's middle outside -115 to 24 degrees (wandering 14 degrees), 55 to 170 m beyond the solid edge; the land's last fall a cliff rising 1.15 per metre; the seabed shelving 0.3 per metre to 45 m; the bay is the old lake's ellipse, 2.2 times as long to the west |
-| the coast road's cliff | on a coast side (eased over 30 m): a lip 1.5 to 4 m wide beyond the solid edge, a cliff 1.6 to 2.6 m down per metre out to a talus 7 m under the water, the seabed beyond (terrain.js `COAST`); open water 10 m beyond the left edge of the sky road (under the deck), 60 to 70 m beyond it on the climb, the carousel, the crest and the plunge; the land side's rock cut 6 m high, its hillside rising at most 0.25 per metre; between the climb and the crest a hill up to 32 m over the road (`COAST.knoll`), a ridge from 80 to 230 m down the tongue from the hairpin's centre, 44 m to either side, set 0.65 of the way towards the climb |
-| the sea span | (round 5: switched off, `SEA_SPAN.off`: with the road brought down its deck passed over the road) scenery: a pale deck 9 m wide, 2.6 m deep, 52 m over the water, on the viaduct's piers every 48 m, on a line from 260 m left of the carousel's middle to 230 m left of the crest's end, carried 15 % of its length on before and 70 % after, standing only where the water is (viaduct.js `SEA_SPAN`) |
-| the bay inside the loop (round 4) | sea sides on the right of the sky road (`parapetSea`), the climb and the carousel (`rockSea`: rock edge, a 1.4 m wall of rock), the crest (`openSea`) and the plunge (`coastUp`); the cliff 2.2 to 3.4 m down per metre out; open water 5 m (the sky road), 30 to 40 m (the others) beyond the right edge (sea.test); the hill on the tongue gone (`knoll.rise` 0); the volcano 195 m right of `ledge2` at 29 %, 190 m over the water, foot 150 m, flanks to the power 1.3, crater 30 m, 24 m deep, its foot 31 m beyond the nearest solid edge; the land drowned round it to 600 m |
-| the sea on the right (round 3) | the sky road's valley under the deck 96 m deep nearly to its ends (its depth along the deck sin^0.25, was ^0.6); the volcano's plume 420 m tall, 16 to 150 m across, leaning 320 m downwind, wisps rising 3 m/s, opacity 0.5; the crater's glow 60 (linear) at full, shown as the sun's strength falls from 5 to 1 (volcano.js `VOLCANO_LOOK`); two draw calls |
-| the low crossing | the long right (`back`, its sides `shoreRun` and `shoreUp`: `lowRun` and `lowUp` with no wood) from 50 to 93 % round it, eased over 50 m: beyond each solid edge a lip 2.5 m wide, then a bank 0.6 m down per metre out to 5 m under the water; inside the bend a lagoon 120 m wide (then 60 m back to the land), 9 m deep at most; the road 2 to 14 m over the water for about 190 m (terrain.js `CAUSEWAY`) |
-| big waves | round a point 70 m left of `back` at 75 % of it, 360 m across: the swell's three waves (not the chop) up to 2.2, 3.4 and 4.2 times higher (150, 98, 63 m), full height within 35 % of the radius (waves.js `BOOST`, `boostAt`) |
-| sea stacks | 7, 9 to 17 m across, 12 to 34 m high, in the open sea, at least 160 m apart |
-| sea map | 512 x 512 texels over 4.8 km (9.4 m a texel): depth, the land's distance from the water (to 500 m), the water's from the land (to 160 m), the sea's share (terrain.js; the ground's coastal colours read it) |
-| shore map | (water lane, `seaShore.js`) 1024 x 1024 texels over the same box (4.7 m a texel; low: 512), baked from `terrain.heightAt`: depth (square root, to 64 m), signed distance to the shoreline (-6 to 160 m, zero where the bed crosses the level between two texels), the land's height (square root, to 400 m; coarser levels keep the highest), sand 0..1 (the bed falling less than 0.16 per metre: sand, more than 0.42: rock); the height function asked within 70 m of a shore and on every fourth texel elsewhere (105 k calls, 0.6 s in Node) |
-| waves | 11 trochoids, longest first: a swell of 150, 98 and 63 m (0.6, 0.38, 0.26 m), chop of 34 to 7.9 m, short waves of 5.1 to 1.7 m (normals only); each in sets and lulls, its height times 1 ± 0.65 over a pattern 7.5 wavelengths long (at least 160 m) turned 65° off it (`GROUPS`); crest to trough about 1.9 m; from the north-west; deep-water speeds |
-| mesh | a disc of rings round each view's eye to 14 km (`SEA_LOOK.horizon`; beyond the far plane, 5 km, kept at depth 1 - 2e-6; towards the mainland's bearings it ends at 0.97 of the far plane): low 32 segments, 6 rings, 352 triangles, flat; medium 96 segments, 22.9 k triangles, moved by the swell and by the sheet on the beaches; high 160 segments, 59.0 k |
-| waves in the normals | the swell's three and the longest chop (150, 98, 63 and 34 m) on every tier, each dropped beyond sqrt(570 h L) m (h the eye's height over the water); the shorter waves of the field (low and mobile know 7, medium 9, high 11) are not drawn as waves: their slopes count as variance and the ripple layers draw the chop |
-| ripples | one 256 x 256 normal map in layers of 3.1, 8.3, 23, 61 and 173 m a repeat, turned 17, -31, 52, -9 and 71 degrees, slopes 0.075, 0.085, 0.08, 0.06 and 0.055 rms in a gust, drifting downwind at 0.32 to 2.4 m/s; low and mobile draw the second and fifth, medium the first, second and fifth, high all five (a layer not drawn counts as roughness); a layer fades between 0.02 and 0.09 of its repeat of pixel footprint; capillaries nobody draws 0.003 of variance: 0.029 in all in a gust (Cox and Munk at 5 m/s) |
-| wind | towards 10 degrees; between gusts 0.28 of a gust's ripples, in a slick 0.5, in the lee of land 0.45; gusts 930 x 270 m and 330 x 95 m patterns drifting at 3.2 m/s, slicks bands 760 x 19 m a repeat (medium, high); sea state by day 1, golden hour 0.75, twilight 0.6, night 0.7 (`SEA_LOOK.byTime.wind`) |
-| colours | the bed pale sand [0.4, 0.36, 0.27] with reef [0.035, 0.045, 0.03] in patches, through water that takes out (0.42, 0.085, 0.058) per metre of depth (red, green, blue), over the deep body [0.0028, 0.013, 0.036] (by day [0.006, 0.028, 0.07], at golden hour [0.0016, 0.0105, 0.0115], at twilight [0.002, 0.011, 0.024]): albedo over sand by day 0.353 0.352 0.267 at 0.3 m, 0.118 0.285 0.238 at 3 m, 0.038 0.227 0.211 at 6 m, 0.009 0.148 0.170 at 12 m, 0.006 0.030 0.076 at 60 m (sea.test); bubbles under surf [0.2, 0.36, 0.35], the water between the lines of surf towards [0.09, 0.3, 0.32]; land in the mirror an albedo of [0.1, 0.115, 0.08] under the time of day's light, a pier's [0.33, 0.32, 0.3]; foam 0.78 to 0.82; F0 0.02 by the mean Fresnel (0.78 at 3 degrees calm, 0.45 in a gust); the mirrored sky given back 0.82 by day, 0.6 at golden hour, 0.8 at twilight, 1 at night (`SEA_LOOK.byTime.sky`); roughness 0.045 calm |
-| the mirror | the sky's environment map everywhere; land from the shore map by a march of the mirrored ray: 6 steps on medium (each 2.9 times the last, 9 m to 1.8 km), 4 on mobile (3.8 times, to 500 m), 8 on high (2.2 times, to 2.2 km), none on low; what stands beyond the shore map (the far massif and ridges) from the car's reflection probe between 1 and 30 degrees up (medium, mobile); the 8 (mobile 4) nearest piers standing in the water within 700 m as posts (low: none); on high a planar mirror 0.3 of the view's height, 3 km deep, with a streaked copy 0.4 of its height (`SEA_MIRROR` in world/index.js), nothing in it brighter than 4 whites |
-| glitter | sparks 1.6 times the sun's irradiance bright, in cells 1.5 pixels across; 0.45 of the breaking-up kept where a pixel covers 3 m and more |
-| surf | on a bed shelving less than 0.38 per metre: lines 6.5 m apart every 4.6 s where the water is under 1.25 m deep and within 46 m of the shore, a crest 0.34 m high in the normal (medium, high); the sheet runs 0.16 m up over the still level and back; on rock (steeper than 0.2 to 0.55) a slap within 5.5 m and a wash to 15 m; a ring 2.6 m wide round each pier (the nearest 4 on low, 8 otherwise) |
-| at night | the 6 lamps the wet road glints with and 2 (low) or 4 tail lamps, drawn into the water as streaks; a tail lamp 14 (brake lamps 3 times as much again), half at 70 m |
-| draw calls | one in every pass that sees it (the scene, the probe's faces); not in the shadow map or the wet road's mirror. On high the water's own mirror is one more pass of the scene (without the water, the ground cover, the kerbs and the studs) and two full-screen passes for its streaked copy |
-| detail levels | `SEA_TIERS` in sea.js: low, mobile, medium, high. A phone on the medium tier (`caps.mobile`) draws `mobile` (64 segments, 2 ripple layers, 4 march steps, a 512 shore map, no relief on the surf, no slicks, no clouds' shade); `?sea=NAME` or createSea's `detail` picks one by name. While the quality ladder's `detail` rung is shed (`World.setDetail`), medium and high draw about what `mobile` draws, by uniforms: the march 4 steps to 500 m (mobile: none), the two ripple layers of `mobile`, one gust sample, no slicks, clouds' shade, surf relief or caustics, and no planar mirror: about 12 texture reads a pixel on open water instead of 17 (high: 20, and a pass of the scene less) |
-| texture reads a pixel | (fragment stage, counted in the source) open water: low 11, mobile 12, medium 17, high 20 (two of them three.js's own for the environment map); near land the march adds its steps (mobile 4, medium 6, high 8) and the probe one; a shelving shore close to adds 3 (the surf's relief: medium, high); high's planar mirror 2. Before the water lane: 7 on low, 8 on medium and high |
-| the water's share of a frame | timed on software WebGL (SwiftShader, 2026-11-19; a ratio, not a phone's time), the open sea from the crest filling a third of the picture, a frame with the sea less the same frame without it: medium 1280x720 1.31 s of 3.51 s (the old water 0.82 s of 2.98 s), with the ladder's `detail` rung shed 1.08 s; `mobile` at 402x874 0.45 s of 1.16 s (old 0.25 s of 1.01 s); low 1280x720 0.49 s of 1.64 s (old 0.34 s of 1.35 s). The new water costs 1.4 to 1.8 times the old per pixel there |
-| memory | the shore map 5.6 MB with its levels (1024; 1.4 MB at 512: low, mobile), the sea map 1 MB (as before), the ripple map and the noise 0.35 MB each; high's mirror 0.3 x 0.3 of the view in half-float, three targets |
 
 ## The picture
 
@@ -424,35 +360,24 @@ pass with their sizes. In short:
 | | low | medium | high |
 | --- | --- | --- | --- |
 | pixel ratio cap | 1.5 | 2 | 2 |
-| render scale floor (`TIERS.scaleFloor`) | 0.6 | 0.72 | 0.72 |
-| drawn pixels per CSS point at the floor, on a 3x phone | 0.9 | 1.44 | 1.44 |
-| the ladder, shed in this order before any resolution (`LADDER`) | probe, blur, detail | probe, blur, detail, ao, msaa | as medium |
 | scene MSAA | none (FXAA on the finished picture) | 4 | 4 |
 | motion blur | inside the last pass, 6 taps, streak ≤ 4 % | own pass, 12 taps, ≤ 7.5 % | 18 taps, ≤ 9 % |
 | bloom levels | 4 | 5 | 6 |
 | lens (flare source, ghosts, glare, star) | no | yes | yes |
 | ambient occlusion | no | 8 samples, half size | 14 samples |
-| car's probe (engine.md, "The reflection probe") | 128 per face, prefiltered (8 samples), a face every 2nd frame (standing too), sees 260 m | 256 (12 samples); a face every 2nd frame (2 in the tunnel), standing too, sees 300 m | 512 (20 samples), 2 faces a frame (3 in the tunnel), standing 2, sees 400 m; in the tunnel the faces see 160 m |
+| car's probe at speed / standing | 64 / 128 per face, a face every 2nd frame (standing too) | 128 / 256; a face every 2nd frame (2 in the tunnel), standing 2 every 3rd | 256 / 512, 2 faces a frame (3 in the tunnel), standing 3; in the tunnel the faces see 160 m |
 | wet road mirror | none (the six nearest lamps' heads drawn into the water analytically) | 0.35 of the view's height, to 220 m, streaked copy 0.3 of its height | 0.5, to 320 m, streak 0.3 |
 | forest: full / reduced / impostor trees to | 0 / 60 / 650 m | 34 / 95 / 900 m | 50 / 130 / 1200 m |
 | effects: skid quads / soft particles / sparks | 800 / 192 / 48 | 1500 / 320 / 96 | 2000 / 400 / 128 |
 
-When frames run long the governor (`src/engine/governor.js`; engine.md, "The
-quality ladder") sheds the tier's ladder one rung at a time, and only then
-lowers the render scale (0.85, 0.72, on low also 0.6), never under the
-floor; it steps back up when frames have been steady for a while. A browser
-that caps the frame rate itself (Low Power Mode: 30 a second) makes it shed
-nothing, after one trial of about a second. A scene drawn below the canvas's
-size is brought to it by a sharpening upscale (engine.md), not stretched.
-Before 2026-11-19 the render scale was the only thing shed and went to 0.5:
-a 3x phone on medium ended at 1.0 drawn pixel per CSS point.
+The adaptive render scale (1, 0.85, 0.72, 0.6, 0.5) steps down when frames run
+long and back up when they are short; it shrinks only the off-screen targets.
 
 ## Quality tiers and budgets
 
 `auto` takes the capability probe's guess (`src/engine/caps.js`): software
-WebGL and unknown phone GPUs start `low`; every iPhone and iPad (whatever
-the browser says of its GPU, or hides), Adreno 640+ and Mali-G71+ phones
-`medium`; Intel graphics other than Arc and Xe `medium`;
+WebGL and unknown phone GPUs start `low`; recent Apple, Adreno 640+ and
+Mali-G71+ phones `medium`; Intel graphics other than Arc and Xe `medium`;
 other desktop GPUs `high`. The choice is stored and applied by reloading.
 
 Budgets set by the rework for a chase frame: low 150 draw calls and 250 k
@@ -507,14 +432,6 @@ places on the lap were not counted. Triangles hardly moved (low 293 to
 About a quarter of every pass's calls is the car (25 in the scene and in the
 mirror, 14 in the shadow map), which this lane did not touch.
 
-**After the day lane** (same tool and moments, plus the run-up to the line at
-t = 100; the head before the lane in brackets): low by day 133 (133), 140
-(140), 153 (152) at the ledge bend, 145 (141) on the run-up; triangles 292,
-338, 366 and 349 k (297, 340, 367, 353 k: the straight's thinned boards more
-than pay for the green hill and the rows of trees). Medium by night 291
-(291), 266 (267), 278 (278), 257 (244). The ledge bend on low was already
-over 150 before the lane, and the green hill adds one call there.
-
 **Draw calls at the tunnel** (tunnel lane, 2026-11-18, the same counter, the
 last of four frames, from t = 34.5 of the autopilot run: the approach 120 m
 before the entrance, near the entrance, deep inside, at the exit), before and
@@ -532,104 +449,7 @@ there is dry) and its calls go to the probe's second face
 (`PROBE.tunnelFaces`). The approach was over both call budgets before the
 tunnel changed and still is.
 
-**The sea** (sea lane, 2026-11-18, the same counting at 393x852, device scale 1, t = 45 and 50 on the sky road,
-before and after): low by day 129 / 143 calls and 302 / 327 k triangles before, 132 / 144 and 270 / 291 k after (the
-drowned ground left out more than pays for the sea's flat disc); medium by night 214 / 228 calls and 0.91 / 1.00 M
-before, 216 / 230 and 0.89 / 0.95 M after (the sea one call, 19.9 k triangles, in the scene).
-
-**Beside the road** (nearfield lane, 2026-11-19: `stats()` of one frame in
-the stills tool, autopilot run by day, `?seed=1`; before and after the lane):
-
-| t (place) | low 393x852: calls, triangles | medium 393x852 | medium 1280x720 |
-| --- | --- | --- | --- |
-| 8 (start straight) | 149, 320 k / 149, 329 k | 200, 1.141 M / 200, 1.149 M | 151, 936 k / 151, 941 k |
-| 43.8 (out of the tunnel, the arch ahead) | 157, 262 k / 158, 277 k | 198, 808 k / 197, 819 k | 169, 691 k / 166, 701 k |
-| 56 (the climb, the coast road) | 88, 166 k / 89, 173 k | 112, 514 k / 110, 513 k | 156, 699 k / 155, 704 k |
-
-Draw calls are unchanged within one or two (the rock is one mesh now, cut into
-400 m pieces, which pays for the arch); triangles grew by up to 6 % on low
-and 1.4 % on medium. The low tier's triangles were over its 250 k budget
-before and still are; medium's were over 600 k before and still are. The
-wall's grooves are on the high tier only (on medium they cost about 100 k
-triangles at the start straight, all passes counted).
-
 None of these was measured on a real GPU or phone.
-
-## What a frame costs
-
-Counted, not timed: this machine draws with software WebGL, so no number here
-says how long anything takes on a GPU. `node tools/perfcount.cjs` (tools.md)
-wraps the renderer in the page and counts what each pass is asked to draw;
-the full-screen passes are counted from their shaders. Autopilot run by day,
-`?seed=1`, an upright phone's shape (402x874), four frames averaged; page
-seconds (the lap clock is about 5.2 s less).
-
-**Medium, by day, before the perf lane** (b786f90, 2026-11-19):
-
-| place | draw calls | triangles | the scene | the sun's shadow map | probe faces (a face every 2nd frame) | trees: full / reduced / impostors | tree cards over the picture | caster cards in the shadow map |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| start straight, t = 8 | 171 | 973 k | 87 calls, 662 k | 43, 182 k | 24, 129 k | 40 / 22 / 1829 | 4.0 layers | 198 trees, 40 M texels |
-| forest, t = 26 | 201 | 1038 k | 128, 777 k | 30, 135 k | 26, 126 k | 43 / 13 / 2326 | 12.3 layers | 451 trees, 77 M texels |
-| into the tunnel, t = 36 | 178 | 792 k | 106, 565 k | 32, 132 k | 23, 96 k | 0 / 0 / 426 | 0 | 196 trees, 27 M texels |
-| coast road, t = 56 | 132 | 607 k | 63, 369 k | 31, 146 k | 22, 92 k | 0 / 0 / 4 | 0 | none |
-
-The budget is 300 calls and 600 k triangles. What the triangles are (t = 8 /
-t = 26): the full trees 204 k / 181 k (40 and 43 trees: about 5 k each; on
-the start straight `detail` stretches the full form to 127 m for the wall of
-maples); the massif 92 k, in every frame wherever the camera looks; the car
-55 k and its wheels 29 k, and again 36 k + 21 k + 4 k in the shadow map; the
-terrain's band and grid 59 k / 142 k, and 79 k / 48 k in the shadow map; the
-three rings of far mountains 50 k; the sea 20 k; the road 14 k / 53 k. A
-probe face is about 190 to 260 k triangles (a third of it the reduced trees
-on the start straight).
-
-Two things the triangle count does not show, both larger than it:
-
-- **Tree cards over the picture.** The area of every tree card the view
-  draws, as seen, over the picture's area: 12 layers in the forest, 10 of
-  them the 43 full trees. Each is alpha-tested (alpha to coverage on the
-  multisampled tiers), so the GPU cannot reject what is hidden before
-  shading it as it does for solid things. An upper bound: depth rejects what
-  lies behind something already drawn.
-- **Caster cards in the shadow map.** Every tree whose crown is in the
-  light's way is drawn into the sun's map as one card turned to the light,
-  and every texel of the card runs an alpha test. Under the day's 16 degree
-  sun the map is fitted to the ground (a texel is 5.5 cm across and 2.8 cm
-  up the light's view), so a crown 8 m wide and 14 m tall is some 70 000
-  texels: 27 to 77 M texels of cards a frame in a map of 4.2 M, 6 to 18
-  times its area, against a picture of 1.4 M pixels. (Cards that hang over
-  the map's edge are counted whole.)
-
-**The full-screen passes** (medium; lookups per pixel of the picture, which is
-the view times the render scale; engine.md lists the passes):
-
-| pass | size | texture lookups per picture pixel | writes |
-| --- | --- | --- | --- |
-| the scene | 1 | (its materials') | half-float colour and 24-bit depth, 4 samples each: 68 MB at 804x1748, resolved to 17 MB |
-| occlusion term | 1/4 | 13 of depth each: 3.3 | 8-bit, 1/4 |
-| its blur, twice | 1/4 each | 10 each: 5 | 8-bit, 1/4, twice |
-| occlusion into the picture | 1 | 10 | half-float, full size |
-| motion blur | 1 | 6 where nothing moves, 2 more per sample: to 30 (to 18 with the `blur` rung shed) | half-float, full size |
-| bloom, 5 halvings | 1/4 ... 1/1024 | 13 each: 4.3 | half-float, 1/3 in all |
-| bloom, 4 enlargements | 1/4 ... 1/256 | 10 each: 3.3 | half-float, 1/3 in all |
-| star | 1/16 | 36 each: 2.3 | half-float, 1/16 |
-| flare source | one texel | (a level of at most 48 x 105 texels, once) | |
-| final | 1 (the canvas's pixels at scale 1) | 6 | the canvas, or 8-bit at the scene's size |
-| upscale (render scale under 1 only) | the canvas's pixels | 12, of the 8-bit picture | the canvas |
-
-40 to 64 lookups a pixel and three full-size half-float targets written
-(the resolve, the occlusion's picture, the blur's) with everything on; 22 to
-46 and two with the `ao` rung shed, 22 to 34 with `blur` shed as well. Low: no occlusion, the blur inside the
-final pass (up to 14 lookups), four bloom levels, then FXAA (9 to 23 lookups
-of the 8-bit picture).
-
-**Fragment shaders as three.js compiled them** (medium, lines of code after
-its includes; texture lookups written in the source, not executed: a loop
-counts once): the asphalt 2071 lines and 73 lookups; the car's paint 2045 and
-65; the terrain 1891 and 69; the sea 1680 and 63; the tunnel 1664 and 61;
-the massif 1632 and 61; concrete and the town 1604 to 1996 and 58. All of
-them carry three.js's physical material (the environment map, the shadow
-map's filter, the lights' loops) under the demo's own code.
 
 ## Sound
 
@@ -654,13 +474,10 @@ stereo picture. Sound starts on the first touch or key (the browsers' rule).
 | `dreamcar.quality` | the chosen tier |
 | `dreamcar.units` | km/h or mph |
 | `dreamcar.map` | the map on or off |
-| `dreamcar.stats` | the performance readout on or off |
-| `dreamcar.level.v1` | where the governor ended on this device, as `tier:level`: the next visit starts there, not at the top |
 | `dreamcar.assists` | the driving help: full, sport or off |
-| `dreamcar.paint`, `dreamcar.paint2` | each driver's paint (a key of `PAINTS`) |
 | `dreamcar.throttle` | the touch throttle: auto or manual |
 | `dreamcar.steering` | the touch steering: pad, slider, arrows or tilt |
-| `dreamcar.hand` | the hand that holds the phone (where the pad's ghost rests): right or left |
+| `dreamcar.hand` | the hand that holds the phone (the pad's side): right or left |
 | `dreamcar.zones.v1` | the touch controls have been named once |
 | `dreamcar.muted` | sound off |
 | `dreamcar.hinted.v1` | the first-run hint has been shown |

@@ -11,15 +11,7 @@
 //   ?laps=3
 //   ?cam=chase|far|bonnet|bumper
 //   ?q=low|medium|high   force a quality tier (default: chosen by a capability probe)
-//   ?dpr=1.5       force the canvas pixel ratio (also switches the quality governor off)
-//   ?scale=0.72    force the render scale: the share of the canvas's size the scene is drawn at (governor off)
-//   ?shed=3        force how many rungs of the tier's ladder are shed (caps.js LADDER; governor off)
-//   ?upscale=0     stretch a scene drawn below the canvas's size the plain way, without the sharpening upscale
-//   ?sharp=0.5     the sharpening upscale's strength, 0..1, in place of the one the render scale gives
-//   ?maxdpr=3      the cap on the device pixel ratio in place of the tier's (the governor stays on: an experiment)
-//   ?floor=0.5     the governor's smallest render scale in place of the tier's (one of 1, 0.85, 0.72, 0.6, 0.5)
-//   ?mobile=1      take this device for a phone (or with 0 for a desk): the tiers' own numbers for phones apply
-//   ?stats         the performance readout (also an option; ?stats=0 hides it whatever the option says)
+//   ?dpr=1.5       force the canvas pixel ratio (also switches adaptive resolution off)
 //   ?seed=7        seed of every random choice
 //   ?t=5           seconds to simulate before the first frame
 //   ?ui=0          no HTML overlay
@@ -29,7 +21,6 @@
 //   ?fx=0          no skid marks, smoke, spray or sparks
 //   ?plate=TEXT &plate2=TEXT   what the number plates say
 //   ?paint=NAME    the first car's paint
-//   ?sea=mobile    the water's detail, if not the tier's own (low, mobile, medium, high: what a phone's medium draws is `mobile`)
 //   ?wet=0.6       road wetness, 0..1 (a preview of weather to come; not in the interface)
 //   ?mute          no sound
 //   ?debug=NAME    show one intermediate buffer of the frame
@@ -97,14 +88,6 @@ const LOOK_COLOURS = [
  * @property {'chase'|'far'|'bonnet'|'bumper'} camera
  * @property {'low'|'medium'|'high'|null} quality
  * @property {number|null} dpr
- * @property {number|null} scale the render scale, forced
- * @property {number|null} shed rungs of the ladder shed, forced
- * @property {boolean} upscale false: no sharpening upscale
- * @property {number|null} sharp the upscale's strength, forced
- * @property {number|null} maxDpr the pixel ratio's cap in place of the tier's
- * @property {number|null} floor the governor's smallest render scale in place of the tier's
- * @property {boolean|null} mobile take the device for a phone (true) or not (false); null: what the browser says
- * @property {boolean|null} stats the performance readout: true or false as the address says, null where it says nothing
  * @property {number} seed
  * @property {number} preAdvance seconds
  * @property {boolean} ui
@@ -181,14 +164,6 @@ export function parseParams(search = typeof location !== 'undefined' ? location.
     camera: oneOf('cam', CAMERAS) || 'chase',
     quality: oneOf('q', TIER_NAMES),
     dpr: num('dpr') ?? null,
-    scale: num('scale') == null ? null : Math.min(1, Math.max(0.25, num('scale'))),
-    shed: num('shed') == null ? null : Math.max(0, Math.floor(num('shed'))),
-    upscale: q.get('upscale') !== '0',
-    sharp: num('sharp') == null ? null : Math.min(1, Math.max(0, num('sharp'))),
-    maxDpr: num('maxdpr') == null ? null : Math.min(4, Math.max(0.5, num('maxdpr'))),
-    floor: num('floor') == null ? null : Math.min(1, Math.max(0.5, num('floor'))),
-    mobile: q.has('mobile') ? q.get('mobile') !== '0' : null,
-    stats: q.has('stats') ? q.get('stats') !== '0' : null,
     seed: Math.floor(num('seed') ?? 1),
     preAdvance: Math.max(0, num('t') ?? 0),
     ui: q.get('ui') !== '0',
@@ -199,8 +174,6 @@ export function parseParams(search = typeof location !== 'undefined' ? location.
     plate: plate('plate'),
     plate2: plate('plate2'),
     paint: word('paint'),
-    /** the water's detail, by name (assets/world/sea.js SEA_TIERS: low, mobile, medium, high); null: the tier's own */
-    sea: word('sea'),
     // null when not given: the time of day's own wetness (lighting.js) applies
     wet: num('wet') == null ? null : Math.min(1, Math.max(0, num('wet'))),
     mute: q.has('mute'),

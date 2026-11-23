@@ -13,8 +13,7 @@ draws. See [techniques.md](techniques.md#determinism).
 ## Servers
 
 ```bash
-npm run dev                          # http://localhost:5190   edits reload the page; also serves the sound bench (sound.html),
-                                     #                         the viewer (viewer.html) and the sea lab (sealab.html)
+npm run dev                          # http://localhost:5190   edits reload the page; also serves the sound bench (sound.html)
 npm run build && npm run preview     # http://localhost:4190   the production build
 ```
 
@@ -32,15 +31,13 @@ SwiftShader on four busy cores. Times below are from that machine.
 
 | script | what it does | checks | time here |
 | --- | --- | --- | --- |
-| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (112 166 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). `governor.test.mjs`: the quality governor run through made-up phones (engine.md, "The quality ladder"): the ladder's order and floors, a slow phone, a weak one, a 30 Hz cap alone and with a slow GPU, recovery, a cap that comes on later and one that goes, a hitch in a measurement, a second visit, no governor for stills, the tier guess (13 tests, under a second). `drift.test.mjs`: the feel: each device's turn-in time, the three assist levels, slides asked for, held and let go on every device, what the default level never lets happen, people's laps on the real road (7 tests). | 5 files | about 1 min |
+| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (112 166 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). `drift.test.mjs`: the feel: each device's turn-in time, the three assist levels, slides asked for, held and let go on every device, what the default level never lets happen, people's laps on the real road (7 tests). | 4 files | about 1 min |
 | `node tools/handling.mjs` | The car measured the way a road test would; prints the table of spec.md. `--json`, `--no-laps`. | (a table, not checks) | 6 s |
 | `node tools/trackmap.mjs out.svg` | Draws the circuit from above with its height, gradient and speed envelope, and prints its numbers (sections, structures, kerbs, dressing, lamps, sectors, pieces). `--png out.png`, `--fit a,b` (close the loop after an edit). | | under 1 s |
-| `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the fixed controls upright and on its side, 76 checks: the slider's fixed centre, a thumb landing off it steering at once, no drift of the centre after a drag, the knob springing back; power with nothing touched on auto and only from GAS on manual; BRAKE lifting the power and reversing at a standstill; DRIFT; two and three fingers at once, a finger sliding off a pedal, pointercancel, blur and orientationchange; touches elsewhere doing nothing; the arrows; the first-run names; both halves of a tablet split), slide (a handbrake turn through the keys and one through the touch slider and DRIFT, the readout, the driving help kept and applied), window, hud (the touch controls among the boxes: at least 64 px, inside the safe area with a phone's insets stood in for, drawn where Input finds them; solo again on manual), options (with Steering and Throttle on touch, the readout, kept, and with no storage), start, photo, determinism, params, ladder (every level of low and medium by hand: each rung sheds what it says, resolution last and never under the floor, no program compiled; `?scale=`, `?shed=`, `?upscale=0`; a running page has a governor and stays on the ladder, `?dpr=` switches it off), tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
+| `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the fixed controls upright and on its side, 76 checks: the slider's fixed centre, a thumb landing off it steering at once, no drift of the centre after a drag, the knob springing back; power with nothing touched on auto and only from GAS on manual; BRAKE lifting the power and reversing at a standstill; DRIFT; two and three fingers at once, a finger sliding off a pedal, pointercancel, blur and orientationchange; touches elsewhere doing nothing; the arrows; the first-run names; both halves of a tablet split), slide (a handbrake turn through the keys and one through the touch slider and DRIFT, the readout, the driving help kept and applied), window, hud (the touch controls among the boxes: at least 64 px, inside the safe area with a phone's insets stood in for, drawn where Input finds them; solo again on manual), options (with Steering and Throttle on touch, kept, and with no storage), start, photo, determinism, params, tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
 | `node tools/soundtest.cjs [URL] [outDir]` | Renders scenarios offline with the game's own audio code (the dev server's `sound.html`) and measures them: partials, levels, sides, tails, jumps, gestures, mute. With `outDir` it keeps the WAV files so that someone can listen. | 62 | about 45 s idle |
 | `node tools/frametest.cjs` | The tone curve's numbers (no browser); with `--url` milliseconds per frame for variants of a page (`--vary "ao=0\|ao=1"`), the pipeline's targets, and a pair of frames 1/60 s apart for a flicker check (`--pair`). | | |
-| `node tools/sealab.cjs --base URL --views views.json` | Stills of the sea lab (`sealab.html` on the dev server: the water alone under the game's sky, haze, sun and frame passes, on a made-up coast that has a beach, a cliff, sea stacks, an islet and piers, or with `--land real` on the game's terrain and nothing else of its world), several views and times of day from one page load each. `--q`, `--time`, `--w`, `--h`, `--out`, `--prefix`, `--only`; a view may carry `look` (other numbers for `SEA_LOOK`) and `read` (named pixels whose 8-bit colour is printed). For working on the water's shader without waiting for the world; the page's errors are printed, so a shader that does not compile shows. | | 2 s to start on the toy coast, about 10 s on the real terrain, a few seconds a view |
 | `node tools/screenshots.cjs` | Regenerates every picture of the README and these documents, and `public/og.jpg`. `--list`, `--only day,night` (page loads or picture names), `--base URL` (default 5190), `--q medium`, `--out dir`. | | 45 to 60 min |
-| `node tools/perfcount.cjs --url URL` | What a frame costs, counted (nothing here can time a GPU): draw calls and triangles per pass (scene, shadow map, probe faces, mirror, full-screen passes) at moments of the autopilot's run and at levels of the quality ladder, the trees in each form, layers of tree cards over the picture, the shadow-casting cards' area in the sun's map, the compiled fragment shaders' lengths. `--times 8,26,36,56 --levels 0,5 --frames 4 --w --h --mobile --out file.json`; put a small `dpr=` in the address. The tables of spec.md, "What a frame costs", are its output. | (a table) | 5 to 10 min a page at medium |
 | `node tools/shot.cjs --url URL` | One screenshot of any URL. `--out --w --h --dpr --mobile --eval "js" --resize WxH --wait`. | | 1 to 3 min |
 | `tools/soundlab.cjs` | The arithmetic the soundtest is built on (spectra, levels); not run by itself. | | |
 
@@ -98,10 +95,8 @@ node tools/screenshots.cjs                # if anything visible changed; look at
 | `skip(seconds)` | run the fixed step that long without drawing, then draw one frame |
 | `advance(seconds, fps = 60)` | play that long, drawing every frame |
 | `state()` | a plain JSON picture of the run: phase, mode, time of day, clock, lamps; per driver lap, `s`, `lat`, distance, speed, gear, rpm, pedals, laps and splits, sector, gaps, position, medal, camera, lamps, assists, the put-back offer |
-| `stats()` | frame time, draw calls, triangles, programs, textures, buffer size, HUD writes, pixel ratio, render scale, `quality` (the governor: level, rungs shed, floor, the cap once found, trials), the pipeline's targets and what it draws now (samples, blur taps, occlusion samples, whether the frame went through the upscale), tier, `hdr`, GPU string |
-| `engine.setQualityStep(n)`, `engine.setRenderScale(x)` | place the quality ladder by hand (level 0: everything; engine.md), or only the render scale; the governor is then off. `game.pipeline.upscale = false` is the plain stretch |
-| `game.perfState()` | what the readout shows, as an object |
-| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`, `e2`, `e5`); `photo(null)` ends it |
+| `stats()` | frame time, draw calls, triangles, programs, textures, buffer size, HUD writes, pixel ratio, render scale, the pipeline's targets, tier, `hdr`, GPU string |
+| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`); `photo(null)` ends it |
 | `set(path, value)` | change a number of lighting.js or config.js and show it: `set('times.night.exposure', 20)`, `set('camera.chase.distance', 6)` |
 
 `window.__ready` is true once the first frame has been drawn.
@@ -109,38 +104,13 @@ node tools/screenshots.cjs                # if anything visible changed; look at
 The parameters tests use most: `?manual`, `?t=`, `?seed=`, `?auto` (a run at
 once), `?ap` (the autopilot), `?q=low` (always test on low: the full world at
 medium takes minutes to draw on software WebGL), `?nodraw`, `?time=`,
-`?mode=split`, `?laps=`, `?ui=0`, `?mute`, `?photo=`, `?debug=`; to stage what a
-phone draws: `?mobile=1` (the tiers' numbers for phones), `?scale=`, `?shed=`,
-`?upscale=0`. All of them
+`?mode=split`, `?laps=`, `?ui=0`, `?mute`, `?photo=`, `?debug=`. All of them
 are in [spec.md](spec.md#url-parameters).
-
-To look at the car's reflection probe itself: `?debug=probe` draws the view's
-cube unrolled four times instead of the picture, at roughness 0, 0.3, 0.6 and
-1 (top left, top right, bottom left, bottom right; the horizon across the
-middle of each, +Z in its centre): blocks, seams, a light printed several
-times or a face that does not match its neighbours show there first. Add
-`&photo=...` to place the car where it matters (engine.md, "The reflection
-probe").
 
 ## What has been verified
 
 Only in headless Chromium on software WebGL (SwiftShader), on one Linux
 machine without a GPU, and only what is listed here.
-
-- **Beside the road** (nearfield lane, 2026-11-19): judged in stills of
-  the chase camera by day at 393x852 and 1280x720 on the medium and low
-  tiers (the start straight, a forest bend, the revetments into the tunnel,
-  the walls out of it with the arch ahead, the sky road, the climb, the
-  carousel), in one staged view under the viaduct, at golden hour and at
-  night out of the tunnel and in the carousel (medium, 393x852), and on the
-  high tier at 1280x720 (the climb), before and after.
-  `node tools/unit.mjs` passed; the playtest's keys, photo and determinism
-  sections against the lane's production build: 49 of 49, and after merging the twilight time of day: 54 of 54 (a twilight still out of the tunnel looked right on low). Not verified:
-  motion (every still is one frame: whether the rock's joints, the pits,
-  the verge's blades and the sand's ripples crawl at speed is not known),
-  a real GPU or phone, Safari, the frame rate's cost of the longer ground
-  shader, the low walls' grooves (high tier) seen close, the arch from the
-  sky road's far side.
 
 - **The road** (`tools/unit.mjs`, track): closes on itself; samples every
   metre; `frameAt` and `locate` invert each other; the surface the wheels
@@ -154,39 +124,6 @@ machine without a GPU, and only what is listed here.
   keyboard driver (scripted drivers, in Node). Run for this document:
   passed.
 - **The rules** (`tools/unit.mjs`, race): 82 checks, passed.
-- **The sea** (`tools/unit.mjs`, sea; sea lane, 2026-11-18, round 2): the
-  coast presets keep the edges and slopes of the presets they replaced (the
-  carousel's and the crest's verge is now gravel); no water within 2 m
-  beyond any solid edge off the decks (1.5 m over the water at the lowest),
-  and every deck at least 39 m over it; open water within 90 m of the sea
-  side of the sky road (10 m: under its deck), the climb, the carousel,
-  the crest and the plunge (60 to 70 m: the cliff); the bay off the start
-  line; the sea map; the waves deterministic. Round 2's look was judged in
-  stills of `e1` at the medium tier (day, golden hour, night) beside the
-  owner's frame E1, and in the chase camera every 2 s from the tunnel's exit
-  to the end of the plunge on the low tier (1280x720 and 393x700).
-- **The furniture** (`tools/unit.mjs`, trackside; sea lane): no vertex of the boards, tyre walls, distance boards, marshal posts, bend signs, chevron boards or kerbstones and no lamp's foot inside the solid edges anywhere on the lap, and no two marshal posts on one spot (it failed before the fix: a parapet board's bar 0.58 m inside at s = 2510 m).
-- **The structures** (`tools/unit.mjs`, structures; sea lane): no point of a bridge's deck, abutments, pier caps or joints, nor of a tunnel's floor, walls or portals, more than 25 mm over the road inside the solid edges, on both bridges (low and medium) and the tunnel (low). It failed before the fix: an abutment's top 0.30 m over the shoulder at s = 2006 m.
-- **The ground** (`tools/unit.mjs`, ground; sea lane): no triangle of the grid or the far land over the road inside the solid edges, low and medium tiers (it failed on 005dc86: 1.99 m at s = 2590 m on low, 0.66 m at s = 3774 m on medium).
-- **The water** (water lane, 2026-11-19; `tools/unit.mjs`, sea; `tools/sealab.cjs`). In Node: the shore map is the
-  same bytes every time, is water where `terrain.heightAt` is under the level and land where it is over it (15 571
-  points within 42 m of a shore, 1 wrong), holds depths near the shore to 0.11 m per (1 + depth / 4) for 95 % of
-  them, crosses zero within a texel and a half of where the bed crosses the level (49 crossings, none off), and
-  its coarser levels hold the highest land of the texels they cover; the water's body over sand is sand at 0.3 m,
-  turquoise at 3 and 6 m, teal at 12 m and the deep colour by 60 m; the mirror is Schlick's on calm water and
-  less at a glancing angle on rough water. In the browser (software WebGL, all under one machine's SwiftShader):
-  the sea lab at 960x540 on the toy coast on medium, low and high by day, and on medium at golden hour, twilight
-  and night (beach, surf close to, shallows from 60 m up, piers, the sun's path from 12 and 60 m, open water,
-  a cliff's foot); the lab on the real terrain by day; the game at 1280x720 on medium by day at the start (the
-  chase camera and two staged cameras over the bay), from the sky road into the sun across the inner bay, across
-  the bay to the viaduct, and on the crest (the chase camera and a staged camera over the open sea), each beside
-  the same camera before the lane's work; colours read off those stills against the references (design.md).
-  Round 2: the game on medium at golden hour, twilight and night on the crest (the chase camera and the staged
-  one), frame K5's camera at twilight, the bay's shore at night; the game as a phone (`&mobile=1`, 402x874: the
-  `mobile` level) by day at five places; low by day on the crest; the lab with the ladder's rung shed and at the
-  `mobile` level; the water's share of a frame with the sea on and off (spec.md).
-  `node tools/playtest.cjs` sections keys, photo and determinism: 54 checks, passed (three runs, the last on
-  the merge of 832bebe; the twilight row's last change, two numbers, came after it).
 - **The feel** (`tools/unit.mjs`, drift): 8 tests, passed (2026-11-18).
 - **The game in a browser** (`tools/playtest.cjs`): a full run against the
   production build of the controls round (FEEL lane): 296 checks, 290 passed.
@@ -218,48 +155,17 @@ machine without a GPU, and only what is listed here.
   tools/unit.mjs` passed; drift.test.mjs now has 8 tests (the pad's lap,
   braking while turning, the red-arc and button slides, a clumsy thumb).
   Tilt is checked with synthetic deviceorientation events only.
-- **The pad under the thumb and the pedal gauge** (CONTROLS lane, round 3,
-  2026-11-19): touch, slide, options, hud, start and split against a
-  production build: 481 of 481 (split 27 s, touch 122 s, slide 113 s, hud 178
-  s, options 241 s, start 47 s). The touch section places the pad at five
-  spots and four edge cases in both orientations (centre = landing point or
-  the documented nudge, first input zero, no movement under a 100 px drag,
-  compressed travel reaches full lock or the red, the 6 px hold, a second
-  finger = handbrake, HUD buttons place nothing, both hands, both halves of a
-  split); the gauge reads full on auto, brake with no throttle under the pad's
-  pull, zero and zero on manual untouched, and its box is in the hud overlap
-  checks. In earlier runs the hud check "nothing over the car" failed once
-  with the insets stood in for (393x852, solo: the car's box 120 px low; the
-  ghost and the gauge were over it): not reproduced in the lane's last run, still
-  unexplained. It failed again in the lead's run of touch, hud, split, options
-  and start on the merged build (468 checks, 467 passed; at s 154 the car's
-  box reached 763 of 852 px down and the gauge and the ghost overlapped it):
-  open. `node tools/unit.mjs` passed (the scripted thumb needed no
-  change). Not verified: a real phone, Safari, real thumbs (is 60 % of the
-  travel and a 6 px hold right at a real edge? does a second finger anywhere
-  feel like a handbrake?), the gauge's eased bars at a real frame rate.
-- **The two-player "water on the track"** (CONTROLS lane found it, SPLIT-BUG
-  lane fixed it, 2026-11-19): at night in a side-by-side split of an upright
-  phone (`?manual&q=low&auto&mode=split&time=night&t=14`, view.split wide,
-  393x852) the second half's road was a pale sheet in the moonlight broken by
-  dark "puddles" (the shadows of the nearer trees), the first half's beside
-  it dark. The cause was not the lamps: the trees that cast into the moon's
-  shadow map were chosen by distance from the view's car (50 m on low), and
-  a 17 degree moon throws a crown's shadow 70 to 100 m, so the trees that
-  shade the road at the car were left out depending on where the car stood;
-  two cars a few metres apart got different sets (139 and 136 casters, now
-  573 and 566, chosen by the map's own box: forest.js `inBox`). The same
-  patch of road measured in the two halves: 104 against 126 grey levels
-  before, 95 against 89 after. The playtest's `split` section now checks it
-  at night on 393x852 (the same patch from both halves within 1.5x, cars
-  abreast and 9 m apart at three places: 1.26x to 1.43x after the fix, the halves' camera angles differ), that each view's draw uses what
-  its own prepareView set (lamp shares, glints, shadow box, mirror, casters),
-  that the lamp shares are uploaded anew for each view, that the shadow map
-  is drawn once per view by its own draw, and that the casting trees do not
-  depend on where the car stands. Looked at on low only, side by side only;
-  medium (its mirror), stacked halves, dusk and day not looked at (the fix
-  is not split-specific: solo pictures change where the left-out trees
-  shaded the road).
+- **The two-player "water on the track"** (CONTROLS lane, round 2): reproduced
+  at night on low in a side-by-side split of an upright phone
+  (`?mode=split&time=night&t=14`, view.split wide, 393x852): the second
+  half's road reads as a sheet of water, the first half's beside it does not.
+  It does not depend on the order the halves are drawn in, on the wet road's
+  mirror (low has none; at medium night the mirror is drawn once per view
+  with that view's camera), on the cars' head lamp beams, or on which car's
+  half it is: drawn from the second camera's place, the first half shows it
+  too. So it follows where the camera stands, by a few metres; the likeliest
+  cause is the per-eye choice of lit lamps at night (lamps.js, the world's
+  lane), not fixed here (src/assets/ is another lane's).
 - **The sound** (`tools/soundtest.cjs`): 62 of 62 checks (audio lane). The
   squeal "stands out at the limit" passes at exactly its 12 dB threshold.
 - **The pictures**: the stills in `docs/images/` and the lanes' comparison
@@ -308,80 +214,6 @@ machine without a GPU, and only what is listed here.
   ones made); the rails' reflectors were. Not looked at on `high`, in split
   screen at night or in motion; the playtest and the soundtest were not
   run. The page raised no console error in any of these loads.
-- **The day lane's changes** (a bluer day sky and a group of cumulus placed
-  over the massif's shoulder, the massif darker with ribs, scree fans,
-  buttresses and a back-lit rim, its saddle raised; the straight's tall
-  boards in two groups with green rows behind the warm-painted low wall; a
-  darker, more contrasty asphalt with a narrower glare; the D3 preset
-  restaged; the green hill beyond the lake; low boards on the ledge's inside
-  wall; thinner valley mist by day): four rounds of stills on software WebGL
-  at `medium` 1280x720 for d1 and d3 beside the frames, d4 once at the end
-  and the d1 place by night once; compositions found on `low`; draw calls and
-  triangles counted with the picture lane's measure tool at phone shape
-  (low by day, medium by night, t = 0, 33, 79, 100) against the head before
-  the lane; `node tools/unit.mjs` passed. The golden-hour sun's clearance of
-  the green hill was worked out on paper, not seen in a still (the one
-  staged towards it looked into the stand). Not looked at on `high`, in
-  motion, in split screen or in the chase view; the playtest, the soundtest
-  and the docs' screenshots were not run.
-- **K5 round 4 and the tunnel's fittings** (cones lower and wider with coarse
-  ribs and broken snow, an ultramarine top, exposure 5, `headPool` 0.4 at
-  twilight only (the night keeps the full pool), the tail lamps' pool 0.3
-  (was 0.7), flags and the tower's window placed to the frame, the tower's
-  gallery, scrub on the right verge, the sea's twilight entry; in the tunnel
-  the wall strips and their reflections, lit panels, yellow dashes, half the
-  bounce, the jet fans drawn lit): K5 at `medium` 1280x720 and 393x852, the
-  tunnel inside, approaching the exit and just outside at day, dusk,
-  twilight and night at `medium`; draw calls in the tunnel on low by day
-  149 and 159 at t = 39 and 41; `node tools/unit.mjs` passed.
-- **K5 round 3 and the tunnel's exposure** (twilight's sunset bearing, raised
-  and more saturated bands, exposure 6 and environment 0.75, the dry road's
-  sky sheen and its own sky mirror at 0.3 at twilight (`roadSheen`), the head
-  lamps' pool 0.4, the tower ribbed with a lower window, green and yellow
-  feather flags, ridged snowy cones; the tunnel at dusk and twilight exposed
-  4.5): K5 stills at `medium` 1280x720 and 393x852 sampled against the frame
-  (scratch samp.py), tunnel stills inside and at the exit at dusk and
-  twilight; the playtest's keys, options, results, board (99 checks) and
-  photo, determinism (32 checks) passed, determinism now with a check that
-  `?manual&t=40` in the tunnel shows the adapted exposure on every load;
-  `node tools/unit.mjs` passed. The exposure's easing was already in the
-  fixed step: the white tunnel in earlier stills was the tunnel's own
-  exposure (6 and 7), not an unsettled one.
-- **Twilight, the fourth time of day** (lighting.js `twilight`, K5 at
-  twilight, the drum smooth, feather flags, nearer cones, no trees on K5's
-  banks): stills on software WebGL at `medium`, K5 at 1280x720 beside the
-  frame and at 393x852 `--mobile`, a lap's highlights at twilight (grid,
-  forest, tunnel, its exit, coast, K5), d1 and d4 at day, dusk and night
-  and d4 at twilight; one round on `low`; `node tools/unit.mjs` passed; the
-  playtest's keys, results, board, options and tiers sections passed
-  against this lane's preview (117 checks, 0 failed, 75 min, most of it
-  tiers). The docs' screenshots (a twilight one was added to
-  tools/screenshots.cjs) were not regenerated. The tunnel's interior in
-  stills still shows the outside exposure for the first seconds (stills
-  fast-forward without drawing; the exposure eases while drawing): not judged
-  in motion.
-- **Frame K5's place** (k5.js, landmarks.js `K5`, the far cones, the
-  massif's west end lowered beyond D1's left edge, the D3 green hill removed,
-  the pale hall kept out of K5's view, the dusk haze and glow tightened):
-  stills on software WebGL, four rounds on `low` and two at `medium`
-  1280x720 at `?photo=k5` beside the frame, the same place by day and by
-  night, a 393x852 `--mobile` chase still there, and d1, d3, d4 once at
-  `medium` afterwards; `node tools/unit.mjs` passed. The chevron was turned
-  to point into the bend after the last still. Not looked at on `high`, in
-  motion or in split screen; draw calls at K5: 142 medium dusk (121 at phone
-  shape), 158 by day, 183 at night.
-- **The dusk lane's changes** (the twilight dome, dusk clouds lit on the
-  sun's side, first stars, the horizon-coloured haze, the dusk grade, lamps
-  and windows on with halos, the tail lamps' red pool on the road): chase
-  stills on software WebGL at `medium` before and after, 1280x720 and
-  393x700 `--mobile`, at t = 29 to 58 of the autopilot run (the approach,
-  inside the tunnel, its exit and the viaduct after it) and d4, by eye; one
-  round on `low`. The pool's final strength (2) was set after the last
-  still (it was judged at 3, too red on the edge line). The tunnel's own
-  exposure was tried at 3.6 and made no visible difference in the stills, so
-  it stays 6. Not looked at on `high`, at night (the pool is on at night
-  too), in motion, in split screen or over the coming sea; draw calls were
-  not counted (no geometry was added); the playtest was not run.
 - **The tunnel lane's changes** (the box tunnel, its portals and cuttings,
   the lamps' zones and cool white, the road's sheen and the cars' shade in the
   tunnel, the probe's cadence and reach there, no wet mirror under the roof):
@@ -396,97 +228,9 @@ machine without a GPU, and only what is listed here.
   on `high`, in split screen, in motion or with a player driving; the
   playtest (which has no tunnel section) and the soundtest were not run (the
   sound's tunnel reverb reads the Track's sky, which did not move).
-- **The forest lane's changes** (the per-piece schemes: frame E2's forest
-  road on the rise and the first ess, frame E5's granite bend on the last
-  ess; pines, boulders, verges, kerbstones instead of rails there, chevron
-  boards, bend signs, the double yellow line and its dashes, the casters
-  chosen by where their shadow falls): stills on software WebGL at `medium`
-  1280x720 by day from the `e2` and `e5` cameras beside the owner's frames,
-  six rounds of E5 (the first four on the carousel, which the coast lane
-  then took for its frame E1) and five of E2, judged by eye; at `low` a few
-  rounds of each; a chase sheet through the forest at `medium` 640x360; draw
-  calls and triangles counted (spec.md, design.md "The forest").
-  `node tools/unit.mjs` passed. Not looked at on `high`, in split screen or
-  in motion; golden hour and night only at `low` in the forest pieces once;
-  the playtest and the soundtest were not run.
-- **The car lane's round 8** (the paint, glass and lamps at night, in the
-  tunnel and by day, with the probe lane's prefiltered probe and its
-  parallax): stills on software WebGL at `medium` 1280x720 by night (grid,
-  forest, coast; chase and two photo cameras), in the tunnel by day (five
-  cameras), at the start by day, before and after, by eye; 393x700 and `low`
-  by night; the viewer's showroom at `high`. `node tools/unit.mjs` passed.
-  Not looked at on `high` in the game, at dusk, in split screen or in motion
-  (the probe's easing and the lines streaming were not seen moving); the
-  playtest was not run.
-- **The road lane's changes** (the asphalt of frames E2 and E5: its tone,
-  wear, grit, paint, edge, more patches and cracks; 2026-11-19): stills on
-  software WebGL at `medium` 1280x720 by day from the chase camera (t = 29,
-  with and without the speed blur), from two low trackside cameras at bends
-  (t = 17 and 29), on the coast road (t = 50) and at `photo=d1`; at golden
-  hour and in the wet night (t = 29); at `low` 393x852 by day; each beside
-  the branch point's and the references, the asphalt's sRGB measured in
-  patches (sunlit about 77 to 118 luma, against E2's 100 to 145; the woods'
-  shade about 56 against E2's 42; trackside about 98 to 108 against E5's 74
-  to 98; the wet night's road 11 against 8 before). `node tools/unit.mjs`
-  passed (5 files); the playtest's keys section 22 of 22 checks and tiers
-  15 of 15 (a first tiers run was cut off by the session's time limit while
-  drawing the high tier at night, and was run again alone). Not looked at on `high` beyond the playtest's frames, in
-  split screen, or in motion: the grit and the paint's ragged edges were
-  made not to sparkle by construction (averaged where a pixel spans many
-  cells) but no frame sequence was watched for crawl.
-- **The car lane's round 9** (the paints and the options' Paint rows, the
-  night-race livery, the window, sill and apron trims, the showroom's bands,
-  the tunnel lines' widening): the playtest's `options` and `params` sections
-  against a production build: 72 checks, 0 failed (with the new paint
-  checks: the row offers every paint, silver by default, the second
-  player's row hidden solo, a choice kept under `dreamcar.paint` and on the
-  car at once, `?paint=night` not kept, an unknown name silver). Stills on
-  software WebGL at `medium`: the livery at the night start, in the tunnel
-  and by day (1280x720), every paint in the viewer's showroom, the car at the
-  newest photographs' angles. `node tools/unit.mjs` passed. Not run: the
-  split-screen paint row with two players, the `keys` section, high tier in
-  the game, phones.
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
-
-- **The probe lane's changes** (the reflection probe prefiltered for
-  roughness, eased in, faces by what changes fastest, 128 / 256 / 512, the
-  parallax proxy, no sun disc in it): `?debug=probe` looked at by day on
-  medium (four roughnesses: no blocks, no seams); stills on software WebGL at
-  `medium`, 1280x720, with the photo camera low behind the car, before and
-  after, by day on the grid, in the esses (t = 33) and by night on the grid;
-  draw calls and triangles per pass counted on low and medium (engine.md, "The
-  reflection probe"); the playtest's `window` (a lost and restored context
-  mid-run) and `tiers` sections passed; `node tools/unit.mjs` passed. Not looked
-  at: `high` and dusk stills, the tunnel itself, split screen, the 8-bit
-  fallback (`?ldr`), and anything in motion (the easing was reasoned, not
-  watched).
-
-- **The quality ladder, the floors, the sharpening upscale, the readout**
-  (perf lane, 2026-11-19). `node tools/unit.mjs`: 6 files passed
-  (`governor.test.mjs`: 14 tests). The playtest against the lane's
-  production build: ladder 25 of 25, options and params 79 of 79, hud 100 of
-  100 (the readout on in every layout), keys and determinism 42 of 42; the
-  tiers section was left to the lead. Stills at an upright phone's size
-  (402x874 at device scale 3, the canvas at the pixel ratio's cap), the
-  start straight at t = 8, medium and low by day: at render scale 1 the
-  picture is the same file, byte for byte, as before the lane (both tiers);
-  at the floor through the upscale the gradient of the picture's brightness
-  is 0.94 of the native picture's against 0.70 for the old floor stretched
-  (medium), and the number plate reads (no pixel can leave the range of the
-  four texels round it by more than 8 % of that range: the pass clamps it). The owner's screenshots of 2026-11-19 put beside these stills are
-  the low tier at its old floor (engine.md, "The quality ladder"). Counted
-  with `tools/perfcount.cjs` (spec.md, "What a frame costs").
-  Not verified: any frame rate, so whether the ladder pays for the floor on
-  any phone; whether the governor's trial (the bottom of the ladder for 40
-  frames, once) is noticed; the upscale in motion (stills only; a pair of
-  frames 1/60 s apart is all that was compared); the rungs seen being taken
-  in a running game (each was placed by hand in a still); Safari's
-  30-a-second Low Power Mode itself (the governor was fed made-up frame
-  times with such a cap, in Node); whether Safari names the iPhone's GPU as
-  the tier guess expects (every iPhone and iPad is now medium whatever it
-  says).
 
 ## What has not been verified
 
@@ -513,19 +257,8 @@ Read this before believing anything above about a device.
   Adreno and Mali GPUs are right are all unknown.
 - **Frame rates.** Every cost here is from software WebGL, where a medium
   frame of the full world takes tens of seconds to draw. No frame rate on
-  any real GPU has been measured. The quality governor has been run through
-  made-up devices in Node and placed by hand in the page, never watched on a
-  real device. **Nothing of the perf lane ran on a real phone.** What will
-  say how it does there is the readout (Options, Readout: Shown; or
-  `?stats`): a screenshot with it on carries the tier (and so whether the
-  phone is on `low` or `medium`), what the browser calls the GPU, the canvas
-  in device pixels, the render scale, whether the scene is multisampled, the
-  mean and the slowest frame rate of the last three seconds, which rungs of
-  the ladder are shed, and the frame-rate cap if the governor found one.
-  From two or three such screenshots (the start, the forest, the tunnel) it
-  can be told whether the floor is affordable, which rungs are always shed
-  (and should be the tier's own numbers for phones), and whether Low Power
-  Mode was on.
+  any real GPU has been measured. The adaptive render scale has been seen to
+  step, never on a real device.
 - **The budgets.** Counted, not timed, at four moments of one autopilot
   run (spec.md): after the finish lane the low tier draws 133 to 149 calls
   by day (budget 150) and medium 228 to 291 by night (budget 300); triangles
@@ -567,33 +300,5 @@ Read this before believing anything above about a device.
   the board and ghost storage after many laps, and the time-of-day fade
   repeated many times are untested.
 - **Wet grip.** The wet road at night is a look; the tyres do not notice it.
-- **The sea** (sea lane): the waves' motion was only seen in stills (no
-  frame sequence was watched for shimmer or swimming of the disc that
-  follows the eye); the high tier's sea, split screen over the sea, the
-  surf from close by (no camera stood on a shore) were not looked at; the
-  sea's cost on a real GPU is unknown. The coast road after round 2 was
-  judged at the medium tier in `e1` only and at the low tier in the chase
-  camera only (the high tier there, and the bonnet and far cameras, were not
-  looked at). The low crossing and its big swell were seen in one medium
-  still each by day, golden hour and night and in the chase camera at
-  393x700 on the low tier; `?photo=waves`'s pose was not staged; frame D1
-  was checked after the far massif's change at a later moment of the run
-  than its preset (its skyline unchanged). Round 5 (the coast run low over
-  the bay): the heights from the tunnel's portal to the gully bridge changed;
-  `node tools/unit.mjs` and `tools/handling.mjs` were run (all passed, after
-  the checks that described the old crest were rewritten for the new top on
-  the ledge); the photo moments after the coast were moved by the Node
-  autopilot's timing (d3, k5, waves, d1 later by 0.4 to 1 s) and not each
-  re-staged.
-- **The water** (water lane): nothing here ran on a real GPU or a phone. The water's shader was never timed on
-  one: its cost is known only as texture reads a pixel (spec.md) and as software frames. The `mobile` detail level
-  (what a phone's medium tier draws) was only compiled and looked at in the lab. No frame sequence was watched:
-  the sparks of the sun's path, the surf's lines, the sheet on the sand, the drifting ripples and gusts were judged
-  in stills, so shimmer, crawling or a visible repeat in motion would not have been seen. The high tier and its planar mirror were seen in the lab only; the twilight water's last numbers (lifted
-  towards frame K5's 31 50 95) were not shot again; split screen over the water, the bonnet and bumper cameras, a phone's portrait picture and the
-  8-bit fallback (`?ldr`: no environment map, the sky's stand-in) not at all. The far land from the car's
-  reflection probe (medium) was not isolated in a still (it is in every medium game still, with the rest). The
-  cars' tail lamps in the water at night were not seen. The surf was developed on the lab's toy beach: the course
-  has hardly a shelving shore yet.
 - **Accessibility** beyond keyboard reachability of the buttons (screen
   readers, colour blindness, reduced motion) has not been considered.

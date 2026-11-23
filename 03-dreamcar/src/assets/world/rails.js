@@ -11,7 +11,6 @@
 // its last metres, turned a little away from the road, as real terminals are.
 
 import * as THREE from 'three';
-import { curbAt } from './schemes.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { EDGE, along, levelFrame, runsOf, stripGeometry, upright } from './furniture.js';
 import { retroReflective } from './retro.js';
@@ -111,8 +110,7 @@ export function createRails({ track, tier, atmosphere }) {
   };
   for (const side of [1, -1]) {
     const kinds = side > 0 ? track.kindL : track.kindR;
-    // (forest lane) not where a piece's scheme draws the edge as a kerbstone (schemes.js curbAt)
-    for (const run of runsOf(track, (i) => kinds[i] === EDGE.RAIL && !curbAt(track, i * track.ds))) {
+    for (const run of runsOf(track, (i) => kinds[i] === EDGE.RAIL)) {
       const before = kinds[(run.i0 - 1 + n) % n];
       const after = kinds[(run.i1 + 1) % n];
       const freeStart = before !== EDGE.WALL && before !== EDGE.PARAPET;
@@ -170,10 +168,7 @@ export function createRails({ track, tier, atmosphere }) {
           levelFrame(track, su, frame);
           // a post under a single beam is cut down to it
           const single = coverOf(track.boards, su, side, 2) > 0.5;
-          const post = upright(new THREE.Vector3(x, y - 0.45, z), frame.yaw, 1, single ? 0.78 : 1, 1);
-          // (sea lane) on the sea side of the coast road the posts are painted white
-          post.white = (side > 0 ? track.coastL : track.coastR)?.[Math.round(track.wrap(su) / track.ds) % n] === 1;
-          posts.push(post);
+          posts.push(upright(new THREE.Vector3(x, y - 0.45, z), frame.yaw, 1, single ? 0.78 : 1, 1));
         },
         { ends: true },
       );
@@ -189,12 +184,7 @@ export function createRails({ track, tier, atmosphere }) {
   // (finish lane) the posts in the beams' own mesh and material, so that a piece of barrier is one draw call in each
   // pass, not two: their texture coordinate v is -1, which railSteel paints as the posts' darker, rougher steel
   postGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(new Array(postGeometry.attributes.position.count).fill([0, -1]).flat(), 2));
-  const postCopies = posts.map((m) => {
-    const g = postGeometry.clone().applyMatrix4(m);
-    // (sea lane) a white post: v = -2
-    if (m.white) g.attributes.uv.array.forEach((_, k, a) => k % 2 === 1 && (a[k] = -2));
-    return g;
-  });
+  const postCopies = posts.map((m) => postGeometry.clone().applyMatrix4(m));
   const beamGeometry = mergeGeometries([...beams, ...postCopies]);
   for (const g of [...beams, ...postCopies, postGeometry]) g.dispose();
   const beam = new THREE.Mesh(beamGeometry, steel);
@@ -236,10 +226,7 @@ float railReflector() {
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-if (vRail.y < -1.5) {
-  // (sea lane) a post painted white (v = -2), on the sea side of the coast road
-  diffuseColor.rgb = vec3(0.72, 0.72, 0.7);
-} else if (vRail.y < -0.5) {
+if (vRail.y < -0.5) {
   // a post (v = -1): darker, rougher steel than the beams (0x8f959a against 0xa9afb3)
   diffuseColor.rgb *= 0.69;
 } else {
@@ -262,7 +249,6 @@ if (vRail.y < -1.5) {
       .replace(
         '#include <roughnessmap_fragment>',
         '#include <roughnessmap_fragment>\nroughnessFactor = vRail.y < -0.5 ? 0.5 : mix( roughnessFactor, 0.62, smoothstep( 0.7, 0.44, vRail.y ) );',
-      )
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nif ( vRail.y < -1.5 ) metalnessFactor = 0.0;');
+      );
   });
 }

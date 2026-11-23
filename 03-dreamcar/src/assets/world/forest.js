@@ -37,14 +37,12 @@
 import * as THREE from 'three';
 import { TILE, createBarkTextures, createFoliageAtlas, tileRect } from './forestTextures.js';
 import { layBy } from './gantry.js';
-import { forDevice } from '../../engine/caps.js';
 import { bakeImpostors } from './impostors.js';
 import { planeNoise, smoothstep } from './shading.js';
 import { GRASS } from './groundMaterial.js';
 import { growTrees } from './treeGeometry.js';
 import { createTreeUniforms, impostorDepthMaterial, impostorMaterial, plantMaterial, treeDepthMaterial, treeMaterial } from './treeMaterial.js';
 import { SPECIES, SPECIES_DATA, VARIANTS, VARIANTS_OF } from './treeSpecies.js';
-import { schemeAt } from './schemes.js';
 
 /** The Track's edge kind TREES (game/track.js EDGE.TREES; assets/ does not import game/). */
 const EDGE_TREES = 4;
@@ -63,14 +61,7 @@ const TIER = {
   low: { full: 0, reduced: 55, far: 650, keep: 0.5, tile: 384, bark: 128, cell: 192, rings: 1, casters: true, fullCap: 1, redCap: 2.6 },
   medium: { full: 58, reduced: 80, far: 900, keep: 0.8, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 2.2, redCap: 2.8 },
   high: { full: 80, reduced: 110, far: 1200, keep: 1, tile: 512, bark: 256, cell: 256, rings: 2, casters: true, fullCap: 2, redCap: 2.8 },
-  /**
-   * (perf lane) A phone's own numbers, laid over its tier's (caps.mobile; engine/caps.js forDevice): only how far each
-   * form is drawn and which trees cast (`castSeen`: shadowSeen below), never what is planted. None yet.
-   */
-  mobile: {},
 };
-/** (perf lane) With `castSeen`: a tree whose shadow passes within this far of the eye (m) casts whatever the view shows: the car mirrors what is beside it. */
-const CAST_NEAR = 30;
 /** Width of the band over which two levels cross-fade (m), on the multisampled tiers. */
 const BLEND = 8;
 /** How far the wood's floor (grass and fallen leaves under the road's trees) is drawn, per tier (m). */
@@ -239,7 +230,7 @@ export function createTreeKit({ renderer, tier, coverage, rng, atmosphere }) {
  * @param {{ reach: number }} options.shadow half the side of the sun's shadow square (m)
  * @param {(x: number, z: number) => boolean} [options.keepOut] true where no tree may stand
  */
-export function createForest({ renderer, track, terrain, tier, caps = null, coverage, rng, atmosphere, shadow, keepOut = () => false }) {
+export function createForest({ renderer, track, terrain, tier, coverage, rng, atmosphere, shadow, keepOut = () => false }) {
   const started = performance.now();
   const ms = {};
   let clock = started;
@@ -248,12 +239,9 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     ms[name] = Math.round(now - clock);
     clock = now;
   };
-  // (perf lane) the tier's numbers, a phone's own laid over them (TIER.mobile: view distances only; what is planted
-  // is the tier's)
-  const T = forDevice(TIER, tier, caps);
+  const T = TIER[tier] ?? TIER.high;
   const noise = planeNoise(rng.int(1 << 30));
   const plantRng = rng.fork('plant');
-  const plantRngMain = plantRng;
 
   // ---------------------------------------------------------------- planting
   /** @type {{ x: number, y: number, z: number, variant: number, h: number, rank: number, road: boolean, turned: number, inside: number }[]} */
@@ -326,10 +314,10 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
    *   heights times this, or height: [lo, hi] its own range (m); detail: how far out it keeps its finer levels of
    *   detail (1: the tier's distances; trees behind others need less); lean: [x, z, rad] leaning that way by so much
    */
-  function addTree(x, y, z, species, { road, turned, inside, young = 1, height = null, detail = 1, lean = null, slim = 1, rng: plantRng = plantRngMain, variant: chosen = -1 }) {
+  function addTree(x, y, z, species, { road, turned, inside, young = 1, height = null, detail = 1, lean = null, slim = 1 }) {
     const data = SPECIES_DATA[SPECIES[species]];
     const variants = VARIANTS_OF[species];
-    const variant = chosen >= 0 ? chosen : variants[plantRng.int(variants.length)];
+    const variant = variants[plantRng.int(variants.length)];
     const lo = height ? height[0] : data.height[0] * young;
     const hi = height ? height[1] : data.height[1] * young;
     const u = plantRng.next();
@@ -417,8 +405,8 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
   // THE START (D4): beyond the pit exit, where the Track says the land side is wooded and the wood has turned, a wall
   // of turned maples: 14 to 20 m tall close behind the barrier, crowns touching, and each row behind taller than the
   // one before it, so that from the grid the wall closes the picture and no sky stands over it; a small dark fir or
-  // two in its front. Elsewhere on the straight only the loose green rows between the lake side's two groups of boards
-  // (below): the paddock before the line stays open, so that the massif shows (D1). (The straight is the Track's section `straight`.)
+  // two in its front. Nowhere else on the straight: the lake side and the paddock before the line stay open, so that
+  // the massif shows (D1). (The straight is the Track's section `straight`.)
   const straight = track.sections?.find((x) => x.id === 'straight');
   if (straight) {
     const span = (track.delta(straight.s0, straight.s1) + track.length) % track.length;
@@ -481,8 +469,7 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
   // D1: at the near end of the lake side's run of boards along the straight, one or two tall dark trees behind the
   // first board (the only trees on that side)
   if (straight) {
-    const onLake = (track.boards ?? []).filter((b) => b.side > 0 && track.delta(straight.s0, b.s0) >= 0 && track.delta(straight.s0, b.s0) < 600).sort((a, b) => track.delta(straight.s0, a.s0) - track.delta(straight.s0, b.s0));
-    const run = onLake[0];
+    const run = (track.boards ?? []).filter((b) => b.side > 0 && track.delta(straight.s0, b.s0) >= 0 && track.delta(straight.s0, b.s0) < 200).sort((a, b) => track.delta(straight.s0, a.s0) - track.delta(straight.s0, b.s0))[0];
     if (run) {
       for (let k = 0; k < 2; k++) {
         const s = (run.s0 + track.length + k * 7 - 4) % track.length;
@@ -491,23 +478,6 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
         if (y < lakeLevel + 0.3 || keepOut(point.x, point.z) || !free(point.x, point.z, 2)) continue;
         addTree(point.x, y - 0.15, point.z, SPECIES.indexOf(k ? 'fir' : 'spruce'), { road: true, turned: 0, inside: 0.1, young: 1.1 });
       }
-    }
-    // (day lane) between that group of boards and the next, behind the low wall: D1's sunlit green middle distance,
-    // shrubs along the wall and round broadleaves of 8 to 13 m in loose rows, the shore showing between them
-    const next = onLake[1];
-    if (run && next) {
-      const s0 = run.s1 + 4;
-      const span = track.delta(s0, next.s0) - 4;
-      const SHORE = [
-        { off: [0.5, 3], step: [3.5, 6.5], r: 2, height: [2.5, 4.5], detail: 0.8, inside: 0.2 },
-        { off: [5, 11], step: [7, 12], r: 3.4, height: [8, 13], detail: 0.9, inside: 0.4 },
-        { off: [14, 24], step: [9, 15], r: 3.8, height: [10, 15], detail: 0.6, inside: 0.5 },
-      ];
-      plantRows(s0, span, 1, SHORE, () => true, (r) => {
-        const roll = plantRng.next();
-        if (r === 0) return roll < 0.75 ? HAZEL : HORNBEAM;
-        return roll < 0.45 ? LIME : roll < 0.8 ? HORNBEAM : roll < 0.93 ? MAPLE : BIRCH;
-      }, () => 0);
     }
   }
 
@@ -531,7 +501,7 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
       addTree(point.x, y - 0.1, point.z, species, { road: true, turned: wood.turned, inside: 0, young: sapling ? 0.3 : 1, detail: 0.6 });
     }
   }
-  let roadTrees = trees.length;
+  const roadTrees = trees.length;
 
   // THE VALLEY BELOW THE LEDGE'S FIRST BEND (D3's left): nothing but low growth on the slopes the bend looks out
   // over, as far as the wooded ridge beyond. Kept as the bend's centre line where its inside is open, with the
@@ -634,202 +604,6 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
       addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies(nearMix, y, false, turned), { road: false, turned, inside: 0.75, detail: 0.5 });
     }
   }
-
-  // (forest lane) THE SCHEMES' WOODS (trackLayout.js SCHEMES, schemes.js): on the pieces that name one, and blended
-  // into their neighbours over its `blend` metres, the road's rows give way to the scheme's own and the mass of the
-  // forest near the road turns to its conifers. Done after everything else is planted, from its own stream, so that
-  // the rest of the lap is planted exactly as before.
-  //   pinewood (frame e2): pines with long bare stems, a few spruces and firs, close to both edges, rows behind
-  //   stonepine (frame e5): pines, firs and spruces in open groups with sunny glades between, a full wood behind; on
-  //   the inside of the bend, near its apex, a tall stone pine standing alone
-  const schemeRng = rng.fork('scheme');
-  const schemeRuns = [];
-  {
-    const runs = [];
-    for (let s = 0; s < track.length; s += 4) {
-      const sch = schemeAt(track, s);
-      if (!sch?.def.wood) continue;
-      const last = runs[runs.length - 1];
-      if (last && last.wood === sch.def.wood && s - last.s1 <= 8) last.s1 = s;
-      else runs.push({ wood: sch.def.wood, s0: s, s1: s });
-    }
-    for (const run of runs) {
-      const box = [1e9, 1e9, -1e9, -1e9];
-      for (let s = run.s0; s <= run.s1; s += 8) {
-        track.pointAt(s, 0, point);
-        box[0] = Math.min(box[0], point.x - 160);
-        box[1] = Math.min(box[1], point.z - 160);
-        box[2] = Math.max(box[2], point.x + 160);
-        box[3] = Math.max(box[3], point.z + 160);
-      }
-      schemeRuns.push({ ...run, box });
-    }
-  }
-  if (schemeRuns.length) {
-    const PINE = SPECIES.indexOf('pine');
-    const SPRUCE = SPECIES.indexOf('spruce');
-    const SPRUCE_B = VARIANTS.findIndex((v) => v.name === 'spruce-b');
-    const PINE_A = VARIANTS.findIndex((v) => v.name === 'pine-a');
-    const PINE_B = VARIANTS.findIndex((v) => v.name === 'pine-b');
-    const MIX = {
-      // [species, variant or -1, share, height range (m)]
-      pinewood: [
-        [PINE, PINE_A, 0.84, [21, 29]],
-        [SPRUCE, SPRUCE_B, 0.11, [19, 26]],
-        [FIR, -1, 0.05, [15, 21]],
-      ],
-      // (e2) the rows further back: crowns lower down, 4 to 20 m up, which is where the 16 degree sun passes on its way
-      // to the road 15 to 45 m off; open, so that it comes through between them in patches (the pines' high crowns
-      // throw their shade beyond the road, only their trunks cross it)
-      pinewoodBack: [
-        [SPRUCE, SPRUCE_B, 0.45, [16, 22]],
-        [FIR, -1, 0.35, [13, 19]],
-        [PINE, PINE_A, 0.2, [20, 27]],
-      ],
-      stonepine: [
-        [PINE, PINE_A, 0.58, [18, 26]],
-        [FIR, -1, 0.24, [12, 19]],
-        [SPRUCE, -1, 0.18, [14, 22]],
-      ],
-    };
-    const pick = (wood) => {
-      const r = schemeRng.next();
-      let acc = 0;
-      for (const m of MIX[wood]) if (r < (acc += m[2])) return m;
-      return MIX[wood][0];
-    };
-    const inBox = (t) => schemeRuns.some((run) => t.x > run.box[0] && t.x < run.box[2] && t.z > run.box[1] && t.z < run.box[3]);
-    // the road's rows give way, the mass near the road turns to the scheme's conifers
-    const kept = [];
-    for (const t of trees) {
-      if (!inBox(t)) {
-        kept.push(t);
-        continue;
-      }
-      track.locate(t.x, t.z, -1, spot);
-      const sch = schemeAt(track, spot.s);
-      const side = spot.lat >= 0 ? 1 : -1;
-      const beyond = Math.abs(spot.lat) - track.edgeAt(spot.s, side);
-      const wood = sch?.def.wood;
-      if (!wood || !MIX[wood] || schemeRng.next() >= sch.w || beyond > 150) {
-        kept.push(t);
-        continue;
-      }
-      if (t.road) continue;
-      // (e2) the wood behind the road's rows thinned, so that the low sun comes through between the crowns and lies on
-      // the road in patches; under a closed canopy 60 to 90 m deep towards the sun the road was in plain shade
-      if (wood === 'pinewood' && schemeRng.next() < 0.55) continue;
-      const m = pick(wood);
-      const variants = VARIANTS_OF[m[0]];
-      t.variant = m[1] >= 0 ? m[1] : variants[schemeRng.int(variants.length)];
-      t.h = m[3][0] + (m[3][1] - m[3][0]) * schemeRng.next();
-      t.turned = 0;
-      kept.push(t);
-    }
-    trees.length = 0;
-    trees.push(...kept);
-    hash.clear();
-    for (const t of trees) occupy(t.x, t.z);
-    // the scheme's own rows
-    const ROWS_OF = {
-      pinewood: [
-        { off: [0.2, 2.2], step: [3.8, 6.5], r: 2.6, detail: 1.8, inside: 0.15, lean: [0.0, 0.04] },
-        { off: [3.5, 7.5], step: [4.5, 8], r: 2.8, detail: 1.3, inside: 0.35 },
-        { off: [9, 15], step: [6, 11], r: 3, detail: 0.9, inside: 0.5, mix: 'pinewoodBack' },
-        { off: [17, 27], step: [6, 11], r: 3.2, detail: 0.6, inside: 0.6, mix: 'pinewoodBack' },
-        { off: [30, 42], step: [7, 12], r: 3.4, detail: 0.5, inside: 0.6, mix: 'pinewoodBack' },
-      ],
-      stonepine: [
-        { off: [0.5, 4], step: [5, 11], r: 3.2, detail: 1.6, inside: 0.1, glade: 0.5 },
-        { off: [6, 12], step: [5, 10], r: 3.4, detail: 1.1, inside: 0.3, glade: 0.55 },
-        { off: [14, 26], step: [6, 11], r: 3.6, detail: 0.7, inside: 0.5, glade: 0.6 },
-      ],
-    };
-    for (const run of schemeRuns) {
-      const rows = ROWS_OF[run.wood];
-      if (!rows) continue;
-      const blend = 100;
-      for (const side of [1, -1]) {
-        rows.forEach((row) => {
-          let hint = -1;
-          for (let d = -blend + schemeRng.range(0, row.step[0]); d < run.s1 - run.s0 + blend; d += schemeRng.range(row.step[0], row.step[1])) {
-            const s = track.wrap(run.s0 + d);
-            const sch = schemeAt(track, s);
-            if (!sch || sch.def.wood !== run.wood || schemeRng.next() >= sch.w) continue;
-            if (!track.woodAt?.(s, side) && !woodAt(track, noise, s, side)) continue;
-            // (e5) sunny glades: no trees where the noise says so
-            if (row.glade && noise.fbm(s / 38 + side * 7.3, 5.1, 2) > row.glade) continue;
-            const lat = side * (track.edgeAt(s, side) + BARRIER_CLEAR + schemeRng.range(row.off[0], row.off[1]));
-            track.pointAt(s, lat, point);
-            if (blocked(point.x, point.z, 0, hint)) continue;
-            hint = spot.index;
-            if (!free(point.x, point.z, row.r)) continue;
-            const y = terrain.heightAt(point.x, point.z);
-            if (y < lakeLevel + 0.5) continue;
-            const m = pick(row.mix ?? run.wood);
-            const x = point.x;
-            const z = point.z;
-            let lean = null;
-            if (row.lean) {
-              track.pointAt(s, 0, point);
-              const l = Math.hypot(point.x - x, point.z - z) || 1;
-              lean = [(point.x - x) / l, (point.z - z) / l, schemeRng.range(row.lean[0], row.lean[1])];
-            }
-            addTree(x, y - 0.15, z, m[0], { road: true, turned: 0, inside: row.inside, height: m[3], detail: row.detail, lean, rng: schemeRng, variant: m[1] });
-          }
-        });
-      }
-      // (e5) the wood all round, closing the picture behind the boulders and the outcrops: the frame's bend lies in a
-      // full wood, fuller than the mass of the forest planted from the terrain
-      if (run.wood === 'stonepine') {
-        for (const side of [1, -1]) {
-          let hint = -1;
-          for (let d = -60; d < run.s1 - run.s0 + 60; d += schemeRng.range(4.5, 7)) {
-            const s = track.wrap(run.s0 + d);
-            const sch = schemeAt(track, s);
-            if (!sch || sch.def.wood !== run.wood) continue;
-            for (let out = 14 + schemeRng.range(0, 5); out < 110; out += schemeRng.range(5, 8)) {
-              if (schemeRng.next() >= sch.w) continue;
-              const lat = side * (track.edgeAt(s, side) + out);
-              track.pointAt(s, lat, point);
-              if (blocked(point.x, point.z, 1, hint)) continue;
-              hint = spot.index;
-              // (only beside its own stretch: another stretch's corridor is somebody else's)
-              if (Math.abs(track.delta(spot.s, s)) > 60) continue;
-              if (!free(point.x, point.z, 3.4)) continue;
-              const y = terrain.heightAt(point.x, point.z);
-              if (y < lakeLevel + 0.5) continue;
-              const m = pick(run.wood);
-              addTree(point.x, y - 0.2, point.z, m[0], { road: false, turned: 0, inside: 0.6, height: m[3], detail: out < 40 ? 0.9 : 0.5, rng: schemeRng, variant: m[1] });
-            }
-          }
-        }
-      }
-      // (e5) the stone pine: alone on the inside of the bend near its apex, its umbrella over the grass island
-      if (run.wood === 'stonepine') {
-        const mid = run.s0 + (run.s1 - run.s0) * 0.5;
-        const k = track.curvature[Math.round(track.wrap(mid) / track.ds) % track.count];
-        const inside = k >= 0 ? 1 : -1;
-        for (const [along, off, h] of [
-          [0.02, 4.5, [20, 22]],
-          [-0.16, 9, [15, 17]],
-        ]) {
-          const s = track.wrap(mid + along * (run.s1 - run.s0));
-          const lat = inside * (track.edgeAt(s, inside) + BARRIER_CLEAR + off);
-          track.pointAt(s, lat, point);
-          if (blocked(point.x, point.z, 0)) continue;
-          // room for its crown
-          for (let j = trees.length - 1; j >= 0; j--) {
-            const t = trees[j];
-            if ((t.x - point.x) ** 2 + (t.z - point.z) ** 2 < 7 * 7) trees.splice(j, 1);
-          }
-          const y = terrain.heightAt(point.x, point.z);
-          addTree(point.x, y - 0.2, point.z, PINE, { road: true, turned: 0, inside: 0, height: h, detail: 2.4, rng: schemeRng, variant: PINE_B });
-        }
-      }
-    }
-  }
-  roadTrees = trees.filter((t) => t.road).length;
   lap('plant');
 
   // ---------------------------------------------------------------- the trees themselves
@@ -1037,47 +811,10 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
   const projView = new THREE.Matrix4();
   const sphere = new THREE.Sphere();
   const eye = new THREE.Vector3();
-  // Without the sun's box (no shadow map): trees cast round the car, as far as the square reaches.
-  // (split-bug lane) With it, every tree whose crown is inside the map's box casts, wherever it stands. Chosen by
-  // distance from the car instead, the trees 50 to 100 m towards a 17 degree moon or sun, whose shadows lie across
-  // the road at the car, were left out: the wet road there lay in full moonlight, a pale sheet broken by the
-  // shadows of the nearer trees, and which trees were left out moved with the car, so the two halves of a split
-  // screen a few metres apart showed one road dark and the other a sheet of water.
+  // trees cast round the car: the shade on the road ahead and beside it is what is seen (the shadow square reaches
+  // further, but what falls there is mostly the forest's own floor)
   const shadowR = Math.min(shadow.reach * 1.1, CAST_REACH);
-  /** Whether a sphere (centre c, radius r) is inside the sun's shadow box. @param {import('./sun.js').ShadowBox} b */
-  const inBox = (b, c, r) => {
-    const x = c.x * b.right.x + c.y * b.right.y + c.z * b.right.z - b.x;
-    if (Math.abs(x) > b.halfX + r) return false;
-    const y = c.x * b.up.x + c.y * b.up.y + c.z * b.up.z - b.y;
-    if (Math.abs(y) > b.halfY + r) return false;
-    const z = c.x * b.dir.x + c.y * b.dir.y + c.z * b.dir.z - b.z;
-    return z < b.towards + r && z > -b.away - r;
-  };
-  /**
-   * (perf lane) Can the shadow of the crown in sphere (c, r) be seen? Its shadow is the bundle of rays behind the
-   * sphere, away from the light, as far as the map's box reaches. If no part of that bundle is in the view's
-   * frustum and none passes near the eye, nothing the view shows is shaded by this tree, and drawing its card into
-   * the map (every texel of it an alpha test) buys nothing. Exact for the view; the car's reflection probe and
-   * the wet road's mirror, which use the view's map, keep what passes within CAST_NEAR of the eye.
-   * Asks the camera, never the car: two views of the same place choose alike.
-   * @param {import('./sun.js').ShadowBox} b
-   */
-  const seenProbe = new THREE.Sphere();
-  const shadowSeen = (b, c, r) => {
-    const length = c.x * b.dir.x + c.y * b.dir.y + c.z * b.dir.z - b.z + b.away;
-    const steps = Math.max(0, Math.ceil(length / r));
-    const near = (CAST_NEAR + r) ** 2;
-    // (spheres a radius apart, a little larger than the crown's, cover the whole bundle)
-    seenProbe.radius = r * 1.12;
-    for (let k = 0; k <= steps; k++) {
-      seenProbe.center.set(c.x - b.dir.x * k * r, c.y - b.dir.y * k * r, c.z - b.dir.z * k * r);
-      if (seenProbe.center.distanceToSquared(eye) < near || frustum.intersectsSphere(seenProbe)) return true;
-    }
-    return false;
-  };
-  const counts = { full: 0, reduced: 0, impostors: 0, casters: 0, castersUnseen: 0, triangles: 0, casterTriangles: 0 };
-  /** (perf lane) What the detail distances are multiplied by (setDetail). */
-  let detailScale = 1;
+  const counts = { full: 0, reduced: 0, impostors: 0, casters: 0, triangles: 0, casterTriangles: 0 };
   const fullTris = models.map((m) => m.triangles[0]);
   const reducedTris = models.map((m) => m.triangles[1]);
   /** Trees at full detail this view: written to the reduced meshes too (after the reduced ones), for the mirror. */
@@ -1112,23 +849,7 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     }
   }
 
-  /** Level direction the shadows fall in (away from the sun), and their length per metre of height (forest lane). */
-  const fall = { x: 0, z: 0, per: 0 };
-  /** How far (m, level) the shadow of something `h` m tall standing at (x, z) passes from the focus. */
-  function shadowGap(x, z, h, focus) {
-    const L = Math.min(CAST_REACH, h * fall.per);
-    const px = focus.x - x;
-    const pz = focus.z - z;
-    const t = L > 0 ? Math.min(L, Math.max(0, px * fall.x + pz * fall.z)) : 0;
-    return Math.hypot(px - fall.x * t, pz - fall.z * t);
-  }
-
-  /**
-   * @param {THREE.Camera} camera
-   * @param {THREE.Vector3} focus the view's car
-   * @param {import('./sun.js').ShadowBox} [box] the sun's shadow box, already placed for this view
-   */
-  function prepareView(camera, focus, box = null) {
+  function prepareView(camera, focus) {
     viewCamera = camera;
     camera.updateMatrixWorld();
     projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -1138,19 +859,14 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     const flat = camera.isOrthographicCamera;
     for (const m of group.children) m.count = 0;
     fullList.length = 0;
-    let unseen = 0;
     const blend = coverage ? BLEND : 0;
-    // (perf lane) the ladder's rung: the distances at which trees keep their full and their reduced form, and the
-    // floor's reach, times `detailScale` (1 until the governor sheds it; no mesh is rebuilt, nothing is compiled)
-    const fullD = T.full * detailScale;
-    const redD = T.reduced * detailScale;
+    const fullD = T.full;
+    const redD = T.reduced;
     for (let k = 0; k < cellSphere.length; k++) {
       if (cellStart[k] === cellStart[k + 1]) continue;
       const cs = cellSphere[k];
       const dEye = flat ? 0 : cs.center.distanceTo(eye) - cs.radius;
-      // the sun's shadow box when it is placed (the trunk's exact test); else (forest lane) where the shadow falls: under
-      // a low sun the crowns that dapple the road ahead stand far off towards the sun (3.5 m away per metre of height)
-      const caster = casterMeshes.length > 0 && (box?.on ? inBox(box, cs.center, cs.radius) : shadowGap(cs.center.x, cs.center.z, 2 * cs.radius, focus) - cs.radius < shadowR);
+      const caster = casterMeshes.length > 0 && Math.hypot(cs.center.x - focus.x, cs.center.z - focus.z) - cs.radius < shadowR;
       const seenCell = dEye < T.far && frustum.intersectsSphere(cs);
       if (!caster && !seenCell) continue;
       for (let j = cellStart[k]; j < cellStart[k + 1]; j++) {
@@ -1158,17 +874,13 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
         const v = trees[i].variant;
         sphere.center.set(spheres[i * 4], spheres[i * 4 + 1], spheres[i * 4 + 2]);
         sphere.radius = spheres[i * 4 + 3];
-        if (caster && (box?.on ? inBox(box, sphere.center, sphere.radius) : shadowGap(trees[i].x, trees[i].z, trees[i].h, focus) < shadowR)) {
-          // (perf lane) on a phone: only if its shadow can be seen
-          if (T.castSeen && box?.on && !shadowSeen(box, sphere.center, sphere.radius)) unseen++;
-          else write(casterMeshes[0], i, 1);
-        }
+        if (caster && Math.hypot(sphere.center.x - focus.x, sphere.center.z - focus.z) < shadowR) write(casterMeshes[0], i, 1);
         if (!seenCell || !frustum.intersectsSphere(sphere)) continue;
         // (small things, the undergrowth and young trees, go to the simpler levels sooner)
         // the floor under it
         if (patchStart[i] < patchStart[i + 1]) {
           const df = flat ? 0 : sphere.center.distanceTo(eye);
-          const reachF = (FLOOR_REACH[tier] ?? FLOOR_REACH.high) * detailScale;
+          const reachF = FLOOR_REACH[tier] ?? FLOOR_REACH.high;
           if (df < reachF) for (let j = patchStart[i]; j < patchStart[i + 1]; j++) writePatch(j, i, coverage ? Math.min(1, (reachF - df) / 15) : 1);
         }
         // (trees behind others, the undergrowth and the mass of the forest go to the simpler levels sooner)
@@ -1200,7 +912,6 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     for (const i of fullList) write(reducedMeshes[trees[i].variant], i, 1);
     for (const m of reducedMeshes) m.userData.other = m.count;
     counts.full = counts.reduced = counts.impostors = counts.casters = counts.triangles = counts.casterTriangles = 0;
-    counts.castersUnseen = unseen;
     for (const m of group.children) {
       upload(m);
       m.count = m.userData.main;
@@ -1233,13 +944,6 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     group,
     uniforms,
     prepareView,
-    /**
-     * (perf lane) Scale the distances at which trees are drawn in full and in reduced form and the floor's reach
-     * (1: the tier's own). Takes effect at the next prepareView.
-     */
-    setDetail(scale) {
-      detailScale = Math.min(1, Math.max(0.3, scale));
-    },
     /** How much of the wood has turned at track distance s (0..1). */
     turnedAt: (s) => turnedAt(track, noise, s),
     /** Is the land beside the road wooded at (s, side): the mix, how much has turned, where the trees begin. */
@@ -1248,13 +952,6 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
       uniforms.uTime.value = simTime;
     },
     setTime(time) {
-      const d = time.sun?.dir;
-      if (d) {
-        const level = Math.hypot(d[0], d[2]) || 1;
-        fall.x = -d[0] / level;
-        fall.z = -d[2] / level;
-        fall.per = d[1] > 0.01 ? level / d[1] : 0;
-      }
       // a breath of wind by day, less at night
       uniforms.uWind.value.z = time.name === 'night' ? 0.5 : 1;
     },

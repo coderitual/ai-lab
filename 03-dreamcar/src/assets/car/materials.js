@@ -21,40 +21,25 @@
 //    nearly all reflection, and must be silver under the tunnel's lamps).
 
 import * as THREE from 'three';
-import { GLSL_HASH, GLSL_NOISE, GLSL_PROBE, GLSL_PROBE_PROXY, targetDefines } from '../../engine/glsl.js';
+import { GLSL_HASH, GLSL_NOISE, GLSL_PROBE, targetDefines } from '../../engine/glsl.js';
 import { RANGE } from './atlas.js';
 import { ARCHES, GRILLE_STARS, INTAKE_CENTRE, INTAKE_SIDE } from './features.js';
-import { BORE_UNIFORMS } from '../world/shading.js';
-import { LUMINAIRE } from '../world/tunnel.js';
-import { LIVERY } from './livery.js';
+import { DIMS, STATIONS } from './spec.js';
 
-/**
- * The paints, defined once (the game's options, `?paint=`, the viewer): base colour (linear), metalness and roughness
- * of the flake layer, how dark it gets edge-on (flop), how much flake shows, the clear coat (`coat`: 1 a gloss
- * lacquer, 0 none, as on a matte wrap; `coatRough` its roughness), the wheels' dark finish if not the black one
- * (`wheels`, linear), and a livery drawn over it (`livery`: livery.js). Changed on a built car by CarModel.setPaint:
- * uniforms only, nothing is rebuilt or recompiled.
- */
+/** The paints: base colour (linear), metalness and roughness of the flake layer, how dark it gets edge-on (flop), and how much flake shows. */
 export const PAINTS = {
   // high-tech silver: this car. A metallic paint, not polished metal: a bright flake layer rough enough to shade
   // softly from light to dark across a panel (light silver-white in the sun, mid grey turned away from it), part
   // metal and part pigment, so it takes the sun's light as a colour of its own as well as a broad sheen; the clear
   // coat above it carries the only sharp reflection, a lacquer's, strong at grazing angles only. At metalness 0.92
   // and roughness 0.27 the layer mirrored everything and the car read as chrome.
-  silver: { color: [0.59, 0.615, 0.675], metal: 0.86, rough: 0.33, flop: 0.22, flake: 1 },
-  // a deep black: almost no flake, all of its look the clear coat's mirror
-  black: { color: [0.006, 0.006, 0.007], metal: 0.4, rough: 0.28, flop: 1, flake: 0.25 },
-  white: { color: [0.78, 0.79, 0.78], metal: 0, rough: 0.35, flop: 1, flake: 0 },
+  silver: { color: [0.59, 0.615, 0.675], metal: 0.82, rough: 0.42, flop: 0.4, flake: 1 },
+  graphite: { color: [0.16, 0.17, 0.18], metal: 1, rough: 0.34, flop: 0.45, flake: 1 },
   blue: { color: [0.018, 0.045, 0.19], metal: 0.85, rough: 0.32, flop: 0.35, flake: 1 },
   red: { color: [0.36, 0.014, 0.014], metal: 0.35, rough: 0.3, flop: 0.6, flake: 0.5 },
-  // a matte grey wrap: no clear coat, a rough, faintly metallic film
-  matte: { color: [0.13, 0.135, 0.14], metal: 0.3, rough: 0.62, flop: 0.8, flake: 0, coat: 0, coatRough: 0.5 },
-  graphite: { color: [0.16, 0.17, 0.18], metal: 1, rough: 0.34, flop: 0.45, flake: 1 },
-  // the night race: a black metallic base under the livery's neon graphics, magenta wheels
-  night: { color: [0.012, 0.011, 0.016], metal: 0.6, rough: 0.3, flop: 0.6, flake: 0.6, wheels: [0.42, 0.012, 0.16], livery: true },
+  white: { color: [0.78, 0.79, 0.78], metal: 0, rough: 0.35, flop: 1, flake: 0 },
+  black: { color: [0.012, 0.012, 0.014], metal: 0.3, rough: 0.3, flop: 1, flake: 0.3 },
 };
-/** The order the options list the paints in (the first is the default). */
-export const PAINT_ORDER = ['silver', 'black', 'white', 'blue', 'red', 'matte', 'graphite', 'night'];
 
 /**
  * Uniforms every car material shares (one object, so that setReflections and setLights touch one place).
@@ -82,56 +67,11 @@ export function createShared(atlas) {
     carProbe: { value: null },
     carProbeOn: { value: 0 },
     carSky: { value: 1 },
-    carKey: { value: 1 },
-    ...proxyUniforms(),
     // lamps: drl, low, high, tail / brake, reverse, indicator left, indicator right
     carLampsA: { value: new THREE.Vector4() },
     carLampsB: { value: new THREE.Vector4() },
     // interior, and three spare
     carLampsC: { value: new THREE.Vector4() },
-    // the tunnel (setBore): where the car is in the road's frame and that frame's axes in car space (GLSL_BORE)
-    carBoreAt: { value: new THREE.Vector4() },
-    carBoreAhead: { value: new THREE.Vector4(0, 0, 1, 0) },
-    carBoreFlat: { value: new THREE.Vector3(1, 0, 0) },
-    carBoreUp: { value: new THREE.Vector3(0, 1, 0) },
-    carBoreMove: { value: new THREE.Vector2() },
-    carBoreBars: { value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 1, 0, 0)) },
-    carBoreFrom: { value: new THREE.Vector4(1e9, 1e9, 1e9, 1e9) },
-    carBoreSpan: { value: new THREE.Vector2(0, -1) },
-    // where the lines of luminaires are, how bright, and the lining's radiance: the tunnel's own (shading.js)
-    uBoreLines: BORE_UNIFORMS.uBoreLines,
-    uBoreLineColor: BORE_UNIFORMS.uBoreLineColor,
-    uBoreZone: BORE_UNIFORMS.uBoreZone,
-    uBoreGlow: BORE_UNIFORMS.uBoreGlow,
-  };
-}
-
-/**
- * The tunnel's luminaires as rows of bars along it, for GLSL_BORE: walked by the same spacing rule as tunnel.js's
- * fittings (LUMINAIRE: pairs of short bars close together in the entrance zone, single bars spaced out further in,
- * closer again before the exit). Returns up to four rows, each (first bar's distance into the tunnel, spacing, bar
- * length, half the gap between a pair's bars or 0), the distance from which each row holds, and the first and last
- * bars' distances.
- * @param {number} length the tunnel's length (m)
- */
-export function boreRows(length) {
-  const L = LUMINAIRE;
-  const spacingAt = (d, toExit) =>
-    d < L.entrance[0] ? L.entrance[1] : d < L.transition[0] || toExit < L.exit[0] ? L.transition[1] : L.interior;
-  const rows = [];
-  let last = 1.5;
-  for (let d = 1.5; d < length - 1; ) {
-    const spacing = spacingAt(d, length - d);
-    const pair = d < L.entrance[0];
-    const row = rows[rows.length - 1];
-    if (!row || row.spacing !== spacing || row.pair !== pair) rows.push({ start: d, spacing, pair, from: rows.length ? (last + d) / 2 : -1e9 });
-    last = d;
-    d += spacing;
-  }
-  return {
-    rows: rows.slice(0, 4).map((r) => [r.start, r.spacing, r.pair ? L.alongPair : L.along, r.pair ? L.pair / 2 : 0]),
-    from: rows.slice(0, 4).map((r) => r.from),
-    span: rows.length ? [rows[0].start, last] : [0, -1],
   };
 }
 
@@ -148,31 +88,6 @@ vCarNormal = normal;
 vCarToView = normalMatrix;
 `;
 
-/**
- * The probe holds the lamps and the sun as the rest of the world sees them, but the car takes their light from the
- * lights themselves (the sun, the floodlights' and its own spots: three.js's direct light, with the paint's own
- * lobes). Read through a rough layer, what the probe's few coarse texels of a lamp add on top of that is a second
- * copy of its light smeared over the panel: at night the silver glowed pale grey all over, in blotches that moved
- * as the probe's faces were redrawn. So a rough read holds anything brighter than a few times the white paper of the
- * moment (`carKey`: the radiance of white paper in the key light, from the picture's exposure, which is set to that
- * light) to about that, rolling off slowly above it; a crisp read keeps far more, so that a lamp stays a jewel in the
- * clear coat and the glass.
- */
-const GLSL_KEY = /* glsl */ `
-uniform float carKey;
-/** What is bright against the moment's white paper loses its colour through a rough layer (amount 0..1). */
-vec3 carTint(vec3 c, float amount) {
-  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  float keep = 1.0 / (1.0 + 3.0 * max(l / max(carKey, 1e-6) - 0.15, 0.0));
-  return mix(vec3(l), c, mix(1.0, keep, amount));
-}
-vec3 carHoldKey(vec3 c, float k) {
-  float cap = k * carKey;
-  float peak = max(c.r, max(c.g, c.b));
-  return peak > cap ? c * (cap * (1.0 + 0.25 * log(peak / cap)) / peak) : c;
-}
-`;
-
 const GLSL_SANE = /* glsl */ `
 // A texel of the probe that is not a number (or overflowed half float) must not reach the picture: the bloom
 // would spread it over the whole screen (and on this renderer it came out black). What the probe saw there is
@@ -182,97 +97,22 @@ vec3 carSane(vec3 c, vec3 instead) {
 }
 `;
 
-
 /**
- * The tunnel's two lines of luminaires in the car's mirrors, exactly (`carBoreLines`). While the car is in or near
- * the tunnel they are straight rows of bars at a known place: along the road, `uBoreLines.x` either side of its
- * centre line, `uBoreLines.y` over it (shading.js BORE_UNIFORMS, set by tunnel.js). A reflected ray from a point of
- * the body is followed to their plane; where it meets it, across the road, says how much of a bar's width it sees
- * (a box seen through a box filter as wide as the pixel's footprint there, plus the layer's own spread), and along
- * it, how much of the row of bars (boreRows: the entrance's pairs, the spaced bars further in) over the same
- * filter, plus the distance the car covers in a 90th of a second, so that the dashes stream past at speed rather
- * than step. The probe sees the fittings only as broad stand-ins a few texels wide, a fifth of a second old: in the
- * paint they were blotches and broken flecks. (The ray from outside the box counts only through its mouth.)
- *
- * The road's frame at the car (setBore, from the Game): `carBoreAt` the car's origin (lat, height over the centre
- * line's grade, s) and how far the car is under the roof (0..1); `carBoreAhead` (xyz) the road's level heading in car
- * space and (w) its grade; `carBoreFlat` its level left; `carBoreUp` the world's up. The box is upright and follows
- * the grade, so a height over the ceiling is taken along the world's up less the grade times the distance along.
- *
- * (The walls and the ceiling in the probe are put at their true distance by the probe's own box, GLSL_PROBE_PROXY.)
+ * Where the probe stands in car space: the middle of the car's box (index.js `box.center`, which the game's probe
+ * is placed at). The probe knows directions only, so the road near the car, seen from the middle of the car, fills
+ * half its cube at the wrong size and place. `carGround` turns a reflected ray of the body that meets the road
+ * within 20 m into the direction from the probe to that point (a parallax correction for one plane, the road's).
  */
-const GLSL_BORE = /* glsl */ `
-uniform vec4 carBoreAt;
-uniform vec4 carBoreAhead;
-uniform vec3 carBoreFlat;
-uniform vec3 carBoreUp;
-uniform vec2 carBoreMove;
-uniform vec4 carBoreBars[4];
-uniform vec4 carBoreFrom;
-uniform vec2 carBoreSpan;
-uniform vec4 uBoreLines;
-uniform vec3 uBoreLineColor;
-uniform vec4 uBoreZone;
-uniform vec3 uBoreGlow;
-vec3 carToCar(vec3 rWorld) { return normalize(transpose(vCarToView) * (viewMatrix * vec4(rWorld, 0.0)).xyz); }
-vec3 carFromCar(vec3 rCar) { return inverseTransformDirection(vCarToView * rCar, viewMatrix); }
-/** How much of a box |x| < h is seen through a box filter b wide. */
-float carBoxSeen(float x, float h, float b) {
-  b = max(b, 1e-4);
-  return (clamp(x + h, -0.5 * b, 0.5 * b) - clamp(x - h, -0.5 * b, 0.5 * b)) / b;
-}
-/** The integral of a row of bars (len long, every period, the first starting at 0) up to y. */
-float carRowSum(float y, float period, float len) { return len * floor(y / period) + min(mod(y, period), len); }
-/** How much of the row of bars (row: first bar's centre, spacing, length) is seen at d through a filter b long. */
-float carRowSeen(float d, vec4 row, float b) {
-  b = max(b, 1e-3);
-  float y = d - row.x + 0.5 * row.z + 1000.0 * row.y;
-  return (carRowSum(y + 0.5 * b, row.y, row.z) - carRowSum(y - 0.5 * b, row.y, row.z)) / b;
-}
-/** The lines of luminaires seen from car-space point p along car-space direction r; spread: the layer's (m per m). */
-vec3 carBoreLines(vec3 p, vec3 r, float spread) {
-  if (carBoreMove.y < 0.5) return vec3(0.0);
-  float pa = dot(p, carBoreAhead.xyz);
-  float sP = carBoreAt.z + pa;
-  float latP = carBoreAt.x + dot(p, carBoreFlat);
-  float hP = carBoreAt.y + dot(p, carBoreUp) - carBoreAhead.w * pa;
-  float ds = dot(r, carBoreAhead.xyz);
-  float dl = dot(r, carBoreFlat);
-  float dh = dot(r, carBoreUp) - carBoreAhead.w * ds;
-  float t = max(uBoreLines.y - hP, 0.0) / max(dh, 0.02);
-  float lat = latP + dl * t;
-  float d = sP + ds * t - uBoreZone.x;
-  // the filters: the pixel's footprint on the plane, the layer's spread, and along the road the car's own motion
-  float bLat = min(fwidth(lat), 4.0) + spread * t;
-  float bS = min(fwidth(d), 8.0) + spread * t + carBoreMove.x;
-  vec4 row = carBoreBars[0];
-  if (d > carBoreFrom.y) row = carBoreBars[1];
-  if (d > carBoreFrom.z) row = carBoreBars[2];
-  if (d > carBoreFrom.w) row = carBoreBars[3];
-  // never thinner than about a pixel: seen small (the chase camera on a phone) a bar's width is a fraction of the
-  // pixel's footprint on the plane, and filtered to its true share it was a faint grey thread
-  // (but no wider than 0.6 m, and dimmer the wider it is drawn: where the body turns sharply, at the rear quarter's
-  // corner, the footprint is wide because the mirror curves, and the widened lines met there in a bright V)
-  float h0 = 0.5 * uBoreLines.w;
-  float h = max(h0, 0.6 * min(fwidth(lat), 1.0));
-  float thin = sqrt(h0 / h);
-  float across = carBoxSeen(abs(lat) - uBoreLines.x - row.w, h, bLat) + (row.w > 0.0 ? carBoxSeen(abs(lat) - uBoreLines.x + row.w, h, bLat) : 0.0);
-  float along = carRowSeen(d, row, bS) * carBoxSeen(d - 0.5 * (carBoreSpan.x + carBoreSpan.y), 0.5 * (carBoreSpan.y - carBoreSpan.x) + 0.5 * row.z, bS);
-  // only rays that go up to the plane, and from outside the box only through its mouth
-  float seen = step(0.02, dh) * step(0.0, uBoreLines.y - hP);
-  float sEdge = sP < uBoreZone.x ? uBoreZone.x : uBoreZone.y;
-  float tm = (sEdge - sP) / (abs(ds) > 1e-4 ? ds : 1e-4);
-  if (sP < uBoreZone.x || sP > uBoreZone.y) {
-    seen *= step(0.0, tm) * step(abs(latP + dl * tm), uBoreLines.x + ${LUMINAIRE.inset.toFixed(3)}) * step(hP + (dh) * tm, uBoreLines.y + 0.1);
-  }
-  return uBoreLineColor * (uBoreLines.z * across * thin * along * seen);
-}
-/** Under the roof the probe's lamps and fittings are the analytic lines' (carBoreLines): what it sees is held to a few times the lining's radiance. */
-vec3 carBoreHold(vec3 seen) {
-  float cap = 4.0 * max(max(uBoreGlow.r, max(uBoreGlow.g, uBoreGlow.b)), 1e-4);
-  float peak = max(seen.r, max(seen.g, seen.b));
-  float keep = peak > cap ? cap * (1.0 + 0.25 * log(peak / cap)) / peak : 1.0;
-  return seen * mix(1.0, keep, carBoreAt.w);
+const PROBE_AT = [0, DIMS.height / 2, (STATIONS.nose + STATIONS.tail) / 2];
+const GLSL_GROUND = /* glsl */ `
+vec3 carGround(vec3 rWorld) {
+  vec3 rCar = normalize(transpose(vCarToView) * (viewMatrix * vec4(rWorld, 0.0)).xyz);
+  if (rCar.y > -0.02) return rWorld;
+  float t = -vCarPos.y / rCar.y;
+  vec3 hit = vCarPos + rCar * t;
+  vec3 fixedCar = normalize(hit - vec3(${PROBE_AT.map((v) => v.toFixed(4)).join(', ')}));
+  vec3 fixedWorld = inverseTransformDirection(vCarToView * fixedCar, viewMatrix);
+  return normalize(mix(fixedWorld, rWorld, smoothstep(8.0, 20.0, t)));
 }
 `;
 
@@ -294,11 +134,7 @@ ${GLSL_HASH}
 ${GLSL_NOISE}
 ${GLSL_PROBE}
 ${GLSL_SANE}
-${GLSL_KEY}
-${GLSL_PROBE_PROXY}
-/** The fragment's place in the world, for the probe's parallax correction. */
-vec3 carWorldPos() { return (vec4(-vViewPosition, 0.0) * viewMatrix).xyz + cameraPosition; }
-${GLSL_BORE}
+${GLSL_GROUND}
 vec4 carAtlas(sampler2D t) { return (texture2D(t, vSkinUv) * 255.0 - 127.5) / 127.5 * carRange; }
 /** How much of the pixel is inside (distance < 0), antialiased by the distance's own footprint. */
 float carCover(float d) { return clamp(0.5 - d / max(fwidth(d), 1e-5), 0.0, 1.0); }
@@ -336,43 +172,34 @@ const FOOTPRINT = 'sqrt(0.39 * max(length(dFdx(r)), length(dFdy(r))))';
  */
 
 /**
- * The paint's flake layer reads the probe at its own roughness: the probe's levels are the surroundings convolved
- * with the GGX lobe of each roughness (ReflectionProbe.js), so one read is a smooth bell of them (until round 8 the
- * mips were plain 2x2 averages, and the layer took nine taps in a cone at a finer level to keep the wood's crowns
- * from printing as blocks). The flakes are metal under a lacquer that is not quite clear: what they show is held to
- * 65 % of its colour (and, as every rough read, less the brighter it is: carTint).
+ * The paint's flake layer is rough, and a rough read of the probe is a read of a coarse mip: the mips are plain 2x2
+ * averages, so at roughness 0.5 a 256 cube is a few texels a face, and bilinear filtering between them drew the
+ * wood's autumn crowns as large blocky yellow patches across the bonnet and roof, and a face's edge as a seam.
+ * `soft` reads instead a cone of nine taps (a ring of eight round the mirror direction, as wide as the layer's
+ * highlight, and the centre twice) at a mip four times finer: a smooth bell of the surroundings, no blocks, no
+ * seams. And the flakes are metal under a lacquer that is not quite clear: what they show is held to 65 % of its
+ * colour, so a coloured thing in the probe tints the panel and never paints a coloured patch on it. The clear coat's
+ * own crisp image (with `soft`) is held to 45 %: at a grazing angle the nearly flat bonnet magnified the wood's
+ * bright yellow crowns at the horizon into a saturated yellow band across it.
  */
 const GLSL_SOFT_PROBE = /* glsl */ `
 vec3 carSoftProbe(vec3 r, float rough, float foot) {
-  vec3 seen = probeSample(carProbe, r, max(rough, foot));
-  float l = dot(seen, vec3(0.2126, 0.7152, 0.0722));
-  return mix(vec3(l), seen, 0.65);
+  vec3 t1 = normalize(cross(abs(r.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), r));
+  vec3 t2 = cross(r, t1);
+  float spread = 0.9 * rough * rough;
+  float lod = max(0.5 * rough, foot);
+  vec3 sum = 2.0 * probeSample(carProbe, r, lod);
+  for (int i = 0; i < 8; i++) {
+    float a = float(i) * 0.7853982 + 0.3927;
+    sum += probeSample(carProbe, normalize(r + spread * (cos(a) * t1 + sin(a) * t2)), lod);
+  }
+  sum *= 0.1;
+  float l = dot(sum, vec3(0.2126, 0.7152, 0.0722));
+  return mix(vec3(l), sum, 0.65);
 }
 `;
 
-/**
- * The flake layer's share of the tunnel's lines (carBoreLines at the layer's own spread): a soft bright sheen round
- * the clear coat's crisp lines, not a second mirror image.
- */
-const BORE_SHEEN = 0.3;
-/**
- * And the clear coat's (and the glass's) share, against a plain lacquer's reflectance: a little more, so that on a
- * pale silver under pale walls the lines read as the brightest thing on the body, as they do on a polished car
- * under strip lights (at 1 they were faint, at the shoulders only a thin grey).
- */
-const BORE_COAT = 5.0;
-
-/**
- * White paper in the key light, as the finished picture has it (lighting.js: about 1 in the afternoon sun, at an
- * exposure of about 0.7): divided by the picture's exposure, the radiance of white paper wherever the car is
- * (`carKey`, CarModel.setReflections).
- */
-export const PAPER = 0.7;
-/** What a crisp read of the probe keeps of a lamp, and a rough one, in white papers of the key light (GLSL_KEY). */
-const KEY_CRISP = '16.0';
-const KEY_ROUGH = '3.0';
-
-const REFLECTIONS = (coat, base = !coat, gain = 1, soft = false, bore = false) => /* glsl */ `
+const REFLECTIONS = (coat, base = !coat, gain = 1, ground = false, soft = false) => /* glsl */ `
 #include <lights_fragment_maps>
 #if defined( RE_IndirectSpecular )
   ${
@@ -381,13 +208,9 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, soft = false, bore = false) =
   #ifdef USE_CLEARCOAT
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryClearcoatNormal), viewMatrix);
-    ${bore ? 'vec3 rBore = r;' : ''}
-    r = probeProxyDir(carWorldPos(), r);
+    ${ground ? 'r = carGround(r);' : ''}
     clearcoatRadiance = mix(clearcoatRadiance * carSky, carSane(probeSample(carProbe, r, max(material.clearcoatRoughness, ${FOOTPRINT})), clearcoatRadiance * carSky), carProbeOn);
-    clearcoatRadiance = carHoldKey(clearcoatRadiance, ${KEY_CRISP});
-    ${bore ? 'clearcoatRadiance = carBoreHold(clearcoatRadiance);' : ''}
     ${soft ? 'clearcoatRadiance = mix(vec3(dot(clearcoatRadiance, vec3(0.2126, 0.7152, 0.0722))), clearcoatRadiance, 0.3);' : ''}
-    ${bore ? `clearcoatRadiance += ${BORE_COAT.toFixed(2)} * carBoreLines(vCarPos, carToCar(rBore), 2.0 * material.clearcoatRoughness * material.clearcoatRoughness);` : ''}
   }
   #else
   clearcoatRadiance *= carSky;
@@ -400,16 +223,16 @@ const REFLECTIONS = (coat, base = !coat, gain = 1, soft = false, bore = false) =
       ? `
   {
     vec3 r = inverseTransformDirection(reflect(-geometryViewDir, geometryNormal), viewMatrix);
-    ${bore ? 'vec3 rBore = r;' : ''}
-    r = probeProxyDir(carWorldPos(), r);
+    ${ground ? 'r = carGround(r);' : ''}
     vec3 seen = carSane(${soft ? `carSoftProbe(r, material.roughness, ${FOOTPRINT})` : `probeSample(carProbe, r, max(material.roughness, ${FOOTPRINT}))`}, radiance * carSky);
-    // and a lamp or the sun is the lights' business (GLSL_KEY): the rougher the layer, the less of it is kept
-    seen = carHoldKey(seen, mix(${KEY_CRISP}, ${KEY_ROUGH}, smoothstep(0.08, 0.3, material.roughness)));
-    // and through a rough layer a coloured lamp gives its light, not its colour (GLSL_KEY: carTint)
-    seen = carTint(seen, smoothstep(0.08, 0.3, material.roughness));
-    ${bore ? 'seen = carBoreHold(seen);' : ''}
+    // The metal layer is a blurred mirror: a small fierce thing in the probe (the sun's glare on the road behind,
+    // a lamp) must not wash a whole panel white. What it takes is held to a few times the probe's average round
+    // that direction; the clear coat above keeps the crisp highlight.
+    vec3 around = carSane(probeSample(carProbe, r, 1.0), seen);
+    float cap = 5.0 * max(max(around.r, max(around.g, around.b)), 1e-5);
+    float peak = max(seen.r, max(seen.g, seen.b));
+    if (peak > cap) seen *= (cap + 0.1 * (peak - cap)) / peak;
     radiance = mix(radiance * carSky, seen, carProbeOn);
-    ${bore ? `radiance += ${(soft ? BORE_SHEEN : BORE_COAT).toFixed(2)} * carBoreLines(vCarPos, carToCar(rBore), 2.0 * material.roughness * material.roughness);` : ''}
   }`
       : `
   radiance *= carSky;`
@@ -461,27 +284,7 @@ function patch(material, shared, caps, { vertex = true, vertexPars = '', vertexM
 }
 
 /** The uniforms mirrorProbe() reads: the probe, whether there is one, and how much sky is overhead. */
-export const probeUniforms = () => ({ carProbe: { value: null }, carProbeOn: { value: 0 }, carSky: { value: 1 }, carKey: { value: 1 }, ...proxyUniforms() });
-
-/** The probe's parallax uniforms (GLSL_PROBE_PROXY), copied each frame from the probe's own (setReflections's `proxy`). */
-export const proxyUniforms = () => ({
-  probeCenter: { value: new THREE.Vector3() },
-  probePlane: { value: new THREE.Vector4(0, 1, 0, 0) },
-  probeBox: { value: new THREE.Matrix4() },
-  probeProxy: { value: new THREE.Vector2(0, 0) },
-});
-
-/** Copies a probe's proxy uniforms (ReflectionProbe `uniforms`) into a material's; none: no correction. */
-export function copyProxy(to, from) {
-  if (!from) {
-    to.probeProxy.value.set(0, 0);
-    return;
-  }
-  to.probeCenter.value.copy(from.probeCenter.value);
-  to.probePlane.value.copy(from.probePlane.value);
-  to.probeBox.value.copy(from.probeBox.value);
-  to.probeProxy.value.copy(from.probeProxy.value);
-}
+export const probeUniforms = () => ({ carProbe: { value: null }, carProbeOn: { value: 0 }, carSky: { value: 1 } });
 
 /**
  * For a three.js standard or physical material built elsewhere (the wheels'): makes it mirror the car's probe as
@@ -507,8 +310,8 @@ export function mirrorProbe(shader, uniforms, { coat = false, seen = 1 } = {}) {
     if (!shader.fragmentShader.includes(chunk)) throw new Error(`car material: no ${chunk}`);
   }
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', `#include <common>\nuniform samplerCube carProbe;\nuniform float carProbeOn;\nuniform float carSky;\n${GLSL_PROBE}\n${GLSL_SANE}\n${GLSL_KEY}\n${GLSL_PROBE_PROXY}\nvec3 carWorldPos() { return (vec4(-vViewPosition, 0.0) * viewMatrix).xyz + cameraPosition; }`)
-    .replace('#include <lights_fragment_maps>', REFLECTIONS(coat, true, 1) + (seen < 1 ? inner : ''));
+    .replace('#include <common>', `#include <common>\nuniform samplerCube carProbe;\nuniform float carProbeOn;\nuniform float carSky;\n${GLSL_PROBE}\n${GLSL_SANE}`)
+    .replace('#include <lights_fragment_maps>', REFLECTIONS(coat, true, 1, false) + (seen < 1 ? inner : ''));
 }
 
 /** The paint, and everything else opaque on the skin. */
@@ -521,9 +324,6 @@ export function createPaintMaterial(shared, caps, paintName = 'silver', { should
     paintRough: { value: paint.rough },
     paintFlop: { value: paint.flop },
     paintFlake: { value: paint.flake },
-    paintCoat: { value: paint.coat ?? 1 },
-    paintLiveryOn: { value: 0 },
-    paintLivery: { value: null },
   };
   patch(material, { ...shared, ...own }, caps, {
     fragmentPars: /* glsl */ `${GLSL_SOFT_PROBE}
@@ -540,9 +340,6 @@ uniform float paintMetal;
 uniform float paintRough;
 uniform float paintFlop;
 uniform float paintFlake;
-uniform float paintCoat;
-uniform float paintLiveryOn;
-uniform sampler2D paintLivery;
 vec3 cBase; float cMetal; float cRough; float cCoat; vec3 cEmit; float cShut; float cPaint; vec3 cTilt;
 // the rounding of the panels' edges into the shut lines: the slope there, and which way it falls (see carGrad)
 float cEdge; float cEdgeD;
@@ -749,27 +546,8 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   // a saw-tooth over the tyre. Only the sideways-facing skin (the lip's band faces the wheel, x = 0).
   if (abs(vCarNormal.x) > 0.25 && carArchHole(p)) discard;
   float ndv = abs(dot(normalize(vNormal), normalize(vViewPosition)));
-  cBase = paintColor * mix(1.0, paintFlop, pow(1.0 - ndv, 1.15));
-  cMetal = paintMetal; cRough = paintRough; cCoat = paintCoat; cEmit = vec3(0.0); cPaint = 1.0; cTilt = vec3(0.0);
-  // the livery (livery.js): its picture in car space, a flank seen from its own side, the top from above
-  if (paintLiveryOn > 0.5) {
-    vec3 n = vCarNormal;
-    float sideW = smoothstep(0.3, 0.55, abs(n.x));
-    float topW = smoothstep(0.3, 0.6, n.y) * (1.0 - sideW);
-    float u = (${f4(LIVERY.front)} - vCarPos.z) / ${f4(LIVERY.front - LIVERY.back)};
-    float vs = clamp((${f4(LIVERY.top)} - vCarPos.y) / ${f4(LIVERY.top - LIVERY.bottom)}, 0.001, 0.999) * ${f4(LIVERY.band)};
-    vec4 L = vec4(0.0);
-    if (sideW > 0.0) {
-      vec2 uv = vCarPos.x > 0.0 ? vec2(u, ${f4(LIVERY.bands[0])} + vs) : vec2(1.0 - u, ${f4(LIVERY.bands[1])} + vs);
-      L += sideW * texture2D(paintLivery, uv);
-    }
-    if (topW > 0.0) {
-      float vt = clamp((vCarPos.x + ${f4(LIVERY.half)}) / ${f4(2 * LIVERY.half)}, 0.001, 0.999) * ${f4(LIVERY.band)};
-      L += topW * texture2D(paintLivery, vec2(u, ${f4(LIVERY.bands[2])} + vt));
-    }
-    // vinyl over the paint: its own colour, not metal, a little rougher, under the same clear coat
-    cBase = mix(cBase, L.rgb, L.a); cMetal = mix(cMetal, 0.0, L.a); cRough = mix(cRough, 0.35, L.a);
-  }
+  cBase = paintColor * mix(1.0, paintFlop, pow(1.0 - ndv, 1.5));
+  cMetal = paintMetal; cRough = paintRough; cCoat = 1.0; cEmit = vec3(0.0); cPaint = 1.0; cTilt = vec3(0.0);
   cHeight = 0.0;
   cAO = carOcclusion(p, vec3(abs(vCarNormal.x), vCarNormal.yz));
   // the tail lamps' own light on the paint round them (the lamp spot in lamps.js cannot reach the car's own
@@ -792,14 +570,6 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
   CAR_REGION(carCover(glass - 0.004), vec3(0.012), 0.0, 0.55, 0.0);
   // gloss black: window surround, belt strip, B-pillar, the frit under the glass's edge, the corner slits
   CAR_REGION(max(carCover(A.g), carCover(glass)), vec3(0.01, 0.01, 0.012), 0.0, 0.06, 1.0);
-  // (round 9, from the owner's photographs) the side windows' outline is a bright trim, 11 mm wide, along the top
-  // of the frames and the belt: the outer part of the black band (the B-pillar and the divider stay black)
-  if (p.y > 0.85 && abs(vCarNormal.x) > 0.2) CAR_REGION(carCover(A.g) * (1.0 - carCover(A.g + 0.011)), vec3(0.8, 0.81, 0.83), 1.0, 0.1, 0.6);
-  // and the side skirt carries a bright strip between the arches, on its blade
-  if (abs(vCarNormal.x) > 0.55 && p.z > -1.0 && p.z < 0.95) {
-    float strip = carInside(p.y - 0.226) * (1.0 - carInside(p.y - 0.208)) * smoothstep(-1.0, -0.94, p.z) * smoothstep(0.95, 0.89, p.z);
-    CAR_REGION(strip, vec3(0.8, 0.81, 0.83), 1.0, 0.12, 0.6);
-  }
   // red reflectors
   CAR_REGION(carCover(B.g), vec3(0.30, 0.01, 0.015), 0.0, 0.1, 1.0);
   // the rear bumper's corner scoops (6.4): a shallow triangular recess, darker inside, with a lit lower edge
@@ -822,8 +592,6 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
     float diffuser = carInside(p.y - top) * carInside(p.x - 0.72);
     CAR_REGION(diffuser, vec3(0.02, 0.02, 0.022), 0.0, 0.6, 0.0);
     CAR_REGION(diffuser * (1.0 - carInside(p.y - top + 0.02)), vec3(0.01, 0.01, 0.012), 0.0, 0.06, 1.0);
-    // (round 9) a bright blade along the diffuser's top, the whole width, joining the pipe trims
-    CAR_REGION(diffuser * (1.0 - carInside(p.y - top + 0.013)), vec3(0.8, 0.81, 0.83), 1.0, 0.1, 0.6);
   }
   // the number plates' black carriers (the plates are geometry, details.js), and the rear plate's recess
   if (p.z < -2.3 && vCarNormal.z < -0.5) {
@@ -918,7 +686,7 @@ vec2 carPlane(vec3 q, vec3 c, vec3 v) {
       ],
       ['#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += cEmit;'],
       ['#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  material.clearcoat *= cCoat;'],
-      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN, true, true)],
+      ['#include <lights_fragment_maps>', REFLECTIONS(true, true, COAT_GAIN, false, true)],
       [
         '#include <lights_fragment_end>',
         /* glsl */ `#include <lights_fragment_end>
@@ -988,7 +756,7 @@ export function createGlassMaterial(shared, caps, channel) {
   else if (n.y > 0.45 && vCarPos.z > -0.1) { transmit = 0.55; frit = 0.025; }
   else if (n.y > 0.45) {
     // (the atlas holds distances to 30 mm: a band any wider would cover the whole pane)
-    transmit = 0.1; frit = 0.028;
+    transmit = 0.15; frit = 0.028;
     // the heating lines: 14, a millimetre wide, 32 mm apart up the slope, copper-brown
     float t = (vCarPos.y - 1.1076) / 0.0158;
     float k = clamp(floor(t + 0.5), 0.0, 13.0);
@@ -1000,7 +768,7 @@ export function createGlassMaterial(shared, caps, channel) {
     heat *= smoothstep(4.0, 8.0, 1.0 / max(fwidth(t), 1e-5));
   }
   else if (vCarPos.z > -0.4) { transmit = 0.5; frit = 0.0; }
-  else { transmit = 0.1; frit = 0.0; }`
+  else { transmit = 0.15; frit = 0.0; }`
       : `transmit = vCarPos.z > 0.0 ? 0.94 : 0.74; frit = 0.0;
   // the tail lamp's lens is clear red (the daylight photographs: a bright cherry red unlit, not smoked): it has a
   // colour of its own and holds back some of what is behind it
@@ -1016,7 +784,7 @@ export function createGlassMaterial(shared, caps, channel) {
   }`,
       ],
       ['#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = glassTint;'],
-      ['#include <lights_fragment_maps>', REFLECTIONS(false, true, 1, false, true)],
+      ['#include <lights_fragment_maps>', REFLECTIONS(false)],
       [
         '#include <lights_fragment_end>',
         /* glsl */ `#include <lights_fragment_end>
@@ -1035,8 +803,7 @@ export function createGlassMaterial(shared, caps, channel) {
       // the panoramic roof is dark tinted glass with a coating: it mirrors its surroundings dimly, and the bright
       // sky round the sun at a grazing angle is rolled off (above a tenth of the sun's light) instead of filling it
       vec3 r = reflectedLight.indirectSpecular * 0.45;
-      // (not under the tunnel's roof, where the lines of luminaires cross it: carBoreLines)
-      reflectedLight.indirectSpecular = r / (1.0 + dot(r, Y) / (max(0.1 * sunY, 30.0 * carBoreAt.w) + 1e-6));
+      reflectedLight.indirectSpecular = r / (1.0 + dot(r, Y) / (0.1 * sunY + 1e-6));
     }
   }
 #endif`,
@@ -1155,7 +922,7 @@ export const LAMP_FN = {
 export function createTrimMaterial(shared, caps, { color, metal, rough, coat = 0, side = THREE.FrontSide }) {
   const material = new THREE.MeshPhysicalMaterial({ metalness: metal, roughness: rough, clearcoat: coat, clearcoatRoughness: 0.03, side });
   material.color.setRGB(color[0], color[1], color[2], THREE.LinearSRGBColorSpace);
-  patch(material, shared, caps, { replace: [['#include <lights_fragment_maps>', REFLECTIONS(coat > 0, coat <= 0, 1, false, true)]] });
+  patch(material, shared, caps, { replace: [['#include <lights_fragment_maps>', REFLECTIONS(coat > 0)]] });
   return material;
 }
 
@@ -1166,7 +933,7 @@ export function createPlateMaterial(shared, caps, { map, normalMap }) {
   patch(material, shared, caps, {
     replace: [
       ['#include <lights_fragment_maps>', REFLECTIONS(false)],
-      ['#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * step(vCarPos.z, 0.0) * carLampsA.w * 0.035;'],
+      ['#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * step(vCarPos.z, 0.0) * carLampsA.w * 0.06;'],
     ],
   });
   return material;
@@ -1202,11 +969,7 @@ void carLampPart() {
     lBase = vec3(0.05, 0.004, 0.005); lEmit = red * 18.0 * carLampsB.x * step(vCarNormal.z, -0.5);
   }
   else if (f == ${F.plate}) { lBase = vec3(0.3); lEmit = vec3(1.0, 0.97, 0.92) * 2.0 * carLampsA.w; }
-  else if (f == ${F.screen}) {
-    // the displays dim themselves in the dark, as a car's do (to a few white papers of the moment's light): at full
-    // brightness, under the night's exposure, they shone through the roof and the rear screen as white bars
-    lBase = vec3(0.004); lRough = 0.06; lEmit = vec3(0.55, 0.7, 1.0) * min(1.2, 6.0 * carKey) * carLampsC.x;
-  }
+  else if (f == ${F.screen}) { lBase = vec3(0.004); lRough = 0.06; lEmit = vec3(0.55, 0.7, 1.0) * 1.2 * carLampsC.x; }
   else if (f == ${F.brow}) {
     // a frosted bar; the white goes out on the side that indicates
     lBase = vec3(0.32, 0.33, 0.34); lRough = 0.5;

@@ -29,7 +29,6 @@ import { ATMOSPHERE_PARS } from './atmosphere.js';
 import { extend, planeNoise, smoothstep, withBake } from './shading.js';
 import { TIMES } from './lighting.js';
 import { PROBE_LAYER } from '../../engine/ReflectionProbe.js';
-import { K5, k5Site } from './landmarks.js';
 
 /** The rings: distance from the middle of the course (m), the ridge's height range (m), columns round. */
 const RINGS = [
@@ -39,9 +38,6 @@ const RINGS = [
 ];
 const ROWS = 14;
 const DEG = Math.PI / 180;
-/** (day lane) How bright the massif's back-lit rim is (see mountainMaterial): set per time of day in setTime. */
-const RIM = { value: 1 };
-const RIM_BY_TIME = { day: 1, dusk: 0.6, twilight: 0.3, night: 0.4 };
 /**
  * (sky lane) The limestone massif: how far it is turned from the start straight's heading towards the land side
  * (degrees), its nearest distance from the start line and how far it stands clear of the course's bounds (m), its
@@ -56,13 +52,7 @@ const MASSIF = {
     // the frame's centre) a great shoulder climbing out of the frame's left edge, a saddle at 40 left, the main
     // pyramid at 15 left (58 % across the frame) nearly as high, then the ridge falling to the right under the sun
     [-75, 3], [-40, 6], [-25, 8], [-15, 10], [-9, 11.6], [-2, 13], [5, 17], [10, 20.5], [15, 23.6], [19, 21.5],
-    // (day lane) the saddle and the shoulder re-read from D1's camera: the frame's ridge left of the peak stays high
-    // (about 21 degrees from 26 to 40 left, 22 at 45) and the shoulder climbs more gently out of the frame (25 at 53
-    // left, 27 at 60); ours fell to 17 and rose to 29
-    [26, 21], [33, 20.6], [40, 21.2], [46, 22.4], [52, 24.6], [58, 26.4], [62, 27],
-    // (day lane, frame K5) beyond D1's left edge (62 left) the massif falls away: from K5's place, high over the bay,
-    // its west end stands just behind the drum tower, and the sky over the sea is clear
-    [68, 14], [74, 5], [95, 2],
+    [26, 20.6], [33, 18], [40, 17], [46, 19], [50, 21], [56, 26], [64, 29], [80, 24], [95, 12],
   ],
   // (round three: the angles of the table times this; set from the D1 camera's still beside the frame, where the
   // main peak stood too low)
@@ -75,8 +65,6 @@ const MASSIF = {
   depth: 6200, // from the foot to the far edge
   cols: { low: 170, medium: 420, high: 560 },
   rows: { low: 50, medium: 110, high: 150 },
-  /** (perf lane) [columns, rows] on a phone (caps.mobile), by tier: none yet. */
-  mobile: {},
 };
 
 /**
@@ -98,7 +86,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   const lowTier = tier === 'low';
 
   // ---------------------------------------------------------------- mountains
-  const mountainMaterial = (order, relief = false, rim = false) => {
+  const mountainMaterial = (order, relief = false) => {
     const m = atmosphere.patch(
       extend(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 }), `far-mountain${relief ? '-relief' : ''}`, (shader) => {
         // at the back of the depth range, in front of the sky only (see above)
@@ -130,8 +118,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   float bedTone = hash11(floor(bedAt) + 7.0);
   float ledge = smoothstep(0.78, 0.97, fract(bedAt));
   float beds = ((bedTone - 0.5) * 0.42 - 0.3 * ledge) * (1.0 - smoothstep(6.0, 16.0, footprint));
-  // (day lane: y / 520 drew streaks the whole height of the face, a curtain; now they run a hundred metres or two)
-  float streakN = fbm(vec2(dot(vRockWorld.xz, vec2(0.71, 0.7)) / 34.0, vRockWorld.y / 170.0), 3);
+  float streakN = fbm(vec2(dot(vRockWorld.xz, vec2(0.71, 0.7)) / 34.0, vRockWorld.y / 520.0), 3);
   float streak = smoothstep(0.56, 0.8, streakN) * (1.0 - smoothstep(5.0, 14.0, footprint));
   float pine = smoothstep(0.55, 0.85, flatness) * smoothstep(0.56, 0.7, fbm(vRockWorld.xz / 45.0, 3)) * (1.0 - smoothstep(10.0, 30.0, footprint));
   vec3 rockCol = diffuseColor.rgb * (1.0 + beds) * (1.0 - 0.28 * streak);
@@ -140,29 +127,6 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   diffuseColor.rgb = mix(diffuseColor.rgb, rockCol, rockShare);
 }`,
           );
-        if (rim) {
-          // (day lane) D1's bright rim: against a sun standing behind the ridge, rock and grass seen edge-on near the
-          // skyline send light forwards (the sheen of a rough surface at a grazing angle, and the haze's own glow over
-          // it), so the ridges on the sun's side are drawn by a thin bright line while the faces below are in shade.
-          // Only where the sun's baked light reaches, and only looking towards it. (The massif only: it needs aBake.)
-          shader.uniforms.uRim = RIM;
-          shader.fragmentShader = shader.fragmentShader
-            .replace('#include <common>', '#include <common>\nuniform float uRim;')
-            .replace(
-              '#include <lights_fragment_end>',
-              `#include <lights_fragment_end>
-#if NUM_DIR_LIGHTS > 0
-{
-  vec3 Lv = directionalLights[0].direction;
-  vec3 Vv = normalize(vViewPosition);
-  float graze = 1.0 - clamp(dot(normal, Vv), 0.0, 1.0);
-  float fwd = max(dot(-Vv, Lv), 0.0);
-  float lift = smoothstep(-0.15, 0.35, dot(normal, Lv));
-  reflectedLight.directDiffuse += directionalLights[0].color * bakedSun() * uRim * (graze * graze * graze) * (fwd * fwd * fwd * fwd) * lift * 0.3;
-}
-#endif`,
-            );
-        }
         if (relief) {
           // (render lane) the faces' relief in the light: the normal tipped by the slope of a world-space field of
           // ridges and buttresses some 60 to 200 m across (finite differences of smooth noise in world space, not
@@ -182,7 +146,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     vec3 g = vec3(fbm(q + vec3(e, 0.0, 0.0), 3) - h0, fbm(q + vec3(0.0, e, 0.0), 3) - h0, fbm(q + vec3(0.0, 0.0, e), 3) - h0) / e;
     vec3 gv = (viewMatrix * vec4(g, 0.0)).xyz;
     gv -= normal * dot(gv, normal);
-    normal = normalize(normal - 0.8 * reliefFade * gv);
+    normal = normalize(normal - 0.55 * reliefFade * gv);
   }
 }`,
           );
@@ -196,7 +160,6 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     // depth either, and the sky dome, drawn last into whatever is still empty, painted over every ring
     m.depthFunc = THREE.AlwaysDepth;
     m.name = `far-mountains-${order}`;
-    if (rim) m.customProgramCacheKey = ((key) => () => `${key()}|rim`)(m.customProgramCacheKey.bind(m));
     return m;
   };
   // (sky lane) THE MASSIF (reference D1): one great limestone mountain ahead and to the land side of the start
@@ -247,9 +210,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       const h = ring.lo + (ring.hi - ring.lo) * Math.min(1, Math.max(0, 0.15 + 1.1 * ridge * (0.5 + broad)));
       // (sky lane) the near rings stand aside where the massif is: they would be in front of it but drawn behind
       // (all of them, round two: the farthest showed over the massif's low right-hand ridge as pale hills)
-      // (sea lane) and where the sea runs to the horizon: no far shore (terrain.sea's bearings)
-      const open = terrain.sea ? terrain.sea.sector(mid.x + Math.cos(a) * ring.r, mid.z + Math.sin(a) * ring.r) : 0;
-      const aside = Math.max(smoothstep(0.3, 0.6, inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a))), smoothstep(0.05, 0.5, open));
+      const aside = smoothstep(0.3, 0.6, inMassif(mid.x + Math.cos(a), mid.z + Math.sin(a)));
       heights.push(h * (1 - aside) - 300 * aside);
     }
     for (let i = 0; i <= cols; i++) {
@@ -330,7 +291,8 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
   // that the nearer spurs paint over what lies behind them.
   let massifTriangles = 0;
   {
-    const [cols, rows] = (caps?.mobile && MASSIF.mobile[tier]) || [MASSIF.cols[tier] ?? MASSIF.cols.high, MASSIF.rows[tier] ?? MASSIF.rows.high];
+    const cols = MASSIF.cols[tier] ?? MASSIF.cols.high;
+    const rows = MASSIF.rows[tier] ?? MASSIF.rows.high;
     const n = (cols + 1) * (rows + 1);
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
@@ -368,28 +330,21 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const crestR = MASSIF.crest * (1 + 0.12 * (crestNoise.fbm(o * 0.06 + 3, 0.7, 3) - 0.5));
         // (the jag is smooth and only touches the top of the face: a jag that changed from column to column tilted
         // whole columns of the face and striped it like a curtain in a raking light)
-        // (day lane: 0.1 and 0.03 cut the skyline into a row of little spikes; D1's ridge is a few big forms)
-        const jag = 0.07 * (crestNoise.ridged(o * 0.22 + 1, 2.3, 3) - 0.5) + 0.012 * (crestNoise.ridged(o * 0.9 + 4, 1.1, 2) - 0.5);
+        const jag = 0.1 * (crestNoise.ridged(o * 0.22 + 1, 2.3, 3) - 0.5) + 0.03 * (crestNoise.ridged(o * 0.9 + 4, 1.1, 2) - 0.5);
         const crestH = eyeY + crestR * Math.tan(profile(o) * MASSIF.lift * DEG);
         // gullies across the face (about one per 1.5 degrees, i.e. 150 m), wandering, deeper low on the face
         const along = (o * DEG * crestR) / 160;
         // (warped, so they wander and fork instead of hanging like a curtain)
         const down = (crestR - r) / 1400;
         const warp = 1.6 * (crestNoise.fbm(along * 0.12 + 5, down * 1.3, 3) - 0.5);
-        // (day lane) the gullies change as they run down (down * 2.2, was 1): they fork and end instead of hanging
-        // the whole height of the face as a curtain
-        const g = crestNoise.ridged(along * 0.5 + 7 + warp, down * 2.2 + 0.4 * warp, 4);
-        const fine = crestNoise.ridged(along * 1.7 + 2, (crestR - r) / 300, 3);
-        // (day lane) buttresses: a few great spurs, 600 to 1000 m apart, that stand out of the face towards the
-        // valley with deep hollows between them, so that their flanks turn towards the low sun or away from it (D1's
-        // ribs, lit on the right and dark on the left)
-        const spur = crestNoise.ridged(along * 0.17 + 3 + 0.5 * warp, down * 0.6 + 11, 3);
+        const g = crestNoise.ridged(along * 0.5 + 7 + warp, down + 0.4 * warp, 4);
+        const fine = crestNoise.ridged(along * 1.7 + 2, (crestR - r) / 500, 3);
         let y;
         if (r <= crestR) {
           const t = Math.max(0, (r - massifNear) / (crestR - massifNear)); // 0 at the foot, 1 at the crest
           const face = t ** 1.7 * 0.82 + 0.18 * t;
           // the gullies bite deepest mid-face and fade out at the crest, so the ridge line stays whole
-          const cut = 1 - (0.13 * (1 - g) + 0.04 * (1 - fine) + 0.2 * (1 - spur)) * Math.sin(Math.PI * Math.min(1, t * 1.05)) ** 0.7;
+          const cut = 1 - (0.2 * (1 - g) + 0.05 * (1 - fine)) * Math.sin(Math.PI * Math.min(1, t * 1.05)) ** 0.7;
           y = -60 + (crestH + 60) * face * cut * (1 + jag * t ** 3);
         } else {
           const t = Math.min(1, (r - crestR) / 2600);
@@ -397,11 +352,7 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         }
         // the ends of the field fade into the land, so it never ends in a wall
         const edge = smoothstep(0, 0.06, u) * smoothstep(1, 0.94, u) * smoothstep(1, 0.92, v);
-        // (sea lane, round 2) where the column's bearing from the course's middle is wholly the sea's (its far end on
-        // the land side, 60 to 75 degrees off the straight: outside frame D1, which sees -13 to 63) it sinks under the
-        // horizon: from the coast road (frame E1) it stood across the open sea as a far shore
-        const sink = terrain.sea ? smoothstep(0.85, 1, terrain.sea.sector(start.pos.x + Math.cos(a) * MASSIF.crest, start.pos.z + Math.sin(a) * MASSIF.crest)) : 0;
-        y = -60 + (y + 60) * edge * (1 - sink);
+        y = -60 + (y + 60) * edge;
         const p = at(i, j);
         pos[p * 3] = x;
         pos[p * 3 + 1] = y;
@@ -476,23 +427,16 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
         const scree = smoothstep(0.6, 0.85, up) * (1 - forest) * smoothstep(treeLine - 50, treeLine + 250, y);
         const stain = 0.85 + 0.3 * crestNoise.fbm(x / 160, z / 260, 3);
         // (round three: pale limestone, darker in the gullies and on the ledges)
-        // (day lane) darker (0.3 was a mid-grey mass against D1's deep blue-grey shade), the ribs paler than the
-        // gullies between them, and pale fans of scree where the gullies open onto the gentler ground at the foot
-        const rr = massifNear + MASSIF.depth * (1 - j / rows);
-        const along = ((MASSIF.right + (i / cols) * span) * DEG * MASSIF.crest) / 160;
-        const gully = crestNoise.ridged(along * 0.5 + 7, (MASSIF.crest - rr) / 640, 3);
-        const rib = 0.55 + 0.9 * gully * gully;
-        const lime = [0.19 * stain * rib, 0.19 * stain * rib, 0.188 * stain * rib];
-        const fan = smoothstep(0.72, 0.9, up) * smoothstep(treeLine - 220, treeLine - 40, y) * smoothstep(treeLine + 260, treeLine + 60, y) * smoothstep(0.55, 0.25, gully);
-        const scr = [0.3, 0.295, 0.28];
-        const green = [0.026, 0.038, 0.022];
-        const c = lime.map((l, k) => l * (1 - Math.max(scree, fan)) + scr[k] * Math.max(scree, fan));
+        const lime = [0.3 * stain, 0.297 * stain, 0.29 * stain];
+        const scr = [0.34, 0.33, 0.31];
+        const green = [0.035, 0.05, 0.026];
+        const c = lime.map((l, k) => l * (1 - scree) + scr[k] * scree);
         for (let k = 0; k < 3; k++) col[p * 3 + k] = c[k] * (1 - forest) + green[k] * forest;
       }
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
     massifTriangles = index.length / 3;
-    const mesh = new THREE.Mesh(geometry, withBake(mountainMaterial(3, !lowTier, true)));
+    const mesh = new THREE.Mesh(geometry, withBake(mountainMaterial(3, !lowTier)));
     mesh.name = 'far-massif';
     mesh.renderOrder = -26; // after the rings: it stands in front of them
     mesh.frustumCulled = false;
@@ -531,97 +475,6 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
     mountains.push(probeMesh);
   }
 
-  // ---------------------------------------------------------------- the far cones (frame K5)
-  // (day lane) Across the open sea from K5's place (landmarks.js K5, k5Site), 14 to 17 km out: a long low range
-  // with three volcano-like cones on it, snow on their upper flanks. Built like a ring (a strip of faces from below
-  // the sea's horizon up to a crest, facing the place, drawn at the back of the depth range before the rings): at dusk
-  // a dark blue silhouette under the horizon's band, by day blue in the thin air with white tops.
-  let conesTriangles = 0;
-  const k5 = k5Site(track);
-  if (k5) {
-    const B0 = K5.view[0] + 10;
-    const B1 = K5.view[1] + 15;
-    const cols = lowTier ? 90 : 220;
-    const rows = lowTier ? 6 : 16;
-    const cn = planeNoise(rng.int(1 << 30));
-    const crestAt = (b) => {
-      let ridge = 260 + 220 * cn.fbm(b * 0.09 + 3, 0.4, 3) + 60 * (cn.ridged(b * 0.4 + 1, 2.2, 3) - 0.5);
-      let dist = 15500;
-      let cone = 0;
-      for (const c of K5.cones) {
-        const off = (Math.abs(b - c.bearing) * DEG) * c.dist; // metres across from the cone's axis
-        const q = off / c.r;
-        // a cone with straight flanks, a slightly blunt top (an old crater), steeper near the top
-        const h = c.h * Math.max(0, 1 - q) ** 1.25 * (1 - 0.05 * Math.exp(-((q / 0.06) ** 2)));
-        if (h > cone) { cone = h; dist = c.dist; }
-      }
-      ridge *= smoothstep(B0, B0 + 12, b) * smoothstep(B1, B1 - 12, b);
-      return { y: Math.max(ridge, cone), cone, dist };
-    };
-    const n = (cols + 1) * (rows + 1);
-    const pos = new Float32Array(n * 3);
-    const col = new Float32Array(n * 3);
-    for (let i = 0; i <= cols; i++) {
-      const b = B0 + ((B1 - B0) * i) / cols;
-      const c = crestAt(b);
-      const sb = Math.sin(b * DEG);
-      const cb = Math.cos(b * DEG);
-      for (let j = 0; j <= rows; j++) {
-        const t = j / rows; // 0 at the foot (under the horizon), 1 on the crest
-        const y = -80 + (c.y + 80) * t ** 0.85;
-        // (round 3) ridges and gullies down the flanks: the face stands out or falls back by up to 220 m, most
-        // mid-slope, so that the sky's light picks out ribs; snow lies in the gullies longest
-        // (round 4: coarse enough to read at 12 km in a 1280 px picture: a rib every 2 or 3 degrees)
-        const gully = cn.ridged(b * 0.45 + 2, t * 1.2, 2);
-        const r = c.dist - (c.y + 80) * 1.6 * (1 - t) + 420 * (1 - gully) * Math.sin(Math.PI * t);
-        const v = (i * (rows + 1) + j) * 3;
-        pos[v] = k5.x + sb * r;
-        pos[v + 1] = y;
-        pos[v + 2] = k5.z + cb * r;
-        // dark rock and scrub, darker at the foot; snow on a cone's upper flanks, reaching further down the gullies
-        const snow = c.cone > 600 ? smoothstep(0.52, 0.64, y / c.cone + 0.12 * (1 - gully) + 0.06 * (cn.fbm(b * 2.1, t * 3, 2) - 0.5)) : 0;
-        const base = (0.03 + 0.03 * t) * (0.8 + 0.4 * gully) + 0.01 * cn.fbm(b * 0.7, t * 2 + 5, 2);
-        // (round 4) the snow bright and broken by dark ridges: the ribs stay bare where they stand out
-        const bare = smoothstep(0.75, 0.95, gully);
-        const sn = snow * (1 - 0.8 * bare);
-        col[v] = base * 0.9 + (0.85 - base * 0.9) * sn;
-        col[v + 1] = base + (0.87 - base) * sn;
-        col[v + 2] = base * 1.1 + (0.92 - base * 1.1) * sn;
-      }
-    }
-    const index = [];
-    for (let i = 0; i < cols; i++) {
-      for (let j = 0; j < rows; j++) {
-        const v = i * (rows + 1) + j;
-        const w = v + rows + 1;
-        index.push(v, v + 1, w, w, v + 1, w + 1);
-      }
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    geometry.setIndex(index);
-    geometry.computeVertexNormals();
-    // facing the place
-    {
-      const nr = geometry.attributes.normal;
-      const k = (cols >> 1) * (rows + 1) + (rows >> 1);
-      if (nr.getX(k) * (k5.x - pos[k * 3]) + nr.getZ(k) * (k5.z - pos[k * 3 + 2]) < 0) {
-        for (let q = 0; q < index.length; q += 3) [index[q + 1], index[q + 2]] = [index[q + 2], index[q + 1]];
-        geometry.setIndex(index);
-        geometry.computeVertexNormals();
-      }
-    }
-    conesTriangles = index.length / 3;
-    const mesh = new THREE.Mesh(geometry, mountainMaterial(4));
-    mesh.name = 'far-cones';
-    mesh.renderOrder = -31; // the farthest of all
-    mesh.frustumCulled = false;
-    mesh.matrixAutoUpdate = false;
-    group.add(mesh);
-    mountains.push(mesh);
-  }
-
   // ---------------------------------------------------------------- mist
   const shared = {
     uTime: { value: 0 },
@@ -646,8 +499,6 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       track.locate(x, z, -1, spot);
       if (Math.abs(spot.lat) < 260) continue;
       if (h > 60) continue;
-      // (sea lane) not over the open sea, where from the coast road a sheet read as a blot on the water
-      if (terrain.sea && terrain.sea.at(x, z) > 0.3) continue;
       if (sheets.some((s) => Math.hypot(s.x - x, s.z - z) < 500)) continue;
       sheets.push({ x, z, y: Math.max(terrain.lake.level, h) + mistRng.range(14, 30), radius: mistRng.range(380, 650) });
     }
@@ -968,19 +819,17 @@ void main() {
 
   return {
     group,
-    stats: { mountainTriangles, massifTriangles, conesTriangles, massif: { near: Math.round(massifNear), x: Math.round(massifCentre.x), z: Math.round(massifCentre.y) }, sheets: sheets.length, lights: lights.length, village: { x: Math.round(village.x), z: Math.round(village.z) }, ms: Math.round(performance.now() - started) },
+    stats: { mountainTriangles, massifTriangles, massif: { near: Math.round(massifNear), x: Math.round(massifCentre.x), z: Math.round(massifCentre.y) }, sheets: sheets.length, lights: lights.length, village: { x: Math.round(village.x), z: Math.round(village.z) }, ms: Math.round(performance.now() - started) },
     setTime(time) {
       const night = time.name === 'night';
       // (look lane) the far ranges by moonlight: snow under a three-quarter moon read as dusk at the night's exposure;
       // reference B's far hills are near black, so they are let down to a dim silhouette
       for (const mesh of mountains) mesh.material.color.setScalar(night ? 0.15 : 1);
-      RIM.value = RIM_BY_TIME[time.name] ?? 1;
       // the mist: lit from above by the sun or moon and the sky, albedo about 0.8
       const e = time.sun.intensity * Math.max(0.1, time.sun.dir[1]) + Math.PI * (0.7 * time.sky.zenith[1] + 0.3 * time.sky.horizon[1]) * 1.2;
       const s = (0.8 * e) / Math.PI;
       shared.uMistColor.value.set(s * (0.75 + 0.25 * time.sun.color[0]), s * (0.8 + 0.2 * time.sun.color[1]), s * (0.85 + 0.15 * time.sun.color[2]));
-      // (day lane: 0.65 by day laid a pale sheet like snow over the valley seen from the ledge's bend, frame D3)
-      shared.uMistOpacity.value = night ? 0.15 : time.name === 'dusk' ? 0.45 : time.name === 'twilight' ? 0.25 : 0.35;
+      shared.uMistOpacity.value = night ? 0.15 : time.name === 'dusk' ? 0.45 : 0.65;
       const lamps = time.lamps.windows;
       lightPoints.material.uniforms.uRadiance.value = 0.6 * lamps;
       lightPoints.visible = lamps > 0;

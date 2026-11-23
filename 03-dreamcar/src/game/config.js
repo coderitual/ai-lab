@@ -340,27 +340,12 @@ export const CAMERA = {
  * from the start of a run at RULES.autopilotPace; `time`, the time of day), used when the address does not give
  * them. D1: the run-up to the line, low behind and right of the car, yawed left; D3: the ledge's first bend, low
  * behind and left, looking down it; D4: the grid at golden hour just after the lights go out (the lamps show green), low on the lake side behind
- * the car, looking forward and right at the land side with the gantry's lamps in the picture. E1 (sea lane, round 2:
- * the owner's coast road frame, strict spec): the car coming out of the carousel, the camera on the crest 10 m ahead of
- * it and a little up, looking back north at it with the horizon tilted 7 degrees (`roll`): the cut spur on the left,
- * the hairpin, the gravel apron, the rail on white posts and the boards on the right, the open sea beyond. Waves (sea
- * lane, round 2): the low crossing on the long right, behind and right of the car, looking ahead and out over the
- * lagoon beside the causeway (not yet staged: the first pose tried, low on the bay side, saw the road and the massif).
- * E2 and E5 (forest lane): the owner's two frames of the forest (design.md, "The reference frames").
+ * the car, looking forward and right at the land side with the gantry's lamps in the picture.
  */
 export const PHOTOS = {
-  d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100.4, time: 'day' },
-  d3: { back: 7, right: -0.3, up: 1.6, yaw: 12, pitch: -8, fov: 52, t: 76.5, time: 'day' },
+  d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
+  d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
-  // (day lane) frame K5, the owner's strict spec at twilight: the end of the sweepback's first piece, high over the bay
-  k5: { back: 6.2, right: 0, up: 2.3, yaw: 0, pitch: -9, fov: 50, t: 89.1, time: 'twilight' },
-  e1: { back: -7.5, right: 2.5, up: 2.2, yaw: 160, pitch: -4, fov: 50, roll: 7, t: 64.9, time: 'day' },
-  waves: { back: 4, right: -8, up: 1.8, yaw: 35, pitch: -3, fov: 55, t: 94.8, time: 'day' },
-  // (forest lane) e2: the forest road of the rise and the first ess, chase-like from behind and above the car, the
-  // low sun crossing from the left; e5: the last ess's exit, on the road ahead of the car, looking back at it coming
-  // round the bend among the granite boulders
-  e2: { back: 6.2, right: 0.3, up: 2.0, yaw: 0, pitch: -5, fov: 50, t: 22.2, time: 'day' },
-  e5: { back: -19.3, right: -3.5, up: 2.95, yaw: 199.4, pitch: -4.5, fov: 40, t: 34.2, time: 'day' },
 };
 
 /**
@@ -368,7 +353,7 @@ export const PHOTOS = {
  * correctly exposed whatever the time of day: `default`, or a time of day's own value. Eased in and out over
  * `ease` s through the same exposure the game drives.
  */
-export const SHOWCASE = { default: 0.5, day: 0.3, dusk: 0.9, twilight: 0.7, night: 0.6, ease: 0.6 };
+export const SHOWCASE = { default: 0.5, day: 0.3, dusk: 0.9, night: 0.6, ease: 0.6 };
 
 /**
  * How the eye follows the light: time constants (s) of the exposure closing down (towards brighter light: fast)
@@ -451,35 +436,25 @@ export const FX = {
 };
 
 /**
- * The car's reflection probe (engine/ReflectionProbe.js), per tier: one cube per view, `size` texels a face, its
- * mips prefiltered for roughness (`samples` GGX samples a texel; level 0 and `levels` of the rough levels are
- * filtered per update, round and round), new pictures eased in over `fade` s. At speed `faces` faces are redrawn
- * each `every`-th frame, the ones that see the roadside go by first; with the car nearly still (the title's orbit,
- * the grid: below `stillBelow` m/s, back to moving above `movingAbove`) `stillFaces` each `stillEvery`-th frame.
- * The faces see `far` m (what lies beyond is culled; the sky, the mountains and the massif's stand-in are drawn at
- * infinity and stay). (probe lane, measured in docs/engine.md "The reflection probe": a face costs about half the
- * view's triangles, most of them things the far plane does not cut (the mountains, the massif's stand-in, the far
- * terrain); the resolution and the filter cost next to nothing beside that, so the cube is twice as large as it was
- * and medium keeps its cadence of a face every other frame: a face a frame there cost 15 more draw calls and 120 k
- * more triangles a frame.)
+ * The car's reflection probe, per tier: the cube's edge and how it is kept up to date. At speed (`moving`) a few
+ * faces are redrawn each `every`-th frame; with the car nearly still (the title's orbit, the grid: below `stillBelow`
+ * m/s, back to moving above `movingAbove`) a larger cube is redrawn whole over a few frames (`stillFaces` each
+ * `stillEvery`-th frame) so the paint's mirror is crisp where it is looked at closely.
+ * (picture lane) A face costs about as many triangles as the view itself (it sees the whole world round the car):
+ * on medium a face every other frame at speed (the cube is new every 12 frames, 0.2 s at 60 Hz) and two every
+ * third frame standing still kept the frame near its budget (docs/spec.md, "Budgets").
  */
 /**
  * (tunnel lane) In the tunnel (the car's sky below `tunnelSky`) the faces see no further than `tunnelFar` m (the box
  * hides the rest; what lies beyond is culled, which pays for it) and `tunnelFaces` are redrawn at speed: the lines of
  * luminaires slide over the paint, and a cube that is a fifth of a second old shows them where the car was 13 m ago.
- * There the probe also hands the materials the bore as a box for their parallax correction (GLSL_PROBE_PROXY),
- * `tunnelBox` m long each way along the road.
  */
 export const PROBE = {
-  low: { size: 128, faces: 1, every: 2, stillFaces: 1, stillEvery: 2, tunnelFaces: 1, far: 260, samples: 8, levels: 1 },
-  medium: { size: 256, faces: 1, every: 2, stillFaces: 1, stillEvery: 2, tunnelFaces: 2, far: 300, samples: 12, levels: 2 },
-  high: { size: 512, faces: 2, every: 1, stillFaces: 2, stillEvery: 1, tunnelFaces: 3, far: 400, samples: 20, levels: 7 },
-  fade: 0.05,
+  low: { size: 64, faces: 1, every: 2, stillSize: 128, stillFaces: 1, stillEvery: 2, tunnelFaces: 1 },
+  medium: { size: 128, faces: 1, every: 2, stillSize: 256, stillFaces: 2, stillEvery: 3, tunnelFaces: 2 },
+  high: { size: 256, faces: 2, every: 1, stillSize: 512, stillFaces: 3, stillEvery: 1, tunnelFaces: 3 },
   tunnelSky: 0.02,
   tunnelFar: 160,
-  /** (car lane) How far before and after a tunnel (m) the car's paint looks for its lines of luminaires (CarModel.setBore). */
-  boreNear: 250,
-  tunnelBox: 30,
   stillBelow: 1.5,
   movingAbove: 4,
 };

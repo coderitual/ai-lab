@@ -12,8 +12,7 @@
 // from the same formula on every tier, so the saw-tooth catches the light
 // alike everywhere.
 //
-// The paint: one colour per tooth, red and white by turns (on the pieces of a scheme that names its own kerb paints,
-// trackLayout.js SCHEMES, those: blue and white in frame e5's bend, bare pale concrete in frame e2's wood); scuffed by tyres
+// The paint: one colour per tooth, red and white by turns; scuffed by tyres
 // along the road edge, rubber smeared on where cars ride them, the concrete
 // showing through worn paint, dust and earth thrown up along the verge side.
 // Wet (night) it darkens and turns glossy.
@@ -25,15 +24,12 @@ import * as THREE from 'three';
 import { roadTextures } from './roadTextures.js';
 import { WET_UNIFORMS, extend, withBake } from './shading.js';
 import { canopyOpen } from './canopy.js';
-import { schemeTable } from './schemes.js';
 import { retroReflective } from './retro.js';
 
 /**
  * The kerb's shape: the same numbers as KERB in game/trackLayout.js (the world never imports from game/). The
  * Track's profile is the truth; these only place rows and shade the teeth. Read from the Track when it offers them.
  */
-/** The circuit's kerb paints (linear): the coloured tooth and the white one. */
-const DEFAULT_PAINT = [[0.42, 0.035, 0.03], [0.62, 0.61, 0.58]];
 const KERB_FALLBACK = { rise: 0.04, tooth: 0.25, pitch: 0.9 };
 /** Per tier: rows per tooth (2: a row at every peak and valley; 0.5: one at every second peak) and columns across. */
 const DETAIL = { low: { rows: 0.5, cols: 3 }, medium: { rows: 2, cols: 3 }, high: { rows: 2, cols: 5 } };
@@ -65,25 +61,8 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
   const index = [];
   const tmp = [0, 0, 0, 1];
   let vertices = 0;
-  // (forest lane) a kerb that lies mostly on pieces of one scheme takes that scheme's two paints (schemes.js), the
-  // whole kerb alike; the rest keep the circuit's red and white
-  const paints = [];
-  const st = schemeTable(track);
-  // (sea lane, round 2) on the coast road (either side a coast side) the kerbs are bare concrete, unpainted (frame E1)
-  const plainAt = (s) => {
-    const i = Math.round(track.wrap(s) / track.ds) % track.count;
-    return track.coastL?.[i] === 1 || track.coastR?.[i] === 1;
-  };
   for (const k of track.kerbs ?? []) {
     const len = track.wrap(k.s1 - k.s0);
-    const votes = new Map();
-    for (let d = 0; d <= len; d += 2) {
-      const i = Math.round(track.wrap(k.s0 + d) / track.ds) % track.count;
-      const key = st.index[i] >= 0 && st.w[i] > 0.5 ? st.index[i] : -1;
-      votes.set(key, (votes.get(key) ?? 0) + 1);
-    }
-    const winner = [...votes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
-    const pair = winner >= 0 && st.defs[winner].kerb ? st.defs[winner].kerb : DEFAULT_PAINT;
     // rows on the teeth's peaks (and valleys): s a whole number of steps, offset to the peaks
     const peak = shape.pitch / 2;
     const first = Math.ceil((k.s0 - peak) / step) * step + peak;
@@ -102,11 +81,9 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
         track.pointAt(s, lat, pt);
         pos.push(pt.x, pt.y, pt.z);
         nor.push(frame.up.x, frame.up.y, frame.up.z);
-        // (sea lane, round 2) w: the side, doubled where the kerb is plain concrete (the coast road, frame E1)
-        along.push(frame.tan.x, frame.tan.y, frame.tan.z, k.side * (plainAt(s) ? 2 : 1));
+        along.push(frame.tan.x, frame.tan.y, frame.tan.z, k.side);
         // s as laid (it may run past the line: never jumps inside a triangle), across 0..1, how much kerb, width
         kerb.push(sRaw, t, amount, k.width);
-        paints.push(...pair[0], ...pair[1]);
         (terrain.bake4At ?? terrain.bakeAt)(pt.x, pt.z, tmp, 0);
         bake.push(tmp[0], tmp[1], tmp[2] * canopyOpen(track, s, lat), tmp[3]);
         vertices++;
@@ -128,8 +105,6 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
   geometry.setAttribute('aAlong', new THREE.Float32BufferAttribute(along, 4));
   geometry.setAttribute('aKerb', new THREE.Float32BufferAttribute(kerb, 4));
   geometry.setAttribute('aBake', new THREE.Float32BufferAttribute(bake, 4));
-  geometry.setAttribute('aPaint', new THREE.Float32BufferAttribute(paints.filter((_, j) => j % 6 < 3), 3));
-  geometry.setAttribute('aPaintB', new THREE.Float32BufferAttribute(paints.filter((_, j) => j % 6 >= 3), 3));
   geometry.setIndex(index);
   geometry.computeBoundingSphere();
 
@@ -143,8 +118,8 @@ export function createKerbs({ track, caps, tier, atmosphere, terrain }) {
   extend(material, 'kerb', (shader) => {
     Object.assign(shader.uniforms, { uAgg: { value: textures.surface }, uBig: { value: textures.big }, ...WET_UNIFORMS });
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec4 aAlong;\nattribute vec4 aKerb;\nattribute vec3 aPaint;\nattribute vec3 aPaintB;\nvarying vec4 vKerbAlong;\nvarying vec4 vKerb;\nvarying vec3 vPaint;\nvarying vec3 vPaintB;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvKerbAlong = aAlong;\nvKerb = aKerb;\nvPaint = aPaint;\nvPaintB = aPaintB;');
+      .replace('#include <common>', '#include <common>\nattribute vec4 aAlong;\nattribute vec4 aKerb;\nvarying vec4 vKerbAlong;\nvarying vec4 vKerb;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvKerbAlong = aAlong;\nvKerb = aKerb;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${KERB_PARS(shape)}`)
       .replace('#include <map_fragment>', KERB_COLOR)
@@ -175,8 +150,6 @@ uniform sampler2D uBig;
 uniform float uWet;
 varying vec4 vKerbAlong; // the road's direction; w the side (+1 left)
 varying vec4 vKerb;      // s, across 0..1 (road to verge), how much kerb, width
-varying vec3 vPaint;     // (forest lane) the coloured tooth's paint and the pale one's (schemes.js)
-varying vec3 vPaintB;
 float kerbRough;
 vec2 kerbSlope;          // rise per metre: outwards across, and along
 const float KERB_RISE = ${shape.rise.toFixed(4)};
@@ -212,10 +185,7 @@ vec2 kUv = vec2( ( kT * kW ) / AGG_TILE, kS / AGG_TILE );
 vec4 kAgg = texture2D( uAgg, kUv * 0.7 );
 vec4 kBig = texture2D( uBig, vec2( kT * kW, kS ) / 9.0 );
 vec4 kBig2 = texture2D( uBig, vec2( kS * 0.11, kT * kW * 0.6 ) );
-vec3 kPaint = mix( vPaintB, vPaint, kRed );
-// (sea lane, round 2) bare pale concrete on the coast road
-float kPlain = step( 1.5, abs( vKerbAlong.w ) );
-kPaint = mix( kPaint, vec3( 0.46, 0.45, 0.42 ), kPlain );
+vec3 kPaint = mix( vec3( 0.62, 0.61, 0.58 ), vec3( 0.42, 0.035, 0.03 ), kRed );
 // paint worn through to the concrete where it is old, most on the tops of the teeth and at the road edge
 float kWorn = smoothstep( 0.55, 0.8, kBig.b * 0.7 + kAgg.a * 0.3 + 0.25 * kTri * kBump + 0.2 * ( 1.0 - kT ) );
 vec3 kConcrete = vec3( 0.3, 0.29, 0.27 ) * ( 0.75 + 0.5 * kAgg.r );
@@ -234,7 +204,7 @@ kerbRough = mix( kerbRough, 0.12 + 0.2 * kWorn, smoothstep( 0.05, 0.4, uWet ) );
 diffuseColor.rgb *= kCol;
 // (finish lane) how much of the pixel is beaded white paint, in specks (retro.js reads it as its weight); a kerb
 // stands proud of the water, so the wet road drowns only some of the beads
-float kBeads = ( 1.0 - kRed ) * ( 1.0 - kPlain ) * ( 1.0 - 0.85 * kWorn ) * ( 1.0 - kRubber ) * ( 1.0 - 0.65 * kDirt ) * ( 1.0 - kSeam )
+float kBeads = ( 1.0 - kRed ) * ( 1.0 - 0.85 * kWorn ) * ( 1.0 - kRubber ) * ( 1.0 - 0.65 * kDirt ) * ( 1.0 - kSeam )
   * ( 0.35 + 2.2 * smoothstep( 0.6, 0.92, kAgg.r ) ) * ( 1.0 - 0.3 * uWet );
 `;
 
@@ -244,7 +214,7 @@ const KERB_NORMAL = /* glsl */ `
   vec3 alongV = normalize( ( viewMatrix * vec4( vKerbAlong.xyz, 0.0 ) ).xyz );
   alongV = normalize( alongV - n0 * dot( alongV, n0 ) );
   // outwards: towards the verge (left of the road when the kerb is on the left)
-  vec3 outV = cross( n0, alongV ) * sign( vKerbAlong.w );
+  vec3 outV = cross( n0, alongV ) * vKerbAlong.w;
   normal = normalize( n0 - outV * kerbSlope.x - alongV * kerbSlope.y );
 }
 `;

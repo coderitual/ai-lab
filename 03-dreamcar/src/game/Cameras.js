@@ -447,8 +447,8 @@ export class CameraRig {
   /**
    * The staging camera (`__dreamcar.photo`, `?photo=`): `back`, `right` and `up` metres from the car's origin in
    * its own level frame, turned `yaw` degrees left of its heading and `pitch` degrees up, a lens of `fov` degrees
-   * top to bottom (as given, whatever the picture's shape), and leaning `roll` degrees clockwise. Nothing but the
-   * car's pose: the same run is the same picture.
+   * top to bottom (as given, whatever the picture's shape). Nothing but the car's pose: the same run is the
+   * same picture.
    */
   _photo(camera, o) {
     const heading = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
@@ -473,8 +473,6 @@ export class CameraRig {
     }
     camera.position.copy(eye);
     camera.lookAt(target);
-    // (sea lane, round 2) a tilted horizon, `roll` degrees clockwise (frame E1's camera leans)
-    if (o.roll) camera.rotateZ((-o.roll * Math.PI) / 180);
     return o.fov ?? 50;
   }
 

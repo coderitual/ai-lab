@@ -411,8 +411,8 @@ function layCorridor(track, plan) {
   const { count: n, ds, layout } = track;
   const segs = layout.segments;
   const sides = [
-    { key: 'L', edge: track.edgeL, kind: track.kindL, verge: track.vergeL, slope: track.slopeL, wood: track._woodL, coast: track.coastL, phase: 0.6 },
-    { key: 'R', edge: track.edgeR, kind: track.kindR, verge: track.vergeR, slope: track.slopeR, wood: track._woodR, coast: track.coastR, phase: 2.9 },
+    { key: 'L', edge: track.edgeL, kind: track.kindL, verge: track.vergeL, slope: track.slopeL, wood: track._woodL, phase: 0.6 },
+    { key: 'R', edge: track.edgeR, kind: track.kindR, verge: track.vergeR, slope: track.slopeR, wood: track._woodR, phase: 2.9 },
   ];
   const far = [new Float64Array(n), new Float64Array(n)];
   for (let side = 0; side < 2; side++) {
@@ -433,7 +433,6 @@ function layCorridor(track, plan) {
       out.kind[i] = KIND[preset.kind];
       out.verge[i] = VERGE[preset.verge];
       out.wood[i] = Math.max(0, WOODS.indexOf(preset.wood ?? null));
-      out.coast[i] = preset.coast ? 1 : 0;
     }
     // Narrow first (so the rounding that follows cannot push an edge out beyond what its preset allows, and the
     // tunnel's walls stay exactly where they are), then limit the rate, then round the corners.
@@ -656,12 +655,6 @@ function clipRanges(track, list) {
   return merged.sort((p, q) => p.s0 - q.s0);
 }
 
-/** (day lane) The two groups of boards on the straight's lake side, as metres from the line (negative: before it). */
-const STRAIGHT_BOARDS = [
-  [-229, -189],
-  [-82, -44],
-];
-
 /**
  * Kerbs, and the dressing of a circuit: where it goes, as data (nothing here is drawn). Kerbs are part of the
  * course (profile() and surfaceAt() return them); everything else stands at or beyond the barrier.
@@ -686,9 +679,7 @@ function layCircuit(track, plan) {
     if (r <= rule.outside) kerbs.push({ s0: s1 - (s1 - s0) * rule.exit, s1: s1 + easeOut, side: -inside, width: rule.width });
     if (seg.runoff) {
       const side = seg.runoff === 'L' ? 1 : -1;
-      // (sea lane, round 2) not on the coast road's sea side, where the run-off is gravel out to the rail (frame E1)
-      const coast = layout.sides[seg[seg.runoff]]?.coast;
-      if (r <= 450 && !coast) tyres.push({ s0: s0 + (s1 - s0) * 0.35, s1: s1 + easeOut * 0.5, side });
+      if (r <= 450) tyres.push({ s0: s0 + (s1 - s0) * 0.35, s1: s1 + easeOut * 0.5, side });
       boards.push({ s0: s0 + (s1 - s0) * 0.15, s1: s1 - (s1 - s0) * 0.1, side });
     }
   }
@@ -705,10 +696,9 @@ function layCircuit(track, plan) {
   /** Distance from the centre line to stand something `inset` m in front of the barrier on one side at s. */
   const front = (s, side, inset) => side * (track.edgeAt(s, side) - inset);
   track.tyreWalls = clipRanges(track, tyres).map((t) => ({ ...t, lat: front(t.s0, t.side, 0.9), depth: 1.2 }));
-  // boards: on the outside of the run-off bends, and on the straight's lake-side wall in two groups (frame D1: one
-  // cluster of tall boards by the run-up's camera, a second far down towards the line; between them the low wall
-  // with the trees and the shore behind it). The land side of the straight has none.
-  for (const [a, b] of STRAIGHT_BOARDS) boards.push({ s0: track.wrap(a), s1: track.wrap(b), side: 1 });
+  // boards: on the outside of the run-off bends, and along the low walls of the straight
+  const straight = track.sections[0];
+  for (const side of [1, -1]) boards.push({ s0: straight.s0 + 40, s1: straight.s1 + track.length - 30, side });
   track.boards = clipRanges(track, boards).map((b) => ({ ...b, lat: front(b.s0, b.side, 0.25), height: 1.1 }));
   // distance boards before the slow corner: the tightest piece of the lap, on the outside of its approach
   let slow = 0;
@@ -726,11 +716,8 @@ function layCircuit(track, plan) {
   const posts = Math.round(track.length / 400);
   for (let k = 0; k < posts; k++) {
     let s = ((k + 0.5) * track.length) / posts;
-    // (sea lane) and 40 m clear of a structure's ends, where the barrier changes from a parapet or a wall to a rail
-    const nearStructure = (q) => onStructure(track, q) || onStructure(track, track.wrap(q - 40)) || onStructure(track, track.wrap(q + 40));
-    for (let tries = 0; tries < 30 && nearStructure(s); tries++) s = track.wrap(s + 20);
-    // (sea lane) and, once moved along, not on top of the next post
-    if (nearStructure(s) || track.marshals.some((m) => Math.abs(track.delta(m.s, s)) < 150)) continue;
+    for (let tries = 0; tries < 20 && onStructure(track, s); tries++) s = track.wrap(s + 20);
+    if (onStructure(track, s)) continue;
     const side = track.edgeAt(s, 1) >= track.edgeAt(s, -1) ? 1 : -1;
     track.marshals.push({ s, side, lat: side * (track.edgeAt(s, side) + 2.5) });
   }
@@ -795,9 +782,6 @@ export class Track {
     this.slopeR = new Float32Array(n);
     this.farSlopeL = new Float32Array(n);
     this.farSlopeR = new Float32Array(n);
-    /** (sea lane) 1 on the sea side of the coast road (a preset's `coast`): ochre gravel beyond the barrier, white posts. */
-    this.coastL = new Uint8Array(n);
-    this.coastR = new Uint8Array(n);
     /** How much sky is overhead: 1 in the open, 0 in the tunnel, easing over about 25 m at the portals. */
     this.sky = new Float32Array(n);
     // Heading on the map (unit, level): what the cubics between samples are built from.

@@ -52,9 +52,7 @@ void main() {
   int kind = int(aShape.x + 0.5);
   vec4 k = uKind[kind];
   float t = uTime - aStart.w;
-  // (lead) a life or a size of nothing would divide by zero below: 0/0 is not a number, and a pixel that is not a
-  // number in the frame is smeared by the blur and the glow into a dark slab over the picture (real GPUs only)
-  float life = max(aVel.w, 1e-3);
+  float life = aVel.w;
   vUv = uv;
   vSeed = aShape.w;
   if (t < 0.0 || t > life) {
@@ -70,7 +68,7 @@ void main() {
   float above = p.y - aGround;
   p.y = max(p.y, aGround + 0.02);
   float u = t / life;
-  float size = max(mix(aShape.y, aShape.z, sqrt(max(u, 0.0))), 1e-3);
+  float size = mix(aShape.y, aShape.z, sqrt(u));
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vec2 corner = uv * 2.0 - 1.0;
   if (kind == 4) {
@@ -91,8 +89,7 @@ void main() {
   vec4 mvPosition = mv;
   #include <fog_vertex>
 
-  // (smoothstep between equal edges is undefined: a spark is simply there from the start)
-  float fadeIn = kind == 4 ? 1.0 : smoothstep(0.0, 0.12, u);
+  float fadeIn = smoothstep(0.0, kind == 4 ? 0.0 : 0.12, u);
   float fadeOut = 1.0 - smoothstep(kind == 4 ? 0.5 : 0.35, 1.0, u);
   // soft against the ground it was born over
   float ground = kind == 2 || kind == 4 ? 1.0 : smoothstep(0.0, 0.6 * size, above + 0.15 * size);
@@ -132,10 +129,7 @@ void main() {
   a *= a;
   // a little lumpiness, fixed per particle
   float lump = 0.75 + 0.25 * sin(q.x * 5.0 + vSeed * 40.0) * sin(q.y * 4.0 - vSeed * 23.0);
-  float alpha = vAlpha * a * lump;
-  // nothing that is not a number reaches the frame
-  if (!(alpha >= 0.0) || !(dot(vColor, vec3(1.0)) < 1.0e6)) discard;
-  gl_FragColor = vec4(max(vColor, 0.0), min(alpha, 1.0));
+  gl_FragColor = vec4(vColor, vAlpha * a * lump);
   #include <colorspace_fragment>
   #include <fog_fragment>
 }
@@ -150,9 +144,7 @@ varying float vSeed;
 void main() {
   vec2 q = vUv * 2.0 - 1.0;
   float a = (1.0 - q.x * q.x) * (1.0 - abs(q.y));
-  vec3 c = vColor * a * vAlpha;
-  if (!(dot(c, vec3(1.0)) < 1.0e6) || !(dot(c, vec3(1.0)) >= 0.0)) discard;
-  gl_FragColor = vec4(c, 1.0);
+  gl_FragColor = vec4(vColor * a * vAlpha, 1.0);
   #include <colorspace_fragment>
   #include <fog_fragment>
 }

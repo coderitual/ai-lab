@@ -14,7 +14,7 @@ export const TEXT = {
   day: 'Day',
   night: 'Night',
   /** A time of day's name on a button (lighting.js may add times: any other name is shown capitalised). */
-  timeName: (name) => ({ day: 'Day', dusk: 'Dusk', twilight: 'Twilight', night: 'Night' })[name] || name.charAt(0).toUpperCase() + name.slice(1),
+  timeName: (name) => ({ day: 'Day', dusk: 'Dusk', night: 'Night' })[name] || name.charAt(0).toUpperCase() + name.slice(1),
   soundOn: 'Sound on',
   soundOff: 'Sound off',
   resume: 'Resume',
@@ -38,18 +38,6 @@ export const TEXT = {
   map: 'Map',
   shown: 'Shown',
   hidden: 'Hidden',
-  /** The performance readout: its option, and the one small line it shows (numbers, so that a screenshot carries them). */
-  stats: 'Readout',
-  statsNote: 'One small line at the bottom: tier, picture size, frames a second (mean/slowest), what is switched off to keep them',
-  /**
-   * @param {{ tier: string, width: number, height: number, ratio: number, scale: number, aa: string, fps: number,
-   *   low: number, shed: string[], cap: number|null, trial: boolean, gpu: string }} p `aa`: how edges are smoothed
-   *   (msaa4, msaa2, fxaa); `fps`: the mean of the last seconds, `low`: the slowest frame of them as frames a second;
-   *   `shed`: the ladder's rungs given up; `cap`: frames a second the browser holds; `gpu`: what the browser calls it
-   */
-  statsLine: (p) =>
-    `${p.tier} ${p.width}×${p.height}@${p.ratio} ×${p.scale.toFixed(2)} ${p.aa} ${p.fps}/${p.low}fps ` +
-    `${p.cap ? `cap${p.cap} ` : ''}${p.trial ? 'testing' : p.shed.length ? `off:${p.shed.join(',')}` : 'all on'}${p.gpu ? ` ${p.gpu}` : ''}`,
 
   lap: 'Lap',
   finalLap: 'Final lap',
@@ -85,23 +73,20 @@ export const TEXT = {
   lamps: { abs: 'ABS', tc: 'TC', esc: 'ESC', hand: 'P', high: 'High beam' },
   buttons: { camera: 'Camera', lights: 'High beam', reset: 'Reset', pause: 'Pause' },
   pads: { steer: 'Steer', brake: 'Brake', drift: 'Drift', gas: 'Gas', pad: 'Steer · brake · drift' },
-  gauge: { throttle: 'Throttle applied', brake: 'Brake applied', hand: 'Handbrake' },
   drivingHelp: 'Driving help',
-  paint: 'Paint',
-  paint2: 'Paint, player 2',
   throttle: 'Throttle',
   steering: 'Steering',
   slider: 'Slider',
   arrows: 'Arrows',
   pad: 'Pad',
   tilt: 'Tilt',
-  hand: 'Resting hand',
+  hand: 'Hand',
   right: 'Right',
   left: 'Left',
   recentre: 'Recentre tilt',
   /** Under the steering choice: what it is (tilt: not yet tried on a real phone). */
   steeringNote: {
-    pad: 'One thumb, either hand: touch anywhere, across steers, down brakes, into the red pulls the handbrake; a second finger is the handbrake',
+    pad: 'One thumb: across steers, down brakes, into the red pulls the handbrake',
     tilt: 'Turn the phone like a wheel; the pad brakes. Untested on a real phone',
   },
   tiltNote: {
@@ -111,15 +96,11 @@ export const TEXT = {
   auto: 'Auto',
   manual: 'Manual',
   bestSlide: 'Best slide',
-  /** A paint's name (PAINTS in assets/car/materials.js; any other is shown capitalised). */
-  paintName: (id) =>
-    ({ silver: 'Silver', black: 'Black', white: 'White', blue: 'Blue', red: 'Red', matte: 'Matte grey', graphite: 'Graphite', night: 'Night race' })[id] ||
-    id.charAt(0).toUpperCase() + id.slice(1),
   /** A driving-help level's name (ASSISTS.levels in config.js; any other id is shown capitalised). */
   assistName: (id) => ({ full: 'Full', sport: 'Sport', off: 'Off' })[id] || id.charAt(0).toUpperCase() + id.slice(1),
 
   hint: {
-    touchPad: 'Touch anywhere, slide to steer, pull back to brake, pull to the red to drift',
+    touchPad: 'Slide to steer, pull back to brake, pull to the red to drift',
     touchTilt: 'Tilt to steer, pull back on the pad to brake',
     touch: 'The car drives itself: steer bottom left, hold Brake to slow',
     touchManual: 'Hold Gas to drive, steer bottom left, Brake to slow',
@@ -157,9 +138,7 @@ export const TEXT = {
       ['Start', 'pause'],
     ],
     touch: [
-      ['Touch anywhere', 'the one-thumb pad appears under the thumb (either hand): slide to steer, pull back to brake, to the red for the handbrake'],
-      ['A second finger', 'handbrake, while it is held (the pad keeps its own)'],
-      ['Bottom left', 'steer, with the slider or arrows (the centre is fixed)'],
+      ['Bottom left', 'steer (the centre is fixed)'],
       ['Brake', 'slow down, reverse when stopped'],
       ['Drift', 'handbrake'],
       ['Gas', 'drive (Throttle: Manual; on Auto the car drives itself)'],

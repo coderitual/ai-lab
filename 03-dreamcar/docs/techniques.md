@@ -73,31 +73,14 @@ Track: out to the solid edge it is the Track's own cross-section; beyond it,
 the hillside the Track asks for, with a cliff where the edge is rock (a rock
 face stands in front of it, `rock.js`); further out it blends over 10 to
 100 m into a field made on a 16 m grid from the road itself (rising inside
-the loop, falling towards the sea, the bay and the valleys, a ridge over the tunnel,
+the loop, falling towards the lake and the valleys, a ridge over the tunnel,
 a ravine under the sky road), with ridged noise on top; far away, mountains.
 
 It is drawn in three pieces that meet without cracks: a **band** that follows
 the road row by row with the Track's samples, its columns on the corridor's
 own kinks (so it is exact where the eye is closest); a **grid** of square
 cells over the course with the band's cells dropped; the **far land** in
-100 m cells (140 m on the low tier). The road's outermost vertices are the
-band's innermost ones. The far land has a hole where the grid is: the lines
-of its lattice nearest the grid's border are moved onto the border, their
-heights read there from the same lattice the grid's border eases onto, and no
-triangle is made inside them. (It used to run on under the grid, sunk 150 m
-in the middle but at its own height for two cells in from the border. Where
-the road stood within those two cells, in a cutting lower than the land, one
-of its triangles lay over the road, visible only from above: a dark slab over
-the car in the tall picture of a phone held upright, at the esses.)
-
-**Light in baked shade** (`shading.js`). The sky's share never falls under
-`BAKE_SKY_FLOOR` (0.7) of the open sky's, and by day and at golden hour the
-indirect light where the baked sun is gone is multiplied by up to
-1 + `BAKE_BOUNCE` (1.0): what the sunlit surroundings throw back. Without it
-the grass run-off inside a bend under the trees was a featureless dark sheet.
-The wood's floor is leaf litter of albedo about 0.07 (it was 0.04 and read as
-a black void behind the barrier), and the tyre walls are painted white and
-red by blocks of five stacks, so a long wall in shade is not a black band.
+100 m cells. The road's outermost vertices are the band's innermost ones.
 
 **Baked sun shadows** (`shading.js`, `terrain.js`). At a low sun whole
 valleys lie in the shade of a ridge kilometres away, far beyond the shadow
@@ -107,133 +90,6 @@ the answers ride on the vertex as `aBake` (sun, moon, sky seen, golden hour).
 Patched materials multiply the directional light by the channel of the time
 showing and the sky's light by the share of sky seen. The shadow map still
 draws everything near; where both say "no light" they agree.
-
-## Near the road: rock in beds, the ground in patches, concrete in panels
-
-(nearfield lane.) What stands within about 40 m of the road and is not the
-asphalt or a tree is drawn in one language (design.md, "Beside the road"):
-clear forms, a few tones per material stepped rather than ramped, crisp lit
-edges and soft contact shade, and every detail finer than a few pixels
-faded to its average with distance (`fwidth`), so nothing shimmers at speed.
-It adds no draw call: it is geometry in meshes that were already drawn (the
-rock faces are now one mesh, cut into 400 m pieces like the kerbs, where
-every 120 m of a run was a call of its own) and shading in materials that
-were already there.
-
-**Rock faces in beds and blocks** (`rock.js`, `groundMaterial.js`). A cut
-face is built of beds `BED` (1.35 m) thick whose lines wave gently along the
-road (`bedOffset`), each bed cut into blocks 2.6 to 6.8 m long, each block set
-back from the face's lean by its own amount (`SET_BACK`, 0.06 to 0.62 m,
-never behind the terrain's cliff) and swelling out towards its middle by up to
-0.38 m, so it is a rounded mass and not a brick. The strip's rows are laid on
-the bed lines themselves, three per bed, so where a bed stands further back
-than the one under it there is a ledge facing up, and where it stands further
-out an overhang facing down. The vertices carry where they are (`aVerge`:
-metres up the face, s, the side; `aMask.y`: 2 plus the share of the face's
-height), and the ground's shader works out the same beds and blocks from the
-same integer hash (`rockHash` in both, so the painted joints fall on the
-geometry's steps). It paints each block one of three tones of the stone (grey
-inland, ochre sandstone on the coast), big patches of staining, the lip of a
-block pale and lit where the bed above stands back and shaded where it stands
-out, broken joints, pits (hollows 10 to 30 cm across in a jittered grid, dense
-in some patches of the face and absent in others, dark under their upper lip
-and lit on their lower one), crusts of orange and yellow lichen, a damp mossy
-foot and a paler worn top; it tilts each block's normal a little (its own
-plane), bevels its lip and foot and dents the pits; it gives the rock a wet
-sheen (roughness 0.36 to 0.62, 0.3 in the damp foot, where it was 0.82
-everywhere); facets that face up grow grass and scrub in ragged tufts, and
-the fold over the top is grass. The land's own steep rock (the coast's
-cliffs, the hillsides) gets the same blocks from the world's axes within
-about 200 m, at its old darker tone, and is what it was further away.
-
-**The arch** (`rock.js`, `ARCH`). A natural arch of the same stone spans the
-cutting where it opens onto the sky road: a tube swept along a curved spine
-from beyond one face's top to beyond the other's, its rings lumpy with noise,
-thick at its feet (5.2 m) and thinner at its crown (2.9 m), skewed across the
-road, its underside about 11 m over the road and never under 9 m anywhere
-over the corridor; its feet are buried in the ground beyond both tops. It is
-drawn and lit as a cut face (the same material, its own bake), in the rock's
-one mesh: no draw call.
-
-**The ground in patches** (`groundMaterial.js`, `groundCover.js`). On the
-verge: beyond the mower's last pass, longer grass with a ragged but definite
-edge; blades streaking the mown grass; tufts left at the road's edge; dry
-patches; worn earth where cars cut over the edge, with two wheel tracks in it;
-at the foot of whatever stands at the solid edge a strip of drainage gravel
-about 0.6 m wide with a dark line of dirt along it, in the barrier's soft
-shade. Beyond the barriers, within about 45 m: carpets of low plants in
-clusters with crisp edges, heather, bilberry, gorse and bracken colours (sedum
-and thrift on the coast); on the steeper banks grey rock breaking through the
-turf in outcrops with a dark rim; tufts; the big soft blotches of tone held
-down near the road. The shrubs of the ground cover (medium and high) take the
-same colours in clusters 22 m long, half of them. On the coast the loose stone
-beside the road and the beaches (a strip within a few metres of the water's
-edge) are sand sculpted by light (`sandRelief`): swells 6.5 m long across the
-wind with a sharp crest and a steep lee, ripples about 0.3 m in the normal
-that fade before they are a pixel, pebbles and scrub; darker where wet; pale
-under the shallows, so the water over it reads clear.
-
-**Concrete** (`concrete.js`, `concreteFinish`). One finish for the tunnel's
-cuttings and portals, the bridges' decks, parapets and abutments, and the
-piers: panels at a pitch (`CONCRETE`: 4.5 m on the retaining walls, 3 m on the
-parapets) each one of three shades, a dark joint with a pale arris beside it,
-lifts of the formwork, board marks, rows of tie holes, a paler cap with a dark
-drip line under it and streaks hanging below (longest under the joints), a
-damp foot with moss, a weep hole low in every panel of a tall wall with its
-stain, and now and then a drain outlet, a pair of bolt plates, a painted band
-at hand height and a stencilled panel number in seven bars on the tall walls.
-It needs to know where on the wall a point is: `aConc` (metres along, up from
-the foot, down from the top, 2) on the tunnel's strips, worked out from the
-strips' own (s, h) on the decks and from the instance's height and the angle
-round the shaft on the piers; parts that do not carry it get the world's axes
-and no foot, cap or decoration. The retaining walls out of the tunnel stand
-back 0.25 m under their cap (a line of shade along the top) with buttress
-ribs as deep as that at every other joint.
-
-**Round 2** (after the owner's "like a game from 98" and references W1, W2,
-W4). Hillsides: the turf's edge onto rock is ragged (fine noise in the slope
-test); a band of bare earth runs along it; rills score steep rock every few
-metres (dark groove, lit rib, a tilt of the normal); grass is drier and paler
-on slopes that face the sun's side and darker on steep shaded ones; terraces
-of worn tracks follow the contours of moderate slopes; the rock's three tones
-stand further apart and its joints are wider, so they read at a phone's size.
-On rising banks beside the road (the land 4 m or more above the edge 25 m
-out) clusters of three to five big half-buried rocks, 1.5 to 4 m (every tier),
-with a thicket of shrubs round them (medium and high), from their own random
-stream (`groundCover.js`, outcrops). The coast's loose stone beside the road
-is W1's orange-ochre fine gravel with damp patches; a beach (low, within a few
-metres of the water's edge) is W4's fine golden sand, almost flat, with tide
-lines, damp patches, tyre tracks, sparse grass at its back and a band towards
-the water wet to a mirror (roughness 0.07) whose inner edge wavers like a
-run-up. Plant carpets grow on banks only, not on flat meadow. The tunnel's
-banner is a printed board in a steel frame on every tier (it was a box of
-one colour on low). Concrete: the panels' shades a clear step apart, joints
-4.5 cm and darker, longer streaks. Low walls: the paint chips in flakes of a
-few centimetres. Rock on the low tier does not swell (its 3 m columns made
-stripes) and does not take the coarse shadow map (it blotched the
-overhangs): the bake shades it.
-
-**Shared roadside pieces** (`roadside.js`, for the lanes that lay out a
-stretch; nothing is placed by this lane). `kerbRailing` (W1): a low concrete
-kerb 0.32 m high and 0.34 m wide with chamfered arrises in the concrete
-finish, square posts every 2 m on base plates, a top rail at 1.05 m and a
-middle rail. `chainFence` (W2, to stand behind a guard rail): posts every 3 m,
-2.4 m high, base plates, a top rail, rust in patches and streaks; the mesh is a
-diamond weave drawn in the shader on one quad per bay and cut out, the wire
-itself while it is a pixel or more, a screen door of its mean coverage further
-off. Each takes runs `{ s0, s1, side, out }` (out: metres beyond the solid
-edge, never inside the corridor) and is two draw calls whatever the runs.
-
-**The low walls** (`walls.js`). A precast safety barrier in section: a
-chamfered foot, a sloped lower face, a near-upright upper face, chamfered
-arrises, a top 0.2 m wide, every corner a crease; on medium and high a groove
-5 cm wide and 3.5 cm deep round every joint between blocks (rows in the
-strip; the low tier paints it). The paint is a band on the road's face over
-cast concrete, chipped and worn through most at the foot, the arrises and the
-blocks' ends; formwork lines and air holes; rain streaks from the top edge,
-road dirt up the foot, black tyre scuffs along the sloped foot; lifting slots
-in each block's top, an anchor recess near the top of each face, a drain
-slot at the foot of every third.
 
 ## The vehicle
 
@@ -285,17 +141,8 @@ slip (counter-steer 0.75 rad per rad). A stick or a thumb is trusted and only
 given the same lock.
 
 On a touch screen the default is a one-thumb pad (`src/engine/Input.js`):
-a disc whose centre is set where the thumb lands (`_land`) and never moves
-until it lifts, so the thumb's offset from it is an absolute position, not a
-gesture, and zero at touch-down. Short of room at an edge the offset is
-stretched back (`dx / f`, `f` the compressed share of the travel, at least
-0.6) before it reaches `padControls`; under 0.6 the centre is nudged inward by
-the missing travel and the input held at zero for 6 px of movement from the
-landing point. The disc is drawn inside the safe area (the knob stays on
-the centre). The Hud keeps two discs: the live one under the thumb, and a ghost
-at the layout's home place; the 0.4 s before the ghost returns is a CSS
-transition delay, so no clock is read. A second finger in the zone is the
-handbrake pedal; the pad keeps the pointer that placed it. `padControls(dx, dy, scale, manual,
+a fixed disc whose centre never moves, so the thumb's offset from it is an
+absolute position, not a gesture. `padControls(dx, dy, scale, manual,
 tripped)` turns that offset into everything the car needs, and is pure, so the
 scripted thumb of the Node tests drives through the very same function:
 across over 70 px is the steering; down, the first quarter of 56 px lifts
@@ -363,23 +210,18 @@ are a feature atlas (`atlas.js`, `features.js`) drawn on the skin rather than
 separate meshes; what must have depth (lamp units, mirrors, wheels) is
 modelled. The paint is a standard physical material with a clear coat and a
 metallic base with flakes; what it mirrors is the car's reflection probe
-(`src/engine/ReflectionProbe.js`, in full in engine.md, "The reflection
-probe"): a cube picture of the surroundings round the car, 128 / 256 / 512
-texels a face by tier, one or two faces redrawn a frame (the ones that see
-the roadside go by first), and filtered into a second cube whose mips hold the
-GGX lobe of one roughness each, so that any layer reads its whole glossy
-reflection in one lookup at its own roughness and a lamp in it is a soft
-lobe, not a blotch; each new picture is eased in over a few frames, so a
-refreshed face does not pop. The probes leave out what would only cost (the
-start's dressing, the town; on `low` also the rails, the guide posts and the
-lamps' glow) and see no further than 260 to 400 m. A face sees the whole world
-round the car and costs about half as many triangles as the view; the cube's
-resolution costs next to nothing beside that. What is big and far is drawn for
-the probes by a cheaper stand-in on `PROBE_LAYER`, a layer only the probes'
-cameras have: the massif's grid on every other column and row (a quarter of
-its triangles); the full grid sets its draw range to nothing for a probe's
-camera. The sky dome draws no sun or moon disc for them (the light's own
-highlight is the disc's).
+(`src/engine/ReflectionProbe.js`): a cube picture of the surroundings round
+the car, a face or two a frame at speed, a larger cube redrawn whole while the
+car is still (the title, the grid), sizes in `PROBE` per tier. The probes
+leave out what would only cost (the start's dressing, the town; on `low`
+also the rails, the guide posts and the lamps' glow, which are less than a
+texel of its 64-texel faces). A face sees the whole world round the car and
+costs about as many triangles as the view, so on `medium` one face is
+redrawn every other frame at speed and two every third frame standing still
+(`PROBE.every`, `stillEvery`). What is big and far is drawn for the probes by
+a cheaper stand-in on `PROBE_LAYER`, a layer only the probes' cameras have:
+the massif's grid on every other column and row (a quarter of its triangles);
+the full grid sets its draw range to nothing for a probe's camera.
 
 ## The trees
 
@@ -413,31 +255,7 @@ treeMaterial.js, impostors.js, forest.js; numbers in design.md, "The forest".
   coverage-preserving mips and a hard swap. No hashed or dithered
   transparency anywhere: under the motion blur it smears into noise.
 - **Shadows** are impostor cards turned to the sun, on a layer only the sun's
-  shadow camera sees: two triangles a tree. The trees that cast are those
-  whose crown lies inside the shadow map's box as `sun.prepareView` placed it
-  for this view (`sun.box`, forest.js `inBox`), not those near the car: a
-  crown 25 m tall under a 17 degree sun or moon shades the road 80 m away,
-  and a choice by distance from the car left those out, differently for two
-  cars a few metres apart (the two-player "water on the track", tools.md).
-  Where no box is placed (the viewer), a tree casts if its shadow comes near
-  the car (forest lane): the level segment from its foot to where the shadow
-  of its top lands is tested against the circle round the car.
-- **Schemes** (forest lane, `schemes.js`): a piece of the plan may name a
-  look (`scheme`, trackLayout.js SCHEMES). Everything that reads it asks
-  one table per Track sample: which scheme, its weight (1 on its pieces,
-  easing to 0 over its `blend` metres either side) and whether the sample
-  is on its own pieces. The weight decides gradually (a tree, a tuft, a
-  boulder is placed with that probability; the asphalt's tone and the
-  concrete strip fade with it); the lines are drawn only on the pieces
-  themselves, so they begin and end at a piece's end. Each part plants or
-  places what the scheme asks from its own random stream (`fork('scheme')`)
-  after everything else is placed, so that the rest of the lap is exactly as
-  it was. A scheme may draw the corridor's solid edges differently without
-  changing them (`curb`): to the cars the edge stays what the Track says (a
-  rail, rock), at the same distance; the world draws a low concrete
-  kerbstone there instead of a rail or a cut face (`schemes.js` `curbAt`,
-  read by rails.js, terrain.js's cliffs, trackside.js), so the physics and
-  its tests are untouched.
+  shadow camera sees: two triangles a tree.
 - **Where trees stand** is asked of `track.woodAt(s, side)` from 2 m behind
   the barrier, plus the mass of the forest away from the road where the
   terrain says; a keep-out callback keeps the start area and the town free.
@@ -451,22 +269,7 @@ the longer the path through the air), the sun's glow (a wide and a tight
 lobe) and its disc thousands of times brighter than the blue, unclamped, so
 the frame's bloom and flare make the glare from real brightness. Two layers
 of cloud lit from the side the light comes from, with grey-blue bases and
-silver rims near the sun; at golden hour, lit from below. The cumulus noise is
-pushed up round one place in the sky (lighting.js `clouds.group`, placed
-against the straight's heading like the sun: 30 degrees left of it, 30 up), so
-that D1's group of big heaps over the massif's shoulder is there whatever the
-noise does elsewhere; their rims are cut sharp (a 0.07 wide edge).
-
-At dusk the clear sky is not the zenith-to-horizon gradient but a twilight
-dome (lighting.js `sky.twilight`, sky.js `twiColumn`): two columns of five
-radiances from the horizon up, one under the sun (rose, orange, pale yellow,
-turquoise, deep blue) and one opposite it (the blue-violet shadow of the
-earth, the pink belt, blue), blended round the sky by how far a direction is
-turned towards the sun, with the sun's glow on top. The clouds' light then
-gathers on the sun's side (`clouds.sunward`): undersides lit orange-rose
-near the sun, dark blue-grey elsewhere; and the first stars show only high
-up and away from the sun (`starsAway`). The environment map, the probes and
-any water are drawn from the same dome, so they mirror it. By night the same
+silver rims near the sun; at golden hour, lit from below. By night the same
 shader draws the moon, airglow and the Milky Way; stars are points a pixel or
 two wide with their brightness spread over the footprint, so they neither
 flicker nor change with the picture's size.
@@ -486,30 +289,6 @@ They lie beyond the far plane, so their vertex shader puts them at the back
 of the depth range; drawn first, depth test always passing, still writing
 depth so the sky does not paint over them.
 
-The massif is back-lit, so its faces are in the sky's light and its form is
-carried by its albedo and its rim (day lane): limestone of albedo about 0.19,
-ribs paler than the gullies between them (a ridged field down the face,
-squared), pale fans of scree where the gullies open onto gentler ground near
-the tree line, a few great buttresses 600 to 1000 m apart cut into the face
-(their flanks turn to the sun or away), gullies that fork and end as they run
-down instead of hanging the whole height of the face. The rim: rock seen
-edge-on near the skyline, looking towards the sun, sends light forwards
-(`uRim`, graze cubed times the view's alignment with the sun to the fourth,
-only where the baked sun reaches): a thin bright line along the ridges on the
-sun's side, as in D1. Its skyline: the ridge left of the main peak stays about
-21 degrees high and the shoulder climbs gently out of the frame.
-
-`far.js` also builds **the far cones** of frame K5 (`K5.cones` in
-landmarks.js): across the open sea from K5's place, 14 to 17 km out, a long
-low range with three volcano-like cones (1600 to 1800 m: lower ones hid behind the bay's far shore) on it, snow on
-their upper flanks, built like a ring (a strip of faces from under the sea's
-horizon to the crest, facing the place, drawn first at the back of the depth
-range; 90 x 6 cells on low, 220 x 10 otherwise). At dusk they are a dark
-blue silhouette under the horizon's band; by day blue in the thin air with
-white tops. (The green hill this file built for D3 was taken out: every place
-on its line of sight from the ledge lies in K5's view, which is the stricter
-spec; `landmarks.js` `inK5View` now keeps the pale hall out of that view too.)
-
 The sun and moon are placed against the straight's heading
 (`lighting.js` `PLACES`, `placeLights`), not on the map: move the straight and
 the day's sun still stands down it.
@@ -523,25 +302,6 @@ to 200 m across (finite differences of smooth 3D noise, not screen
 derivatives, so it does not speckle), so that under the low sun facets light
 up and turn away between the gullies. Each fades out where a pixel covers
 more than its scale.
-
-## Frame K5's place
-
-`landmarks.js` `K5` and `k5Site`: the place is a distance into the section
-`sweepback` (101 m: where the road, due south off the gully bridge, begins
-its right turn), and everything of the frame is placed from it: the drum
-tower beyond the right edge, the flags and the chevron beyond the left one
-(metres past the place and beyond the solid edge, so a change of the corridor
-moves them with it), the far lamps on the low shore below (bearings and
-distances from the place, kept where the ground is just above the water),
-and the far cones across the sea (far.js). `inK5View` says whether a point of
-the map lies in the frame's view (bearings 128 to 238 from the place, within
-3 km, or within 260 m of it): the pale hall of D3 is kept out of it.
-`k5.js` builds the scenery as one mesh of coloured triangles (the drum in dark
-ribbed panels, its walkway, roof and railing, the flags' poles and bowed
-sails, the chevron board), one pane for the window and a cloud of points for
-the lamps: three draw calls where it is in view, about 1300 triangles on low.
-The window and the lamps are emissive, switched by `lamps.windows` and
-`lamps.street`; no light is added.
 
 ## The sun's shadow
 
@@ -562,25 +322,6 @@ tyres). The filter (three.js's five-tap PCF) is 1.0 / 1.2 / 1.6 texels wide
 on low / medium / high (`SHADOW` in sun.js; it was 1.2 / 1.8 / 2.5). The car also lays its own contact shadow (the CAR lane's
 `car/shadow.js`), which no map is fine enough to draw.
 
-## Boulders
-
-`boulders.js` (forest lane): a unit icosahedron squashed into an ellipsoid
-and lumped by smooth noise of the direction (the same at every copy of a
-corner, so the non-indexed facets stay closed), then FRACTURED: three to five
-planes, everything beyond a plane pressed back onto it, which leaves the flat
-faces and sharp arrises of granite split along its joints. Painted per
-vertex: the granite flecked, lichen in pale patches, moss where a face looks
-at the sky (the grass's own green), the foot dark where it stands in the
-earth. Its corners are then merged and it is shaded smooth (detail 3 on
-medium, 4 on high: a facet of a 5 m boulder read as a low-poly model). Where
-the ground falls away from the road, a big block reaches up to the road's
-level all the same (taller, standing on the ground). Two shapes (a weathered `round` one and a split `block`), each one
-instanced mesh, scaled, turned and tilted per boulder. groundCover.js places
-each with its middle at least its plan radius (the shape's own widest reach
-in plan at the largest scale, plus 15 cm for the tilt) beyond the solid
-edge, so no car can touch one; the low tier draws them as its plain rocks in
-the granite's tone.
-
 ## The asphalt
 
 `road.js`, `roadTextures.js`, `corridor.js`, `roadHistory.js`.
@@ -599,47 +340,14 @@ the granite's tone.
   number instead of a covariance matrix).
 - **The glare lobe.** A second, anisotropic specular lobe stretched along the
   line of sight lays the low sun's glare along the road as a long streak
-  (`ASPHALT_SHEEN`, road.js `SHEEN`: along 0.12, across 0.15, at 0.28 of a plain dielectric), broken up by the stones. Dry asphalt keeps 0.25 of the standard material's own isotropic lobe, so that the streak is the sheen's; under water or paint it keeps all of it. The sky's sheen (`SKY_SHEEN`, gain 0.42) fills the shade at a glancing angle.
-- **The tone** (road.js `ASPHALT`, road lane, fitted to frames E2 and E5):
-  albedo from 0.11 on the newest surfacing (binder over everything) to
-  0.22 a generation old (the binder weathered grey, the stones' tops bare), a
-  shade warm, the single stones of the old standing apart by 1.05 times their
-  tone about its mean. Sunlit it reads a pale to mid grey, in the woods' shade
-  a cooler grey that keeps its stones; wet, its pores full, it keeps 0.25 of
-  that (`damp`), so the wet night's road stays dark. The dry road's diffuse
-  light from the sky and the fill loses half its colour (`shadeGrey` 0.5):
-  in a wood's shade it is lit by the sunlit ground and crowns about it as well
-  as by the blue sky, and E2's shade is a cool grey, not blue.
-- **Wear** (road.js `WEAR`): each lane's two wheel paths (0.85 m either side
-  of the lane's middle) darker by up to 16 % and smoother, the outer metre
-  lighter, and faint streaks along the road: the large field stretched about
-  three hundred times along it, which changes the tone by 14 % and thins the
-  paint where the wheels cross it.
-- **Grit** (road.js `GRIT`): small dark stones on a grid of 11 cm cells, one
-  per cell at most, odds of 0.05 off the line rising by 0.2 towards each
-  edge, none on the wheel paths or the racing line. A pixel that spans many
-  cells shows their average darkening instead of single dots, so the grit
-  cannot sparkle or crawl; up close each stone stands 3 mm proud.
+  (`ASPHALT_SHEEN`: along 0.45, across 0.06), broken up by the stones. Dry asphalt keeps 0.3 of the standard material's own isotropic lobe, so that the streak is the sheen's; under water or paint it keeps all of it.
 - **The racing line and the history.** A polished darker band where cars run,
   rubber in the bends and the braking zones; runs of surfacing with joints,
-  seams 2 m either side of the middle, patches (about one per 300 m, more on
-  old runs), cracks sealed with tar (about one per 90 m), expansion joints on
-  the decks, tyre marks before the carousel: single things placed by rule
-  along the Track (roadHistory.js, its own `rng` forks) and drawn exactly.
-- **Paint** (road.js `PAINT`): a solid white line inside each edge, the start
-  line and the grid's boxes, and where a piece carries one a double yellow
-  centre line; a few millimetres proud, its edges following the stones it was
-  sprayed over by a centimetre or two up close, worn where tyres cross it
-  (flecked through along the wheel paths, thinner, the asphalt's grey
-  showing) and cut away where the road was patched.
-- **The edge:** a thin band of dust and grit along the pavement's own edge
-  (`ASPHALT.rim`), then the margin's older, dustier asphalt.
-  Where a piece's scheme asks (forest lane, `uScheme`: one texel a metre,
-  read nearest so that a line begins exactly at its piece's end) a double
-  yellow centre line with short dashes beside it into the bend, the road
-  lane's old surface with more sealed cracks and less rubber, and a flush
-  precast concrete strip 0.32 m wide along the margin's outer side. All of
-  it is paint and tone on the profile: the course is unchanged.
+  seams 2 m either side of the middle, patches, sealed cracks, expansion
+  joints on the decks, tyre marks before the carousel: single things placed
+  by rule along the Track and drawn exactly.
+- **Paint:** a solid white line inside each edge, the start line and the
+  grid's boxes, a few millimetres proud, worn where tyres cross it.
 - **Wetness** (one shared uniform, the time of day's `wetness` or `?wet=`):
   water fills the gaps between stones first (the height channel says which),
   puddles stand in the wheel tracks and low spots, the road under the
@@ -658,10 +366,6 @@ the granite's tone.
   lobe about the mirrored view, narrow across the plane of incidence, long in
   it), and on every tier the cars' tail lamps are drawn so too (`TAIL_GLINT`,
   only behind the car), which the mirror cannot show.
-- **The tail lamps' pool** (`TAIL_POOL`, power 0.3, dusk lane): on dry asphalt too,
-  from dusk on, each lit tail lamp lays red light on the road behind its car
-  (falling with the square of the distance, only behind the car, three times
-  as much with the brakes on), as the head lamps lay their pool ahead.
 - **The canopy** (`src/assets/world/canopy.js`): what the woods beside the road
   hide of the sky, defined once from the Track's `woodAt` and multiplied into
   the baked sky share (`aBake.z`) of the road, the kerbs and the verges, and
@@ -690,306 +394,6 @@ vignette, a filmic tone curve, saturation, split toning, lift, sRGB, grain and
 dither. On low the blur is done inside the final pass and FXAA replaces the
 multisampling. Every pattern (blur jitter, AO rotation, dither) is a function
 of the pixel, grain of the run's own clock.
-
-## The sea (from demo 01)
-
-`src/engine/waves.js`, `src/assets/world/sea.js`, the coast in
-`src/assets/world/terrain.js`. Demo 01's sea brought into this frame: 03
-does not import from 01 (each demo builds alone); the port is 03's own, and
-inside 03 the sea is defined once: the waves in waves.js, where the water is
-in terrain.js (`terrain.sea`), how it looks in sea.js.
-
-**Where it is.** The terrain's height function makes the coast: outside the
-loop, at a bearing from the course's middle outside the mainland's
-(`SEA.mainland`), the land falls from the road's own height to the water
-55 to 170 m beyond the solid edge, steeply at the last (a cliff), and the
-seabed shelves away beyond (`coastAt`). Far from the road the valley itself
-sinks to the seabed in those bearings. The lake's ellipse, drawn out to the
-west, makes the bay. Which low ground is sea is decided by a flood from the
-open water over the 16 m field: whatever it does not reach is a hollow,
-which `keepDry` holds just above the water, because the water is one level
-plane drawn everywhere (the land covers it where it stands higher). Cells of
-the grid and the far land wholly 2 m under the water are not drawn (fewer
-triangles than the lake's world had, on every tier). At start-up the
-terrain also writes the **sea map** (512 x 512 over 4.8 km): the depth, and
-two chamfer distance fields (the land's distance from the water, the
-water's from the land). The water reads it for the shallows and the surf,
-the ground for its coastal colours. Seven sea stacks are bumps in the same
-height function, placed by `rng.fork('stacks')` in the open sea 30 to 120 m
-off the shore.
-
-**The surface** is 01's: a sum of trochoidal (Gerstner) waves with deep-water
-dispersion, the vertex stage moving a camera-centred radial grid (01's, rings
-spaced to keep the cells square) and the fragment stage summing the analytic
-slopes for the normal. Each wave is dropped from the mesh where the mesh has
-fewer than about five vertices per wavelength, and from the normals where it
-is smaller than a pixel (01's rule: at sqrt(570 h L) m for an eye h m over a
-wave L m long). New here: the slope variance a wave stops drawing is handed
-back (`lost`: both axes together, half the square of its steepness), and the
-water keeps it (see the shading, below). Close to, the sun breaks into
-glitter on the facets; far out the same light is a smooth, wide path: no
-shimmer, no aliased sparks, with nothing to tune by distance.
-The swell is long and soft (150, 98, 63 m), the chop and the short waves are
-a light breeze's. (Round 2, frame E1) **Wave groups**: a sum of a few long
-trochoids seen from 100 m up reads as ruled lines. Each wave's amplitude is
-multiplied by its own slow factor, 1 + 0.65 cos(g . p + phase), with g about
-7.5 wavelengths long and turned 65 degrees off the wave (`GROUPS`): sets and
-lulls in the swell, rough and calm patches in the chop. The factor is applied
-in the mesh's displacement, the normals, the crest test for foam and in
-`sampleWaves` alike (the sea is still defined once); its own slope is left
-out of the normal (it is a hundredth of the wave's).
-
-**The shore map** (water lane; `src/assets/world/seaShore.js`). Everything
-the water does at a coast it does from one texture, baked at start-up from
-the land's own height function (`terrain.heightAt`, what the mesh is made of)
-against the sea's level: 1024 x 1024 texels over the sea map's box (4.7 m a
-texel; 512 on low), four channels. *Depth* of the bed, stored as a square
-root so that the first metre has thirty steps. *Distance to the shoreline*,
-signed (positive on the water, negative for 6 m up the land) so that it runs
-smoothly through the water's edge: a chamfer transform that starts, not from
-texel centres, but from where the bed crosses the level between a wet texel
-and a dry one (the bed taken to run straight between them), so the zero is
-right to a fraction of a texel. *The land's height* over the water, whose
-coarser mip levels are not means but the highest of the four texels below:
-one read of a coarse level answers "does anything in this stretch stand this
-tall". And *sand*: one where the bed shelves gently, zero where it falls
-steeply (a cliff's foot is rock). The height function is asked only within
-70 m of a shoreline (by the sea map's own distance fields) and on every
-fourth texel elsewhere: 105 thousand calls for a million texels, 0.6 s in
-Node. Water is wherever the land lies under the level, nothing else: the
-terrain keeps hollows that are not the sea's above it (`keepDry`), and the
-water is drawn everywhere. Because the map is made from the height function
-and not from anything the coast lane names, a new beach or a moved stack is
-in the water's picture without the water being told.
-
-**The shading** is a MeshStandardMaterial with the surface written into it
-(shading.js `extend`): the sun or moon with its shadow map, the fill and the
-haze reach the water as they reach the land, and the time of day's light is
-all the light it has. What the water adds is in four parts.
-
-*Slopes, and what happens to the ones a pixel cannot draw.* The normal is the
-analytic slopes of the swell and the longest chop (four waves: 150 to 34 m)
-plus wind ripples: one tiling normal map read at several sizes (3.1, 8.3, 23,
-61 and 173 m a repeat; its waves are an eighth of that and shorter), each
-layer turned a different way and drifting downwind at its own speed, so that
-no two line up and nothing tiles to the eye. The wave field's shorter waves
-(21 m and less) still move the mesh and answer `sampleWaves`, but they are
-not drawn as waves (`createWaveField`'s `normals`): seven sines of one length
-each were the "ruled lines" on the water, which a breeze's chop is not; the
-173 m layer is the chop's picture, and their slopes stay in the roughness. How rough
-the water is at a place is a slow field: gusts (cat's paws, a soft noise drawn
-out three to one along the wind and drifting with it at 3.2 m/s) against
-calmer water between them (0.28 of a gust's ripples), long glassy slicks
-(windrows: the same noise drawn out forty to one, here and there), the lee of land (the shore map's
-land channel, read 300 m coarse: any land hereabouts), the shallow margin,
-and the time of day's sea state (evenings are calmer). A layer is drawn only
-while a pixel's footprint along the line of sight is a part of its
-wavelength; what is not drawn is not forgotten. Its slope variance (measured
-from the map at start-up, not guessed) is carried in `seaVar` together with
-the waves' own lost slopes and the capillaries nothing draws, and does three
-things. It widens the highlight (alpha^2 = alpha0^2 + variance): the sun's
-path is sparks close to and a wide road far out, with no rule about distance
-and nothing to shimmer. It weakens and lifts the mirror: a rough surface seen
-at a glancing angle shows the eye the facets that lean towards it, so it
-mirrors less than Fresnel's curve says (Bruneton's fit of the mean Fresnel
-factor of a Gaussian sea: 0.78 at 3 degrees on calm water, 0.45 in a gust)
-and what it mirrors is the sky some way above the horizon (2.5 sigma at the
-horizon, nothing looking down). That, and not a tint, is why open water in a
-breeze is darker and bluer than the sky it lies under, why a calm bay is
-paler, and why a gust shows as a dark patch. And it softens the edge of
-whatever is mirrored.
-
-*The body, by depth.* What comes back out of the water is the bed seen
-through the column over the deep colour of the time of day: per channel,
-`deep * (1 - T) + bed * T` with `T = exp(-k * depth * path)`, k =
-(0.42, 0.085, 0.058) per metre for red, green and blue and `path` the mean
-of the way down and the refracted way back (longer at a glancing look). Red
-is gone in two or three metres, green in twenty: the same pale sand reads
-sand at 0.3 m, green at one, turquoise at three to six, teal at twelve and
-is lost in the deep blue by forty, with nothing but the map's depth saying
-which. The bed is modelled in the shader (the ground under the water is not
-drawn: the water is opaque): pale sand with ripples, dark reef and weed in
-patches of two noise octaves, more of it where the map says the bed is rock,
-none on the beach's margin; it is looked up where the refracted line of sight
-meets it and wobbles with the surface's normal, and close to the light the
-ripples gather plays over it (the minimum of two drifting copies of the
-noise's cell edges, raised to a power).
-
-*The mirror.* The sky is the environment map, clouds and all, read along the
-lifted ray and blurred by the spread. On medium and high the mirrored ray is
-also marched across the shore map's land heights: six or eight steps, each
-2.9 (2.2) times the last from 9 m out (to 1.8 and 2.2 km), each reading the
-mip level whose texels are about half its distance, which holds the highest land of that
-stretch; where `height / distance` stands over the ray's own slope the water
-shows land instead of sky: dark (a coast's albedo under the time of day's
-light), hazed by its distance, soft by the slopes' spread. Because the ray is
-the pixel's own, the ripples draw the image out towards the eye and break its
-edge, as water does. The viaducts' piers are not land: the eight nearest that
-stand in the water are given to the shader as posts (place, half width, top)
-and the same ray is tested against each; a pier is lit by which of its faces
-the water sees. The march is skipped where the coarse level says no land is
-near. What stands beyond the shore map (far.js's massif and ridges, 5 to
-17 km out) is in neither: on medium the game hands the water the view's
-reflection probe (`world.setSeaProbe`, one line in Game.js), and between one
-and thirty degrees over the horizon, where mountains are and the things
-beside the car are not, the mirror reads that cube instead of the sky's
-map. On high the world also draws a planar
-mirror for the water (`PlanarMirror`, 0.3 of the view's height, 3 km deep,
-the scene from the eye mirrored in the water's level, without the water, the
-ground cover, the kerbs and the studs): the pixel looks up where its lifted
-ray, taken some way out, lands in that picture, mixes in the mirror's
-streaked copy by the roughness, and falls back on the map and the march where
-the ray leaves the picture. Nothing in it may be brighter than four whites
-(the sun's disc is not mirrored twice: its glitter is the light's highlight).
-
-*The sun's glitter.* The directional light's highlight is right in the mean
-and wrong in kind: a real path is made of points. After the lights, the
-highlight is multiplied by a field of sparks with mean one: the water is cut
-into cells about a pixel and a half across (two neighbouring power-of-two
-sizes, blended, so that no line shows where the size changes), each cell
-flashes for a share of its own beat, and the share is the highlight's
-radiance over a spark's (1.6 times the sun's irradiance). Where the path is
-strong every cell is lit and it is solid; at its edges it thins into single
-points that the bloom picks up; far out, where a pixel holds many facets,
-less than half of the breaking-up is kept. The hash is the engine's integer
-one, the clock the run's.
-
-*White water*, all from the shore map. Where the bed shelves gently and is
-less than 1.25 m down (and within 46 m), lines of surf come in 6.5 m apart
-every 4.6 s: the phase is the distance to the shore over the spacing plus
-time, plus a slow wander along the shore (two crossed sines) so that a line
-is an arc, not a ring round the whole bay. A line is a front (solid white
-for a tenth of the cycle), lace behind it that thins as the water ages (the
-foam mask lowers the threshold of a bubble-and-thread noise), a face ahead of
-it where the water is thin and milky turquoise, and on medium and high a
-crest in the normal, pointing down the map's gradient. The same phase lifts
-the water's edge in the vertex stage (`seaSheet`: up quickly as a line
-arrives, back slowly, 0.16 m), so a sheet runs up the sand and drains; where
-the water over the bed is a few centimetres it carries foam at its edge and
-bubbles behind. Where the bed falls steeply (rock, a cliff's foot, a stack)
-there is a slap that breathes with the swell within 5 m and a wash to 15 m;
-round each pier a ring. A pixel that covers more than a part of the lines'
-spacing sees their mean, so nothing crawls. Out at sea the swell's Jacobian
-leaves streaks behind crests, in the gusts.
-
-At night the six lamps the wet road glints with (lamps.js picks them per
-view) and the cars' tail lamps (the `beams` the world is given) are drawn
-into the water as streaks: a lobe about the mirrored view, narrow across the
-plane of incidence and long in it, widened by the roughness.
-
-**To the horizon.** The disc reaches 14 km. The views' far plane is at 5 km:
-the vertex stage keeps the vertices beyond it just inside the depth range
-(`z = w (1 - 2e-6)`, in front of far.js's ridges at `1 - 1e-6`, behind
-everything real), and towards the mainland's bearings (read off
-`terrain.sea.sector`) pulls them back to where the disc always ended, so no
-water shows behind the far land. The water goes into the haze by its true
-distance (the atmosphere's own patch), and over the last third of the disc
-into `hazeColor` of its direction, which is what the sky dome shows under
-the horizon. Not done: the wake of a car's splash, refraction of what stands
-in the water, the bed under the open sea's swell.
-
-**Less of it.** `SEA_TIERS` (sea.js) has four levels of detail: the three
-tiers and `mobile`, which is what the medium tier means on a phone
-(`caps.mobile`; `?sea=` picks one by name): a coarser mesh, two ripple
-layers, four march steps, a quarter of the shore map. Those are compiled in.
-The quality ladder's `detail` rung (`World.setDetail`, with the trees) is
-not: while it is shed the same shader skips, on one uniform, the ripple
-layers the leanest level does not draw (their slopes go into the roughness,
-so the glitter keeps its width), the second gust sample, the slicks, the
-clouds' shade, the surf's relief and the caustics, and marches four steps
-instead of six or eight; on high the planar mirror is not drawn. The colour
-by depth, the glitter, the surf and the nearest reflections stay. A rung can
-come and go at any moment, so nothing about it may compile a shader.
-
-**For the ground.** `SEA_SHORE_GLSL` (sea.js) gives any material that carries
-`SEA_UNIFORMS` the shore map (`shoreAt`, `shoreDepth`, `shoreDist`,
-`shoreLand`) and the sheet's level at a place and time (`seaSheet(xz, t)`,
-with `uSeaTime`; never more than `SEA_SHEET_TOP`): sand lower than the level
-plus `SEA_SHEET_TOP` has been wet, and how long ago is in the same function.
-
-**The coast road's cliff** (round 2, `COAST` in terrain.js). The near
-profile beyond a sea side's solid edge (`nearAt`) is replaced, by the side's
-coast weight eased over 30 m along the road, with `coastCliff`: a lip, then
-`top - (top - foot) * smoothstep(t)` down a run of `drop / steep` metres,
-then the seabed. Two things would undo it. The 16 m land-shape field is
-smoothed three times, which turns a cliff into a 50 m slope: so after the
-smoothing each cell off a sea side is pulled down to the same cliff
-(`coastCell`), and those cells seed the sea's flood. And the band and the
-grid blend the near profile into that field from 10 m out, adding the land's
-small hills and `keepDry`'s lift: on a sea side the near profile is kept to
-the edge of the road's reach (the last 40 m blend), the hills are left off,
-and nothing is lifted (only the sea stacks stand out of it). The spur inside
-the carousel (`COAST.knoll`) is a ridge from the hairpin's centre (the
-Track's point at the piece's middle, `r` to its inside) down the tongue
-between its legs, added after the two legs' grounds are blended, so both
-legs see the same hill, and only beyond the cut's top.
-
-**The low crossing and the big waves** (round 2). The causeway is the same
-cliff function with other numbers (a 2.5 m lip, a bank 0.6 down per metre),
-applied to both sides of a stretch of `back` (`seaSide`: on the inside it
-fades out beyond the lagoon's width, so the land comes back), and on the
-lagoon side the seabed stops at 9 m. The big swell is a factor on the swell's
-amplitudes only, a smoothstep bump round one place (`BOOST`, set by
-`waves.setBoost` from `terrain.sea.surf`): in the shader it multiplies the
-same `waveGroup` factor that the sets and lulls use, so the mesh, the normals,
-the Jacobian foam and `sampleWaves` all see one surface.
-
-**The inner sound and the volcano** (round 3). The water inside the loop is
-the same sea plane: the sky road's and the plunge's right sides are coast
-sides (their cliff), and a disc round the island drowns the land-shape field
-and the near ground alike (`sound`, applied after the coast's override in
-the 16 m field, where it also seeds the flood, and in `heightOf` and `land`),
-fading out within 60 to 120 m of any solid edge so that the course's own
-ground and frame D3's bank stay. The island is a height function taken as a
-maximum over everything else (`volcanoAt`), so the cone, its crater and its
-gullies are ground like any other: baked, shaded and drawn by the terrain.
-The plume (volcano.js) is an open tube bent downwind by the square of its
-height in the vertex stage, its alpha broken into wisps by value noise that
-rises with the run's clock; the glow is an additive disc whose radiance is
-set from the time of day's sun strength, never by name.
-
-**No ground over the road** (sea lane). The grid leaves out a cell only where all its corners lie under the band. Where
-the band stops short (on a deck and at its abutments, where another stretch is nearer, inside a tight bend) a cell can
-have corners under the band at the road's height and others beyond it at the top of a rock cut or under a deck: its
-plane then stands over the road inside the corridor (the owner's "dark slab" across the lane at the sky road's end,
-1.99 m over the road at s = 2590 m on the low tier, and at the gully bridge's start on medium). Every triangle with a
-corner within two cells of a corridor is now sampled at eleven points and left out if any point inside the solid edges
-(outside a bore) stands over the road; `tools/unit/ground.test.mjs` walks every triangle of the built grid and far land
-near the course on the low and medium tiers and fails if one does.
-
-**No furniture inside the edges** (sea lane). Something placed from the edge at its own s stands inside the corridor
-wherever the edge widens across the thing's own width, as it does past the viaduct's end, where the edge slews from the
-parapet (7.5 m) to the coast's rail (9.9 m). The marshal huts and the distance boards now stand beyond the widest edge
-within their own reach (trackside.js `edgeNear`); marshal posts keep 40 m clear of a structure's ends and 150 m from
-each other (two had landed on one spot after the viaduct), and a parapet's board hangs from a bar that starts at the
-parapet's outer face instead of reaching over it onto the deck. `tools/unit/trackside.test.mjs` builds trackside.js's
-furniture and the forest lane's signs, chevrons and kerbstones with stand-ins for the atlas and the ground, locates every
-vertex on the course, and fails if any lies inside the solid edge on its side (the bar did, 0.58 m, before this); it
-checks every lamp's foot the same way.
-
-**No structure over the road** (sea lane). A bridge's abutment is a block under each end of the deck. Its top was set
-level, 0.3 m under the road's centre line at the deck's end. But the road falls away to its edges (crown, bank and
-drains): past the deck's ends the shoulder lies up to 0.6 m under the centre. So three of the four abutments' tops
-stood over the shoulder inside the edges: 0.33 m at the sea viaduct's start, 0.32 m at its end (the owner's pale
-plate on the left shoulder at lap 0:49) and 0.27 m at the gully bridge's start. The top is now 0.3 m under the lowest
-of the road over the block's own footprint. The expansion joints' plates were laid as eight straight chords across the
-road and stood up to 5 cm over its crown; they now follow `track.profile()` in 32 steps, 12 mm over it.
-`tools/unit/structures.test.mjs` samples every triangle of the viaducts' and tunnels' meshes, as built for low and
-medium (the tunnels on low only: the medium tier's banner needs a canvas), at points no more than 0.5 m apart. It
-fails if any point inside the solid edges stands more than 25 mm over the road, leaving out what hangs more than 4 m
-over it and the daylight's veil in a tunnel's mouth.
-
-**Per-piece road markings** (round 2, road.js `PIECE_MARKS`). A scheme per
-piece id, each scheme one channel of a per-metre RGBA texture (`uMarks`,
-sampled at s / length like the edge texture), eased over 6 m at its ends.
-'coast' (channel r) is a double yellow centre line: two 0.12 m lines 0.12 m
-apart, painted with the edge lines' wear and weight but a yellow paint
-colour. Channels g, b and a are free for other schemes.
-
-**Per tier**: low a flat disc (32 segments, four rings, 160 triangles) and
-the 7 longest waves in the normals; medium 96 segments moved by the swell,
-9 waves; high 160 segments, all 11. The clock is the run's (`world.update`),
-the eye's height sets the waves' reach in `prepareView`.
 
 ## What each pass draws (the budget)
 
@@ -1114,25 +518,6 @@ arrows), far brighter than what they light (`head`, 60 times the lamps'
 colour), so they bloom and the reflection probe sees them; they are not
 lights. No light was added to the scene.
 
-**The strips, the panels, the dashes** (day lane, frame v1). Along the top of
-each wall, just under the haunch, a continuous light strip (`WALL_STRIP`: 0.22
-m high, 9 times the lamps' colour) portal to portal, which the reflection
-probe sees too (a stand-in twice as tall at half the radiance), so the strips
-slide over the cars' paint; the road mirrors them as long soft streaks
-(`uBoreStrip`: where the mirrored ray meets the wall it heads for, how near
-the strip's height, blurred with the distance). Lit panels every 34 m on the
-bend's outside wall (`LIT_PANEL`: a white field with a block of colour, no
-lettering), yellow dashes along the inside edge (`DASHES`). The bounce
-between the walls was halved (`BOUNCE` 0.22, was 0.45): the ceiling stands
-dark between the fittings and the walls take their light from the lamps and
-the strips. The jet fans are drawn with the glow at the radiance the fittings give
-painted steel up there (`FAN_LIT`: a pale shell, a bright rim at each end, a
-dark grille, brackets): as plain paint they took light only from the few real
-lamps near the car and hung ahead as black holes in the ceiling. All of it is emissive geometry in the meshes the tunnel already
-had; no light was added. Inside, every time of day uses its own
-`tunnelExposure` (day 5.6, golden hour and twilight 4.5, night 5), eased in
-the fixed step like any exposure.
-
 **What the road mirrors** (road.js `TUNNEL_SHEEN`). The tunnel's road is
 dry, so there is no planar mirror there; the asphalt follows its own mirrored
 ray up to the plane of the fittings, finds how far across it passes from
@@ -1151,19 +536,11 @@ the box its faces see only 160 m (`PROBE.tunnelFar`: what lies beyond is
 culled) and on medium two faces are redrawn every other frame instead of one
 (`tunnelFaces`), so the cube is a tenth of a second old at speed and the lines
 of fittings slide over the roof, the shoulders and the glass with the car.
-The probe stands at the middle of the car, knows directions only and sees
-the fittings as broad stand-ins a fifth of a second old: in the paint they
-came out as blotches and broken flecks. So the car draws the two lines of
-luminaires itself (car.md, "In the tunnel"): each reflected ray is followed
-from the body's own point to the lines' plane, with the rows of bars and their
-places read from the tunnel (`BORE_UNIFORMS`, `LUMINAIRE`) and the car's place
-in the road's frame handed over by the game each frame (`setBore`); the probe's
-read is held to a few times the lining's radiance under the roof, so the
-fittings in it do not double them, and box-projected onto the walls and the
-ceiling. In the tunnel the probe hands the materials the bore as a box (wall to
-wall, road to ceiling, 30 m each way: `probeBox`, GLSL_PROBE_PROXY), and the
-car's materials read the probe through it (box projection), so the walls and
-the ceiling stand at their true distance in the flanks.
+The probe stands at the middle of the car and knows directions only: a line 5
+to 6 m overhead is mirrored almost where it should be on the roof and the
+glass, and a little wide on the flanks. A correction for the ceiling's plane in
+the car's materials, as `carGround` corrects for the road's, would put them
+exactly; it has not been made.
 
 **The portals and the cuttings.** The faces are a rectangle with the mouth
 cut out (ShapeGeometry), a reveal, a lintel standing out, a coping. The
@@ -1202,7 +579,7 @@ and railing, the banner as a colour.
 ## The staging camera
 
 `setPhoto` in `src/game/Game.js`, `_photo` in `src/game/Cameras.js`.
-`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, `e1`, `k5`, `waves`, which also set the moment of the autopilot's run and the time of day) places every view's
+`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, which also set the moment of the autopilot's run and the time of day) places every view's
 camera `back` m behind, `right` m right of and `up` m above the car's origin
 in the car's level frame (its heading only, not its pitch or roll), turned
 `yaw` degrees left of the heading and `pitch` degrees up, with a lens of

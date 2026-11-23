@@ -39,7 +39,6 @@
 
 import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE } from '../../engine/glsl.js';
-import { CONCRETE, concreteFinish } from './concrete.js';
 import { PROBE_LAYER } from '../../engine/ReflectionProbe.js';
 import { levelFrame } from './furniture.js';
 import { LAMP_KINDS, SPOT_GLSL } from './lamps.js';
@@ -50,8 +49,6 @@ import { DESIGN, paintBoard } from './signs.js';
 const CEILING = 6.4;
 /** The walkway behind the kerb (its face is the Track's solid edge): width and height (m). */
 const WALK = { width: 1.0, height: 0.22 };
-/** The bore as a box, for the cars' probes (game/Game.js): the walls stand `walk` beyond the solid edges, the ceiling `ceiling` over the road. */
-export const BORE = { ceiling: CEILING, walk: WALK.width };
 /** The chamfer where wall meets ceiling: how far across and how far down (m). */
 const HAUNCH = { across: 0.9, down: 0.7 };
 /** The wall's cast panels: length along the road, and the joint along them over the dado (m). */
@@ -62,27 +59,14 @@ const SHELL = 0.5;
 /** Rows of the box along the road: one every this many metres, per tier (its faces are flat: a 1000 m bend needs few). */
 const ROW = { low: 4, medium: 2, high: 2 };
 /** The box's own light bounced about, as a share of what one lamp lays on the wall beside it. */
-// (day lane: 0.45 lit the ceiling and the walls as a flat pale box; the strips and the fittings now carry the light)
-const BOUNCE = 0.22;
-/**
- * (day lane, frame v1) The continuous light strip along the top of each wall, under the haunch: its height (m) and
- * the height above the road of its middle, and its radiance against the luminaires' colour. The probe sees it too:
- * it slides over the cars' paint.
- */
-const WALL_STRIP = { height: 0.22, at: CEILING - HAUNCH.down - 0.3, radiance: 9 };
-/** (day lane) Lit panels along the outside wall: length, height, the height of their middle, spacing (m), radiance. */
-const LIT_PANEL = { length: 5.6, height: 1.3, at: 3.3, step: 34, radiance: 2.2 };
-/** Our own panels: a white field with a coloured block (no lettering). */
-const PANEL_COLORS = [[0.1, 0.55, 1.0], [1.0, 0.45, 0.05], [0.1, 0.9, 0.45], [0.95, 0.15, 0.2]];
-/** (day lane) Yellow dashes along the inside edge: length, gap, width, lat from the pavement's edge (m). */
-const DASHES = { length: 1.2, step: 3.6, width: 0.14, inset: 0.45, asBoxes: false };
+const BOUNCE = 0.45;
 /**
  * The luminaires: how far in from the wall (m, on the ceiling at the haunch's foot), their emitter's size across and
  * along, the gap between a pair's two bars, and the zones: pairs of bars every `entrance[1]` m over the first
  * `entrance[0]` m, single bars every `transition[1]` m to `transition[0]` m in and over the last `exit[0]` m, and
  * every `interior` m between. Their radiance is LAMP_KINDS.tunnel.head times its colour.
  */
-export const LUMINAIRE = { inset: 1.15, across: 0.24, along: 1.25, alongPair: 0.7, pair: 0.34, entrance: [60, 2.0], transition: [130, 3.0], exit: [36, 3.0], interior: 6 };
+const LUMINAIRE = { inset: 1.15, across: 0.24, along: 1.25, alongPair: 0.7, pair: 0.34, entrance: [60, 2.0], transition: [130, 3.0], exit: [36, 3.0], interior: 6 };
 /**
  * What the cars' reflection probes see of the fittings instead (a stand-in on PROBE_LAYER): a bar as wide as `across`
  * (m) and `along` times as long, at `radiance` of the fittings' own. A fitting 0.24 m wide 5 m away is half a texel of a
@@ -96,8 +80,6 @@ const GUIDE = 12.5;
 const GUIDE_H = 1.0;
 /** Jet fans: a pair every FANS m, the first FAN_FIRST m in. Lane signals every SIGNALS m (and at the entrance). */
 const FANS = 110;
-/** (day lane) The jet fans' radiance as the tunnel's fittings light them (drawn with the glow: see where they are built). */
-const FAN_LIT = { shell: [0.075, 0.078, 0.082], rim: [0.32, 0.34, 0.36], grille: [0.014, 0.015, 0.017], bracket: [0.05, 0.052, 0.055] };
 const FAN_FIRST = 70;
 const SIGNALS = 120;
 /** The three lanes' middles (m left of the centre line): where the lane signals hang. */
@@ -132,13 +114,14 @@ const PAINT = {
   steel: [0.32, 0.33, 0.34],
   galvanised: [0.42, 0.43, 0.42],
   pipe: [0.28, 0.1, 0.06],
+  fan: [0.5, 0.5, 0.48],
+  fanInside: [0.03, 0.03, 0.035],
   door: [0.16, 0.17, 0.17],
   signal: [0.025, 0.025, 0.03],
   blue: [0.01, 0.07, 0.32],
   white: [0.8, 0.8, 0.78],
   black: [0.02, 0.02, 0.02],
   banner: [0.75, 0.2, 0.03],
-  yellow: [0.6, 0.42, 0.03],
 };
 /** Radiance (scene units, linear) of what glows. */
 const GLOW = {
@@ -196,8 +179,6 @@ class Parts {
     this.pos = [];
     this.nor = [];
     this.col = [];
-    /** (nearfield lane) where on a concrete wall each point is (concrete.js aConc), (0, 0, 0, 0) where unknown */
-    this.conc = [];
     this.index = [];
   }
   get empty() {
@@ -217,31 +198,25 @@ class Parts {
       else v.set(0, 1, 0);
       this.nor.push(v.x, v.y, v.z);
       this.col.push(color[0], color[1], color[2]);
-      this.conc.push(0, 0, 0, 0);
     }
     if (geometry.index) for (let i = 0; i < geometry.index.count; i++) this.index.push(base + geometry.index.getX(i));
     else for (let i = 0; i < p.count; i++) this.index.push(base + i);
   }
-  /** A flat convex polygon (corners in order), one colour, its normal from the corners; `conc` per corner, if known. */
-  poly(points, color, conc = null) {
+  /** A flat convex polygon (corners in order), one colour, its normal from the corners. */
+  poly(points, color) {
     if (points.length < 3) return;
     const a = points[0];
     const nrm = new THREE.Vector3().subVectors(points[1], a).cross(new THREE.Vector3().subVectors(points[2], a)).normalize();
     const base = this.pos.length / 3;
-    points.forEach((q, i) => {
+    for (const q of points) {
       this.pos.push(q.x, q.y, q.z);
       this.nor.push(nrm.x, nrm.y, nrm.z);
       this.col.push(color[0], color[1], color[2]);
-      if (conc) this.conc.push(conc[i][0], conc[i][1], conc[i][2], 2);
-      else this.conc.push(0, 0, 0, 0);
-    });
+    }
     for (let k = 1; k < points.length - 1; k++) this.index.push(base, base + k, base + k + 1);
   }
-  /**
-   * A strip of rows of points (each row the same count; a point doubled is a crease), normals from the winding;
-   * `conc` the same rows of [along, up, down] (concrete.js), if known.
-   */
-  strip(rows, color, conc = null) {
+  /** A strip of rows of points (each row the same count; a point doubled is a crease), normals from the winding. */
+  strip(rows, color) {
     const m = rows[0].length;
     const base = this.pos.length / 3;
     const a = new THREE.Vector3();
@@ -258,8 +233,6 @@ class Parts {
         this.pos.push(row[k].x, row[k].y, row[k].z);
         this.nor.push(nrm.x, nrm.y, nrm.z);
         this.col.push(color[0], color[1], color[2]);
-        if (conc) this.conc.push(conc[r][k][0], conc[r][k][1], conc[r][k][2], 2);
-        else this.conc.push(0, 0, 0, 0);
       }
     }
     for (let r = 0; r < rows.length - 1; r++) {
@@ -274,7 +247,6 @@ class Parts {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    g.setAttribute('aConc', new THREE.Float32BufferAttribute(this.conc, 4));
     g.setIndex(this.index);
     g.computeBoundingSphere();
     return g;
@@ -411,53 +383,6 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
       d += spacingAt(d, length - d);
     }
 
-    // ---- (day lane, frame v1) the light strips along the top of both walls, continuous portal to portal
-    {
-      const stripColor = spec.color.map((c) => c * WALL_STRIP.radiance);
-      const STEP = 8;
-      for (let d = 0; d < length; d += STEP) {
-        const len = Math.min(STEP, length - d);
-        const { M } = place(track, t.s0 + d + len / 2);
-        for (const side of [1, -1]) {
-          glow.add(UNIT_BOX, M(side * (Wb - 0.02), WALL_STRIP.at, 0, [0.04, WALL_STRIP.height, len + 0.02]), stripColor);
-          probeGlow.add(UNIT_BOX, M(side * (Wb - 0.02), WALL_STRIP.at, 0, [0.04, WALL_STRIP.height * 2, len + 0.02]), stripColor.map((c) => c * 0.5));
-        }
-      }
-      BORE_UNIFORMS.uBoreStrip.value.set(Wb - 0.02, WALL_STRIP.at, WALL_STRIP.height / 2, WALL_STRIP.radiance);
-    }
-    // ---- lit panels along the outside wall (the bend's outside: its left on a right-hand bend), our own blocks of colour
-    {
-      levelFrame(track, (t.s0 + t.s1) / 2, frame);
-      const outside = frame.curvature > 0 ? -1 : 1;
-      let k = 0;
-      for (let d = LIT_PANEL.step * 0.75; d < length - LIT_PANEL.step * 0.5; d += LIT_PANEL.step, k++) {
-        const { M } = place(track, t.s0 + d);
-        const white = [LIT_PANEL.radiance, LIT_PANEL.radiance, LIT_PANEL.radiance * 0.96];
-        const block = PANEL_COLORS[k % PANEL_COLORS.length].map((c) => c * LIT_PANEL.radiance * 0.8);
-        const third = LIT_PANEL.length / 3;
-        glow.add(UNIT_BOX, M(outside * (Wb - 0.03), LIT_PANEL.at, third / 2, [0.04, LIT_PANEL.height, 2 * third]), white);
-        glow.add(UNIT_BOX, M(outside * (Wb - 0.03), LIT_PANEL.at, -third, [0.04, LIT_PANEL.height, third]), block);
-        paint.add(UNIT_BOX, M(outside * (Wb - 0.01), LIT_PANEL.at, 0, [0.02, LIT_PANEL.height + 0.16, LIT_PANEL.length + 0.16]), PAINT.housing);
-      }
-    }
-    // ---- yellow dashes along the inside edge
-    {
-      levelFrame(track, (t.s0 + t.s1) / 2, frame);
-      const inside = frame.curvature > 0 ? 1 : -1;
-      const dashProf = {};
-      const dashProf0 = {};
-      // (lead) Off for now: as level boxes these stood up to 4 cm over a road that falls and tilts under them
-      // (tools/unit/structures.test.mjs). They belong in the road's own paint (road.js's marks), which follows it.
-      for (let d = 2; DASHES.asBoxes && d < length - 2; d += DASHES.step) {
-        const { M } = place(track, t.s0 + d);
-        // (lead) on the road's own surface at that distance from the centre line: the pavement falls away from the
-        // crown, and a dash laid at the centre line's height stood 0.25 m over the shoulder
-        const lat = inside * (track.halfWidth - DASHES.inset);
-        const fall = track.profile(t.s0 + d, lat, dashProf).y - track.profile(t.s0 + d, 0, dashProf0).y;
-        paint.add(UNIT_BOX, M(lat, fall + 0.012, 0, [DASHES.width, 0.01, DASHES.length]), PAINT.yellow);
-      }
-    }
-
     // ---- on the walls: guidance lights, emergency doors with lit frames and signs, fire points
     for (let d = GUIDE / 2; d < length; d += GUIDE) {
       const { M } = place(track, t.s0 + d);
@@ -504,22 +429,14 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
       const sides = low ? 8 : 16;
       const shell = new THREE.CylinderGeometry(0.56, 0.56, 1, sides, 1, true).rotateX(Math.PI / 2);
       const face = new THREE.CircleGeometry(0.52, sides);
-      // (day lane) the fans are drawn with the glow, at the radiance the fittings give painted steel up there: as plain
-      // paint they took light only from the few real lamps near the car and hung ahead as black holes in the ceiling.
-      // A pale painted shell, a bright rim at each end, a dark grille (never black), brackets.
-      const rim = new THREE.CylinderGeometry(0.6, 0.6, 1, sides, 1, true).rotateX(Math.PI / 2);
       for (let d = FAN_FIRST; d < length - 40; d += FANS) {
         const { M } = place(track, t.s0 + d);
         for (const lat of [3.1, -3.1]) {
-          glow.add(shell, M(lat, CEILING - 0.82, 0, [1, 1, 3.6]), FAN_LIT.shell);
-          for (const e of [-1.74, 1.74]) {
-            glow.add(rim, M(lat, CEILING - 0.82, e, [1, 1, 0.14]), FAN_LIT.rim);
-            glow.add(face, M(lat, CEILING - 0.82, e * 0.97, [1, 1, 1], [0, e > 0 ? 0 : Math.PI, 0]), FAN_LIT.grille);
-          }
-          for (const e of [-1, 1]) glow.add(UNIT_BOX, M(lat, CEILING - 0.14, e, [0.1, 0.28, 0.1]), FAN_LIT.bracket);
+          paint.add(shell, M(lat, CEILING - 0.82, 0, [1, 1, 3.6]), PAINT.fan);
+          if (!low) for (const e of [-1.7, 1.7]) paint.add(face, M(lat, CEILING - 0.82, e, [1, 1, 1], [0, e > 0 ? 0 : Math.PI, 0]), PAINT.fanInside);
+          for (const e of [-1, 1]) paint.add(UNIT_BOX, M(lat, CEILING - 0.14, e, [0.1, 0.28, 0.1]), PAINT.steel);
         }
       }
-      rim.dispose();
       shell.dispose();
       face.dispose();
     }
@@ -784,13 +701,10 @@ function buildCuttings({ track, terrain, t, Wb, cast, paint, screens, low }) {
   ]) {
     for (const side of [1, -1]) {
       const rows = [];
-      const conc = [];
-      const ribs = [];
       const screenRows = [];
       const n = Math.ceil((s1 - s0) / step);
       for (let r = 0; r <= n; r++) {
-        const a = s0 + ((s1 - s0) * r) / n;
-        const s = track.wrap(a);
+        const s = track.wrap(s0 + ((s1 - s0) * r) / n);
         const f = levelFrame(track, s, {});
         // beside the mouth the walls stand back a little towards the box's own (but never behind the foot of the
         // terrain's cliff, which would then stand in front of them), and stand upright, leaning back further out
@@ -803,29 +717,9 @@ function buildCuttings({ track, terrain, t, Wb, cast, paint, screens, low }) {
         if (kind === 'slope') {
           const lean = CUT.slope * h * Math.min(1, fromFace / CUT.upright);
           rows.push([at(0, yE - 0.5), at(0, yE + 0.15), at(lean, yE + h), at(lean, yE + h), at(lean + 0.6, yE + h + 0.05), at(lean + 0.6, yE + h + 0.05), at(lean + 1.2, yE + h - 1.2)]);
-          // (nearfield lane) where on the wall each point is, for the concrete's panels, cap and foot (concrete.js)
-          conc.push([[a, -0.5, h + 0.5], [a, 0.15, h - 0.15], [a, h, 0], [a, h, 0], [a, h, 0], [a, h, 0], [a, h - 1.2, 1.2]]);
         } else {
           const top = yE + h;
-          // (nearfield lane) the wall's face stands back under a cap that overhangs it (a line of shade along the top),
-          // and buttress ribs as deep as the overhang stand out from it, every other panel; never so far back that the
-          // terrain's cliff (from FOOT behind the solid edge) could show in front of it
-          const recess = Math.max(0, Math.min(0.25, 0.68 - (edge - solid)));
-          const capH = Math.min(0.35, 0.4 * h);
-          rows.push([
-            at(0.02 + recess, yE - 0.5),
-            at(0.02 + recess, top - capH),
-            at(0.02 + recess, top - capH),
-            at(0.02, top - capH),
-            at(0.02, top - capH),
-            at(0.02, top),
-            at(0.02, top),
-            at(0.62, top),
-            at(0.62, top),
-            at(0.62, top - 1.5),
-          ]);
-          conc.push([[a, -0.5, h + 0.5], [a, h - capH, capH], [a, h - capH, capH], [a, h - capH, capH], [a, h - capH, capH], [a, h, 0], [a, h, 0], [a, h, 0], [a, h, 0], [a, h - 1.5, 1.5]]);
-          if (recess > 0.05 && h > 1.5) ribs.push({ a, recess, yE, top: top - capH, h, capH });
+          rows.push([at(0.02, yE - 0.5), at(0.02, top), at(0.02, top), at(0.62, top), at(0.62, top), at(0.62, top - 1.5)]);
           // the screen's height: lowest at the portal, a step up every SCREEN.step m
           const away = track.delta(t.s1, s);
           const hs = Math.min(SCREEN.top, SCREEN.screen + SCREEN.rise * Math.floor(Math.max(0, away) / SCREEN.step));
@@ -833,34 +727,7 @@ function buildCuttings({ track, terrain, t, Wb, cast, paint, screens, low }) {
           else screenRows.push(null);
         }
       }
-      cast.strip(rows, kind === 'slope' ? [0.34, 0.33, 0.3] : [0.56, 0.55, 0.52], conc);
-      // the ribs, at every other joint of the panels (CONCRETE.wall.panel), as tall as the face under the cap
-      const pitch = 2 * CONCRETE.wall.panel;
-      for (const rib of ribs) {
-        const k = Math.round(rib.a / pitch);
-        const at = k * pitch;
-        if (Math.abs(at - rib.a) > step / 2 || track.delta(s0 + 1, at) < 0 || track.delta(at, s1 - 1) < 0) continue;
-        const w = 0.28;
-        const P = (along, d, y) => {
-          const f = levelFrame(track, track.wrap(along), {});
-          const solid = track.edgeAt(track.wrap(along), side);
-          const edge = solid + Math.min(CUT.back, Math.max(0, Wb - solid));
-          return new THREE.Vector3(f.pos.x + f.flat.x * side * (edge + d), y, f.pos.z + f.flat.z * side * (edge + d));
-        };
-        const y0 = rib.yE - 0.5;
-        const y1 = rib.top;
-        // its faces read as the middle of a panel (no joint drawn down the rib)
-        const c = (along, y) => [along + CONCRETE.wall.panel / 2, y - rib.yE, rib.top + rib.capH - y];
-        const front = [P(at - w, 0.02, y0), P(at + w, 0.02, y0), P(at + w, 0.02, y1), P(at - w, 0.02, y1)];
-        const backs = [P(at - w, 0.02 + rib.recess, y0), P(at + w, 0.02 + rib.recess, y0), P(at + w, 0.02 + rib.recess, y1), P(at - w, 0.02 + rib.recess, y1)];
-        const tint = [0.53, 0.52, 0.49];
-        const cf = [c(at - w, y0), c(at + w, y0), c(at + w, y1), c(at - w, y1)];
-        // wound to face the road on either side
-        const order = (q) => (side > 0 ? q : [q[0], q[3], q[2], q[1]]);
-        cast.poly(order(front), tint, order(cf));
-        cast.poly(order([backs[0], front[0], front[3], backs[3]]), tint, order([cf[0], cf[0], cf[3], cf[3]]));
-        cast.poly(order([front[1], backs[1], backs[2], front[2]]), tint, order([cf[1], cf[1], cf[2], cf[2]]));
-      }
+      cast.strip(rows, kind === 'slope' ? [0.34, 0.33, 0.3] : [0.56, 0.55, 0.52]);
       // the blue sign on the exit's wall, on the right of whoever looks into the mouth from outside, facing the road
       if (kind === 'screen' && side > 0) {
         const s = track.wrap(t.s1 + 10);
@@ -920,7 +787,7 @@ function buildGantry({ track, terrain, s, paint, glow, low }) {
 
 /**
  * The banner over the entrance: one of the circuit's made-up boards (signs.js), on posts on the headwall's coping.
- * (nearfield lane) The same printed board on every tier, in a steel frame.
+ * On the low tier its field's colour only, in the painted steel's mesh.
  */
 function buildBanner({ track, terrain, s, paint, low }) {
   const { P, M } = place(track, s, -1);
@@ -930,22 +797,14 @@ function buildBanner({ track, terrain, s, paint, low }) {
   const foot = top + 0.6;
   const lat = 2;
   for (const e of [-w / 2 + 1, w / 2 - 1]) paint.add(UNIT_BOX, M(lat + e, (top + foot) / 2 + 0.3, -0.2, [0.12, foot - top + 0.6, 0.12]), PAINT.steel);
-  // (nearfield lane) a board on every tier, not a box of the field's colour on the low one (the owner's phone): a
-  // steel frame round the printed face, a dark back, two braces to the posts
-  const fy = foot + h / 2;
-  for (const [dx, dy, sx, sy] of [
-    [0, h / 2 + 0.06, w + 0.24, 0.12],
-    [0, -h / 2 - 0.06, w + 0.24, 0.12],
-    [-w / 2 - 0.06, 0, 0.12, h + 0.24],
-    [w / 2 + 0.06, 0, 0.12, h + 0.24],
-  ])
-    paint.add(UNIT_BOX, M(lat + dx, fy + dy, -0.1, [sx, sy, 0.14]), PAINT.steel);
-  paint.add(UNIT_BOX, M(lat, fy, -0.17, [w, h, 0.04]), PAINT.housing);
-  for (const e of [-w / 2 + 1, w / 2 - 1]) paint.add(UNIT_BOX, M(lat + e, fy, -0.2, [0.1, h, 0.1]), PAINT.steel);
+  if (low) {
+    paint.add(UNIT_BOX, M(lat, foot + h / 2, -0.1, [w, h, 0.08]), PAINT.banner);
+    return null;
+  }
   const canvas = document.createElement('canvas');
-  canvas.width = low ? 256 : 512;
-  canvas.height = low ? 64 : 128;
-  paintBoard(canvas.getContext('2d'), [0, 0, canvas.width, canvas.height], DESIGN.arvent);
+  canvas.width = 512;
+  canvas.height = 128;
+  paintBoard(canvas.getContext('2d'), [0, 0, 512, 128], DESIGN.arvent);
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = 4;
@@ -1071,9 +930,27 @@ vec3 boreLampLight(vec3 P, vec3 N) {
   });
 }
 
-/** Cast concrete for the portals and the cuttings: (nearfield lane) concrete.js's finish. */
+/** Cast concrete for the portals and the cuttings: board marks, soft stains and weathering running down. */
 export function concreteDetail(material) {
-  return concreteFinish(material, { key: 'tunnel', kind: 'wall' });
+  return extend(material, 'portal-concrete', (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPortalWorld;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPortalWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${GLSL_HASH}\n${GLSL_NOISE}\nvarying vec3 vPortalWorld;`)
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+{
+  vec3 p = vPortalWorld;
+  float boards = 0.95 + 0.05 * hash11(floor(p.y / 0.3));
+  float stain = valueNoise(vec2(p.x * 0.25 + p.z * 0.25, p.y * 0.08)) * valueNoise(vec2((p.x - p.z) * 1.3, p.y * 0.05));
+  // streaks of weathering running down from the tops: fine across, long down
+  float run = valueNoise(vec2((p.x + p.z) * 2.1, p.y * 0.18));
+  diffuseColor.rgb *= boards * (1.0 - 0.4 * stain) * (0.86 + 0.22 * run);
+}`,
+      );
+  });
 }
 
 /**

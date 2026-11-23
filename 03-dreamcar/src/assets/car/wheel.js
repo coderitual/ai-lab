@@ -26,7 +26,7 @@
 
 import * as THREE from 'three';
 import { targetDefines } from '../../engine/glsl.js';
-import { PAPER, copyProxy, mirrorProbe, probeUniforms } from './materials.js';
+import { mirrorProbe, probeUniforms } from './materials.js';
 import { TYRES } from './spec.js';
 import { TYRE_MARK as MARK, TYRE_REPEAT, TYRE_TREAD_V, FINISH, createCoverTexture, createPalette, createTyreMarkTexture, createTyreTextures, paletteU } from './wheelTextures.js';
 
@@ -1298,31 +1298,19 @@ export function createWheel({ front, left, tier = 'high', caps = null }) {
   // every material mirrors the car's own reflection probe, as the body does (materials.js); the parts deep in the
   // wheel see only a share of it
   const reflections = probeUniforms();
-  // the dark finish of the wheel's face (a paint may colour it: PAINTS `wheels`, setFinish)
-  const black = new THREE.Vector3(...FINISH.black.color);
-  reflections.carWheelBlack = { value: black.clone() };
-  const compile = (material, name, own, options, tinted = false) => {
+  const compile = (material, name, own, options) => {
     material.defines = { ...(material.defines || {}), ...(caps ? targetDefines(caps) : {}) };
     material.customProgramCacheKey = () => `wheel ${name} ${tierName}`;
     material.onBeforeCompile = (shader) => {
       if (own) own.call(material, shader);
       mirrorProbe(shader, reflections, options);
-      if (tinted) {
-        shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform vec3 carWheelBlack;')
-          .replaceAll(linear(FINISH.black), 'carWheelBlack')
-          .replace(
-            '#include <roughnessmap_fragment>',
-            '\tdiffuseColor.rgb = mix( carWheelBlack, diffuseColor.rgb, smoothstep( 0.03, 0.1, max( diffuseColor.r, max( diffuseColor.g, diffuseColor.b ) ) ) );\n#include <roughnessmap_fragment>',
-          );
-      }
     };
   };
   const marked = !!textures.markFront;
   compile(tyreMaterial, marked ? 'tyre marked' : 'tyre', marked ? patchTyreMarked : patchTyre);
-  compile(spokeMaterial, 'spokes', detail.physical ? patchSpokes : null, { coat: detail.physical }, true);
+  compile(spokeMaterial, 'spokes', detail.physical ? patchSpokes : null, { coat: detail.physical });
   compile(fixedMaterial, 'fixed', null, { seen: INNER_SKY });
-  compile(shellMaterial, 'shell', patchShell, undefined, true);
+  compile(shellMaterial, 'shell', patchShell);
 
   // ---- the corner: rides up and down > steers > (what stays | what spins)
   const object = new THREE.Group();
@@ -1378,15 +1366,7 @@ export function createWheel({ front, left, tier = 'high', caps = null }) {
       tyreMaterial.userData.uniforms.uSpun.value = smoothstep(FADE.tread[0], FADE.tread[1], speed);
     },
 
-    /** The face's dark finish: a linear colour, or null for the wheel's own black. */
-    setFinish(color) {
-      if (color) reflections.carWheelBlack.value.set(...color);
-      else reflections.carWheelBlack.value.copy(black);
-    },
-
-    setReflections({ cube, sky, exposure, proxy = null }) {
-      if (exposure) reflections.carKey.value = PAPER / exposure;
-      copyProxy(reflections, proxy);
+    setReflections({ cube, sky }) {
       reflections.carProbe.value = cube || null;
       reflections.carProbeOn.value = cube ? 1 : 0;
       reflections.carSky.value = sky;

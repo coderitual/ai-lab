@@ -17,10 +17,8 @@
 // triangle), 1 where the strip beyond the margin is paved (tunnel, bridges),
 // and how much sky is overhead.
 //
-// The asphalt is an old mountain road's, kept for racing (frames E2 and E5): a
-// pale to mid grey, fine, worn into the wheel paths, with cracks, patches and
-// grit; drawn in the fragment shader from (lat, s), in layers, each at the
-// scale it belongs to:
+// The asphalt is a circuit's: dark, fine and smooth, drawn in the fragment
+// shader from (lat, s), in layers, each at the scale it belongs to:
 //  - the stones (roadTextures.js): tone, height, polish and relief of the
 //    wearing course, looked up twice at shifted places and blended, the
 //    choice of places changing from one patch of road to the next, so the
@@ -36,14 +34,8 @@
 //    cracks, expansion joints on the decks, drains at the portals, drips, and
 //    the tyre marks before the slow corner: single things placed by rule,
 //    drawn exactly;
-//  - wear and grit (WEAR, GRIT): each lane's wheel paths darker and smoother,
-//    long faint streaks along the road, small dark stones off the line and
-//    towards the edges;
 //  - paint: a solid white line inside each edge of the pavement, the start
-//    line and the grid's boxes, the double yellow line where a piece carries
-//    it (PIECE_MARKS) or its scheme asks for it (trackLayout.js SCHEMES,
-//    schemes.js: forest lane, with the asphalt there older and more cracked
-//    and a flush concrete strip along the margin's outer side); a few millimetres proud (it
+//    line and the grid's boxes, nothing else; a few millimetres proud (it
 //    catches the light along its edges), worn where tyres cross it, cut away
 //    where the road was patched, full of glass beads that send a car's head
 //    lamps back;
@@ -74,62 +66,9 @@ import { BORE_UNIFORMS, WET_UNIFORMS, extend, withBake } from './shading.js';
 import { GLINTS } from './lamps.js';
 import { canopyOpen } from './canopy.js';
 import { PIECE } from './terrain.js';
-import { schemeTable } from './schemes.js';
 
 /** The edge line: its width (m), its outer edge on the pavement's edge. */
 const EDGE_LINE = 0.28;
-/**
- * (sea lane, round 2) Per-piece road markings beyond the white edge lines, by piece id (trackLayout.js): a scheme
- * names what each piece adds. 'coast': a double yellow centre line (two lines `yellow.width` m wide, `yellow.gap` m
- * apart), the coast road after the tunnel as in frame E1. Each scheme is one channel of the marks texture (uMarks:
- * r coast; g, b, a free for other schemes), eased over `MARK_EASE` m at the ends of its pieces.
- */
-const PIECE_MARKS = { viaduct: 'coast', climb: 'coast', carousel: 'coast', crest: 'coast', plunge: 'coast' };
-const MARK_CHANNEL = { coast: 0 };
-const MARK_EASE = 6;
-const YELLOW = { width: 0.12, gap: 0.12, color: [0.62, 0.43, 0.08] };
-/** (forest lane) The double yellow centre line of a scheme's pieces (schemes.js): each line's width (m); the coast's paint. */
-const CENTRE_LINE = { width: YELLOW.width, yellow: YELLOW.color };
-/**
- * (road lane) The asphalt's albedo (linear), fitted to the owner's frames E2 and E5 (design.md, "The road"): a pale
- * to mid grey a shade warm in sun, a cooler grey in shade that still shows its stones. `fresh` the newest surfacing
- * (binder over everything), `old` a generation old (the binder weathered grey, the stones' tops bare), `grain` how far
- * the single stones stand apart in tone on the old (times the stone's tone about its mean), `rubber` what the racing
- * line is laid with, `margin` and `dust` the strip beyond the edge line and the grit blown onto it, `rim` how much of
- * that dust lies along the asphalt's own edge, `damp` what is left of the dry tone when the pores are full of water,
- * `shadeGrey` how much of the sky's colour the dry road's diffuse light loses: in a wood's shade the road is lit by
- * the sunlit ground and crowns about it as well as by the blue sky (E2's shade is a cool grey, not blue).
- */
-const ASPHALT = {
-  fresh: [0.11, 0.106, 0.101],
-  old: [0.22, 0.211, 0.195],
-  grain: 1.05,
-  rubber: [0.05, 0.05, 0.052],
-  margin: [0.19, 0.182, 0.166],
-  dust: [0.25, 0.235, 0.21],
-  rim: 0.55,
-  damp: 0.25,
-  shadeGrey: 0.5,
-};
-/**
- * The wear of the surface (E2): each lane's two wheel paths `path` m either side of the lane's middle, `pathWidth`
- * wide, darker by `paths` at most; faint streaks along the road (a stretch of the large field `streakAcross` per metre
- * across and `streakAlong` per metre along) that change the tone by `streaks`; the outer metre of the road lighter
- * by `edges`.
- */
-const WEAR = { path: 0.85, pathWidth: 0.42, paths: 0.16, streakAcross: 1.9, streakAlong: 0.0035, streaks: 0.14, edges: 0.08 };
-/**
- * Small dark stones and debris on the road (E5): a grid of `cell` m cells, each holding one with these `odds` off the
- * line (and `edge` more towards the edges), `size` its radius as a share of the cell (smallest, largest), `meanSize`
- * its mean radius as a share of the cell (what a far pixel averages), `color` its albedo.
- */
-const GRIT = { cell: 0.11, odds: 0.05, edge: 0.2, size: [0.07, 0.2], meanSize: 0.11, color: [0.03, 0.029, 0.027] };
-/**
- * How paint looks (white and yellow alike): `white` the edge line's albedo, `ragged` how far its edges follow the
- * stones up close (m), `flecks` how much of it the wheels wear through where they cross it, `thin` how much of the
- * paint's colour a worn place keeps.
- */
-const PAINT = { white: [0.74, 0.74, 0.71], ragged: 0.018, flecks: 0.35, thin: 0.6 };
 /** Columns of the mesh across the pavement, metres from the centre line (the edges are added). */
 const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
 /**
@@ -144,9 +83,7 @@ const INNER = { low: [0], medium: [4, 2, 0, -2, -4], high: [4, 2, 0, -2, -4] };
  * road the streak leaves dark asphalt on both sides. `grain`: how much of each stone's own tilt the lobe follows
  * (the rest sees the road's plane: one streak under the sun, broken up by the stones, not scattered into sparks).
  */
-// (day lane) narrower across (0.15, was 0.18) and a little stronger (0.28, was 0.25): D1's glare is a narrower,
-// brighter path to the sun over darker asphalt
-const SHEEN = { along: 0.12, across: 0.15, gain: 0.28, grain: 0.5, keep: 0.25 };
+const SHEEN = { along: 0.12, across: 0.18, gain: 0.25, grain: 0.5, keep: 0.25 };
 /**
  * The sky in the road (ASPHALT_SKY): seen at a glancing angle asphalt mirrors the low sky ahead as a soft broad
  * sheen (frames D3 and D4: it is what fills the shade). `gain` of the sky's own radiance at the horizon of the
@@ -157,9 +94,7 @@ const SHEEN = { along: 0.12, across: 0.15, gain: 0.28, grain: 0.5, keep: 0.25 };
  * cool at golden hour, never the sky's blue or rose); never more than `cap` (the sun's aureole is in that map: its
  * glare is the sun's own lobe's business).
  */
-// (day lane: gain 0.42, was 0.5: the middle distance of D1's road, 30 to 60 m out, was 25 to 35 levels paler than
-// the frame's)
-const SKY_SHEEN = { gain: 0.42, power: 4, blur: 0.36, lift: 0.12, grey: 0.9, cap: 1.2 };
+const SKY_SHEEN = { gain: 0.5, power: 4, blur: 0.36, lift: 0.12, grey: 0.9, cap: 1.2 };
 /** Head lamp brightness (THROW in assets/car/index.js: candela-like units at the beam's peak, per lamp). */
 const LAMP_LOW = 1600;
 const LAMP_HIGH = 4500;
@@ -180,13 +115,6 @@ const GLINT = { across: 0.006, along: 0.12, gain: 0.12 };
  * lamps themselves too small to streak: seen from under the road they are thin bars edge on.
  */
 const TAIL_GLINT = { across: 0.05, along: 0.3, radiance: 1.6, brake: 3, gain: 0.6, color: [1.0, 0.03, 0.015] };
-/**
- * (dusk lane) The tail lamps' red light pooled on dry asphalt behind the car (the owner's twilight reference): what
- * each lamp lays on the road, per unit of its TAIL_GLINT radiance, falling with the square of the distance, only
- * behind the car, softened within about `soft` m (m^2 added to the squared distance: the lamp is not a point, and the
- * road right under the bumper must not burn); `color` its red after the asphalt has taken it. Brake lamps triple it, as they do the glint.
- */
-const TAIL_POOL = { power: 0.3, soft: 2.5, color: [1.0, 0.05, 0.025] };
 /**
  * (tunnel lane) Under the tunnel's roof the dry asphalt mirrors, softly (TUNNEL_SHEEN): the two lines of luminaires
  * (shading.js BORE_UNIFORMS: where they are and how bright), blurred `blur[0]` m across plus `blur[1]` m for every
@@ -308,52 +236,6 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
   edgeTexture.wrapS = THREE.RepeatWrapping;
   edgeTexture.needsUpdate = true;
 
-  // (forest lane) the pieces' schemes, per metre: r the lines (1 on the scheme's own pieces: they start and end at its
-  // ends), g how much older and paler the asphalt is, b how many more cracks, a the concrete strip's width (m); the
-  // last three blended into the neighbours (schemes.js)
-  const st = schemeTable(track);
-  const schemeBytes = new Uint8Array(n * 4);
-  let gap = 0.16;
-  for (let i = 0; i < n; i++) {
-    const k = st.index[i];
-    if (k < 0) continue;
-    const def = st.defs[k];
-    if (def.gap) gap = def.gap;
-    // (r: 255 the lines; 200 or 150 the lines with yellow dashes beside them on the left or the right, over the first
-    // `dashes` m of a scheme's run: the inside of the bend that begins there)
-    let lines = st.on[i] && def.lines === 'double-yellow' ? 255 : 0;
-    if (lines && def.dashes) {
-      const run = st.runs.find((r) => r.def === def && track.wrap(i * ds - r.s0) <= track.wrap(r.s1 - r.s0));
-      if (run && track.wrap(i * ds - run.s0) < def.dashes) lines = track.curvature[Math.round(track.wrap(run.s0 + 30) / ds) % n] > 0 ? 200 : 150;
-    }
-    schemeBytes.set([lines, byte(st.w[i] * (def.asphalt ?? 0)), byte(st.w[i] * (def.cracks ?? 0)), byte(st.w[i] * (def.strip ?? 0))], i * 4);
-  }
-  const schemeTexture = new THREE.DataTexture(schemeBytes, n, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
-  schemeTexture.magFilter = schemeTexture.minFilter = THREE.NearestFilter;
-  schemeTexture.wrapS = THREE.RepeatWrapping;
-  schemeTexture.needsUpdate = true;
-  // ---- (sea lane, round 2) the per-piece markings (PIECE_MARKS), per metre: one channel per scheme
-  const marks = new Uint8Array(n * 4);
-  {
-    let s0 = 0;
-    for (const seg of track.layout?.segments ?? []) {
-      const len = seg.r ? Math.abs(seg.r) * seg.deg * (Math.PI / 180) : seg.len;
-      const channel = MARK_CHANNEL[PIECE_MARKS[seg.id]];
-      if (channel !== undefined) {
-        for (let d = -MARK_EASE; d <= len + MARK_EASE; d += ds) {
-          const i = Math.round(track.wrap(s0 + d) / ds) % n;
-          const v = Math.min(1, Math.max(0, Math.min(d + MARK_EASE, len + MARK_EASE - d) / MARK_EASE));
-          marks[i * 4 + channel] = Math.max(marks[i * 4 + channel], byte(v));
-        }
-      }
-      s0 += len;
-    }
-  }
-  const marksTexture = new THREE.DataTexture(marks, n, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
-  marksTexture.magFilter = marksTexture.minFilter = THREE.LinearFilter;
-  marksTexture.wrapS = THREE.RepeatWrapping;
-  marksTexture.needsUpdate = true;
-
   const textures = roadTextures({ caps, tier });
 
   // the grid's boxes, in track coordinates (s counted back from the line is negative)
@@ -371,8 +253,6 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     uAggN: { value: textures.relief },
     uBig: { value: textures.big },
     uEdge: { value: edgeTexture },
-    uScheme: { value: schemeTexture },
-    uMarks: { value: marksTexture },
     uFeat: { value: history.texture },
     uLength: { value: track.length },
     uGrid: { value: slots },
@@ -385,9 +265,6 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     uGlintPos: { value: Array.from({ length: GLINTS }, () => new THREE.Vector4()) },
     uGlintColor: { value: Array.from({ length: GLINTS }, () => new THREE.Vector3()) },
     ...WET_UNIFORMS,
-    // (day lane) the time of day's share of the sky's sheen (lighting.js roadSheen: twilight's road is near black)
-    uSkySheenShare: { value: 1 },
-    uHeadPoolShare: { value: 1 },
     ...BORE_UNIFORMS,
     ...(mirror ? mirror.uniforms : {}),
   };
@@ -401,8 +278,6 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     ROAD_TIER: shade.tier,
     AGG_TILE: textures.tile.toFixed(3),
     ROAD_SLOTS: history.slots,
-    CENTRE_HALF_GAP: (gap / 2).toFixed(3),
-    ROAD_SHOULDER: track.shoulder.toFixed(3),
     ...(mirror && shade.tier > 0 ? { ROAD_MIRROR: 1 } : {}),
   };
   extend(material, 'asphalt', (shader) => {
@@ -459,11 +334,6 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     setWetness(w) {
       WET_UNIFORMS.uWet.value = w;
     },
-    /** @param {number} share how much of the sky's sheen the asphalt shows at this time of day (lighting.js roadSheen) */
-    setSkySheen(share, pool = 1) {
-      uniforms.uSkySheenShare.value = share;
-      uniforms.uHeadPoolShare.value = pool;
-    },
     /** @param {import('./index.js').Beam[]} beams */
     setBeams(beams) {
       for (let i = 0; i < BEAMS; i++) {
@@ -487,7 +357,6 @@ export function createRoad({ track, caps, tier, atmosphere, terrain, rowStep, rn
     dispose() {
       for (const g of geometries) g.dispose();
       edgeTexture.dispose();
-      marksTexture.dispose();
       history.dispose();
       material.dispose();
     },
@@ -665,18 +534,6 @@ if ( vRoadWorld.w > 0.5 && vRoad.w < 0.6 && uBoreZone.y > uBoreZone.x ) {
     duty = max( duty, 0.42 * ( 1.0 - smoothstep( uBoreZone.w - 10.0, uBoreZone.w + 10.0, toExit ) ) );
     duty *= smoothstep( -1.0, 1.0, into ) * smoothstep( -1.0, 1.0, toExit );
     tAdd += uBoreLineColor * ( uBoreLines.z * duty * across * ${TUNNEL_SHEEN.gain.toFixed(3)} );
-    // (day lane) the wall strips: where the mirrored ray meets the wall it heads for, how near the strip's height,
-    // blurred more the further it travels; continuous, so long soft streaks down the road
-    float tSide = dot( tR, tL );
-    if ( abs( tSide ) > 0.02 && uBoreStrip.w > 0.0 ) {
-      float tWall = ( sign( tSide ) * uBoreStrip.x - vRoad.x ) / tSide;
-      float hWall = tUp * tWall;
-      float sS = vRoad.y + dot( tR, tA ) * tWall;
-      float ws = uBoreStrip.z + ${TUNNEL_SHEEN.blur[1].toFixed(3)} * tWall * tWall * 0.5;
-      float ds = ( hWall - uBoreStrip.y ) / ws;
-      float inside = smoothstep( uBoreZone.x - 1.0, uBoreZone.x + 1.0, sS ) * smoothstep( uBoreZone.y + 1.0, uBoreZone.y - 1.0, sS );
-      tAdd += uBoreLineColor * ( uBoreStrip.w * exp( - ds * ds ) * uBoreStrip.z / ws * inside * ${TUNNEL_SHEEN.gain.toFixed(3)} );
-    }
   }
   // the tail lamps, short and broad in the dry stone
   float tTail = 0.0;
@@ -754,11 +611,9 @@ const ASPHALT_SKY = /* glsl */ `
   vec3 skyOwn = reflectedLight.indirectSpecular;
   skyOwn = mix( skyOwn, vec3( dot( skyOwn, vec3( 0.2126, 0.7152, 0.0722 ) ) ), ${SKY_SHEEN.grey.toFixed(2)} * ( 1.0 - roadWater ) );
   skyLow = mix( skyLow, vec3( dot( skyLow, vec3( 0.2126, 0.7152, 0.0722 ) ) ), ${SKY_SHEEN.grey.toFixed(2)} );
-  reflectedLight.indirectSpecular = skyOwn * uSkySheenShare + skyLow * ( roadSkySheen * pow( 1.0 - skyNoV, ${SKY_SHEEN.power.toFixed(1)} ) );
+  reflectedLight.indirectSpecular = skyOwn + skyLow * ( roadSkySheen * pow( 1.0 - skyNoV, ${SKY_SHEEN.power.toFixed(1)} ) );
 }
 #endif
-// (road lane) the dry road's diffuse light from the sky and the fill, a part of its colour lost (ASPHALT.shadeGrey)
-reflectedLight.indirectDiffuse = mix( reflectedLight.indirectDiffuse, vec3( dot( reflectedLight.indirectDiffuse, vec3( 0.2126, 0.7152, 0.0722 ) ) ), ${ASPHALT.shadeGrey.toFixed(2)} * ( 1.0 - roadWater ) );
 // under the tunnel's roof the same sheen mirrors the lit lining instead (shading.js BORE_UNIFORMS)
 reflectedLight.indirectSpecular += uBoreGlow * ( ( 1.0 - smoothstep( 0.0, 0.6, vRoad.w ) ) * roadSkySheen * pow( 1.0 - clamp( dot( nonPerturbedNormal, geometryViewDir ), 0.0, 1.0 ), ${SKY_SHEEN.power.toFixed(1)} ) );
 `;
@@ -768,18 +623,13 @@ uniform sampler2D uAgg;
 uniform sampler2D uAggN;
 uniform sampler2D uBig;
 uniform sampler2D uEdge;
-uniform sampler2D uScheme;
-uniform sampler2D uMarks;
 uniform highp sampler2D uFeat;
 uniform float uLength;
 uniform vec4 uGrid[${GRID_SLOTS}];
 uniform float uHalf;
 uniform float uWet;
-uniform float uSkySheenShare;
-uniform float uHeadPoolShare;
 uniform vec3 uBoreGlow;
 uniform vec4 uBoreLines;
-uniform vec4 uBoreStrip;
 uniform vec3 uBoreLineColor;
 uniform vec4 uBoreZone;
 uniform vec3 uBeamPos[${BEAMS}];
@@ -828,8 +678,6 @@ roadFade = 1.0 - smoothstep( 18.0, 110.0, rDist );
 // 1 where single stones are told apart, 0 where a pixel holds many
 float rNear = 1.0 - smoothstep( 0.012, 0.05, max( length( rDx ), length( rDy ) ) );
 float rOnRoad = smoothstep( uHalf + aaL, uHalf - aaL, rA );
-// (forest lane) the piece's scheme: lines, older asphalt, more cracks, the concrete strip (schemes.js)
-vec4 rScheme = texture2D( uScheme, vec2( ( floor( rS / uLength * float( textureSize( uScheme, 0 ).x ) ) + 0.5 ) / float( textureSize( uScheme, 0 ).x ), 0.5 ) );
 
 // ================= the large fields and the stones
 vec4 rBig = texture2D( uBig, rUv / ${BIG_TILE.toFixed(1)} );
@@ -977,40 +825,25 @@ float rAge = ftHead.z >= 0.0 ? mix( ftHead.x, ftHead.y, smoothstep( -aaS, aaS, r
 float rSeamTar = ftHead.z >= 0.0 ? roadCover( rJointX, 0.02, aaS ) : 0.0;
 rAge = clamp( rAge + ( rBig2.r - 0.5 ) * 0.22, 0.0, 1.0 );
 rAge = mix( rAge, ftTone * 0.5, ftFresh );
-// (forest lane) an old road's surface: weathered, its binder worn off the stones (frame e2's pale grey)
-rAge = mix( rAge, max( rAge, 0.92 ), rScheme.g );
 float rWorn = mix( 0.3, 1.0, rAge );
-// new: binder over everything, dark. Old: the binder weathered grey and worn off the stones' tops (ASPHALT).
-// (road lane, frames E2 and E5: a pale to mid grey in sun, a shade warm, its stones showing; never charcoal)
-vec3 rCol = mix( vec3( ${ASPHALT.fresh.map((c) => c.toFixed(3)).join(', ')} ), vec3( ${ASPHALT.old.map((c) => c.toFixed(3)).join(', ')} ), rAge );
-rCol *= 1.0 + ( rAgg.r - 0.5 ) * mix( 0.5, ${ASPHALT.grain.toFixed(2)}, rAge );
-rCol *= ( 0.88 + 0.24 * rBig.r ) * ( 0.93 + 0.14 * rBig2.r ) * ( 0.92 + 0.16 * rMottle );
-// the wear of a road two cars wide: each lane's two wheel paths darker and smoother, the crown between and the
-// edges outside them lighter, and faint streaks drawn out along the road where tyres and rain run
-float rLane = rA - 0.5 * uHalf;
-float rPaths = exp( -pow( ( abs( rLane ) - ${WEAR.path.toFixed(2)} ) / ${WEAR.pathWidth.toFixed(2)}, 2.0 ) ) * rOnRoad;
-float rStreak = texture2D( uBig, vec2( rLat * ${WEAR.streakAcross.toFixed(2)}, rS * ${WEAR.streakAlong.toFixed(4)} ) ).g;
-rCol *= 1.0 - ${WEAR.paths.toFixed(2)} * rPaths * rWorn * ( 0.7 + 0.6 * rStreak );
-rCol *= 1.0 + ${WEAR.streaks.toFixed(2)} * ( rStreak - 0.5 ) * ( 0.4 + rPaths );
-rCol *= 1.0 + ${WEAR.edges.toFixed(2)} * smoothstep( uHalf - 1.6, uHalf - 0.4, rA ) * rWorn;
+// new: binder over everything, black. Old: the binder weathered grey and worn off the stones' tops.
+// (night lane, frame D3: the sunlit road is a warm light grey; the stones are a warm limestone under the binder)
+vec3 rCol = mix( vec3( 0.03, 0.029, 0.028 ), vec3( 0.084, 0.078, 0.069 ), rAge );
+rCol *= 1.0 + ( rAgg.r - 0.5 ) * mix( 0.45, 1.5, rAge );
+rCol *= ( 0.86 + 0.28 * rBig.r ) * ( 0.92 + 0.16 * rBig2.r ) * ( 0.92 + 0.16 * rMottle );
 rCol *= 1.0 - 0.2 * rTracks * rWorn;
 rCol *= 1.0 + 0.1 * rCrown * rWorn;
 rCol *= 1.0 - 0.12 * rDrip * rWorn;
-rCol = mix( rCol, vec3( ${ASPHALT.rubber.map((c) => c.toFixed(3)).join(', ')} ) * ( 0.8 + 0.4 * rAgg.r ), 0.7 * rRubber * ( 1.0 - 0.6 * rScheme.g ) );
-// (forest lane) the scheme's older surface is the road lane's old tone (rAge above), with less rubber on it
+rCol = mix( rCol, vec3( 0.03, 0.03, 0.032 ) * ( 0.8 + 0.4 * rAgg.r ), 0.78 * rRubber );
 // roughness as alpha squared (what averages truly over a pixel): each stone its own polish, the binder dull
 float rAlpha2 = rAgg.b * ${ROUGH_GAIN.toFixed(2)} * mix( 1.35, 0.9, rAge );
 rAlpha2 *= 1.0 - 0.5 * min( rTracks, 1.0 ) * rWorn;
-rAlpha2 *= 1.0 - 0.3 * rPaths * rWorn;
 rAlpha2 *= 0.8 + 0.4 * rBig.b;
 rAlpha2 = mix( rAlpha2, 0.07, 0.6 * rRubber );
-rAlpha2 *= 1.0 + 0.4 * rScheme.g;
 roadTiltGain = 1.0 - 0.35 * min( rTracks, 1.0 ) * rWorn;
 
 // ================= paint: an edge line inside each edge, the start line, the grid
-// (the paint's edges are not ruled: up close they follow the stones it was sprayed over, by a centimetre or so)
-float rRag = ${PAINT.ragged.toFixed(3)} * ( rAgg.g - 0.5 ) * rNear;
-float rMarks = roadCover( rA - ( uHalf - ${(EDGE_LINE / 2).toFixed(3)} ) + rRag, ${(EDGE_LINE / 2).toFixed(3)}, aaL );
+float rMarks = roadCover( rA - ( uHalf - ${(EDGE_LINE / 2).toFixed(3)} ), ${(EDGE_LINE / 2).toFixed(3)}, aaL );
 rMarks += roadCover( rS0, 0.2, aaS ) * roadCover( rLat, uHalf - ${EDGE_LINE.toFixed(3)}, aaL );
 for ( int i = 0; i < ${GRID_SLOTS}; i ++ ) {
   float d = rS0 - uGrid[ i ].x;
@@ -1019,30 +852,16 @@ for ( int i = 0; i < ${GRID_SLOTS}; i ++ ) {
   rMarks += roadCover( d - 2.7, 0.07, aaS ) * roadCover( l, 1.25, aaL );
   rMarks += roadCover( abs( l ) - 1.18, 0.07, aaL ) * roadCover( d - 2.05, 0.65, aaS );
 }
-// (forest lane) the scheme's double yellow centre line, two solid lines either side of the centre
-float rYellow = step( 0.5, rScheme.r ) * roadCover( rA - ( CENTRE_HALF_GAP + ${(CENTRE_LINE.width / 2).toFixed(3)} ), ${(CENTRE_LINE.width / 2).toFixed(3)}, aaL );
-// and short yellow dashes beside it on the inside of a bend's first part (r 200: left, 150: right)
-float rDashSide = rScheme.r < 0.9 && rScheme.r > 0.5 ? ( rScheme.r > 0.7 ? 1.0 : -1.0 ) : 0.0;
-rYellow += abs( rDashSide ) * roadCover( rLat * rDashSide - ( CENTRE_HALF_GAP + 0.55 ), 0.06, aaL ) * roadCover( fract( rS / 3.0 ) - 0.5, 0.17, aaS / 3.0 );
-rMarks += rYellow;
 // worn: thin where the tyres run, gone in places, broken by the stones up close, newer where the road is
 float rWear = 0.55 + 0.25 * rBig.b + 0.2 * rMottle - 0.3 * rRubber + 0.2 * ( rAgg.g - 0.5 ) * rNear + 0.2 * ( 1.0 - rAge );
-// (and where wheels cross it most, the stones show through in flecks along the road)
-rWear -= ${PAINT.flecks.toFixed(2)} * ( 1.0 - rStreak ) * rPaths;
-// (sea lane, round 2) the per-piece markings (PIECE_MARKS): the coast road's double yellow centre line
-float rCoastLine = textureLod( uMarks, vec2( rS / uLength, 0.5 ), 0.0 ).r * roadCover( rA - ${(YELLOW.gap / 2 + YELLOW.width / 2).toFixed(3)} + rRag, ${(YELLOW.width / 2).toFixed(3)}, aaL );
-rYellow += rCoastLine;
-rMarks += rCoastLine;
 roadPaint = clamp( rMarks, 0.0, 1.0 ) * rOnRoad * smoothstep( 0.14, 0.38, rWear ) * ( 1.0 - ftErase );
-vec3 rPaintCol = mix( vec3( ${PAINT.white.map((c) => c.toFixed(3)).join(', ')} ), vec3( ${YELLOW.color.map((c) => c.toFixed(3)).join(', ')} ), clamp( rYellow, 0.0, 1.0 ) );
-// thinner where it is worn: the asphalt's own tone comes through
-rCol = mix( rCol, rPaintCol * ( 0.88 + 0.16 * rAgg.r ) * ( 0.88 + 0.12 * rBig.r ), roadPaint * mix( ${PAINT.thin.toFixed(2)}, 1.0, smoothstep( 0.3, 0.7, rWear ) ) );
+rCol = mix( rCol, vec3( 0.68, 0.68, 0.655 ) * ( 0.88 + 0.16 * rAgg.r ) * ( 0.88 + 0.12 * rBig.r ), roadPaint );
 rAlpha2 = mix( rAlpha2, 0.085, roadPaint );
 roadTiltGain *= 1.0 - 0.65 * roadPaint;
 
 // ================= what lies on top of the paint: tar, stains, iron
 // cracks that broke the old road into blocks, and the seam between the lanes
-float rBlocks = roadCover( rBig.g * 5.3, 0.011, aaM ) * smoothstep( 0.55 - 0.4 * rScheme.b, 0.75 - 0.4 * rScheme.b, rBig2.b ) * smoothstep( 0.5, 0.8, rAge ) * ( 1.0 - ftFresh );
+float rBlocks = roadCover( rBig.g * 5.3, 0.011, aaM ) * smoothstep( 0.55, 0.75, rBig2.b ) * smoothstep( 0.5, 0.8, rAge ) * ( 1.0 - ftFresh );
 float rSeam = 0.45 * roadCover( abs( rLat ) - ${SEAM_LAT.toFixed(2)} - 0.015 * sin( rS * 0.3 ), 0.012, aaL ) * smoothstep( 0.35, 0.6, rBig2.g + rAge * 0.3 );
 float rTar = clamp( max( max( ftTar, rSeamTar ), max( rBlocks, rSeam ) ), 0.0, 1.0 ) * rOnRoad;
 rCol = mix( rCol, vec3( 0.021, 0.021, 0.023 ), 0.93 * rTar );
@@ -1057,27 +876,7 @@ rCol = mix( rCol, vec3( 0.004 ), ftHole );
 rAlpha2 = mix( rAlpha2, 0.16, ftMetal );
 roadMetal = ftMetal * 0.8 * ( 1.0 - ftHole );
 roadTiltGain *= 1.0 - 0.8 * ftMetal;
-
-// ================= grit (GRIT): small dark stones and bits of debris, thrown off the line, thickest towards the
-// edges. One cell of a grid holds at most one; where a pixel spans many cells it shows their average instead (the
-// same weight at every distance: no sparkle)
-float rOffLine = clamp( 1.0 - 1.6 * rTracks - rRubber, 0.0, 1.0 ) * ( 1.0 - 0.75 * rPaths );
-float rGritOdds = ${GRIT.odds.toFixed(3)} * rOffLine + ${GRIT.edge.toFixed(3)} * smoothstep( uHalf - 1.5, uHalf + 0.3, rA );
-rGritOdds = clamp( rGritOdds * ( 0.5 + rBig2.g ), 0.0, 0.9 );
-vec2 rGc = rUv / ${GRIT.cell.toFixed(3)};
-vec2 rGi = floor( rGc );
-vec2 rGh = hash22( rGi + vec2( 4099.0, 211.0 ) );
-float rGPick = hash12( rGi + vec2( 37.0, 8191.0 ) );
-float rGr = ${GRIT.cell.toFixed(3)} * mix( ${GRIT.size[0].toFixed(2)}, ${GRIT.size[1].toFixed(2)}, rGh.x * rGh.x );
-vec2 rGo = ( rGc - rGi - 0.5 - ( rGh.yx - 0.5 ) * 0.4 ) * ${GRIT.cell.toFixed(3)};
-float rGd = length( rGo * vec2( 1.0, 0.75 + 0.5 * rGh.y ) ) - rGr;
-float rGDot = step( rGPick, rGritOdds ) * smoothstep( aaM, -aaM, rGd );
-float rGMean = rGritOdds * ${(Math.PI * GRIT.meanSize * GRIT.meanSize).toFixed(4)};
-float rGrit = mix( rGDot, rGMean, smoothstep( 0.4 * rGr, 1.6 * rGr, aaM ) ) * rOnRoad * ( 1.0 - ftMetal ) * ( 1.0 - 0.95 * roadPaint );
-rCol = mix( rCol, vec3( ${GRIT.color.map((c) => c.toFixed(3)).join(', ')} ) * ( 0.6 + 0.8 * rGh.y ), rGrit );
-rAlpha2 = mix( rAlpha2, 0.3, rGrit );
-roadTiltGain *= 1.0 - 0.5 * rGrit;
-roadBump = ( ftHeight + 2.5 * roadPaint + 1.2 * rTar + 3.0 * rGDot * ( 1.0 - smoothstep( 0.4 * rGr, 1.6 * rGr, aaM ) ) ) * 0.001;
+roadBump = ( ftHeight + 2.5 * roadPaint + 1.2 * rTar ) * 0.001;
 
 // ================= the margin beyond the edge line: the same asphalt, older, dusty, leaves where woods stand
 roadGravel = 0.0;
@@ -1093,31 +892,16 @@ if ( rOut > -0.6 ) {
   float margin = smoothstep( -aaL, aaL, rOut ) * loose;
   // dust thickens outwards, in drifts
   float dust = margin * smoothstep( 0.0, 1.3, rOut + 0.4 * ( rBig.b - 0.5 ) ) * ( 0.55 + 0.6 * gAgg.a );
-  // (road lane) the thin band of dust along the very edge of the pavement, on the asphalt's side too (E2, E5)
-  float rim = smoothstep( -0.35, -0.02, rOut ) * ( 1.0 - margin ) * loose * ( 0.6 + 0.6 * gAgg.a );
-  rCol = mix( rCol, vec3( ${ASPHALT.dust.map((c) => c.toFixed(3)).join(', ')} ) * ( 0.75 + 0.5 * gAgg.r ), ${ASPHALT.rim.toFixed(2)} * rim * ( 1.0 - 0.7 * roadPaint ) );
-  rCol = mix( rCol, vec3( ${ASPHALT.margin.map((c) => c.toFixed(3)).join(', ')} ) * ( 0.8 + 0.5 * rAgg.r ), 0.5 * margin );
-  rCol = mix( rCol, vec3( ${ASPHALT.dust.map((c) => c.toFixed(3)).join(', ')} ) * ( 0.6 + 0.8 * gAgg.r ), clamp( dust, 0.0, 0.7 ) );
+  rCol = mix( rCol, vec3( 0.1, 0.095, 0.085 ) * ( 0.8 + 0.5 * rAgg.r ), 0.5 * margin );
+  rCol = mix( rCol, vec3( 0.16, 0.152, 0.14 ) * ( 0.6 + 0.8 * gAgg.r ), clamp( dust, 0.0, 0.7 ) );
   rAlpha2 = mix( rAlpha2, 0.35, margin );
   roadGravel = clamp( dust, 0.0, 1.0 );
   // leaves gather along the edge under trees
-  // (road lane: beyond the edge line, a few on it; the line itself reads clean and white, as in E2)
-  float lying = leafy * smoothstep( -0.2, 0.6, rOut ) * ( 0.55 + 0.9 * rBig2.r );
-  rLeaves = smoothstep( 1.02 - 0.3 * lying, 1.06 - 0.3 * lying, gAgg.b + 0.25 ) * step( 0.02, lying ) * ( 1.0 - 0.75 * roadPaint );
+  float lying = leafy * smoothstep( -0.6, 0.6, rOut ) * ( 0.55 + 0.9 * rBig2.r );
+  rLeaves = smoothstep( 1.02 - 0.3 * lying, 1.06 - 0.3 * lying, gAgg.b + 0.25 ) * step( 0.02, lying );
   rCol = mix( rCol, mix( vec3( 0.16, 0.085, 0.025 ), vec3( 0.05, 0.03, 0.015 ), gAgg.r ), rLeaves );
   rAlpha2 = mix( rAlpha2, 0.2, rLeaves );
   roadTiltGain *= 1.0 - 0.8 * rLeaves;
-  // (forest lane) the scheme's flush concrete strip along the margin's outer side: precast pieces a metre long
-  float stripW = rScheme.a;
-  if ( stripW > 0.01 ) {
-    float stripIn = rOut - ( ROAD_SHOULDER - stripW );
-    float strip = smoothstep( -aaL, aaL, stripIn ) * loose;
-    float joint = roadCover( fract( rS ) - 0.5, 0.008, aaS ) + roadCover( stripIn, 0.012, aaL );
-    vec3 concrete = vec3( 0.36, 0.35, 0.32 ) * ( 0.82 + 0.3 * gAgg.r ) * ( 0.85 + 0.3 * rBig2.r );
-    rCol = mix( rCol, mix( concrete, vec3( 0.05, 0.048, 0.045 ), clamp( joint, 0.0, 1.0 ) * 0.8 ), strip * smoothstep( 0.0, 0.3, stripW / 0.32 ) );
-    rAlpha2 = mix( rAlpha2, 0.5, strip );
-    roadGravel *= 1.0 - strip;
-  }
 }
 
 // ================= water
@@ -1144,8 +928,7 @@ roadPuddle = rRaining * smoothstep( 0.9, 1.08, rFill + ( rAgg.g - 0.5 ) * 0.2 * 
 roadWater = max( roadWater, 0.4 * rCarried * smoothstep( 0.6, 0.3, rAgg.g * rNear + 0.45 * ( 1.0 - rNear ) ) ) * ( 1.0 - ftHole );
 // damp darkens: the pores full, light lost inside. Driest on the crown, darkest at the water's edge.
 float rSoaked = max( smoothstep( 0.0, 0.2, rRain ) * mix( 0.55, 1.0, smoothstep( -4.0, -0.3, rFill ) ), min( rCarried, 1.0 ) );
-// (the paler the dry stone, the more of its pale is the air in its pores: ASPHALT.damp)
-rCol *= mix( 1.0, mix( mix( ${ASPHALT.damp.toFixed(2)}, 0.8, roadPaint ), 0.9, roadMetal ), rSoaked );
+rCol *= mix( 1.0, mix( mix( 0.5, 0.8, roadPaint ), 0.9, roadMetal ), rSoaked );
 rCol *= 1.0 - 0.12 * roadPuddle;
 rAlpha2 *= mix( 1.0, 0.75, rSoaked );
 // a broken film scatters what it mirrors, standing water does not
@@ -1162,7 +945,7 @@ roadSheenGain = ${SHEEN.gain.toFixed(2)} * ( 1.0 - roadWater ) * ( 1.0 - 0.6 * r
 roadSheenGain *= mix( 1.0, 0.3 + 1.4 * smoothstep( 0.35, 0.75, rAgg.g ), rNear );
 roadIsoKeep = mix( ${SHEEN.keep.toFixed(2)}, 1.0, max( roadWater, roadPaint * 0.5 ) );
 // the sky's sheen: the dry road's (standing water shows the mirror or the environment map itself)
-roadSkySheen = ${SKY_SHEEN.gain.toFixed(2)} * uSkySheenShare * ( 1.0 - roadWater ) * ( 1.0 - 0.5 * roadGravel );
+roadSkySheen = ${SKY_SHEEN.gain.toFixed(2)} * ( 1.0 - roadWater ) * ( 1.0 - 0.5 * roadGravel );
 roadSkySheen *= mix( 1.0, 0.4 + 1.2 * smoothstep( 0.35, 0.75, rAgg.g ), rNear );
 // the stones' tilts that a pixel averages away come back as roughness (see roadTextures.js)
 float rRoughDry = pow( clamp( rAlpha2 + rVariance * roadTiltGain * roadTiltGain, 0.0004, 1.0 ), 0.25 );
@@ -1232,21 +1015,6 @@ const ASPHALT_BEADS = /* glsl */ `
     float back = exp( -pow( acos( clamp( dot( l, toEye ), -1.0, 1.0 ) ), 2.0 ) / 0.09 );
     pool += e * back;
   }
-  // (day lane: at twilight the time of day's headPool share of it: the full pool painted the road white round the car)
-  totalEmissiveRadiance += vRoadWorld.w * pool * uHeadPoolShare * diffuseColor.rgb * ( 0.6 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
-
-  // (dusk lane) the tail lamps' red pool on the road behind each car (TAIL_POOL), from dusk on
-  float redPool = 0.0;
-  for ( int i = 0; i < ${BEAMS}; i ++ ) {
-    if ( uTailPower[ i ] <= 0.0 ) continue;
-    for ( int k = 0; k < 2; k ++ ) {
-      vec3 l = uTailPos[ i * 2 + k ] - vRoadWorld.xyz;
-      float d = max( length( l ), 0.3 );
-      l /= d;
-      float behind = smoothstep( -0.1, 0.5, dot( -l, -uBeamDir[ i ] ) );
-      redPool += uTailPower[ i ] * behind * max( l.y, 0.0 ) / ( d * d + ${TAIL_POOL.soft.toFixed(2)} );
-    }
-  }
-  totalEmissiveRadiance += vRoadWorld.w * ${TAIL_POOL.power.toFixed(2)} * redPool * diffuseColor.rgb * RECIPROCAL_PI * ( 1.0 - 0.85 * roadPuddle ) * vec3( ${TAIL_POOL.color.map((c) => c.toFixed(3)).join(', ')} );
+  totalEmissiveRadiance += vRoadWorld.w * pool * diffuseColor.rgb * ( 0.6 * RECIPROCAL_PI ) * ( 1.0 - 0.85 * roadPuddle ) * ( 1.0 - roadPaint ) * vec3( 0.96, 0.98, 1.0 );
 }
 `;

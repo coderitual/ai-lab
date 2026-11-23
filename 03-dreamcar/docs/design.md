@@ -13,9 +13,9 @@ circuit in the mountains by a lake: a lakeside straight, fast esses through the
 woods, a lit tunnel, a road on piers across the valley, a slow carousel, a
 crest, a plunge, a ledge, a second bridge and a long right back to the shore.
 Three laps against the clock, alone or against a friend in split screen. The
-same circuit exists four times: on a sunlit autumn afternoon with the sun
-straight down the start straight, at golden hour, at twilight after the sun
-has set, and on a wet night after rain, when the picture is made of lamps and their reflections in the asphalt.
+same circuit exists three times: on a sunlit autumn afternoon with the sun
+straight down the start straight, at golden hour, and on a wet night after
+rain, when the picture is made of lamps and their reflections in the asphalt.
 It plays in a browser with a keyboard, a gamepad, or thumbs on a phone.
 
 It is an original demo. Two things were looked at for what "good" looks like
@@ -93,10 +93,8 @@ A second car, in a different paint, is the second player's.
 
 ## The road
 
-A racing circuit, not a public road: 5.14 km, driven clockwise, 61 m between
-the lake shore and the top, just out of the tunnel (the top was 108 m, on the
-crest, until the owner had the coast after the tunnel brought down to the bay:
-it now runs 11 to 44 m over the line, out and back). Paved 12 m wide (three
+A racing circuit, not a public road: 5.14 km, driven clockwise, 108 m between
+the lake shore and the top (110 m above the water). Paved 12 m wide (three
 lanes, `HALF_WIDTH` 6), a 1.2 m strip beyond each edge line that is a red and
 white kerb in the bends and a paved margin elsewhere, then mown grass 3 to 10 m
 wide (widest on the outside of the fast bends) to a barrier: a steel rail by
@@ -105,26 +103,16 @@ beside the pits (the rest of the land side is a rail), rock where the road is
 cut into the hill, parapets on the bridges, the walkways' kerbs in the tunnel. Trees stand
 behind the barrier, never as it.
 
-How the ground is drawn (src/assets/world): the asphalt (road.js) is an
-old mountain road's kept for racing, as in frames E2 and E5 (below): a pale
-to mid grey in sun, a shade warm (albedo 0.11 new to 0.22 a generation old),
-a cooler grey in the woods' shade that still shows its stones; fine stone
-grain close by fading to a clean tone; each lane's wheel paths darker and
-smoother, the crown and the edges lighter, long faint streaks along the road;
-small dark grit off the line and towards the edges, a thin band of dust
-along the edge; a polished, darker racing line and rubber in
+How the ground is drawn (src/assets/world): the asphalt (road.js) is
+dark, fine racing asphalt with a polished, darker racing line and rubber in
 the bends and the braking zones (corridor.js), runs of surfacing of different
-ages with joints, the paver's seams 2 m either side of the middle, patches
-(about one per 300 m) and cracks sealed with tar (about one per 90 m), tyre
-marks before the carousel (roadHistory.js);
+ages with joints, the paver's seams 2 m either side of the middle, a few
+patches and sealed cracks, tyre marks before the carousel (roadHistory.js);
 its markings are a solid white line inside each edge (0.28 m), the start line
-and twelve grid boxes from `track.grid`, nothing else, but on the two forest
-stretches of frames E2 and E5 (below, "The forest"), where a piece's
-`scheme` adds a double yellow centre line and an older, paler surface. A second, anisotropic
+and twelve grid boxes from `track.grid`, nothing else. A second, anisotropic
 specular lobe stretched along the line of sight lays the low sun's glare on it
 as a long streak (`ASPHALT_SHEEN`). The kerbs (kerbs.js) are red and white
-painted concrete (blue and white in E5's bend, bare pale concrete in E2's
-wood: the scheme's paints), one colour per tooth, on `track.kerbs`, exactly on
+painted concrete, one colour per tooth, on `track.kerbs`, exactly on
 `track.profile()` (on low, rows at every second tooth top). Beyond the margin
 the terrain's band carries the verge: mown stripes 1.6 m wide, a ragged strip
 of worn earth along the kerbs, longer grass at the barrier, with tufts of
@@ -137,8 +125,7 @@ lamps (retro.js), as the road's lines do. Barriers: two
 stacked W-beams on posts (one beam where trackside panels stand behind it;
 set back behind tyre walls; a reflector painted on the upper beam over every
 fourth post, which blazes in the head lamps at night), low concrete walls 0.93 m high on the straight
-(walls.js, precast blocks: on the lake side of the straight a warm grey and a
-burnt orange by turns, white along the pits, a deep bottle green elsewhere), cut faces of bedded
+(walls.js, precast blocks painted white and teal), cut faces of bedded
 limestone where the edge is rock. Viaduct piers are slender eight-sided
 shafts under flared capitals; the short bridge spans a V-shaped gully across
 it with a stream's notch. Gradients up to 8 per cent; banking by rule
@@ -152,19 +139,16 @@ line, m; speeds are the autopilot's at full pace):
 | Shore bend | 250 to 657 | a banked right of 220 m radius (9 degrees) away from the water, starting to climb; about 200 km/h |
 | Forest esses | 657 to 1409 | right 260 m, left 330 m, right 240 m, climbing at 5 to 6 per cent; 205 to 240 km/h |
 | The tunnel | 1409 to 2006 | a rock cutting faced in concrete at its end, the lit box (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out between retaining walls with acoustic screens; up to 255 km/h |
-| The sky road | 2006 to 2582 | on piers over the sea: a 576 m left of 300 m radius, banked 10 degrees, down at 8 per cent from 54 m to 11 m over the line, the open sea on the left and the bay inside the loop on the right; about 230 to 260 km/h |
-| The carousel | 2582 to 2915 | the low point by the water (11 m), a 150 m climb, then 190 degrees right at 55 m radius round the head of the lagoon on a causeway, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
-| The crest | 2915 to 3115 | a 200 m straight on a low shelf between the open sea and the bay, the volcano ahead and to the right; about 110 to 165 km/h |
-| The plunge | 3115 to 3394 | a 400 m right, level, 25 m over the line (the name is the old road's); to 200 km/h |
-| The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m, the bay on the right, climbing to 38 m; 203 to 238 km/h |
-| Gully bridge | 3778 to 4115 | 337 m straight on piers over the bay, over a broad top (44 m), then 8 per cent down to its old end height; to 271 km/h |
+| The sky road | 2006 to 2582 | on piers: a 576 m left of 300 m radius, banked 10 degrees, the valley 42 m under its middle; about 230 to 257 km/h |
+| The carousel | 2582 to 2915 | a 150 m climb, then 190 degrees right round a spur at 55 m radius, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
+| The crest | 2915 to 3115 | the top (108 m), in the open, the lake far below; the car goes light over it at about 160 km/h |
+| The plunge | 3115 to 3394 | 8 per cent down a 400 m right into a compression; to 215 km/h |
+| The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m on the hillside, rock on one side; 216 to 257 km/h |
+| Gully bridge | 3778 to 4115 | 337 m straight on piers, 26 m over the gully, 8 per cent down; to 282 km/h |
 | The long right | 4115 to 4686 | 90 degrees at 300 m radius, banked 9 degrees, onto the straight; 234 to 283 km/h |
 
-The autopilot laps in 85.2 s at full pace, 93.5 s at 0.9, 118.3 s at 0.7
-(85.1, 92.9 and 117.1 before the coast ran low: the lap's heights from the
-tunnel's portal to the gully bridge's end changed, the plan and the length did
-not; the road rejoins its old height and grade at the gully bridge's end, 37.6
-m, so the long right, frame K5's place and the straight are as they were). Sector lines at 1882 m (just out of the tunnel) and
+The autopilot laps in 85.1 s at full pace (217 km/h on average), 92.9 s at
+0.9, 117.1 s at 0.7. Sector lines at 1882 m (just out of the tunnel) and
 3420 m (the start of the ledge).
 
 The Track says where everything of a circuit goes, as data the world reads
@@ -187,11 +171,9 @@ count, the upper two green for four seconds after lights out. On the land side
 behind the wall a catch fence, a pit lane and a two-storey pit building
 (garages, a glazed floor lit at dusk and at night, a roof terrace under a
 canopy carrying the name); on the lake side a covered stand. Along the lake
-side of the straight two groups of tall hoardings (3.8 m panels, tops near 5 m):
-five by the run-up's camera (frame D1) and four more 45 to 80 m before the
-line; between them the low wall is open, with hazel along it and loose rows
-of round green broadleaves 8 to 15 m tall behind it (forest.js). The land side
-stays open (grass, the barrier, the pits). Past the pit exit a short tyre wall with low
+side of the straight one run of tall hoardings (3.8 m panels, tops near 5 m),
+broken only by the stand and the gantry's tower; the land side stays open
+(grass, the barrier, the pits). Past the pit exit a short tyre wall with low
 boards on a low wall behind it. At the far end of the straight a footbridge
 carrying boards, a marshal's tower, and on the outside of the first bend a
 small stand and distance boards 200, 150 and 100. Low boards along the bends,
@@ -232,13 +214,8 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   arrows, Space the handbrake. Pad: triggers, left stick, A or RB the
   handbrake. Touch: the owner plays on an iPhone held upright in one hand,
   and asked for controls that are "one-hand friendly and super smooth and
-  precise". So the default is one thumb on an analog pad that appears under the thumb
-  (round 3: the owner plays with either hand and asked that "the pad
-  should also adjust to where the user starts to touch"; he had rejected a
-  stick whose base moved while the finger moved, so the centre is set at
-  touch-down and never moves until the thumb lifts). At rest it is a faint ghost at the bottom
-  corner of the holding hand's side (Hand: Right or Left: it only places the
-  ghost and the handbrake button), within the
+  precise". So the default is one thumb on a fixed analog pad at the bottom
+  corner of the holding hand's side (Hand: Right or Left), within the
   thumb's natural arc: drawn like a finished game's stick (a dark glass disc
   with a light rim, its centre and full lock marked, an amber brake arc
   along its foot that fills as the brake is pressed, a red arc below it).
@@ -247,11 +224,9 @@ lies on the far shore of the lake (`town.js`, on `facade.js`'s houses).
   pulled on into the red arc it yanks the handbrake, like a lever, and the
   knob clicks into the arc: brake, flick into a slide and steer through it
   with one thumb. A round HANDBRAKE button stands in the other bottom corner
-  for a second thumb; a second finger anywhere is the handbrake too. The pad's centre is where
-  the thumb landed and never moves, so the first input is zero and the knob
-  springs back when it lifts; near an edge the travel is compressed (to
-  60 % at the least) and then the centre is nudged inward with a 6 px hold
-  at zero, so there is never a jump. Options: the slider (a track with a marked
+  for a second thumb. The pad's centre never moves, so a thumb landing off
+  it steers at once and the knob springs back when it lifts; nothing else on
+  the screen drives the car. Options: the slider (a track with a marked
   centre) or two arrows, each with the pedals (BRAKE, DRIFT, and GAS on
   manual); tilt (the phone rolled like a wheel, the pad still braking;
   untested on a real phone). Throttle manual makes the pad's up the
@@ -362,17 +337,13 @@ its car's origin in the car's own level frame, turned `yaw` degrees left of
 the car's heading and `pitch` degrees up, with a lens of `fov` degrees top to
 bottom (as given, whatever the picture's shape); the HUD is hidden unless
 `hud: true` is given; `photo(null)` ends it. The same in the address:
-`?photo=back,right,up,yaw,pitch,fov[,roll]` (`roll`: degrees the picture leans clockwise; add `,hud` to keep the HUD), so that
+`?photo=back,right,up,yaw,pitch,fov` (add `,hud` to keep the HUD), so that
 `node tools/shot.cjs --url "…?manual&auto&ap&t=20&photo=4.5,2.2,0.9,22,1,46"`
 needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
-day, t 100.4 s), `?photo=d3` (the ledge's first bend, day, t 76.5 s; 100 and 76.6 before the coast ran low),
-`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green),
-`?photo=k5` (frame K5, strict spec at dusk: t 89.1 s (88.7 before the coast ran low), the end of the sweepback's first piece, a chase camera
-6.2 m back and 2.3 m up, pitched 9 degrees down, lens 50 degrees) and
-`?photo=e1` (frame E1, strict spec for the coast stretch: day, t 64.9 s, the car coming out of the carousel,
-the camera on the crest looking back at it; a `roll` of 7 degrees tilts the horizon as the frame's does); a name
+day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 78.8 s) and
+`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green); a name
 brings its own moment of the autopilot's run and its time of day unless the
 address gives `t` or `time`, and also works on the handle
 (`__dreamcar.photo('d1')`). The camera moves with the car, so the engine's
@@ -391,10 +362,8 @@ with a short `advance` after loading.
   straight down the road (lighting.js `PLACES`, turned to the Track's heading
   by `placeLights`): the chase view drives into it, its glare lies along the
   asphalt, shadows fall straight back and a little left. A deep blue sky, pale
-  and bright at the horizon (zenith 0.15, 0.33, 0.86; horizon 0.5, 0.65,
-  0.92), with lit cumulus: a group of big heaps with crisp white tops and
-  soft grey bases over the massif's shoulder, left of its main peak, and a few
-  small ones elsewhere (grey-blue bases, silver rims near the sun); a compact sun with a soft aureole; dry asphalt. The
+  and bright at the horizon, with small lit cumulus (grey-blue bases, silver
+  rims near the sun); a compact sun with a soft aureole; dry asphalt. The
   drawn sky is as bright as the frames' (pale blue, paling to the horizon);
   its light on the scene is set apart (`env.intensity` 0.6, fill 0.13), so
   that the shade stays open but deep: sunlit level ground about 2.1 from the
@@ -420,37 +389,15 @@ with a short `advance` after loading.
   straight. Its orange light crosses the straight almost level, so whatever
   stands on the lake side throws shadows 25 to 30 m long over the grid while
   the trees, the gantry and the buildings on the land side, and the massif,
-  stand in red-orange light. The sky is a whole twilight dome (dusk lane,
-  after the owner's "in the dusk lighting the tunnel and after the tunnel
-  looks dull and bad" and his twilight references): under the sun a rose and
-  orange horizon rising through gold and pale yellow into turquoise and a
-  deep blue overhead; opposite it the blue-violet shadow of the earth low
-  down with a pink belt over it; long thin clouds lit orange-rose from below
-  near the sun and dark blue-grey elsewhere; the first stars high up opposite
-  the sun. The haze is the horizon's: gold and rose towards the sun,
-  blue-violet away from it, so the far land stands in layered blue
-  silhouettes. The grade is rich and deep (contrast 1.24, saturation 1.22,
-  exposure 4.2), a whiter balance (tint 1.03, 1.0, 0.94) with cool shade and
-  gold highlights (split toning). Dry. The lamps and windows are on and glow
-  with halos against the lit sky (`halo` 0.1, a faint cone in the air); the
-  cars run on low beam, their head lamps pooling on the road ahead and their
-  tail lamps laying a red pool on the asphalt behind them (road.js
-  `TAIL_POOL`).
-- **Twilight** (frame K5, strict, and the twilight references): the sun 5°
-  under the horizon, 60° left of the start straight's heading (from K5's
-  place the band is brightest a little right of the road, over the tower);
-  no direct light and no sun shadows, only the sky's (the environment map,
-  strength 0.75, and a faint blue fill), so the land is dark blue and what faces the sunset catches its band
-  as a warm rim. The dome deep blue overhead through turquoise and pale
-  yellow to an orange-rose band over the sunset, the earth's shadow and its
-  pink belt opposite, all but clear, the first stars high up. The water
-  mirrors the band as a pale gleam. Street lamps, floodlights and windows on
-  (cones in the air at 0.6 of the night's), the cars on low beam with the red
-  pool behind them, the road dry and dark (it shows 0.3 of its sky sheen,
-  `roadSheen`, and 0.4 of the head lamps' pool, `headPool`); the sea dark with
-  the band's pale gleam (sea.js `byTime.twilight`). Exposure 5 (between golden hour's
-  4.2 and night's 22), contrast 1.18, saturation 1.15; in the tunnel 4.5, as
-  at golden hour (its lamps are the day's).
+  stand in red-orange light. Golden, never violet (render lane, after the
+  owner's "small shading problems" and D4 beside our still): the sky is a gold
+  haze low down paling into a clear light blue overhead, the haze the far
+  land fades into is gold-brown, the sky's fill is warm, and the grade warms
+  the white balance (tint 1.05, 1.0, 0.9) with rust in the shadows and gold in
+  the highlights (split toning); clouds lit from below that the paint
+  mirrors; the fill is low (env 0.6, exposure 4.2, contrast 1.2), so the lit crowns and the
+  lamps carry the picture and the shade stays deep and warm. Dry. Lamps and
+  windows are on.
 - **Night:** a three-quarter moon low ahead and a little left of the start
   straight (8° left of its heading, 17° up, beside the massif, which stands as a silhouette with
   moonlit edges), enough to draw the ridges and the edges of the road; stars; the low beam reaching about
@@ -485,62 +432,10 @@ with a short `advance` after loading.
 - The paint is a metallic silver under a clear coat: a sharp mirror image of
   the real surroundings over a soft, flake-sparkling base.
 
-## Beside the road (nearfield)
-
-**Art direction.** Everything within about 40 m of the road that is not the
-asphalt or a tree is drawn as material you can name at a glance, not as a
-smear of noise: rock in sculpted beds and swelling blocks with pits, a wet
-sheen, lichen and grass on its ledges; ground that changes material in
-readable patches with crisp edges (mown verge, longer grass, worn earth,
-drainage gravel, carpets of low plants in autumn colour, sand sculpted into
-swells and ripples on the coast); concrete with a rhythm of panels, joints,
-lifts, caps and weathering. Forms first, then a few deliberate tones per
-material, then light: lit lips, shaded undersides, contact shade at every
-foot. Fine detail fades out before it can shimmer at speed.
-
-**The owner's environment references** (refs/env, kept out of the
-repository; other games' pictures, judged for quality and character only,
-nothing of their places, plants, rock shapes or lettering is taken):
-
-- *A canyon with a natural arch:* massive rock with pitted, pocked erosion,
-  strata and overhangs, a strong wet sheen where the sun rakes it, mist in
-  the gaps, a shallow clear stream over pale sand and pebbles, clusters of
-  low red and orange plants.
-- *A shore under a towering pitted cliff:* pale sand, turquoise shallows,
-  dense carpets of red, orange and purple low plants, a rock stack, mist at
-  the cliff's foot.
-- *The same at eye level:* pale rounded boulders with layered caps, vivid
-  plant carpets, turquoise water.
-- *Snowfields at a low sun:* dark rock breaking through, warm light, cool
-  violet shade, every ripple of the surface showing.
-- *A rally stage:* a rich verge of weeds, tufts, dirt and wet ruts, boards on
-  a low wall, flags, poles and wires, a tall-grass field.
-- *Desert dunes (addendum 9):* long soft swells with a sharp crest line,
-  wind ripples, scrub casting small shadows, a warm sunlit side against a
-  cool lee; foreground rock in layered beds with cracks, lichen and a rim of
-  light.
-
-**What was built from them** (techniques.md, "Near the road"): the cut faces
-in beds and rounded blocks with ledges and overhangs, pits, lichen, a wet
-sheen and a damp foot; a natural arch of the same stone spanning the cutting
-where it opens onto the sky road (1972 m, its underside about 11 m over the
-road: the circuit's signature rock, seen for two seconds or so from the
-tunnel's exit); carpets of heather, bilberry, gorse and bracken colours
-beyond the barriers (sedum and thrift reds on the coast), and shrubs in the
-same colours in clusters; the coast's loose stone and beaches as sculpted
-sand, pale under the shallows; the verge in bands with drainage gravel at
-every barrier's foot; one concrete finish for the cuttings, bridges and
-piers; the low walls as precast safety barriers with grooves between blocks
-and worn paint. Not done: mist at the foot of faces, flags, poles and wires,
-pools of water by the road (the water is the sea lane's).
-
 ## The reference frames
 
 The owner chose five frames as the spec for the look ("treat those
-screenshots as spec, not suggestion"), and later two more for the forest,
-E2 and E5 ("another spec references"; "certain parts of the track can
-still be as they are, but I want it to have some parts that look like on
-the screenshots"). They are kept out of the repository
+screenshots as spec, not suggestion"). They are kept out of the repository
 and described here in words. Every change to the light, the materials or the
 grade is judged by staging our still beside the frame it answers to, at the
 same framing, and listing what still differs (ideas.md keeps the lists).
@@ -573,356 +468,14 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   in low warm light, with rust in their shade and dark trunks below; a gantry
   over the road carrying columns of round start lamps; boards, a tyre wall, a
   low concrete wall; the asphalt in shade, the car's tail lamps lit.
-- **E2** and **E5** (road lane; the owner: "Road should be like that
-  exactly"; the spec for the asphalt everywhere on the lap): a two-lane road
-  through pines, by day. In sun the asphalt is a pale to mid grey, a shade
-  warm (sampled: sRGB about 100 to 150, luma; the lane seen across the light
-  about 100, patches lit straight on about 145), in the trees' shade a cool
-  dark grey (about [34, 43, 51]) that still shows its texture; fine stone
-  grain close to the camera fading smoothly to a clean tone; a soft sheen
-  towards the sun at grazing angles, no mirror; darker, smoother bands where
-  the tyres run, the crown and edges lighter, long faint streaks along the
-  road; thin dark meandering cracks, some sealed with tar, an occasional
-  rectangular patch a different grey, a few per hundred metres; small dark
-  stones scattered off the line and near the edges (E5); crisp but slightly
-  worn paint: white edge lines and a double yellow centre line; a clean
-  asphalt edge meeting a low concrete kerb or the verge with a thin band of
-  dust along it. Only the road is answered to; the cars, people and captions
-  in them are not ours to copy.
-- **E1** (sea lane; strict spec for the coast stretch, preset `e1`): a road
-  winding in an S round a cut hill on a headland high above an open sea; the
-  whole frame is described under "The sea".
 
-- **E2** (the owner's "another spec reference"), from a console racing game,
-  by day: a straight road through a wood of tall conifers with long bare
-  trunks and high crowns standing close on both sides, deep shade under
-  them; the low sun coming through from the side lays crisp patches of light
-  and long trunk shadows across pale grey, slightly worn asphalt; a double
-  yellow centre line and white edge lines; a low concrete kerb at the road's
-  edge, then a bright verge of long grass with ferns and yellow flowers;
-  mossy boulders among the trunks; a forested hillside at the vanishing
-  point under a bright sky with clouds.
-- **The owner's video** of the same game on the same kind of road
-  ("another detailed spec ... exact spec"; overcast; cut into sheets of its
-  best shots): long faces of pale grey granite rising 10 m and more straight
-  from the verge with pines on top, besides loose boulders; rows of five or
-  six yellow chevron arrows on black boards on the outside of the bends,
-  bright even in shade; the double yellow centre line with short yellow
-  dashes beside it into the bends; long blue and white kerbs on the inside
-  of each bend with a flat concrete strip behind; dry olive grass and dark
-  low shrubs on the verges; a red board here and there.
-- **E5**, the same game, a mountain bend: big pale granite boulders and
-  outcrops right at the roadside, some as large as a van, shrubs between
-  them; mixed pines and firs, a tall stone pine with a bare trunk on the
-  inside; open sunny glades; grass islands with purple and yellow flowers; a
-  blue and white painted kerb at the apex; the double yellow line following
-  the bend; a yellow diamond warning sign (ours is a plain bend arrow of our
-  own drawing); more road beyond through the trees.
-
-- **The twilight references** (four more frames of racing games, sent with
-  "in the dusk lighting the tunnel and after the tunnel looks dull and bad";
-  their light, sky, colour and mood only): after sunset, a sky from deep blue
-  overhead through turquoise and pale yellow to a band of orange and rose on
-  the horizon over dark blue mountains and a pale gleam of water, a dark road
-  whose white lines catch the sky, tail lamps glowing red with their light
-  pooled on the asphalt, small warm lamps far off; blue hour over cool
-  blue-violet land under a pale sky with long dark clouds, a lit board
-  glowing; a low sun breaking under heavy cloud into a blinding glare that a
-  wet road mirrors; the last warm side light with long shadows across the
-  road and a lit snowy mountain against a clear pale sky.
-
-- **K5**, one of those twilight frames made strict spec for one place ("treat
-  it as spec of one of the place on the track; beside the car everything is
-  spec"): after sunset, a chase camera low behind the car on a wide dark road
-  high over the water, curving gently right. The sky deep blue overhead
-  through pale turquoise and yellow to an orange-rose band on the horizon,
-  clear. Across the left and the middle a pale sheet of water with a bright
-  gleam, dark blue mountains beyond it with a few snow-capped cones. On the
-  left a guard rail, low scrub, small warm lamps far off, a yellow chevron
-  board and two tall dark feather flags on poles; on the right a guard rail
-  curving with the road and a big dark round tower with a railing round its
-  top and one warm lit window. The road dark, its white lines catching the
-  sky, the tail lamps' red glow on the asphalt behind the car. Our place is
-  the end of the sweepback's first piece, where the road comes off the gully
-  bridge high over the bay, due south, and begins its long right turn down to
-  the shore (`?photo=k5`; landmarks.js `K5`): the bay and the open sea to the
-  west lie ahead and to the left, the golden-hour sun stands 35 degrees to the
-  right behind the tower, the far cones (far.js) stand across the sea, and the
-  tower, the flags, the chevron and the lamps are k5.js's. Our flags are plain;
-  the tower is our own.
-
-Day answers to D1, D3, E1 and A, its two forest stretches to E2 and E5 (and the asphalt everywhere to E2 and E5; D1's "dark smooth asphalt" gave way to them); golden hour to D4, D2 and the twilight references (K5 strictly); the wet night to two
+Day answers to D1, D3 and A; golden hour to D4 and D2; the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
 light, the materials, the vegetation, the composition and the sense of speed:
 no names, logos, HUD artwork or layout, track shapes, liveries or lettering.
 The car itself is checked against four daylight photographs of the owner's
 car (car.md), which also stay out of the repository.
-
-## The sea
-
-(sea lane) After the tunnel the road comes out onto the coast. The owner:
-"after the tunnel there is a nice part of the track where we can have a
-sea; the sea and its shader are built in the repo, in the 01 project". His
-reference for the look (kept out of the repository, like the others; called
-E1 here): a road winding along a headland high above an open sea, deep blue
-water with a long soft swell, a bright band towards the horizon and haze
-into a clear sky; an ochre and rust cut slope with grass on top on the land
-side, ochre gravel run-off and a steel rail on white posts on the sea side;
-a viaduct on tall piers standing in front of the water; sun-bleached warm
-light. Only its light, colour, materials and composition are taken.
-
-**E1 is strict spec for the coast stretch** (the owner, round 2: "This is
-strict spec"; and "give a sea view after the tunnel"): a still from the
-comparison camera `e1` must read as the same picture except for the car.
-Nothing of the game's content is copied (no names, logos, board lettering,
-track shape). The frame, read carefully: the camera looks back along a road
-that winds in an S round a hill on a headland high above the sea; open sea
-fills the right half and the upper middle to a straight hazy horizon about
-60 % up, tilted a few degrees, with clear pale-blue sky deepening upwards and
-no land behind the water; on the left a steep hill cut for the road, a
-rust and ochre face 10 to 15 m high with erosion gullies, dark at its foot,
-dry olive grass and scrub above; dark asphalt with a double yellow centre
-line and white edge lines, a low concrete kerb strip on the inside of the
-bend; on the outside a broad apron of ochre gravel, then a steel rail on
-white posts, a lip of dry grass and then the sea far below; red and white
-boards at the next bend; a pale viaduct on tall slender piers standing in
-the sea; a low warm sun from the left behind the camera, the hill's shadow
-over the left of the road.
-
-**Where E1 is on our course** (`?photo=e1`): the carousel, the slow right
-hairpin round a spur at the head of the headland, is the bend nearest the
-frame's S; the camera stands on the crest just past its exit, looking back
-north at the car coming out of it on the inside lane. The hill on the left
-is the spur inside the hairpin (`COAST.knoll`), cut for the road; the
-apron, the rail and the sea are on the right; the boards stand round the
-hairpin's outside. What our course cannot give: the sky road is behind this
-camera (it runs from the climb's foot back south-east to the tunnel), so the
-frame's viaduct is not in our picture; its piers stand in the sea where the
-driver sees them, from the tunnel's cutting, the sky road and the climb.
-(Round 3) So that E1 has its bridge, a pale span on the viaduct's own piers
-stood out in the sea off the headland as scenery (viaduct.js `SEA_SPAN`,
-no road on it; round 5 switched it off: with the coast road brought down to
-the bay its deck passed over the road), crossing the water behind the hairpin from E1's camera; the
-camera stands low and close (2.2 m up, 7.5 m ahead of the car); round the
-hairpin three red and white boards stand, not a hoarding (the coast road's
-paler asphalt of round 3 went when the road lane's new asphalt came, which is
-the mid grey the frame asks for everywhere). And
-our day sun is fixed: 16 degrees up, due east (down the start straight); from
-E1's camera, looking a little east of north, it stands about 80 degrees to
-the left and very slightly ahead, so the cut face (facing west) is in its own
-shade and the spur's shadow lies across the near road, where the frame's sun
-comes from behind the camera's left and lights the face.
-
-- **Where the coast runs** (`SEA` in terrain.js). The course stands on a
-  headland. Seen from the middle of the course, everything outside the loop
-  at a bearing outside the mainland's (-115° to 50°, 0° being the start
-  straight's heading) is sea to the horizon: north of the tunnel's spur, round
-  the sky road and the headland of the carousel and the crest, down the west
-  side. The mainland with the massif and the far ridges stays east, behind
-  the start straight, so frame D1 is untouched. The lake beside the straight
-  is a bay of the same sea, as it was to the east and opening to the open
-  water in the south-west. (Round 2: the mainland's sector ends at 24°, not
-  50°, so that from the climb no far shore stands across the inlet; D1's view
-  lies between -70° and -2°.) Away from the coast road the land falls to the
-  water 55 to 170 m beyond the solid edge, the last of it as a cliff (rise
-  1.15 per metre) of ochre rock with a dark wet band at its foot; the seabed
-  shelves away at 0.3 per metre to 45 m. Seven sea stacks stand 30 to 120 m
-  off the open coast. No far shore: the far ridges stand aside where the sea
-  is (far.js), so the sky road and the crest look over water, haze and sky.
-- **The coast road's cliff** (round 2, `COAST` in terrain.js). On the sea
-  side of the coast road the land does not slope away to a shore far off:
-  beyond the rail a lip of dry grass 1.5 to 4 m wide, then a cliff straight
-  down into the sea (1.6 to 2.6 m down per metre out, rounded at its top, a
-  talus at its foot 7 m under the water), so that open water lies some 40
-  to 60 m beyond the solid edge and 85 to 110 m below the road. The land
-  side is cut 6 m deep (the coast's rust face) and rises gently beyond it
-  (at most 0.25 per metre), and the spur between the climb and the crest
-  rises as a hill up to about 32 m over the road, along a ridge from 80 to
-  230 m down the tongue from the hairpin's centre, set towards the climb.
-  It is low round the hairpin itself, on purpose: the day's sun stands on
-  that side 16 degrees up, and with an 11 m cut and the rock preset's steep
-  hillside (round 2's first tries) the whole of E1's road and apron lay in
-  its shade; now the shade covers the inside of the road at the bend's
-  exit, as the frame's does. Nothing grows tall either side of the coast
-  road: dry olive grass and scrub.
-- **The sky road over the sea** (round 2): the deck crosses an inlet; the
-  ground under its middle is 96 m down (`drop`), under the water, so its
-  piers stand in the sea.
-- **The sea on the right and the volcano** (round 3; the owner, after
-  driving it on a phone: "seaside should be on the right side with some
-  island and volcano"). The lap runs clockwise, so the open sea outside the
-  loop is always on the driver's left. The sea now also reaches inside: an
-  inner sound under the sky road (whose valley is the sea's out to near its
-  ends) and round a volcanic island in the loop, so that the first part of
-  the sky road and the plunge have water on the right (`parapetSea`,
-  `coastUp`: the presets they replace with the coast's cliff beyond the edge
-  and nothing growing). The island (terrain.js `VOLCANO`; round 4 moved and
-  reshaped it, below) has a crater; round it the land is drowned except
-  within 60 to 120 m of a solid edge (`VOLCANO.sound`). A thin plume of steam and smoke leans away on the wind
-  from the crater and drifts up with the run's clock; the crater glows
-  warm as the sun weakens (volcano.js). Frame D3's bank beside the ledge is
-  kept within 60 m of its edge; beyond it is now the sound.
-- **The bay inside the loop** (round 4; the owner chose it, and accepted
-  losing the hill inside that part of the lap, frame D3's bank included).
-  (Round 5: the ledge's insides too, `bankSea` and `rockSea`.) Every side from the sky road to the plunge is now a sea side: the sky
-  road's right (`parapetSea`), the climb's and the carousel's insides
-  (`rockSea`: the rock edge stays, as a low wall of rock 1.4 m high over the
-  cliff), the crest's right (`openSea`), the plunge's right (`coastUp`).
-  The tongue between the climb and the crest is a channel of the sea, and
-  the hill that stood on it is gone (`COAST.knoll.rise` 0). The coast's
-  cliff is steeper (2.2 to 3.4 m down per metre out) so that the water lies
-  30 to 40 m beyond a right edge and the channel is water in its middle.
-  The volcano was moved where the chase camera sees it ahead and to the
-  right from the sky road's start and from the crest and the plunge: 195 m
-  right of the ledge's second bend (`VOLCANO`), a steeper cone (190 m, foot
-  150 m, flanks to the power 1.3) of dark basalt, green low down, a pale ash
-  rim (groundMaterial.js reads `uVolcano`), its foot 31 m beyond the nearest
-  solid edge at the least; the plume is wider, thinner and softer, a billow
-  of smoke 420 m tall leaning 320 m downwind. Round it the land is drowned to
-  600 m (`VOLCANO.sound`). Frame K5's place at the start of the long right
-  is untouched.
-- **The low crossing and the big waves** (round 2; the owner: "after the
-  tunnel it would be nice to see some sea side with BIG waves. Maybe some
-  river that will be super nice to cross ... we will be very close to it").
-  Between the tunnel and the gully the road is 60 to 108 m up and already
-  climbs and falls at 7.5 to 8 per cent: no piece can come down to the water
-  there without breaking the course's limits (the gradient, the top on the
-  crest 100 to 130 m over the lake). The first place after the tunnel where
-  the road comes down to the sea is the long right before the straight
-  (`back`), from half way round it to near its end: 170 m with the road 2
-  to 14 m over the water. There the land either side falls away (terrain.js
-  `CAUSEWAY`): the road runs on a causeway, a lip of 2.5 m beyond each rail
-  and a rubble bank into the water, across the mouth of a lagoon on the
-  inside of the bend (120 m wide, 9 m deep at most) with the bay on the
-  outside. The rails are the open steel rails the corridor already had; the
-  course is untouched, but nothing grows behind the long right's rails any
-  more (`shoreRun`, `shoreUp`: the woods hid the water). Off the outer side the swell runs big (waves.js
-  `BOOST`): its three long waves 2.2, 3.4 and 4.2 times their height at the
-  middle of a circle of 360 m (round 3: the shorter ones most, so that they
-  read as steep rollers, about 3 to 5 m from crest to trough in the sets);
-  the same factor moves the mesh (medium, high), shades the normals (low)
-  and answers `sampleWaves`. It stops short of the straight, whose bay
-  frames D1 and D4 look over. `?photo=waves` looks over the lagoon beside
-  the causeway. Not yet what the owner asked for: in the first stills the
-  water is close on the lagoon side and glitters, but the boosted swell does
-  not read as rollers from the road (150 m waves 3 m high are gentle slopes
-  at that range); spray against the bank, breakers that curl over and a
-  finer inner mesh near the eye are not built.
-- **The coast road** (`coastDown`, `coastRun`, `coastTop` in trackLayout.js:
-  the climb, the carousel, the crest and the plunge): on the sea side the
-  steel rail stands on white posts and nothing grows that would hide the
-  water; round the carousel and over the crest the verge inside the rail is
-  a broad apron of ochre gravel (round 2: `verge: 'gravel'`, the grip and
-  sound of gravel; no tyre wall on a coast side's run-off), elsewhere grass;
-  on the land side the cut rock of the climb and the carousel is the coast's
-  rust and ochre in faint beds scored by gullies, dry grass on top. The
-  corridor's edges and slopes are exactly the presets' it replaced. The road
-  from the sky road to the plunge has a double yellow centre line
-  (`PIECE_MARKS` in road.js) and its kerbs are bare concrete (kerbs.js); no
-  floodlight poles stand round the carousel and over the crest
-  (`lapLamps.skip`). Within a few hundred metres of the sea all rock
-  is that warm stone and all loose stone ochre grit (groundMaterial.js reads
-  the sea map); inland it stays the grey limestone.
-- **The water** moves as demo 01's sea does (engine/waves.js): a long soft
-  swell (150, 98 and 63 m long, 0.6 m and less; round 2: lower and spread
-  wider in direction, and every wave rising and falling in sets and lulls of
-  its own, `GROUPS`, so that from high above it is a texture, not ruled
-  lines) under a light breeze's chop, from the open sea in the north-west,
-  dying down over the shallows. How it looks is the next section's.
-
-### The water (W1 to W4)
-
-(water lane) The owner, of the water as it stood ("a flat sheet with
-stripes"): "Also water color and shader. Make it look better from the
-distance", then, with pictures, "Some new spec references for detailed water
-terrain and hyperrealistic effect. Treat it really seriously", and of the
-four together: "These look great. Spec exact". The pictures stay out of the
-repository; they are frames of games, and what is taken from them is the
-physics of the look (colour, light, structure), never content. They are
-called W1 to W4 here, and E1 (above), M2 and M3 (the environment references:
-turquoise pools over a pale bed) belong with them. What each says about the
-water, read carefully, with 8-bit colours read off the picture:
-
-- **W1, a low road over calm water** (ours: the low return leg): dark slate
-  blue water a few metres under a railing on both sides of the road, covered
-  in fine wind ripples that the distance compresses into thin horizontal
-  streaks, in patches of rougher and smoother water; lighter towards the
-  horizon; under a wooded island its dark mass lies in the water as a soft
-  band; each pier of a long viaduct is mirrored as a soft dark smear two or
-  three times its own width and as long as it is tall, broken by the
-  ripples; a high thin overcast, no glitter. Near water beside the rail 62 84
-  108 (left) and 69 81 89 (right, under the bridge); middle distance 86 111
-  139; far 99 128 164; a pier's reflection 57 68 74 against 117 133 151
-  between the piers; the island's reflection 70 89 103; the sky above the
-  horizon 129 156 192.
-- **W2, a bend beside a beach** seen through a wire fence: a band of
-  turquoise along a pale beach (86 126 144 to 93 135 156), white surf at its
-  edge, blue beyond it (119 142 164 to 122 143 174), a calm pale bay on the
-  far side that all but mirrors a white sky (135 149 160 to 188 204 219).
-- **W3, the sea from a height**, into a low sun under heavy cloud: a wide
-  blazing road of glitter (231 230 221, burnt out at its heart and breaking
-  into points and streaks towards the eye), dark warm-grey open water either
-  side of it (155 153 138 to 181 176 157), wind streaks across it; inshore
-  teal (80 106 96), then turquoise (94 117 103 to 67 102 87), then the sand
-  showing through (88 82 66) with dark patches of reef, white water round the
-  rocks and along the beach (129 134 115).
-- **W4, a beach under an overcast sky**: small waves breaking in two or three
-  lines along the shore, translucent turquoise where they stand up (77 115
-  121), lacy foam that stretches and thins behind each line (175 207 210) and
-  a solid white edge (213 213 204), a thin sheet of water running up the sand
-  and draining back, the sand darker and mirror-wet where it has been; dark
-  slate water beyond the surf (65 77 86), calm grey-blue further out (102 123
-  137) paling to the horizon (135 155 175); sea stacks whose dark reflection
-  lies on the calm water. No sun on the water at all: it must be right
-  without glitter.
-- **E1**: open sea from a height by day: deep blue near (60 95 129), paler
-  towards a hazy horizon (144 176 194) under a sky of 196 208 220 there.
-- **M3**: a pool a hand deep over a white bed: 113 187 190, paler at its edge
-  (140 207 195).
-
-What that asks of the water, and what answers it (techniques.md, "The sea"):
-
-1. **Colour by depth and by angle.** Shallow water over sand is turquoise to
-   green with the bed, its ripples and its dark reef showing through; then
-   teal; then the deep colour. Looking along the water it carries the sky,
-   looking down into it its own body. One model does both: the bed seen
-   through a column that absorbs red first, and a mirror whose strength and
-   direction follow the roughness. There is no "shallow colour" and no "far
-   colour" in the code.
-2. **Close to** (to 80 m): wind ripples in several sizes moving with the
-   wind, the slow swell under them, sparks towards the sun, and long soft
-   reflections of what stands in or by the water.
-3. **The middle distance** (to 800 m): gusts as darker, rougher patches,
-   slicks as paler threads, the shade of clouds; nothing that repeats.
-4. **Far** (to the horizon, 14 km): the slopes a pixel cannot draw become
-   roughness, so the sun's path is wide and steady and narrows to the
-   horizon; a paler band there; haze into the sky's colour with no line; land
-   mirrored as dark soft shapes.
-5. **Shores**: lines of surf parallel to a beach, foam round rock and piers,
-   the sheet on the sand; all from the shore map.
-6. **Every time of day** the same water: golden hour's path is gold on dark
-   teal; at twilight the water is dark and calm with the band of the sky's
-   colours lying on it far out; at night the moon's path, the road's lamps
-   and the cars' tail lamps as streaks.
-
-**Where the pictures are on our course.** By day the sun stands low in the
-east, over the mainland: from the coast road its path lies across the bay
-inside the loop (1.5 km of water towards the sun from the sky road and the
-crest), not on the open sea, which lies west and north, away from it. W3's
-road of glitter to an open horizon is the golden hour's (the sun in the
-south-west, over the open sea). The low return leg (W1) has water 30 to 40 m
-off on both sides. The bay beside the start straight shelves gently enough to
-show the bed (water under 6 m for 60 to 100 m off the shore); the coast
-after the tunnel falls away at 0.3 per metre and steeper, so its turquoise
-is a narrow band until the coast lane's beach is there. The water needs
-nothing changed when it comes: it reads the shore map.
-
-- **Tiers**: low draws a flat disc of 352 triangles with the swell in the
-  normals only, two ripple layers, the sky alone in the mirror, surf and foam
-  without relief, and no pass of its own; medium moves the mesh, draws three
-  layers, mirrors the land and the piers from the shore map; high draws four
-  layers and has a planar mirror (one more small pass of the scene).
 
 ## The tunnel
 
@@ -1053,62 +606,6 @@ yellowing, larch green-gold, spruce and fir dark. Built in
   tree of the road's rows, fallen leaves under every turned one. Shadows:
   impostor cards on a layer only the sun's shadow camera sees.
 
-**The two stretches of frames E2 and E5** (forest lane). The owner: "certain
-parts of the track can still be as they are, but I want it to have some parts
-that look like on the screenshots"; E5 is strict spec. Two pieces' looks are
-set by a `scheme` on the pieces of the plan (trackLayout.js `SCHEMES`; read
-through `schemes.js`), each blended into its neighbours over 70 to 90 m (the
-tree mix, the verge, the asphalt's tone), its lines starting and ending at its
-pieces' ends. Everything else on the lap is planted and placed exactly as
-before (the schemes' trees, cover and boulders come from their own random
-streams after the rest).
-
-- **E2, the forest road: the rise and the first ess** (557 to 906 m). The day's
-  sun crosses it square from the left (70 to 99 degrees off the road's
-  heading, 16 up): the only forest stretch it crosses from the side for its
-  whole length; the lap has no forest straight longer than the rise's 100 m
-  (a longer one would move every piece after it), so the rise and the gentle
-  first ess (260 m radius) are the frame's straight. Pines with long bare
-  stems (`pine-a`: the crown in the top 40 %, stubs of dead branches below),
-  a few spruces and firs, in four rows from 2 to 29 m behind the edges on
-  both sides; the mass of the wood behind them thinned by 70 % and turned to
-  the same conifers, so that the sun comes through between the crowns 50 to
-  90 m off towards it. Double yellow centre line; paler, older asphalt with
-  more sealed cracks; a flush concrete strip on the margin's outer side; the
-  kerbs bare pale concrete; no rail (the solid edge, a rail to the cars, is
-  drawn as a low concrete kerbstone, 0.2 m: `curb`), no tyre walls or boards;
-  long grass, ferns and patches of yellow flowers on the verge; mossy boulders
-  among the trunks. The canopy term (canopy.js) there: crowns 24 m high,
-  stopping 60 % of the sky.
-- **E5, the mountain bend: the last ess** (1137 to 1409 m), a right of 240 m
-  radius, the tightest forest bend. (The frame's road folds back round an
-  island; on our lap only the carousel does, and the carousel and the crest
-  are the sea lane's coast frame E1: so no second piece of road shows beyond
-  the island here.) Its solid edges stay what they were to the cars (rails at
-  the same distances: the course drives exactly as before); the world draws
-  them as low concrete kerbstones, 0.32 m (`curb`), and no tyre walls, boards,
-  marshal posts or floodlight poles stand on the piece (`lapLamps.skip`, as
-  on D3's bend). Pale granite boulders in the frame's places (`E5_ROCKS` in
-  groundCover.js: a 5 m boulder and its neighbour on the inside by the exit,
-  a rock further in, an outcrop of 2.4 to 5.8 m blocks stacked on the outside
-  round the apex) and singly and in outcrops along both sides, dark shrubs at
-  their feet; pines, firs and spruces in open groups round sunny glades, the
-  inside kept open to the low sun, a full wood behind, a stone pine
-  (`pine-b`) alone on the inside near the apex; grass
-  islands with patches of purple lupins and yellow flowers; blue and white
-  kerbs; the double yellow line round the bend, with short yellow dashes
-  beside it on the inside over the bend's first 70 m; a bend sign of our own
-  (a yellow diamond, a black bent arrow) 90 m before the bend on its outside.
-  From the owner's video of the same kind of place ("exact spec", overcast,
-  read here by day): a face of pale granite along the outside of the bend's
-  first half (blocks of 4 to 6.5 m at the verge and a second tier stacked
-  behind and above them, 8 to 12 m in all, shrubs at their feet), a row of
-  six chevron boards of our own drawing (a black board, two yellow
-  arrowheads) on the outside over the bend's first part, and dry olive grass
-  on its verges.
-  The camera `e5` stands on the road 19 m past the car near the exit, looking
-  back at it across the inside of the bend.
-
 Measured on software WebGL in this container (shared with other work, so the
 times scatter by a third), the forest alone in the main view:
 
@@ -1128,25 +625,5 @@ bake, meshes): about 1.3 s on medium (400 / 450-550 / 200 / 100-160 / 80-160
 ms) and 1.1-1.3 s on low (300 / 400-550 / 150-200 / 50-120 / 60-120 ms):
 over the 1 s and 0.7 s aimed at. Textures 47.7 MB (medium, high), 23 MB
 (low).
-
-(forest lane) Before and after the two stretches, the autopilot's chase view,
-same build otherwise (`low` by day at 393x852, `medium` by night at
-1280x720; whole frame's calls / the forest's own calls and triangles):
-
-| t (s), place | low before | low after | medium night before | medium night after |
-| --- | --- | --- | --- | --- |
-| 14, the shore bend | 124 / 12, 53 k | 125 / 13, 50 k | 246 / 23, 265 k | 250 / 22, 286 k |
-| 20, the rise (E2) | 121 / 12, 55 k | 113 / 6, 28 k | 265 / 22, 314 k | 235 / 9, 334 k |
-| 26, the second ess | 161 / 14, 32 k | 154 / 7, 23 k | 358 / 24, 215 k | 330 / 13, 213 k |
-| 33, the last ess (E5) | 137 / 13, 34 k | 128 / 8, 7 k | 302 / 24, 286 k | 271 / 12, 128 k |
-| 34.2, the E5 camera's moment | | 138 / 4, 3 k | | 286 / 11, 117 k |
-
-The low tier at t = 26 and medium by night at t = 26 were over their budgets
-(150 and 300 calls) before and still are (154, 330); the medium forest at
-t = 20 is over its 300 k triangles (334 k, was 314 k). The forest's start-up
-measured 0.71 s on low and 1.01 s on medium after (0.85 s and 1.2 s before,
-the same machine, loaded: within the scatter); the ground cover's 30 ms and
-104 ms (21 and 77 before: the boulders, the ferns, the flowers, the signs,
-kerbstones and chevrons).
 
 Not measured on a real phone or a real GPU.

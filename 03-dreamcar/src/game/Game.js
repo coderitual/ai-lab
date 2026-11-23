@@ -21,17 +21,15 @@
 
 import * as THREE from 'three';
 import { createCar } from '../assets/car/index.js';
-import { PAINTS, PAINT_ORDER } from '../assets/car/materials.js';
 import { LAMPS as CAR_LAMPS } from '../assets/car/spec.js';
 import { createWorld } from '../assets/world/index.js';
 import { CANOPY, canopyOpen } from '../assets/world/canopy.js';
-import { BORE } from '../assets/world/tunnel.js';
 import { TIMES } from '../assets/world/lighting.js';
 import { Engine, FIXED_DT } from '../engine/Engine.js';
 import { FramePipeline } from '../engine/FramePipeline.js';
 import { Input, buzz } from '../engine/Input.js';
 import { ReflectionProbe } from '../engine/ReflectionProbe.js';
-import { LADDER, TIERS, probeCaps } from '../engine/caps.js';
+import { TIERS, probeCaps } from '../engine/caps.js';
 import { clamp, clamp01, damp, lerp } from '../engine/math.js';
 import { createRng } from '../engine/rng.js';
 import { CameraRig } from './Cameras.js';
@@ -85,12 +83,6 @@ const HINT_KEY = 'dreamcar.hinted.v1';
 const QUALITY_KEY = 'dreamcar.quality';
 const UNITS_KEY = 'dreamcar.units';
 const MAP_KEY = 'dreamcar.map';
-/** The performance readout, on or off. */
-const STATS_KEY = 'dreamcar.stats';
-/** Where the governor ended on this device, as `tier:level`: the next visit starts there instead of at the top. */
-const LEVEL_KEY = 'dreamcar.level.v1';
-/** How often the readout's line is written again (drawn frames). */
-const STATS_EVERY = 20;
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /**
  * The driving help (ASSISTS.levels in config.js), the touch throttle ('auto' | 'manual'), steering (STEERINGS, the
@@ -100,8 +92,6 @@ const ASSISTS_KEY = 'dreamcar.assists';
 const THROTTLE_KEY = 'dreamcar.throttle';
 const STEERING_KEY = 'dreamcar.steering';
 const HAND_KEY = 'dreamcar.hand';
-/** Each local driver's paint (a key of PAINTS): the first driver's, the second's. */
-const PAINT_KEYS = ['dreamcar.paint', 'dreamcar.paint2'];
 const STEERINGS = ['pad', 'slider', 'arrows', 'tilt'];
 const ZONES_KEY = 'dreamcar.zones.v1';
 
@@ -125,27 +115,12 @@ const HELD = { steer: 0, throttle: 0, brake: 0, handbrake: 1 };
 
 const probeAt = new THREE.Vector3();
 const probeHidden = [];
-const probeMotion = { velocity: null, time: 0 };
-const proxySurface = {};
-const proxyFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
-const proxyNormal = new THREE.Vector3();
-const proxyPoint = new THREE.Vector3();
-const proxyBox = new THREE.Matrix4();
-const proxyCentre = new THREE.Vector3();
-const proxyAxes = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
 const mirrorHidden = [];
 const frameOut = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
 const putAt = new THREE.Vector3();
 const shadowPoint = new THREE.Vector3();
 const shadowNormal = new THREE.Vector3();
 const surface = {};
-/** For the car's tunnel uniforms (CarModel.setBore): the road's frame at the car, and its axes in car space. */
-const boreFrame = { pos: new THREE.Vector3(), tan: new THREE.Vector3(), left: new THREE.Vector3(), up: new THREE.Vector3() };
-const boreAhead = new THREE.Vector3();
-const boreFlat = new THREE.Vector3();
-const boreUp = new THREE.Vector3();
-const boreTo = new THREE.Vector3();
-const boreInverse = new THREE.Quaternion();
 const lookRead = { steer: 0, throttle: 0, brake: 0, handbrake: 0, analog: false, lookBack: false };
 
 export class Game {
@@ -156,9 +131,9 @@ export class Game {
   constructor(container, params) {
     this.params = params;
     this.container = container;
-    const engine = new Engine(container, { manual: params.manual, pixelRatio: params.dpr, renderScale: params.scale, shed: params.shed, draw: !params.nodraw });
+    const engine = new Engine(container, { manual: params.manual, pixelRatio: params.dpr, draw: !params.nodraw });
     this.engine = engine;
-    this.caps = probeCaps(engine.renderer, { ldr: params.ldr, mobile: params.mobile });
+    this.caps = probeCaps(engine.renderer, { ldr: params.ldr });
     /** @type {import('../engine/caps.js').Tier} */
     // ?q= wins; then the quality chosen in the options (dreamcar.quality); 'auto' is what the probe chose
     const stored = kept(QUALITY_KEY);
@@ -168,28 +143,16 @@ export class Game {
     /** km/h or mph, and whether the map shows (the options; kept on the device). */
     this.units = kept(UNITS_KEY) === 'mph' ? 'mph' : 'kmh';
     this.mapShown = kept(MAP_KEY) !== 'off';
-    /** The performance readout (the options, kept; ?stats and ?stats=0 win and are not kept). */
-    this.statsShown = params.stats ?? kept(STATS_KEY) === 'on';
     /** The driving help every car gets (a key of ASSISTS.levels), and the touch throttle. */
     const help = kept(ASSISTS_KEY);
     this.assists = help && ASSISTS.levels[help] ? help : ASSISTS.default;
     this.throttle = kept(THROTTLE_KEY) === 'manual' ? 'manual' : 'auto';
     this.steering = STEERINGS.includes(kept(STEERING_KEY)) ? kept(STEERING_KEY) : STEERINGS[0];
     this.hand = kept(HAND_KEY) === 'left' ? 'left' : 'right';
-    /** Each driver's paint (the options, kept on the device; ?paint= for the first driver, not kept). */
-    this.paints = DRIVERS.map((who, i) => {
-      const own = i === 0 && PAINTS[params.paint] ? params.paint : kept(PAINT_KEYS[i]);
-      return PAINTS[own] ? own : who.paint;
-    });
     /** Why tilt is not steering ('' | 'refused' | 'unavailable'): the options say so. */
     this.tiltNote = '';
     this._zonesSeen = kept(ZONES_KEY) === '1';
-    engine.setMaxPixelRatio(params.maxDpr ?? TIERS[this.tier].pixelRatio);
-    // what the governor sheds when frames run long, and how low the render scale may then go (engine/governor.js)
-    engine.setLadder(LADDER[this.tier], params.floor ?? TIERS[this.tier].scaleFloor);
-    // a device that had to shed last time starts where it ended, and climbs from there if it now has the time
-    const [keptTier, keptLevel] = (kept(LEVEL_KEY) || '').split(':');
-    if (keptTier === this.tier && Number(keptLevel) > 0) engine.startAt(Number(keptLevel));
+    engine.setMaxPixelRatio(TIERS[this.tier].pixelRatio);
     this.rng = createRng(params.seed);
 
     this.pipeline = new FramePipeline(engine.renderer, this.caps, { tier: this.tier, post: params.post });
@@ -198,16 +161,8 @@ export class Game {
     // the times of day are whatever lighting.js has, in its order; the demo opens at DEFAULT_TIME (config.js: null, the first)
     params = { ...params, time: params.time && TIMES[params.time] ? params.time : DEFAULT_TIME && TIMES[DEFAULT_TIME] ? DEFAULT_TIME : Object.keys(TIMES)[0] };
     this.params = params;
-    this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params, viewFar: VIEW.far });
+    this.world = createWorld({ renderer: engine.renderer, caps: this.caps, tier: this.tier, track: this.track, rng: this.rng, params });
     if (this.world.time.name !== params.time) this.world.setTime(params.time);
-    // the ladder's rung that is the world's (the pipeline and draw() ask the engine for theirs each frame)
-    const detail = () => this.world.setDetail(engine.isShed('detail'));
-    engine.onQuality(() => {
-      detail();
-      // (kept for the next visit; not the bottom the governor visits for a second while it tests for a frame-rate cap)
-      if (engine.adaptive && !engine.governor.watch?.trial) keep(LEVEL_KEY, `${this.tier}:${engine.qualityStep}`);
-    });
-    detail();
     this.effects = new Effects({
       scene: this.world.scene,
       track: this.track,
@@ -347,7 +302,7 @@ export class Game {
 
     this.racers = DRIVERS.slice(0, n).map((who, index) => {
       const car = createCar({
-        paint: this.paints[index] ?? who.paint,
+        paint: (index === 0 && params.paint) || who.paint,
         plate: (index === 0 ? params.plate : params.plate2) || who.plate,
         tier: this.tier,
         caps: this.caps,
@@ -391,7 +346,7 @@ export class Game {
       return racer;
     });
     if (!split) {
-      this.ghostCar = createCar({ ghost: true, paint: this.paints[0], plate: '', tier: this.tier, caps: this.caps });
+      this.ghostCar = createCar({ ghost: true, paint: DRIVERS[0].paint, plate: '', tier: this.tier, caps: this.caps });
       this.ghostCar.object.visible = false;
       world.scene.add(this.ghostCar.object);
     }
@@ -410,12 +365,10 @@ export class Game {
     if (!this._map) this._map = this._mapOf();
     for (const v of this.hud.views) v.setMap(this._map, n);
     this.views = this.racers.map((racer, i) => {
-      // (ENGINE lane) what the car's paint mirrors: a cube picture of its surroundings, a face or two a frame,
-      // prefiltered for roughness (PROBE in config.js)
+      // (ENGINE lane) what the car's paint mirrors: a cube picture of its surroundings, a face or two a frame
+      // two sizes (PROBE in config.js): the smaller at speed, the larger, redrawn whole, while the car is nearly still
       const table = PROBE[this.tier] || PROBE.medium;
-      const probe = params.probe
-        ? new ReflectionProbe(engine.renderer, table.size, { caps: this.caps, far: table.far, samples: table.samples, levelsPerUpdate: table.levels, fade: PROBE.fade })
-        : null;
+      const probe = params.probe ? new ReflectionProbe(engine.renderer, table.size) : null;
 
       return {
         racer,
@@ -428,7 +381,7 @@ export class Game {
         exposure: this._exposureFor(racer.vehicle),
         /** 0..1: how much of the showcase's exposure compensation is in (eased in the fixed step). */
         showcase: this.phase === 'title' ? 1 : 0,
-        /** The probe the paint reads; `still`: the car is nearly still, and the probe is kept on its slower cadence. */
+        /** The probe the paint reads now; `still` says which of the two it is. */
         probe,
         probes: probe ? [probe] : [],
         still: false,
@@ -614,19 +567,6 @@ export class Game {
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
-    if (name.startsWith('paint:')) {
-      // paint:<driver>:<name>: repainted at once (uniforms only), and kept
-      const [, who, id] = name.split(':');
-      const i = Number(who);
-      if (PAINTS[id] && i >= 0 && i < this.paints.length) {
-        this.paints[i] = id;
-        keep(PAINT_KEYS[i], id);
-        this.racers[i]?.car.setPaint(id);
-        if (i === 0) this.ghostCar?.setPaint(id);
-      }
-      if (this.engine.manual && !this._rendering) this.engine.advance(0);
-      return;
-    }
     if (name.startsWith('units:')) {
       this.units = name.slice(6) === 'mph' ? 'mph' : 'kmh';
       keep(UNITS_KEY, this.units);
@@ -636,13 +576,6 @@ export class Game {
     if (name.startsWith('map:')) {
       this.mapShown = name.slice(4) !== 'off';
       keep(MAP_KEY, this.mapShown ? 'on' : 'off');
-      if (this.engine.manual && !this._rendering) this.engine.advance(0);
-      return;
-    }
-    if (name.startsWith('stats:')) {
-      this.statsShown = name.slice(6) === 'on';
-      keep(STATS_KEY, this.statsShown ? 'on' : 'off');
-      this._statsFrame = -1;
       if (this.engine.manual && !this._rendering) this.engine.advance(0);
       return;
     }
@@ -824,11 +757,6 @@ export class Game {
         if (phase === 'countdown') Object.assign(controls, HELD);
       }
       vehicle.step(dt, controls);
-      // the HUD's pedal gauge: what the car got, eased here so the picture only reads it (TC shows as a flicker)
-      const gauge = racer.gauge || (racer.gauge = { t: 0, b: 0 });
-      const k = 1 - Math.exp(-dt / 0.04);
-      gauge.t += (vehicle.throttle - gauge.t) * k;
-      gauge.b += (vehicle.brake - gauge.b) * k;
     }
     if (racers.length > 1) collideVehicles(racers[0].vehicle, racers[1].vehicle);
 
@@ -1051,41 +979,6 @@ export class Game {
     return map;
   }
 
-  /**
-   * The car's place in the tunnel's frame, for the paint's lines of luminaires (CarModel.setBore): its origin as
-   * drawn, in the road's level frame at its s (along, across, and height over the centre line's grade), that frame
-   * in car space, and how far it is under the roof (the Track's sky, which eases over the portals).
-   */
-  _poseBore(car, obj, vehicle) {
-    const track = this.track;
-    let near = false;
-    for (const t of track.tunnels) if (track.delta(t.s0 - PROBE.boreNear, vehicle.s) >= 0 && track.delta(vehicle.s, t.s1 + PROBE.boreNear) >= 0) near = true;
-    track.frameAt(vehicle.s, boreFrame);
-    boreAhead.set(boreFrame.tan.x, 0, boreFrame.tan.z).normalize();
-    boreFlat.set(boreFrame.left.x, 0, boreFrame.left.z).normalize();
-    const grade = boreFrame.tan.y / Math.max(Math.hypot(boreFrame.tan.x, boreFrame.tan.z), 1e-6);
-    boreTo.subVectors(obj.position, boreFrame.pos);
-    const along = boreTo.dot(boreAhead);
-    const lat = boreTo.dot(boreFlat);
-    const h = boreTo.y - grade * along;
-    boreInverse.copy(obj.quaternion).invert();
-    boreAhead.applyQuaternion(boreInverse);
-    boreFlat.applyQuaternion(boreInverse);
-    boreUp.set(0, 1, 0).applyQuaternion(boreInverse);
-    car.setBore({
-      lat,
-      h,
-      s: vehicle.s + along,
-      under: near ? clamp01(1 - vehicle.sky) : 0,
-      ahead: boreAhead,
-      flat: boreFlat,
-      up: boreUp,
-      grade,
-      speed: vehicle.speed,
-      near,
-    });
-  }
-
   // -------------------------------------------------------------- a frame
 
   /**
@@ -1124,12 +1017,7 @@ export class Game {
       }
       car.setLights(racer.lamps);
       // the car's sky: none in the tunnel, less under the woods (the same canopy the road beside it sees)
-      // (probe lane) `proxy`: the probe's parallax uniforms (ReflectionProbe `uniforms`, GLSL_PROBE_PROXY in engine/glsl.js);
-      // (car lane) and the picture's exposure, which says how bright white paper is where it is (materials.js GLSL_KEY)
-      const own = this.views[racer.index];
-      const probe = own?.probe ?? null;
-      car.setReflections({ cube: probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat), proxy: probe?.uniforms ?? null, exposure: own?.frame.exposure || own?.exposure });
-      if (car.setBore) this._poseBore(car, obj, vehicle);
+      car.setReflections({ cube: this.views[racer.index]?.probe?.texture ?? null, sky: vehicle.sky * canopyOpen(this.track, vehicle.s, vehicle.lat) });
 
       obj.updateMatrixWorld();
       sharp.prevMatrix.copy(sharp.matrix);
@@ -1224,18 +1112,14 @@ export class Game {
       qualityFixed: !!this.params.quality,
       units: this.units,
       map: this.mapShown,
-      stats: this.statsShown,
       assists: this.assists,
       assistLevels: Object.keys(ASSISTS.levels),
-      paints: PAINT_ORDER,
-      paint: this.paints.slice(),
       throttle: this.throttle,
       steering: this.steering,
       hand: this.hand,
       tiltNote: this.tiltNote,
     });
     hud.setFade(1 - this._fadeLevel);
-    this._perf();
     // the board: on the title and the pause sheet (and in the results), never over the run
     if (this.phase === 'title' || this.engine.paused) hud.setBoard(this._boardTable(), RULES.medals, this.world.time.name);
     if (this.phase === 'title') return;
@@ -1269,7 +1153,6 @@ export class Game {
       }
       h.setSpeed(v.speed * 3.6);
       h.setRev(v.rpm, v.gear);
-      if (racer.gauge) h.setGauge(racer.gauge.t, racer.gauge.b, racer.controls.handbrake > 0.5);
       const a = v.assists;
       h.setTells({
         abs: a.abs > 0.1,
@@ -1319,41 +1202,6 @@ export class Game {
     }
   }
 
-  /** The performance readout: one line of what is being drawn and how fast, written a few times a second. */
-  _perf() {
-    const { engine, hud } = this;
-    if (!this.statsShown) {
-      if (this._statsFrame !== -2) hud.setPerf(null);
-      this._statsFrame = -2;
-      return;
-    }
-    if (this._statsFrame >= 0 && engine.frame - this._statsFrame < STATS_EVERY) return;
-    this._statsFrame = engine.frame;
-    hud.setPerf(TEXT.statsLine(this.perfState()));
-  }
-
-  /** What the readout shows (and tests read): the tier, the canvas, the render scale, frames a second, the ladder. */
-  perfState() {
-    const { engine } = this;
-    const q = engine.qualityState();
-    const f = engine.frameStats(3);
-    return {
-      tier: this.tier,
-      width: engine.bufferWidth,
-      height: engine.bufferHeight,
-      ratio: Math.round(engine.pixelRatio * 100) / 100,
-      scale: engine.renderScale,
-      aa: this.pipeline.sceneTarget.samples > 0 ? `msaa${this.pipeline.sceneTarget.samples}` : 'fxaa',
-      fps: f.mean > 0 ? Math.round(1000 / f.mean) : 0,
-      low: f.worst > 0 ? Math.round(1000 / f.worst) : 0,
-      shed: q.shed,
-      cap: q.capMs ? Math.round(1000 / q.capMs) : null,
-      trial: q.trial,
-      // (what the browser calls the GPU, shortened: it is what the tier was guessed from)
-      gpu: `${this.caps.hdr ? '' : 'ldr '}${this.caps.gpu.replace(/^angle \(|\)$/g, '').slice(0, 18)}`.trim(),
-    };
-  }
-
   /** The board's table for the time of day showing (read from storage through a throwaway race when none runs). */
   _boardTable() {
     const name = this.world.time.name;
@@ -1369,31 +1217,6 @@ export class Game {
     return this._board.table;
   }
 
-  /**
-   * The local proxy of a view's probe, for the materials' parallax correction (GLSL_PROBE_PROXY): the road's plane
-   * under the car, and in the tunnel the bore as a box along the road (wall to wall, road to ceiling).
-   */
-  _probeProxy(probe, vehicle, inTunnel) {
-    const track = this.track;
-    track.surfaceAt(probeAt.x, probeAt.z, this._proxyHint ?? -1, proxySurface);
-    this._proxyHint = proxySurface.index;
-    proxyNormal.set(proxySurface.nx, proxySurface.ny, proxySurface.nz);
-    proxyPoint.set(probeAt.x, proxySurface.y, probeAt.z);
-    if (!inTunnel) {
-      probe.setProxy(proxyNormal, proxyPoint, null);
-      return;
-    }
-    const f = track.frameAt(vehicle.s, proxyFrame);
-    const left = track.edgeAt(vehicle.s, 1) + BORE.walk;
-    const right = track.edgeAt(vehicle.s, -1) + BORE.walk;
-    proxyCentre.copy(f.pos).addScaledVector(f.left, (left - right) / 2).addScaledVector(f.up, BORE.ceiling / 2);
-    proxyBox
-      .makeBasis(proxyAxes[0].copy(f.tan).multiplyScalar(PROBE.tunnelBox), proxyAxes[1].copy(f.left).multiplyScalar((left + right) / 2), proxyAxes[2].copy(f.up).multiplyScalar(BORE.ceiling / 2))
-      .setPosition(proxyCentre)
-      .invert();
-    probe.setProxy(proxyNormal, proxyPoint, proxyBox);
-  }
-
   /** Draw every view into its rectangle. */
   draw() {
     const table = PROBE[this.tier] || PROBE.medium;
@@ -1407,19 +1230,23 @@ export class Game {
       if (this.ghostCar?.shadow) mirrorHidden.push(this.ghostCar.shadow);
       mirrorHidden.push(...this.effects.objects);
       this.world.prepareView(view.camera, car.object.position, this.beams, mirrorHidden);
-      // (water lane) the water mirrors the far land from this view's probe (world/sea.js)
-      this.world.setSeaProbe?.(view.probe?.texture ?? null);
       // (ENGINE lane) the car's probe, from the middle of the car, without the car itself; after prepareView, so
       // that the shadows it shows are this view's. In split screen the two take turns. Nearly still (the title's
-      // orbit, the grid) it is redrawn on a slower cadence; at speed the faces that see the roadside go by first.
-      const vehicle = view.racer.vehicle;
-      if (view.probe) {
-        const speed = Math.abs(vehicle.speed);
-        view.still = view.still ? speed < PROBE.movingAbove : speed < PROBE.stillBelow;
+      // orbit, the grid): the larger cube, redrawn whole over a few frames; at speed the smaller one, a face or two.
+      if (view.probes.length) {
+        const speed = Math.abs(view.racer.vehicle.speed);
+        const still = view.still ? speed < PROBE.movingAbove : speed < PROBE.stillBelow;
+        if (still !== view.still) {
+          view.still = still;
+          // the larger cube is made the first time it is needed
+          if (still && !view.probes[1]) view.probes[1] = new ReflectionProbe(this.engine.renderer, table.stillSize);
+          view.probe = view.probes[still ? 1 : 0];
+          // the one taken up is refreshed face by face from what it last showed (its very first update draws all six)
+          view.frame.probe = view.probe.texture;
+        }
       }
-      // (the ladder's first rung: the faces redrawn half as often)
-      const probeEvery = (view.still ? (table.stillEvery ?? 1) : table.every) * (this.engine.isShed('probe') ? 2 : 1);
-      const inTunnel = vehicle.sky < PROBE.tunnelSky;
+      const probeEvery = view.still ? (table.stillEvery ?? 1) : table.every;
+      const inTunnel = view.racer.vehicle.sky < PROBE.tunnelSky;
       const probeFaces = view.still ? table.stillFaces : inTunnel ? (table.tunnelFaces ?? table.faces) : table.faces;
       if (view.probe && this.engine.frame % (probeEvery * n) === i * probeEvery) {
         probeAt.copy(car.box.center).applyMatrix4(car.object.matrixWorld);
@@ -1432,10 +1259,7 @@ export class Game {
         if (this.ghostCar) probeHidden.push(this.ghostCar.object);
         // smoke and sparks in a reflection would smear over the whole car
         probeHidden.push(...this.effects.objects);
-        probeMotion.velocity = vehicle.velocity;
-        probeMotion.time = this.engine.renderTime;
-        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces, inTunnel ? PROBE.tunnelFar : undefined, probeMotion);
-        this._probeProxy(view.probe, vehicle, inTunnel);
+        view.probe.update(this.world.scene, probeAt, probeHidden, probeFaces, inTunnel ? PROBE.tunnelFar : undefined);
       }
       this.pipeline.render(this.world.scene, view.camera, view.rect, view.frame);
       view.rig.cut = false;
@@ -1544,7 +1368,6 @@ export class Game {
       pixelRatio: engine.pixelRatio,
       renderScale: engine.renderScale,
       qualityStep: engine.qualityStep,
-      quality: engine.qualityState(),
       pipeline: this.pipeline.stats(),
       tier: this.tier,
       hdr: this.caps.hdr,

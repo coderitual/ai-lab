@@ -285,24 +285,6 @@ export class ViewHud {
     };
     this.tell.high.el.innerHTML = `<svg viewBox="0 0 24 24" role="img" aria-label="${TEXT.lamps.high}">${ICONS.lights}</svg>`;
 
-    // the pedal gauge: two slim bars beside the speed, the throttle (green) and the brake (amber, red) as the car got
-    // them, and a mark for the handbrake (setGauge)
-    this.gauge = cell('div', 'gauge', cluster);
-    this.gaugeFill = {};
-    for (const [name, label] of [['brake', TEXT.gauge.brake], ['hand', TEXT.gauge.hand], ['throttle', TEXT.gauge.throttle]]) {
-      const bar = make('div', `bar ${name}`, this.gauge.el);
-      bar.setAttribute('role', 'meter');
-      bar.setAttribute('aria-label', label);
-      bar.setAttribute('aria-valuemin', '0');
-      bar.setAttribute('aria-valuemax', '100');
-      bar.setAttribute('aria-valuenow', '0');
-      if (name !== 'hand') {
-        for (const t of ['t50', 't100']) make('i', `tick ${t}`, bar);
-        this.gaugeFill[name] = make('b', 'fill', bar);
-      }
-      this.gaugeFill[`${name}Bar`] = bar;
-    }
-    this._gaugeKey = '';
     // the drift readout (designed, not yet wired: the HANDLING lane's slide angle and score feed setDrift): over
     // the road above the car, only while the car slides beyond about 15 degrees, fading out after
     this.drift = cell('div', 'slide', el);
@@ -317,23 +299,14 @@ export class ViewHud {
     const ctl = this.controls.el;
     const named = (c, name) => make('span', 'name', c.el, name);
     // the one-thumb pad: its glass base and marks (SVG), the knob over it
-    // (two: the live pad, drawn under the thumb that placed it, and the ghost, a faint hint at the home place while no
-    // thumb is down)
     this.stick = cell('div', 'stick', ctl);
     const base = make('svg:svg', 'face', this.stick.el);
     base.setAttribute('viewBox', '-112 -112 224 224');
     base.innerHTML = stickSvg();
-    this.stickFace = base;
     this.brakeFill = [...base.querySelectorAll('.brakefill')];
     this.stickKnob = make('i', 'knob', this.stick.el);
+    named(this.stick, TEXT.pads.pad);
     this._stickKey = '';
-    this.ghost = cell('div', 'stick ghost', ctl);
-    const gbase = make('svg:svg', 'face', this.ghost.el);
-    gbase.setAttribute('viewBox', '-112 -112 224 224');
-    gbase.innerHTML = stickSvg();
-    make('i', 'knob', this.ghost.el);
-    named(this.ghost, TEXT.pads.pad);
-    this._placedKey = '';
     this.slider = cell('div', 'slider', ctl);
     make('b', 'rail', this.slider.el);
     make('b', 'mid', this.slider.el);
@@ -517,23 +490,6 @@ export class ViewHud {
     this.speed.text(Math.round(Math.abs(kmh) * UNITS[this.units]));
   }
 
-  /** The pedal gauge: the throttle and the brake the car got (0..1, eased in the fixed step) and whether the handbrake is on. */
-  setGauge(throttle, brake, hand) {
-    const t = Math.round(Math.max(0, Math.min(1, throttle)) * 50) * 2;
-    const b = Math.round(Math.max(0, Math.min(1, brake)) * 50) * 2;
-    const key = `${t},${b},${hand ? 1 : 0}`;
-    if (key === this._gaugeKey) return;
-    this._gaugeKey = key;
-    const g = this.gaugeFill;
-    g.throttle.style.transform = `scaleY(${t / 100})`;
-    g.brake.style.transform = `scaleY(${b / 100})`;
-    g.throttleBar.setAttribute('aria-valuenow', String(t));
-    g.brakeBar.setAttribute('aria-valuenow', String(b));
-    g.handBar.setAttribute('aria-valuenow', hand ? '100' : '0');
-    this.gauge.flag('hand', !!hand).flag('braking', b > 60);
-    writes++;
-  }
-
   /** The rev arc filled to `rpm`, red at the limiter; the gear beside the speed. */
   setRev(rpm, gear) {
     const f = Math.min(1, Math.round((Math.max(0, rpm) / (SCALE_K * 1000)) * 200) / 200);
@@ -583,10 +539,8 @@ export class ViewHud {
       const vs = this.el.style;
       if (pad) {
         const p = L.pad;
-        place(this.ghost, p.cx, p.cy, 2 * p.r, 2 * p.r);
-        this.ghost.el.style.setProperty('--knob', `${p.knob.toFixed(1)}px`);
+        place(this.stick, p.cx, p.cy, 2 * p.r, 2 * p.r);
         this.stick.el.style.setProperty('--knob', `${p.knob.toFixed(1)}px`);
-        this._placedKey = '';
         // where the readouts may stand: above the pad on its side, above the handbrake button on the other (px from the view's bottom)
         const d = L.drift;
         const right = L.hand === 'right';
@@ -605,7 +559,6 @@ export class ViewHud {
         ])
           place(a, b.x, b.y, 2 * b.r, 2 * b.r);
       }
-      this.ghost.show(pad);
       this.stick.show(pad);
       this.slider.show(!pad && !arrows);
       this.arrowL.show(arrows);
@@ -622,20 +575,6 @@ export class ViewHud {
       // pulled; with no thumb, back at the centre (an eased spring, hud.css), or across by the tilt
       const p = L.pad;
       const k = c.knob;
-      // under the thumb: the pad is where the thumb landed (it keeps the last place while it fades out)
-      const pl = c.placed;
-      if (pl) {
-        const key = `${pl.cx.toFixed(1)},${pl.cy.toFixed(1)},${pl.r.toFixed(1)},${pl.ox.toFixed(1)},${pl.oy.toFixed(1)}`;
-        if (key !== this._placedKey) {
-          this._placedKey = key;
-          const st = this.stick.el.style;
-          st.left = `${(pl.cx - pl.r).toFixed(1)}px`;
-          st.top = `${(pl.cy - pl.r).toFixed(1)}px`;
-          st.width = st.height = `${(2 * pl.r).toFixed(1)}px`;
-          this.stickFace.style.transform = `translate(${pl.ox.toFixed(1)}px, ${pl.oy.toFixed(1)}px)`;
-          writes++;
-        }
-      }
       let x = 0;
       let y = 0;
       if (k) {
@@ -654,7 +593,7 @@ export class ViewHud {
           y *= most / len;
         }
       } else if (c.tilt !== null && c.tilt !== undefined) x = c.tilt * TOUCH.pad.steer * p.s;
-      const brake = k && !k.tripped ? Math.max(0, Math.min(1, (k.ey / (TOUCH.pad.brake * p.s) - TOUCH.pad.lift) / (1 - TOUCH.pad.lift))) : 0;
+      const brake = k && !k.tripped ? Math.max(0, Math.min(1, (k.dy / (TOUCH.pad.brake * p.s) - TOUCH.pad.lift) / (1 - TOUCH.pad.lift))) : 0;
       const key = `${x.toFixed(1)},${y.toFixed(1)},${brake.toFixed(2)},${!!k}`;
       if (key !== this._stickKey) {
         this._stickKey = key;
@@ -663,7 +602,6 @@ export class ViewHud {
         for (const f of this.brakeFill) f.setAttribute('stroke-dasharray', dash);
         writes++;
       }
-      this.ghost.flag('away', !!k);
       this.stick.flag('held', !!k).flag('tripped', !!k && k.tripped).flag('braking', brake > 0);
     } else {
       // the slider's knob: where the thumb asks, at the centre when there is none
@@ -801,9 +739,6 @@ export class Hud {
 
     this.veil = cell('div', 'veil', root);
     this.veil.show(false);
-    // the performance readout: one small line at the page's bottom edge, under everything, in nobody's way
-    this.perf = cell('div', 'perf', root);
-    this.perf.show(false);
 
     // the title: the menu beside the car on a wide screen, under it on an upright one
     this.title = cell('div', 'panel title', root);
@@ -852,13 +787,8 @@ export class Hud {
     this.steeringNote = cell('div', 'optnote', o);
     this.optHand = choiceRow(o, TEXT.hand, ['right', 'left'], [TEXT.right, TEXT.left], (v) => this.act(`hand:${v}`));
     this.optThrottle = choiceRow(o, TEXT.throttle, ['auto', 'manual'], [TEXT.auto, TEXT.manual], (v) => this.act(`throttle:${v}`));
-    // the paint, each driver's (the second's row shows in split screen); one button per paint, made in setState
-    this.optPaint = [choiceRow(o, TEXT.paint, [], [], () => {}), choiceRow(o, TEXT.paint2, [], [], () => {})];
-    for (const row of this.optPaint) row.group.classList.add('wrap');
     this.optUnits = choiceRow(o, TEXT.units, ['kmh', 'mph'], [TEXT.kmh, TEXT.mph], (v) => this.act(`units:${v}`));
     this.optMap = choiceRow(o, TEXT.map, ['on', 'off'], [TEXT.shown, TEXT.hidden], (v) => this.act(`map:${v}`));
-    this.optStats = choiceRow(o, TEXT.stats, ['on', 'off'], [TEXT.shown, TEXT.hidden], (v) => this.act(`stats:${v}`));
-    make('div', 'optnote', o, TEXT.statsNote);
     this.closeButton = button(make('div', 'buttons', o), TEXT.done, () => this.closeOptions(), 'primary');
     this.options.show(false);
     this.optionsOpen = false;
@@ -890,12 +820,6 @@ export class Hud {
     const out = { left: parseFloat(cs.paddingLeft) || 0, right: parseFloat(cs.paddingRight) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };
     probe.remove();
     return out;
-  }
-
-  /** The performance readout's line (null: hidden). Written only when it changes. */
-  setPerf(line) {
-    this.perf.show(line !== null);
-    if (line !== null) this.perf.text(line);
   }
 
   /** DOM writes so far (all views and panels): the HUD's cost, for tests. */
@@ -985,7 +909,7 @@ export class Hud {
    */
   setState(s) {
     const times = s.times || [s.time];
-    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.stats}|${s.assists}|${(s.paint || []).join(',')}|${s.throttle}|${s.steering}|${s.hand}|${s.tiltNote}|${this.optionsOpen}`;
+    const key = `${s.phase}|${s.paused}|${s.mode}|${s.time}|${s.muted}|${s.device}|${s.attract}|${times.join(',')}|${s.quality}|${s.tier}|${s.units}|${s.map}|${s.assists}|${s.throttle}|${s.steering}|${s.hand}|${s.tiltNote}|${this.optionsOpen}`;
     this._s = s;
     if (key === this._state) return;
     const [wasPhase, wasPaused] = this._state.split('|');
@@ -1027,16 +951,6 @@ export class Hud {
       this.optAssists.cells.set(id, new Cell(b));
     }
     pick(this.optAssists, s.assists);
-    this.optPaint.forEach((row, driver) => {
-      for (const id of s.paints || []) {
-        if (row.cells.has(id)) continue;
-        const b = button(row.group, TEXT.paintName(id), () => this.act(`paint:${driver}:${id}`), 'toggle');
-        b.dataset.value = id;
-        row.cells.set(id, new Cell(b));
-      }
-      pick(row, (s.paint || [])[driver]);
-    });
-    this.optPaint[1].row.hidden = s.mode !== 'split';
     pick(this.optThrottle, s.throttle);
     this.optThrottle.row.hidden = !touch;
     pick(this.optSteering, s.steering);
@@ -1052,7 +966,6 @@ export class Hud {
     pick(this.optSound, s.muted ? 'off' : 'on');
     pick(this.optUnits, s.units);
     pick(this.optMap, s.map ? 'on' : 'off');
-    pick(this.optStats, s.stats ? 'on' : 'off');
     this.optSound.row.hidden = !s.canSound;
     this.qualityNote.text(s.qualityFixed ? TEXT.qualityFixed(s.tier) : TEXT.qualityNow(s.tier));
     for (const v of this.views) {

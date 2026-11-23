@@ -28,7 +28,6 @@
 // scene in the same frame use the map as it is.
 
 import * as THREE from 'three';
-import { forDevice } from '../../engine/caps.js';
 
 /**
  * Per tier: the map's edge in texels, half the side of the square it covers (m), and how wide the shadow's edge
@@ -40,8 +39,6 @@ export const SHADOW = {
   low: { size: 1024, reach: 46, radius: 1.0 },
   medium: { size: 2048, reach: 56, radius: 1.2 },
   high: { size: 4096, reach: 66, radius: 1.6 },
-  /** (perf lane) A phone's own numbers, laid over its tier's (caps.mobile; engine/caps.js forDevice): none yet. */
-  mobile: {},
 };
 
 /** How far in from the edge of its square a view's car is kept (m): shadows also fall on what is behind it. */
@@ -85,16 +82,6 @@ function installShadowFade() {
 }
 
 /**
- * The map's box in the light's own frame, as prepareView last placed it: a point p is in it when
- * |p.right - x| < halfX, |p.up - y| < halfY and -away < p.dir - z < towards (`dir` points at the light).
- * @typedef {object} ShadowBox
- * @property {THREE.Vector3} right @property {THREE.Vector3} up @property {THREE.Vector3} dir
- * @property {number} x @property {number} y @property {number} z
- * @property {number} halfX @property {number} halfY @property {number} towards @property {number} away
- * @property {boolean} on false while the map is not drawn at all (no shadows)
- */
-
-/**
  * @typedef {object} Sun
  * @property {THREE.DirectionalLight} light
  * @property {THREE.HemisphereLight} fill
@@ -104,8 +91,6 @@ function installShadowFade() {
  * @property {(camera: THREE.Camera, focus: THREE.Vector3) => void} prepareView puts the shadow round what this
  *   view looks at, and asks for the map to be drawn
  * @property {(share: number) => void} setFill how much of the fill reaches the view's car (none in the tunnel)
- * @property {ShadowBox} box what the map covers for the view prepareView last placed it for (forest.js chooses the
- *   trees that cast from it)
  * @property {() => void} dispose
  */
 
@@ -113,13 +98,12 @@ function installShadowFade() {
  * @param {object} options
  * @param {THREE.WebGLRenderer} options.renderer
  * @param {import('../../engine/caps.js').Tier} options.tier
- * @param {import('../../engine/caps.js').Caps} [options.caps] the device: a phone has its own map size (SHADOW.mobile)
  * @param {boolean} options.shadows
  * @returns {Sun}
  */
-export function createSun({ renderer, tier, caps = null, shadows }) {
+export function createSun({ renderer, tier, shadows }) {
   installShadowFade();
-  const { size, reach, radius } = forDevice(SHADOW, tier, caps);
+  const { size, reach, radius } = SHADOW[tier];
   // the map's texels across the light's view (x) and up it (y): y is set per time of day, from the light's height
   const texel = (2 * reach) / size;
   let texelUp = texel;
@@ -166,8 +150,6 @@ export function createSun({ renderer, tier, caps = null, shadows }) {
   const fillSky = new THREE.Color();
   const fillGround = new THREE.Color();
   let standOff = 0;
-  /** @type {ShadowBox} */
-  const box = { right, up, dir, x: 0, y: 0, z: 0, halfX: reach, halfY: reach, towards: 0, away: 0, on: shadows };
   /** @type {THREE.Camera|null} */
   let pendingFor = null;
 
@@ -175,7 +157,6 @@ export function createSun({ renderer, tier, caps = null, shadows }) {
     light,
     fill,
     objects: [light, light.target, fill],
-    box,
 
     setTime(time, sky, ground) {
       // (look lane, dusk) a sun under the horizon lights nothing directly: `light` is then the soft key the
@@ -205,9 +186,6 @@ export function createSun({ renderer, tier, caps = null, shadows }) {
       const towards = upReach / slope + CASTER_HEIGHT / dir.y;
       const away = upReach / slope + GROUND_DROP;
       standOff = towards + 10;
-      box.halfY = upReach;
-      box.towards = towards;
-      box.away = away;
       shadow.camera.near = 10;
       shadow.camera.far = standOff + away;
       shadow.camera.updateProjectionMatrix();
@@ -231,9 +209,6 @@ export function createSun({ renderer, tier, caps = null, shadows }) {
       const y = Math.round(centre.dot(up) / texelUp) * texelUp;
       const z = centre.dot(dir);
       centre.set(0, 0, 0).addScaledVector(right, x).addScaledVector(up, y).addScaledVector(dir, z);
-      box.x = x;
-      box.y = y;
-      box.z = z;
       light.target.position.copy(centre);
       light.position.copy(centre).addScaledVector(dir, standOff);
       light.target.updateMatrixWorld();

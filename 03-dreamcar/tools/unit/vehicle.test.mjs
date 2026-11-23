@@ -763,16 +763,14 @@ if (realTrack) {
     return `${r.times.map((x) => x.toFixed(1)).join(', ')} s, body ${r.off.toFixed(2)} m beyond the pavement at most, ${r.slip.toFixed(1)}° of slip`;
   });
 
-  // (sea lane, round 5) the coast runs low over the bay and climbs back to the ledge: the top is a broad one on the
-  // ledge's first bend (no crest made to lift the car any more); over it every wheel stays loaded
-  test('over the top of the climb from the bay every wheel stays on the road and the car is never lifted', () => {
+  test('the crest: the car goes light at the autopilot\'s pace, but every wheel stays on the road', () => {
     const notes = [];
     for (const pace of [1, 0.9]) {
       const driver = new AutoDriver(realTrack, { pace });
       const car = new Vehicle(realTrack);
       car.reset(realTrack.grid(0, {}));
       const c = controls();
-      const crest = [realTrack.at('ledge1', 0.3), realTrack.at('ledge2', 1)];
+      const crest = [realTrack.at('crest', 0.5), realTrack.at('plunge', 0.25)];
       let least = Infinity, lightest = Infinity, t = 0, laps = 0, last = car.s;
       while (laps < 2 && t < 400) {
         driver.drive(car, DT, c);
@@ -789,8 +787,8 @@ if (realTrack) {
         if (car.s > crest[0] && car.s < crest[1]) lightest = Math.min(lightest, total / (CAR.mass * CAR.gravity));
       }
       check(least > 0.05, `pace ${pace}: a wheel was down to ${(least * 100).toFixed(0)} % of its load`);
-      check(lightest > 0.6, `pace ${pace}: the car is down to ${(lightest * 100).toFixed(0)} % of its weight over the top`);
-      notes.push(`pace ${pace}: ${(lightest * 100).toFixed(0)} % of the weight over the top at the least, no wheel under ${(least * 100).toFixed(0)} %`);
+      check(lightest < 0.8, `pace ${pace}: the car is not light over the crest (${(lightest * 100).toFixed(0)} % of its weight)`);
+      notes.push(`pace ${pace}: ${(lightest * 100).toFixed(0)} % of the weight over the crest, no wheel under ${(least * 100).toFixed(0)} %`);
     }
     return notes.join('; ');
   });
