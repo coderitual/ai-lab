@@ -105,13 +105,16 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
       });
     }
     // expansion joints: steel plates across the road at both ends of the deck
+    const jointProf = { y: 0, surface: 0 };
     for (const s of [b.s0 + 0.4, b.s1 - 0.4]) {
       const rowAt = (ds) => {
         const lats = [];
-        for (let k = 0; k <= 8; k++) lats.push(-track.edgeAt(s, -1) + ((track.edgeAt(s, 1) + track.edgeAt(s, -1)) * k) / 8);
+        // (sea lane) on the road's own cross-section (its crown and its drains), closely enough that no chord between
+        // two points stands more than a few millimetres off it
+        for (let k = 0; k <= 32; k++) lats.push(-track.edgeAt(s, -1) + ((track.edgeAt(s, 1) + track.edgeAt(s, -1)) * k) / 32);
         return lats.map((lat) => {
           track.pointAt(s + ds, lat, p);
-          return [p.x, p.y + 0.012, p.z, s + ds, lat];
+          return [p.x, track.profile(s + ds, lat, jointProf).y + 0.012, p.z, s + ds, lat];
         });
       };
       jointParts.push(stripGeometry([rowAt(-0.14), rowAt(0.14)]));
@@ -139,7 +142,16 @@ export function createViaducts({ track, terrain, atmosphere, tier = 'medium' }) 
       [b.s1, 1],
     ]) {
       levelFrame(track, s, frame);
-      const top = frame.pos.y - 0.3;
+      // (sea lane) its top level 0.3 m under the lowest of the road over its footprint: under the centre line's
+      // height it stood 0.3 m over the shoulder where the road is banked down to one side (the owner's pale plate at
+      // the sea viaduct's end)
+      let low = Infinity;
+      const prof = { y: 0, surface: 0 };
+      for (let d = -0.1; d <= 3.3; d += 0.4) {
+        const sd = track.wrap(s + out * d);
+        for (const side of [1, -1]) for (let f = 0; f <= 1.0001; f += 0.25) low = Math.min(low, track.profile(sd, side * f * track.edgeAt(sd, side), prof).y);
+      }
+      const top = Math.min(frame.pos.y, low) - 0.3;
       const c = new THREE.Vector3().copy(frame.pos).addScaledVector(frame.ahead, out * 1.6);
       const ground = terrain.heightAt(c.x, c.z);
       const foot = Math.min(ground, top - 3) - 3;
