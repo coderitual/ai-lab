@@ -99,6 +99,8 @@ if (place) {
     for (let z = track.bounds.minZ - 200; z <= track.bounds.maxZ + 200; z += 20) {
       for (let x = track.bounds.minX - 200; x <= track.bounds.maxX + 200; x += 20) {
         if (Math.abs(terrain.heightAt(x, z) - terrain.before.heightAt(x, z)) < 1e-6) continue;
+        // (not what the arm of the lake lowered: arm.test.mjs walks that)
+        if (terrain.arm && terrain.arm.ground(x, z, terrain.before.heightAt(x, z)) < terrain.before.heightAt(x, z) - 1e-6) continue;
         moved++;
         track.locate(x, z, -1, spot);
         nearest = Math.min(nearest, Math.abs(spot.lat) - track.edgeAt(spot.s, spot.lat >= 0 ? 1 : -1));
@@ -119,6 +121,8 @@ if (place) {
           track.pointAt(s, side * (track.edgeAt(s, side) + beyond), p);
           const d = Math.abs(terrain.heightAt(p.x, p.z) - terrain.before.heightAt(p.x, p.z));
           if (d < 1e-6) continue;
+          // (the arm of the lake, arm.js, lowers the ground on the left of its own stretch: arm.test.mjs)
+          if (terrain.arm && side > 0 && terrain.arm.ground(p.x, p.z, terrain.before.heightAt(p.x, p.z)) < terrain.before.heightAt(p.x, p.z) - 1e-6) continue;
           // (a point nearer to the place's own stretch than to this one is the place's side of the shared ground)
           track.locate(p.x, p.z, -1, spot);
           const own = place.along(spot.s);

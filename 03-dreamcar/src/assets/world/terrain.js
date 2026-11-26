@@ -34,6 +34,8 @@ import * as THREE from 'three';
 import { planeNoise, smoothstep, withBake } from './shading.js';
 import { CANOPY, canopyOpen } from './canopy.js';
 import { createLakeside } from './lakeside.js';
+import { goldwoodOf } from './goldwood.js';
+import { createArm } from './arm.js';
 import { APPROACH, approachAt, approachesOf, beforeFace, behindFace, coverOver, meadowAt, rise as approachRise, woodAt as approachWood } from './approach.js';
 
 // The Track's EDGE and SURFACE values (the world never imports from game/).
@@ -108,6 +110,12 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   const lakeLevel = track.layout?.lakeLevel ?? -1.8;
   // the lakeside (lakeside.js): one place where the land beyond the solid edges is shaped by hand
   const lakeside = createLakeside(track, rng.fork('lakeside'));
+
+  // the arm of the lake (arm.js): the other place where the land beyond the solid edges is shaped by hand (it only
+  // lowers ground, on the outside of the lap below the gully bridge's end)
+  const arm = createArm(track, rng.fork('arm'));
+  // the golden wood (goldwood.js): the esses in autumn; it moves no ground, only marks the band beside the road
+  const goldwood = goldwoodOf(track);
 
   // ---- per sample: what the road asks of the land on each side
   const wrap = (s) => track.wrap(s);
@@ -449,8 +457,10 @@ const FOOT = 0.8;
 
   /** H at a point whose track coordinates are known (`raw`: the land before the lakeside was shaped). */
   function heightOf(x, z, s, lat, front = false, raw = false) {
-    const h = heightBefore(x, z, s, lat, front, raw);
-    return lakeside && !raw ? lakeside.ground(x, z, h, s, lat) : h;
+    let h = heightBefore(x, z, s, lat, front, raw);
+    if (raw) return h;
+    if (lakeside) h = lakeside.ground(x, z, h, s, lat);
+    return arm ? arm.ground(x, z, h, s, lat) : h;
   }
   function heightBefore(x, z, s, lat, front, raw) {
     const side = lat >= 0 ? 1 : -1;
@@ -493,7 +503,8 @@ const FOOT = 0.8;
   const near = (x, z) => (inMacro(x, z) ? bilinear(macroD, mx, mz, minX, minZ, MACRO, x, z) : 1e9) < NEAR_REACH;
   /** The land far from any road, with the lakeside in it. */
   function landAt(x, z) {
-    return lakeside ? lakeside.ground(x, z, land(x, z)) : land(x, z);
+    const h = lakeside ? lakeside.ground(x, z, land(x, z)) : land(x, z);
+    return arm ? arm.ground(x, z, h) : h;
   }
   function heightAt(x, z, raw = false) {
     if (!near(x, z)) return raw ? land(x, z) : landAt(x, z);
@@ -522,8 +533,11 @@ const FOOT = 0.8;
 
   // ---- the forest: where the Track says trees stand, and in patches on the massif and the far slopes
   function forestOf(x, z, y, slope, s, lat, d, raw = false) {
-    const f = forestBefore(x, z, y, slope, s, lat, d);
-    return lakeside && !raw ? lakeside.wood(x, z, f, s, lat) : f;
+    let f = forestBefore(x, z, y, slope, s, lat, d);
+    if (raw) return f;
+    if (lakeside) f = lakeside.wood(x, z, f, s, lat);
+    // (the far range's snow, a negative mask, is the lakeside's own)
+    return arm && f >= 0 ? arm.wood(x, z, f, s, lat) : f;
   }
   function forestBefore(x, z, y, slope, s, lat, d) {
     if (y < lakeLevel + 0.6) return 0;
@@ -631,7 +645,8 @@ const FOOT = 0.8;
         for (let k = 1; k <= 4; k++) offs[2 + k] = offs[2] + (top - offs[2]) * (k / 4);
         for (let k = 0; k < BAND_OUT.length; k++) offs[7 + k] = top + BAND_OUT[k];
         const gravel = (side > 0 ? track.vergeL : track.vergeR)[i] === SURFACE_GRAVEL;
-        const woodHere = track.woodAt ? !!track.woodAt(s, side) && !lakeside?.open(s, side) : false;
+        const woodHere = track.woodAt ? !!track.woodAt(s, side) && !lakeside?.open(s, side) && !arm?.opens(s, side) : false;
+        const gold = goldwood ? goldwood.stretch(s) : 0;
         let lastOwn = 0;
         for (let k = 0; k < cols; k++) {
           let lat = side * (edge + offs[k]);
@@ -663,12 +678,17 @@ const FOOT = 0.8;
           verge[v * 4 + 1] = s + lapOffset;
           verge[v * 4 + 2] = Math.abs(lat) - edge;
           // w: 0 on a verge with no wood behind it, 0.4 under woods (leaf litter); vertices without the attribute read 1
-          verge[v * 4 + 3] = woodHere ? 0.4 : 0;
+          // (the golden wood, goldwood.js: up to 0.09 more, by how much of that place it is; the ground's material
+          // paints its pale grass and fallen leaves from it)
+          verge[v * 4 + 3] = woodHere ? 0.4 + 0.09 * gold : 0;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
           // (ref lane) a negative aMask.y is the meadow of a tunnel's approach (groundMaterial.js), verge and all
           const p = gravel ? null : placeOf(s, lat, d);
           if (p && p.meadow > 0) mask[v * 2 + 1] = -p.meadow;
+          // (the arm of the lake: its open bank is the same grass, from the barrier out)
+          const bank = arm && !gravel && !(p && p.meadow > 0) && d > 0 ? arm.meadow(pt.x, pt.z, s, lat) : 0;
+          if (bank > 0) mask[v * 2 + 1] = -bank;
           // (and its verge is under no canopy: the wood beside it is cleared)
           if (p && p.meadow > 0 && Math.abs(lat) < edge + CANOPY.clear) bake[v * 4 + 2] += (sky - bake[v * 4 + 2]) * p.meadow;
           // (the lakeside's spur: its steep ground is the bank's weathered stone, aMask.y = 3, not the lap's grey rock)
@@ -945,6 +965,8 @@ const FOOT = 0.8;
           mask[v * 2 + 1] = smoothstep(0.6, 0.9, 1 - inv) * 0.5;
           const p = s === null ? null : placeOf(s, gLat[k], d);
           if (p && p.meadow > 0) mask[v * 2 + 1] = -p.meadow;
+          const bank = arm && !(p && p.meadow > 0) ? arm.meadow(x, z, s, gLat[k]) : 0;
+          if (bank > 0) mask[v * 2 + 1] = -bank;
           if (lakeside && !(p && p.meadow > 0) && s !== null && 1 - inv > SPUR_STEEP && lakeside.spur(x, z, s, gLat[k]) > 0.5) mask[v * 2 + 1] = 3;
         }
       }
@@ -1053,6 +1075,23 @@ const FOOT = 0.8;
     farGeometry.computeVertexNormals();
   }
 
+  /**
+   * Where the lake's sheet of water is laid. With the arm of the lake (arm.js) it reaches over the arm too, grown
+   * by whole cells of the sheet's grid so that the water beside the straight keeps every vertex it had; `within`
+   * then keeps it out of the ground between the two that it has no business under.
+   */
+  function lakeSheet() {
+    const base = { x0: LAKE.x - LAKE.rx * 1.1, x1: LAKE.x + LAKE.rx * 1.1, z0: LAKE.z - LAKE.rz * 1.1, z1: LAKE.z + LAKE.rz * 1.1 };
+    // (`extent` stays the lake beside the straight: the mist and the far shore's village are placed from it)
+    if (!arm) return { level: lakeLevel, extent: base, sheet: { extent: base } };
+    const CELL = 40;
+    const e = arm.extent;
+    const grow = (d) => CELL * Math.ceil(Math.max(0, d) / CELL);
+    const extent = { x0: base.x0 - grow(base.x0 - e.x0), x1: base.x1 + grow(e.x1 - base.x1), z0: base.z0 - grow(base.z0 - e.z0), z1: base.z1 + grow(e.z1 - base.z1) };
+    const within = (x, z) => (x >= base.x0 - 1e-6 && x <= base.x1 + 1e-6 && z >= base.z0 - 1e-6 && z <= base.z1 + 1e-6) || arm.shore(x, z) > -45;
+    return { level: lakeLevel, extent: base, sheet: { extent, cell: CELL, within } };
+  }
+
   // ---- assembled
   const group = new THREE.Group();
   group.name = 'terrain';
@@ -1082,7 +1121,7 @@ const FOOT = 0.8;
   return {
     group,
     material,
-    lake: { level: lakeLevel, extent: { x0: LAKE.x - LAKE.rx * 1.1, x1: LAKE.x + LAKE.rx * 1.1, z0: LAKE.z - LAKE.rz * 1.1, z1: LAKE.z + LAKE.rz * 1.1 } },
+    lake: lakeSheet(),
     heightAt,
     heightOnTrack,
     normalAt(x, z, out = normal) {
@@ -1098,6 +1137,12 @@ const FOOT = 0.8;
      * and seat again what stands on it.
      */
     lakeside,
+    /** The golden wood (goldwood.js), or null: a stretch of the Track; it moves no ground. */
+    goldwood,
+    /** The arm of the lake (arm.js), or null: the same holds for it. */
+    arm,
+    /** The ground as it is drawn (the grid's and the far land's own facets): what stands on coarse ground is seated on this. */
+    surfaceAt: (x, z) => coarseHeight(x, z),
     before: { heightAt: (x, z) => heightAt(x, z, true), forestAt: (x, z) => forestAt(x, z, true) },
     bakeAt,
     bake4At,

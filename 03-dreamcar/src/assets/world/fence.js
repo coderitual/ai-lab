@@ -1,4 +1,5 @@
-// The lakeside's fence (lakeside.js; the photograph r2): a stock fence along
+// The stock fences (the lakeside's, lakeside.js, the photograph r2; and the
+// one along the bank above the arm of the lake, arm.js, r4): a stock fence along
 // the top of the low cut on the right of the stretch, weathered wooden posts
 // with wire strung between them. It stands a couple of metres beyond the
 // cut's lip, well beyond the solid edge: scenery, nothing a car can reach.
@@ -10,6 +11,7 @@
 
 import * as THREE from 'three';
 import { LAKESIDE } from './lakeside.js';
+import { ARM } from './arm.js';
 
 /** Posts: metres apart, height range, thickness; where the line stands beyond the cut's lip (m); wire heights and its thickness (m). */
 const FENCE = {
@@ -35,7 +37,8 @@ const FENCE = {
  */
 export function createFence({ track, terrain, tier, atmosphere, rng }) {
   const lakeside = terrain.lakeside;
-  if (!lakeside) return null;
+  const arm = terrain.arm;
+  if (!lakeside && !arm) return null;
   const step = FENCE.step[tier] ?? FENCE.step.medium;
   const wires = FENCE.wires[tier] ?? FENCE.wires.medium;
   const sides = tier === 'low' ? 3 : 4;
@@ -66,7 +69,7 @@ export function createFence({ track, terrain, tier, atmosphere, rng }) {
     return [x + lx * h, y, z + lz * h];
   };
   let posts = 0;
-  for (let d = LAKESIDE.from + 2; d <= LAKESIDE.to - 2; d += step) {
+  for (let d = LAKESIDE.from + 2; lakeside && d <= LAKESIDE.to - 2; d += step) {
     const s = track.wrap(lakeside.s0 + d);
     const c = terrain.cliffAt(s, -1);
     const lat = -(track.edgeAt(s, -1) + c.top + FENCE.beyond + rng.range(-0.12, 0.12));
@@ -79,7 +82,7 @@ export function createFence({ track, terrain, tier, atmosphere, rng }) {
   // the lake's side: the photograph's rail stands on wooden posts. The circuit's steel rail stays what it is; a
   // weathered wooden post stands close behind it every few metres, its top a hand above the beam.
   const fenceTops = tops.length;
-  for (let d = LAKESIDE.from + 1; d <= LAKESIDE.to; d += step * 1.5) {
+  for (let d = LAKESIDE.from + 1; lakeside && d <= LAKESIDE.to; d += step * 1.5) {
     const s = track.wrap(lakeside.s0 + d);
     const lat = track.edgeAt(s, 1) + 0.36;
     track.pointAt(s, lat, p);
@@ -87,23 +90,45 @@ export function createFence({ track, terrain, tier, atmosphere, rng }) {
     posts++;
   }
   tops.length = fenceTops;
+  // The arm of the lake (arm.js; the photograph r4): the same fence along the top of the bank on the water's side,
+  // a few metres beyond the rail. Its numbers come from a stream of its own (the lakeside's posts keep theirs).
+  const armTops = [];
+  if (arm) {
+    const ar = rng.fork('arm');
+    for (let d = ARM.fence.from; d <= ARM.fence.to; d += step) {
+      const s = track.wrap(arm.s0 + d);
+      const lean = [ar.range(-0.05, 0.05), ar.range(-0.05, 0.05)];
+      const lat = track.edgeAt(s, 1) + ARM.fence.beyond + ar.range(-0.12, 0.12);
+      const h = ar.range(FENCE.height[0], FENCE.height[1]);
+      const yaw = ar.range(0, Math.PI);
+      const tone = ar.range(0.8, 1.2);
+      // (not on the deck, nor where another stretch is nearer)
+      if ((track.bridges ?? []).some((b) => track.delta(b.s0, s) > -1 && track.delta(b.s1, s) < 1)) continue;
+      track.pointAt(s, lat, p);
+      armTops.push(post(p.x, terrain.heightOnTrack(s, lat), p.z, h, yaw, lean[0], lean[1], tone));
+      posts++;
+    }
+  }
   // the wires: an upright ribbon from post to post, in two pieces with a little sag between
-  for (let i = 0; i < tops.length - 1; i++) {
-    const a = tops[i];
-    const b = tops[i + 1];
-    for (const hgt of wires) {
-      const base = pos.length / 3;
-      for (let k = 0; k <= 2; k++) {
-        const t = k / 2;
-        const y = a[1] + (b[1] - a[1]) * t + hgt - (k === 1 ? FENCE.sag : 0);
-        const x = a[0] + (b[0] - a[0]) * t;
-        const z = a[2] + (b[2] - a[2]) * t;
-        pos.push(x, y - FENCE.wire / 2, z, x, y + FENCE.wire / 2, z);
-        col.push(...FENCE.steel, ...FENCE.steel);
-      }
-      for (let k = 0; k < 2; k++) {
-        const v = base + k * 2;
-        index.push(v, v + 2, v + 1, v + 1, v + 2, v + 3);
+  for (const run of [tops, armTops]) string(run);
+  function string(tops) {
+    for (let i = 0; i < tops.length - 1; i++) {
+      const a = tops[i];
+      const b = tops[i + 1];
+      for (const hgt of wires) {
+        const base = pos.length / 3;
+        for (let k = 0; k <= 2; k++) {
+          const t = k / 2;
+          const y = a[1] + (b[1] - a[1]) * t + hgt - (k === 1 ? FENCE.sag : 0);
+          const x = a[0] + (b[0] - a[0]) * t;
+          const z = a[2] + (b[2] - a[2]) * t;
+          pos.push(x, y - FENCE.wire / 2, z, x, y + FENCE.wire / 2, z);
+          col.push(...FENCE.steel, ...FENCE.steel);
+        }
+        for (let k = 0; k < 2; k++) {
+          const v = base + k * 2;
+          index.push(v, v + 2, v + 1, v + 1, v + 2, v + 3);
+        }
       }
     }
   }

@@ -19,7 +19,8 @@ parts work. Written for whoever changes it next.
 | --- | --- |
 | ![Golden hour on the grid](images/grid-dusk.jpg) | ![The wet night](images/night.jpg) |
 | ![The approach to the tunnel: a meadow, the portal set into the hillside](images/approach.jpg) | ![In the tunnel](images/tunnel.jpg) |
-| ![The lakeside after the sky road](images/lakeside.jpg) | |
+| ![The lakeside after the sky road](images/lakeside.jpg) | ![The golden wood: the forest esses](images/golden-wood.jpg) |
+| ![The arm of the lake from the gully bridge](images/lake-arm.jpg) | |
 
 ## Keeping this current
 

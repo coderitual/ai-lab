@@ -68,10 +68,18 @@ const LOADS = [
         photo: { back: 5.8, right: -3.2, up: 1.1, yaw: -29, pitch: -4, fov: 34 },
         caption: 'Three-quarter rear, into the sun',
       },
+      // the golden wood (config.js PHOTOS.r3's camera and moment; design.md, "The golden wood"): the car is behind it
+      {
+        name: 'golden-wood',
+        start: true,
+        dist: 869,
+        photo: { back: -6, right: -2.2, up: 1.45, yaw: -26, pitch: 5, fov: 50 },
+        shutter: 0.1,
+        caption: 'The golden wood: the forest esses between walls of turned broadleaves',
+      },
       // the approach to the tunnel from photograph R1's camera (PHOTOS.r1 in game/config.js): the car is behind it
       {
         name: 'approach',
-        start: true,
         dist: 1379,
         photo: { back: -6, right: 3.2, up: 1.3, yaw: -17, pitch: 6, fov: 36 },
         caption: 'The approach to the tunnel: a meadow, and the portal set into the hillside',
@@ -96,6 +104,14 @@ const LOADS = [
         dist: 2800,
         photo: { back: 10, right: -25, up: 40, yaw: -60, pitch: -50, fov: 60 },
         caption: 'The carousel: the slow corner, 190 degrees round a radius of 55 m',
+      },
+      // the arm of the lake from the gully bridge (config.js PHOTOS.r4's camera and moment; design.md)
+      {
+        name: 'lake-arm',
+        dist: 3963,
+        photo: { back: -8, right: 1.5, up: 1.7, yaw: 5, pitch: -1.5, fov: 24 },
+        shutter: 0.1,
+        caption: 'The arm of the lake: down the road from the gully bridge to the water and the ranges beyond',
       },
       { name: 'chase', dist: 10010, caption: 'The chase view at speed on the straight, driving into the sun' },
       { name: 'og', dist: 10050, size: CARD, out: 'public/og.jpg', caption: 'Link preview' },

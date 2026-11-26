@@ -19,6 +19,7 @@
 import * as THREE from 'three';
 import { fieldTexture, gradientField, normalTexture, valueField, worleyField } from '../../engine/noise.js';
 import { extend, withBake } from './shading.js';
+import { GOLDWOOD } from './goldwood.js';
 
 /**
  * (finish lane) The one green of the grass, linear albedo: the meadow (lush where it is damp, drier and a little
@@ -349,6 +350,21 @@ vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 // (env lane) the verge: mown grass in stripes along the road, a strip of worn earth and loose stones along the
 // kerbs' outer edge, longer grass at the foot of the barrier
 float gVerge = ( 1.0 - step( 0.5, vVerge.w ) ) * ( 1.0 - smoothstep( 0.0, 1.5, vVerge.z ) );
+// (the golden wood, goldwood.js) the terrain marks the band beside the road there with up to 0.09 more in vVerge.w.
+// Fallen leaves at two scales that never line up: single leaves and small drifts (the detail's litter channel,
+// about 10 cm a texel, fading with distance to their mean) and patches a few metres across; each fleck one of three
+// tones.
+float gGold = ( 1.0 - step( 0.5, vVerge.w ) ) * clamp( ( vVerge.w - 0.4 ) / 0.09, 0.0, 1.0 );
+float gLeafA = 0.0;
+float gLeafB = 0.0;
+vec3 gLeafCol = vec3( 0.0 );
+if ( gGold > 0.0 ) {
+  gLeafA = 0.55 * gDet.a + 0.45 * gDet2.a;
+  gLeafB = smoothstep( 0.5, 0.75, 0.6 * gMid.a + 0.4 * gDet.r );
+  float which = fract( gDet2.b * 3.0 + gMid.r * 2.0 );
+  gLeafCol = which < 0.45 ? ${v3(GOLDWOOD.ground.leaf[0])} : which < 0.8 ? ${v3(GOLDWOOD.ground.leaf[1])} : ${v3(GOLDWOOD.ground.leaf[2])};
+  gLeafCol *= 0.75 + 0.5 * gDet2.g;
+}
 float gVergeEarth = 0.0;
 float gWoodBehind = gVerge > 0.0 ? clamp( vVerge.w / 0.4, 0.0, 1.0 ) : 0.0;
 if ( gVerge > 0.0 ) {
@@ -381,6 +397,20 @@ if ( gVerge > 0.0 ) {
   // fallen leaves drifted against the barrier's foot under woods (frame D4)
   float leaves = gWoodBehind * ( 1.0 - gMeadow ) * smoothstep( -1.6, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
   vergeCol = mix( vergeCol, mix( vec3( 0.2, 0.075, 0.02 ), vec3( 0.09, 0.04, 0.015 ), gDet.b ), leaves );
+  // (the golden wood) its verge: pale dry grass, long and unmown, the worn earth along the kerb kept; fallen leaves
+  // lie over it in flecks of gold, orange and brown, thickest in a drift along the paved margin and at the
+  // barrier's foot
+  if ( gGold > 0.0 ) {
+    vec3 pale = ${v3(GOLDWOOD.ground.pale)} * ( 0.7 + 0.6 * gDet.r ) * ( 0.85 + 0.3 * gMid.r ) * ( 0.85 + 0.3 * gDet2.r );
+    vec3 dry = mix( pale, earthCol, max( earth, stones * 0.8 ) * 0.8 );
+    float drift = max( 1.0 - smoothstep( 0.0, ${GOLDWOOD.ground.drift.toFixed(2)}, vd + 0.5 * ( gDet2.r - 0.5 ) ), smoothstep( -1.8, -0.2, vVerge.z ) * 0.8 );
+    float fleck = smoothstep( 0.62 - 0.34 * drift, 0.7 - 0.3 * drift, gLeafA ) * ( 0.45 + 0.55 * drift );
+    // (far off, where the detail has faded to its mean, the share of the ground the leaves cover)
+    fleck = mix( 0.12 + 0.6 * drift, fleck, gFade );
+    dry = mix( dry, gLeafCol, max( fleck, gLeafB * 0.5 ) );
+    vergeCol = mix( vergeCol, dry, gGold );
+    earth *= 1.0 - 0.6 * gGold;
+  }
   gGrass = mix( gGrass, vergeCol, gVerge );
   gVergeEarth = gVerge * max( earth, stones * 0.8 );
   gScree *= 1.0 - gVerge;
@@ -413,6 +443,13 @@ groundGrass = ( 1.0 - gRock ) * ( 1.0 - gScree ) * ( 1.0 - gForest ) * ( 1.0 - g
 groundThrough = ${v3(GRASS.through)} * ( 0.6 + 0.4 * gVerge ) * groundGrass * gFade;
 gAlbedo = mix( gAlbedo, vec3( 0.03, 0.045, 0.02 ) * ( 0.7 + 0.6 * gDet.r ), gScrub * 0.85 );
 gAlbedo = mix( gAlbedo, gForestCol, gForest );
+// (the golden wood) behind its barrier the wood's floor is litter: this year's leaves over pale grass, fading into
+// the lap's own floor further in
+if ( gGold > 0.0 ) {
+  float gIn = gGold * ( 1.0 - gVerge ) * ( 1.0 - smoothstep( ${GOLDWOOD.ground.floor[0].toFixed(1)}, ${GOLDWOOD.ground.floor[1].toFixed(1)}, vVerge.z ) ) * ( 1.0 - gRock );
+  vec3 floorCol = mix( ${v3(GOLDWOOD.ground.pale)} * ( 0.6 + 0.6 * gDet.r ) * ( 0.8 + 0.4 * gMid.r ), gLeafCol, clamp( 0.35 + 0.5 * smoothstep( 0.4, 0.62, gLeafA ) + 0.3 * gLeafB, 0.0, 1.0 ) );
+  gAlbedo = mix( gAlbedo, floorCol, gIn );
+}
 // (seen from the road a clump is crowns, not forest floor)
 gAlbedo = mix( gAlbedo, gCanopy * 1.3, gClump * ( 1.0 - clamp( vMask.x * 3.0, 0.0, 1.0 ) ) );
 gAlbedo = mix( gAlbedo, gScreeCol, gScree );
