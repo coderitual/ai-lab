@@ -612,10 +612,15 @@ void main() {
     return r < 0.5 ? SODIUM : r < 0.8 ? WARM : COOL;
   };
   /** A lamp or a window at (x, z) if the ground there is dry land below the place's top; returns whether it was put. */
+  // (The village is laid out on the land as it was before any place was shaped by hand, terrain.before, as the mist
+  // is: its streets draw their random numbers by the ground they walk over, and the arm of the lake, arm.js, lowers
+  // the valley at the town's western end. A lamp then stands on the land as it is, and none where there is water now.)
+  const was = terrain.before ?? terrain;
   const put = (place, x, z, rise, c, i, kind) => {
-    const h = terrain.heightAt(x, z);
+    const h = was.heightAt(x, z);
     if (h < level + 0.6 || h > place.top) return false;
-    lights.push({ x, y: h + rise, z, c, i, kind });
+    const now = terrain.heightAt(x, z);
+    if (now >= level + 0.6) lights.push({ x, y: now + rise, z, c, i, kind });
     return true;
   };
   for (const [place, density] of [[TOWN, 1], [HAMLET, 0.35]]) {
@@ -639,9 +644,9 @@ void main() {
             }
           }
         }
-        const h0 = terrain.heightAt(x, z);
-        const gx = terrain.heightAt(x + 8, z) - h0;
-        const gz = terrain.heightAt(x, z + 8) - h0;
+        const h0 = was.heightAt(x, z);
+        const gx = was.heightAt(x + 8, z) - h0;
+        const gz = was.heightAt(x, z + 8) - h0;
         const g = Math.hypot(gx, gz) || 1;
         // along the level, with a little wander; now and then a street that climbs
         const climb = k % 5 === 4 ? 0.8 : 0.1;
@@ -660,10 +665,12 @@ void main() {
     for (let f = 0.8; f < 1.5; f += 0.01) {
       const x = lakeMid.x + Math.cos(ang) * lakeMid.rx * f;
       const z = lakeMid.z + Math.sin(ang) * lakeMid.rz * f;
-      const h = terrain.heightAt(x, z);
+      const h = was.heightAt(x, z);
       if (h < level + 0.8) continue;
       if (((x - TOWN.x) / (TOWN.rx * 1.25)) ** 2 + ((z - TOWN.z) / (TOWN.rz * 2)) ** 2 < 1 && lightRng.next() < 0.85 * share + 0.15) {
-        lights.push({ x, y: h + 5, z, c: lightRng.next() < 0.7 ? SODIUM : WARM, i: 1.1, kind: 'shore' });
+        const colour = lightRng.next() < 0.7 ? SODIUM : WARM;
+        const now = terrain.heightAt(x, z);
+        if (now >= level + 0.8) lights.push({ x, y: now + 5, z, c: colour, i: 1.1, kind: 'shore' });
       }
       break;
     }

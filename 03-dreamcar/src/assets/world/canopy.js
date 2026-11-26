@@ -39,12 +39,15 @@ const tables = new WeakMap();
 const opened = new WeakMap();
 
 /**
- * Says where a wood the Track names does not stand after all (the lakeside clears the lake's side of its stretch):
- * `open(s, side)` true there. Asked before the first canopyOpen of that Track.
+ * Says where a wood the Track names does not stand after all (the lakeside clears the lake's side of its stretch,
+ * the arm of the lake the water's side of its): `open(s, side)` true there. Asked before the first canopyOpen of
+ * that Track.
  * @param {object} track @param {(s: number, side: number) => boolean} open
  */
 export function openCanopy(track, open) {
-  opened.set(track, open);
+  // (more than one place may say so: a wood stands only where none of them opens it)
+  const before = opened.get(track);
+  opened.set(track, before ? (s, side) => before(s, side) || open(s, side) : open);
   tables.delete(track);
 }
 

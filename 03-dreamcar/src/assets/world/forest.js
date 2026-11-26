@@ -44,6 +44,7 @@ import { GRASS } from './groundMaterial.js';
 import { LAKESIDE } from './lakeside.js';
 import { APPROACH, approachesOf } from './approach.js';
 import { GOLDWOOD, goldwoodOf } from './goldwood.js';
+import { ARM } from './arm.js';
 import { TIMES } from './lighting.js';
 import { growTrees } from './treeGeometry.js';
 import { createTreeUniforms, impostorDepthMaterial, impostorMaterial, plantMaterial, treeDepthMaterial, treeMaterial } from './treeMaterial.js';
@@ -918,6 +919,72 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     }
   }
   if (lakeside) drawOwn(trees, rng.fork('lakeside-tint'), rng.fork('lakeside-floor'));
+
+  // THE ARM OF THE LAKE (arm.js; the photograph r4): the lap's own trees give way in the water and on the open bank
+  // between the road and it, and whatever else stands on the ground the place lowered is seated on it again (on
+  // the ground as it is drawn: out there it is coarse). Then, from a stream of its own, young growth in groups on
+  // the bank, never tall enough to hide the water from the road, and a wood on the far shores.
+  const arm = terrain.arm ?? null;
+  if (arm) {
+    const P = ARM.planting;
+    const ar = rng.fork('arm');
+    const kept = trees.filter((t) => !arm.clears(t.x, t.z));
+    for (const t of kept) {
+      if (!arm.moved(t.x, t.z) || lakeside?.moved(t.x, t.z)) continue;
+      const before = land.heightAt(t.x, t.z);
+      const now = terrain.heightAt(t.x, t.z);
+      if (now < before - 0.01) t.y += Math.min(now, terrain.surfaceAt(t.x, t.z)) - before;
+    }
+    trees.length = 0;
+    hash.clear();
+    for (const t of kept) {
+      trees.push(t);
+      occupy(t.x, t.z);
+    }
+    const seat = (x, z) => Math.min(terrain.heightAt(x, z), terrain.surfaceAt(x, z));
+    // young growth on the bank: birch and lime saplings in groups, sunk to their crowns
+    for (const [d, beyond, count, spread] of P.groups) {
+      for (let k = 0; k < count; k++) {
+        const a = ar.range(0, Math.PI * 2);
+        const q = spread * Math.sqrt(ar.next());
+        const tall = ar.range(P.young[0], P.young[1]);
+        const wide = ar.range(1.2, 1.8);
+        const kind = ar.next();
+        const s = track.wrap(arm.s0 + d + Math.cos(a) * q * 1.5);
+        track.pointAt(s, track.edgeAt(s, 1) + beyond + Math.sin(a) * q, point);
+        const x = point.x;
+        const z = point.z;
+        if (blocked(x, z, 1) || !free(x, z, 1.4) || arm.shore(x, z) > -5) continue;
+        addTree(x, seat(x, z) - 0.15, z, kind < 0.55 ? BIRCH : kind < 0.85 ? LIME : MAPLE, { road: true, turned: 0.4, inside: 0, detail: 1.2, height: [tall / 0.7, tall / 0.7], sink: 0.3, slim: wide, from: ar, crownSun: true });
+      }
+    }
+    // the far shores: a wood from a few metres back from the water up the hills (only where trees are drawn at all:
+    // beyond the forest's bounds the ground's own canopy colour stands for it)
+    const W = P.shore;
+    const e = arm.extent;
+    for (let z = Math.max(Z0, e.z0 - W.reach); z < Math.min(Z1, e.z1 + W.reach); z += W.lattice) {
+      for (let x = Math.max(X0, e.x0 - W.reach); x < Math.min(X1, e.x1 + W.reach); x += W.lattice) {
+        const px = x + ar.range(-0.45, 0.45) * W.lattice;
+        const pz = z + ar.range(-0.45, 0.45) * W.lattice;
+        const roll = ar.next();
+        const rank = ar.next();
+        const kind = ar.next();
+        if (rank > T.keep || px <= X0 || pz <= Z0) continue;
+        const m = -arm.shore(px, pz);
+        if (m < W.from || m > W.reach) continue;
+        if (roll > W.density * (1 - 0.5 * smoothstep(W.reach * 0.5, W.reach, m))) continue;
+        if (arm.clears(px, pz) || blocked(px, pz, 2.5) || !free(px, pz, 2.8)) continue;
+        // (only on the far side of the water from the road: the lap's own woods stand everywhere else)
+        if (spot.lat <= 0 || Math.abs(spot.lat) - track.edgeAt(spot.s, 1) < ARM.reach * 0.5) continue;
+        const y = seat(px, pz);
+        if (y < arm.level + 0.4) continue;
+        const edge = m < W.from + 14;
+        const species = edge ? (kind < 0.45 ? BIRCH : kind < 0.75 ? LIME : kind < 0.9 ? HORNBEAM : FIR) : kind < W.conifer ? NEEDLE[kind < W.conifer * 0.6 ? 0 : 1] : kind < W.conifer + 0.18 ? BIRCH : kind < W.conifer + 0.32 ? LIME : kind < W.conifer + 0.42 ? HORNBEAM : MAPLE;
+        addTree(px, y - 0.3, pz, species, { road: false, turned: 0.1, inside: edge ? 0.2 : 0.7, detail: edge ? 0.8 : 0.5, from: ar, tone: W.tone, crownSun: true });
+      }
+    }
+    drawOwn(trees, rng.fork('arm-tint'), rng.fork('arm-floor'));
+  }
 
   // THE GOLDEN WOOD (goldwood.js; the photograph r3): through the forest esses the lap's own trees give way for some
   // way beyond both edges (tall conifers on bare stems, standing apart), and two continuous walls of turned

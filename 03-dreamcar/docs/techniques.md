@@ -75,7 +75,7 @@ face stands in front of it, `rock.js`); further out it blends over 10 to
 100 m into a field made on a 16 m grid from the road itself (rising inside
 the loop, falling towards the lake and the valleys, a ridge over the tunnel,
 a ravine under the sky road), with ridged noise on top; far away, mountains.
-One place is then shaped by hand beyond the edges ("The lakeside", below).
+Two places are then shaped by hand beyond the edges ("The lakeside" and "The arm of the lake", below).
 
 It is drawn in three pieces that meet without cracks: a **band** that follows
 the road row by row with the Track's samples, its columns on the corridor's
@@ -845,10 +845,70 @@ the same).
 **The low tier** keeps the first two rows whole and 70, 60 and 50 % of the
 three behind, half the young growth, and a fifth as many cards of grass.
 
+## The arm of the lake: the second place shaped by hand
+
+`src/assets/world/arm.js`, read by `terrain.js`, `forest.js`,
+`groundCover.js`, `fence.js` and (through `terrain.lake.sheet`) `index.js`.
+design.md ("The arm of the lake") says what the place is; it is made the way
+the lakeside is (above), with these differences.
+
+**It only lowers.** `arm.ground(x, z, h, s, lat)` is asked after the
+lakeside's. The water is three overlapping ellipses in the place's frame with
+two waves along the shore; `most()` is the highest the ground may stand at a
+point: the bed inside the shore, a beach, and beyond it a bank that rises
+0.36 per metre on the far shores and 0.1 on the tongue of land between the
+water and the road. The ground becomes the lower of that and what it was
+(rounded where the two meet), by a weight that is nothing on the right of
+the road, inside any corridor and for 1.5 m beyond the left solid edge, all
+of it from 52 m beyond that edge, and nothing again beyond 240 m from the
+shore. A cap needs no blending at its far edge and can raise nothing: the
+hills behind the far shores, the pale hall's hilltop (landmarks.js looks for
+it from the ledge, 300 m behind the arm's west shore) and everything the
+place does not reach are bit for bit what they were.
+
+**The valley beyond.** South of the arm the land rose in one unbroken ramp
+to the far land's rim, five degrees high from the bridge, a single dark
+slope that hid the ranges of `far.js`. `passed()` scales it down in a sector
+from the bridge (16 degrees right to 48 left of the road, 0.9 to 5.3 km out,
+where there is no road): the land keeps 42 % of what it stood over 18 m. It
+is scaled, not capped, so its own ridges and gullies are still there, one
+behind the other and each paler in the haze, and the three far ranges stand
+over them.
+
+**One sheet of water.** The arm is the lake's own level, so it is the lake's
+own sheet: `terrain.lake.sheet` grows the sheet's box over the arm by whole
+cells of its 40 m grid (the water beside the straight keeps every vertex it
+had) and gives `lake.js` a `within` that keeps it to the old box and to
+within 45 m of the arm's shore; the ground under the gully bridge, which lies
+below the lake's level, stays dry. `terrain.lake.extent` is still the lake
+beside the straight: the mist and the village are placed from it.
+
+**Coarse ground.** The arm lies at the edge of the terrain's grid, where the
+grid eases onto the far land's 100 m lattice, and its southern half beyond
+it. The shore there is where the lattice's facets cross the water, tens of
+metres from where `shore()` says; trees and anything else seated on that
+ground use `terrain.surfaceAt(x, z)` (the ground as it is drawn) or the lower
+of the two.
+
+**What else read the ground.** The village across the lake (`far.js`) walks
+its streets along the contours and draws a random number at every step, and
+its western end lay on ground the arm lowered: it is now laid out on the
+land as it was (`terrain.before`, as the mist already was), and a lamp then
+stands on the land as it is, or not at all where there is water now. The
+canopy (`canopy.js`) is told the Track's wood on the water's side no longer
+stands; `openCanopy` now adds to what an earlier place said instead of
+replacing it.
+
+`tools/unit/arm.test.mjs` holds the promises: nothing moved inside any solid
+edge, within 1.5 m beyond a left one or anywhere on the right of the road;
+the place only lowers and only in its box and its pass; the arm is under water and joins
+the lake; the hall stands where it stood; the rest of the lap keeps its
+hillsides.
+
 ## The staging camera
 
 `setPhoto` in `src/game/Game.js`, `_photo` in `src/game/Cameras.js`.
-`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, `r1`, `r2`, `r3`, which also set the moment of the autopilot's run and the time of day) places every view's
+`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, `r1`, `r2`, `r3`, `r4`, which also set the moment of the autopilot's run and the time of day) places every view's
 camera `back` m behind, `right` m right of and `up` m above the car's origin
 in the car's level frame (its heading only, not its pitch or roll), turned
 `yaw` degrees left of the heading and `pitch` degrees up, with a lens of
@@ -857,7 +917,7 @@ but the car's pose, so with `?manual` the same run gives the same picture. The
 HUD hides unless `hud: true`; `photo(null)` gives the views back to their
 rigs. `?photo=back,right,up,yaw,pitch,fov[,hud]` does the same from the
 address. A pose may carry `shutter`, the share of the game's motion-blur
-shutter its picture is taken with (`r2`, `r3`: a tenth; the others ride with the
+shutter its picture is taken with (`r2`, `r3`, `r4`: a tenth; the others ride with the
 car at the game's own). A camera ahead of the car looking back at it has a negative `back`
 and a `yaw` near 180. `tools/screenshots.cjs` stages every picture of the
 docs with it, at distances along an autopilot run.

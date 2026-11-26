@@ -11,7 +11,10 @@
 //   kerbs.js        the red and white kerbs on the margins, from track.kerbs
 //   rock.js         the cut rock faces at the rock edges
 //   approach.js     the meadow on the tunnel's approach, as numbers (terrain, tunnel, forest, cover, meadow.js)
-//   lake.js         the water beside the straight, and the lakeside's tarn
+//   lake.js         the water beside the straight, the lakeside's tarn and the arm of the lake
+//   arm.js          the arm of the lake below the gully bridge, shaped by hand beyond the left edge: what
+//                   the terrain, the forest, the ground cover and the fence read to make it
+//   goldwood.js     the forest esses in autumn: what the forest, the ground and the ground cover read
 //   lakeside.js     one place after the sky road, shaped by hand beyond the edges: what the terrain, the
 //                   forest, the ground cover, the rock and the fence (fence.js) read to make it
 //   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
@@ -176,7 +179,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   // (the tunnel's cuttings are concrete: tunnel.js builds them where concreteCut says)
   const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock'), except: (s) => !!concreteCut(track, s) });
   lap('rock');
-  const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
+  const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, level: terrain.lake.level, ...terrain.lake.sheet });
   // the lakeside's tarn (lakeside.js): the same water, at its own level, only in its own basin
   const lakeside = terrain.lakeside;
   const tarn = lakeside

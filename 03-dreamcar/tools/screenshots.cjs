@@ -105,6 +105,14 @@ const LOADS = [
         photo: { back: 10, right: -25, up: 40, yaw: -60, pitch: -50, fov: 60 },
         caption: 'The carousel: the slow corner, 190 degrees round a radius of 55 m',
       },
+      // the arm of the lake from the gully bridge (config.js PHOTOS.r4's camera and moment; design.md)
+      {
+        name: 'lake-arm',
+        dist: 3963,
+        photo: { back: -8, right: 1.5, up: 1.7, yaw: 5, pitch: -1.5, fov: 24 },
+        shutter: 0.1,
+        caption: 'The arm of the lake: down the road from the gully bridge to the water and the ranges beyond',
+      },
       { name: 'chase', dist: 10010, caption: 'The chase view at speed on the straight, driving into the sun' },
       { name: 'og', dist: 10050, size: CARD, out: 'public/og.jpg', caption: 'Link preview' },
     ],

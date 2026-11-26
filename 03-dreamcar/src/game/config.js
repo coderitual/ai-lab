@@ -343,8 +343,8 @@ export const CAMERA = {
  * the car, looking forward and right at the land side with the gantry's lamps in the picture. R2 (a photograph, not
  * a game frame: design.md, "The lakeside"): out of the sky road above the tarn, on the paved margin outside the left
  * edge line at eye height, looking along the road and a little left, the car 24 m ahead; a tenth of the game's
- * shutter (`shutter`), because a photograph of a verge is taken standing still. R3 (a photograph too: design.md, "The golden wood")
- * is taken the same way, with the car behind the camera.
+ * shutter (`shutter`), because a photograph of a verge is taken standing still. R3 and R4 (photographs too: design.md,
+ * "The golden wood" and "The arm of the lake") are taken the same way, with the car behind the camera.
  */
 export const PHOTOS = {
   d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
@@ -355,6 +355,8 @@ export const PHOTOS = {
   r2: { back: 24, right: -2, up: 1.45, yaw: 5, pitch: 0, fov: 52, shutter: 0.1, t: 56.45, time: 'day' },
   // R3, the golden wood (design.md): in the esses where the first bend gives way to the second, at eye height in the left lane, looking along the right-hand wall; the car behind the camera
   r3: { back: -6, right: -2.2, up: 1.45, yaw: -26, pitch: 5, fov: 50, shutter: 0.1, t: 25.8, time: 'day' },
+  // R4, the arm of the lake (design.md): on the gully bridge, a long lens down the road to the water and the ranges beyond it; the car behind the camera
+  r4: { back: -8, right: 1.5, up: 1.7, yaw: 5, pitch: -1.5, fov: 24, shutter: 0.1, t: 85.4, time: 'day' },
 };
 
 /**

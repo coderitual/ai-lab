@@ -145,7 +145,7 @@ line, m; speeds are the autopilot's at full pace):
 | The plunge | 3115 to 3394 | 8 per cent down a 400 m right into a compression; to 215 km/h |
 | The ledge | 3394 to 3778 | a left of 300 m and a right of 350 m on the hillside, rock on one side; 216 to 257 km/h |
 | Gully bridge | 3778 to 4115 | 337 m straight on piers, 26 m over the gully, 8 per cent down; to 282 km/h |
-| The long right | 4115 to 4686 | 90 degrees at 300 m radius, banked 9 degrees, onto the straight; 234 to 283 km/h |
+| The long right | 4115 to 4686 | 90 degrees at 300 m radius, banked 9 degrees, onto the straight, an arm of the lake below it on the left ("The arm of the lake"); 234 to 283 km/h |
 
 The autopilot laps in 85.1 s at full pace (217 km/h on average), 92.9 s at
 0.9, 117.1 s at 0.7. Sector lines at 1882 m (just out of the tunnel) and
@@ -352,7 +352,8 @@ places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
 day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 78.8 s) and
 `?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green), and
 `?photo=r1` (the approach to the tunnel, day, t 34.85 s: photograph R1's camera, with the car behind it),
-`?photo=r2` (the lakeside, day, t 56.45 s) and `?photo=r3` (the golden wood, day, t 25.8 s); a name
+`?photo=r2` (the lakeside, day, t 56.45 s), `?photo=r3` (the golden wood, day, t 25.8 s) and `?photo=r4` (the
+arm of the lake from the gully bridge, day, t 85.4 s); a name
 brings its own moment of the autopilot's run and its time of day unless the
 address gives `t` or `time`, and also works on the handle
 (`__dreamcar.photo('d1')`). The camera moves with the car, so the engine's
@@ -497,6 +498,13 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   centre line; the left side open, with a few dark conifers far down the
   road and a bare mountain beyond. It is the spec for one place only: "The
   golden wood", below.
+- **R4**, a photograph (free licence): a road coming down towards a lake
+  under an overcast sky, seen through a long lens. The asphalt and its narrow
+  verges of gravel and pale long grass in the foreground, a low rail where
+  the road bends away; a dark band of low wood; the water, grey and still,
+  with a wooded point reaching into it; and beyond it ridge behind ridge,
+  each paler than the one before, up to a snow-dusted massif under the
+  cloud. It is the spec for one place only: "The arm of the lake", below.
 
 Day answers to D1, D3 and A; golden hour to D4 and D2; the wet night to two
 further night references of the owner's (a wet street at night with lamps
@@ -644,6 +652,61 @@ few pale trunks; the verge has a kerb and a steel rail and no gravel
 shoulder or fallen logs; the asphalt is the lap's grey without a centre
 line; the sky is the lap's paler blue; there is no bare mountain behind:
 the meadow over the tunnel closes the road instead.
+
+## The arm of the lake
+
+A third place answers to a photograph (R4, above): the end of the lap's long
+descent, where the road comes off the gully bridge at 8 per cent towards the
+long right (s = 3785 to 4500 m, lap time about 1:18 to 1:27). The road ran
+down into a closed wood there, the ground beyond it rose to a hill that hid
+the lake, and the lake itself ended 150 m short of the place. Now the lake
+reaches an arm up the valley below the road, and the bridge looks down the
+road to water. The road, its edges, rails, boards and lamps are what they
+were; everything that changed is scenery beyond the left solid edge, and one
+module describes it (`src/assets/world/arm.js`).
+
+- **The water.** The arm is the lake's own water at the lake's own level:
+  it leaves the lake beside the straight at its western end, turns north and
+  runs 700 m up the valley to a head below the bridge's end, 60 to 100 m
+  from the road and 25 to 35 m under it. From the bridge it lies ahead and
+  to the left, a band of water between the verge and the far shore; from the
+  long right it lies below the road on the left all the way round.
+- **The bank.** The woods that stood on the left of the road from the
+  bridge's end round the first half of the long right are gone: a bank of
+  meadow grass falls from the rail to the water, steep under the bridge's
+  end and gentle further round, with long grass at the rail and down the
+  bank, a stock fence on weathered posts along its top for the first 170 m,
+  and groups of young birch and lime no taller than 5 m, so that nothing
+  stands between the road and the water. The rail, the tyre wall and the
+  boards on the outside of the bend are the circuit's own.
+- **The far shores.** West of the arm the hills rise straight from the
+  water, wooded (conifers and broadleaves, darker than the lap's sunlit
+  woods) with the pale hall of frame D3 on its hilltop behind them; south of
+  it the land that closed the valley is cut back to a shore 400 m further
+  off and rises behind it ridge after ridge to the far ranges, each paler in
+  the day's haze.
+- **The light** is the day's own: the sun 16 degrees up on the right of the
+  descent, so the bank below the road is in its own shade, and the water,
+  the western shore and the ridges beyond are lit.
+
+The comparison camera is `?photo=r4`: on the gully bridge 150 m before its
+end, a long lens (24 degrees) down the road, the car behind the camera.
+
+What still differs from the photograph (tools.md): the photograph is a dim,
+overcast, nearly colourless exposure and ours is the lap's sunny day, which
+is not this place's to change. Against the sky, the far range and the water
+are as bright as the photograph's (within 15 %), but the middle ridge and
+the near slope are several times lighter and bluer: ours stand in sunlit
+haze, the photograph's in cloud shadow. The far range has no snow; the
+foreground is the bridge's parapet and the lap's asphalt, not a gravel verge
+with dry grass (the long grass and the fence begin where the bridge ends);
+there is no dark band of wood before the water, no sign, no centre line;
+the road bends right, not left. The arm's far shore lies on the terrain's
+100 m lattice: its line is straight in pieces.
+
+Seen from elsewhere: the ledge's first bend (frame D3) looks the same way,
+and its far ridge is lower and paler than it was, with a sliver of the arm
+under it; the hall on its hilltop and everything nearer are unchanged.
 
 ## The tunnel
 

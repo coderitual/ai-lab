@@ -105,6 +105,21 @@ the tunnel's face, where the approach's meadow opens). It moves no ground.
 | the ground | `aVerge.w` 0.4 to 0.49 on the band; the verge's grass [0.095, 0.055, 0.024], leaves [0.27, 0.115, 0.016], [0.25, 0.062, 0.011] and [0.1, 0.04, 0.012] (linear albedo), a drift 1.3 m wide along the paved margin; litter on the wood's floor to 12 m beyond the edge, gone by 26 m |
 | ground cover | per tier (low / medium / high): long pale grass (`cover-meadow` cards tinted [0.62, 0.27, 0.12], 0.4 to 0.7 m tall) 1 / 4.8 / 6.4 a metre of road and side, seven in ten of them in the last metre and a half before the barrier and the first behind it; none of the lap's dark tufts; the lap's bushes tinted [4.2, 1.9, 0.6] |
 
+**The arm of the lake** (`ARM` in `src/assets/world/arm.js`; design.md):
+scenery beyond the left edge from the gully bridge to the start of the
+straight, measured from s = 4115 m (the bridge's end) in a frame u along the
+road's heading there and v to its left.
+
+| | |
+| --- | --- |
+| the water | the lake's own level (1.8 m under the line) and the lake's own sheet; three lobes: the head 190 by 136 m, its middle 166 m along and 153 m left; the arm 520 by 156 m at 381 m along, 163 m left; the turn towards the lake 380 by 530 m at 731 m along, 8 m left, which joins the lake beside the straight; about 20 ha well inside the shore; up to 6 m deep |
+| the ground | only ever lowered, on the left of the road beside s = 3785 to 4945 m (eased over 60 m), from 1.5 m beyond the solid edge (all of it from 52 m), within 240 m of the shore (all of it within 140 m): no higher than a beach of 0.11 per metre for 7 m and a bank of 0.36 per metre on the far shores, 0.1 per metre on the land between the water and the road (90 to 690 m along, up to 150 m left), with knolls of 3 m; 74 ha lowered round the water, by 105 m at most (the hill that closed the valley south of the long right) |
+| the valley beyond | seen from the bridge (150 m before its end), between 16 degrees right (all of it from 6) and 48 degrees left (all of it to 36) of the road and from 900 m (all of it from 1500) to 5300 m (all of it to 4500), the land keeps 42 % of what it stood over 18 m: the far land's rim there about 2 degrees high instead of 5 |
+| the open bank | on the left beside s = 4095 to 4495 m (eased over 30 m), to 330 m beyond the edge: no wood (the Track's `lowDown` and `lowRun` woods are cleared there), the approach meadow's paint at 0.5 from the barrier out |
+| trees | the lap's own cleared in the water, on its beach and on the open bank; planted: nine groups of four to seven young birch, lime and maple on the bank, 2.6 to 5.2 m over the ground, three tenths of each under it; a wood on the far shores from 5 m back from the water to 260 m (lattice 6.2 m, 85 % planted, half conifers, toned [0.6, 0.68, 0.72]), only where the forest draws trees at all (within 250 m of the course's bounds) and no nearer than 165 m to the road |
+| ground cover | long grass (`cover-meadow`, tinted [1.15, 1.0, 0.7]) 3.5 / 16.8 / 22.4 a metre of road (low / medium / high) on the left of the open bank's stretch, 55 % of it within 1.6 m before and 3.8 m behind the barrier, the rest down the bank to 44 m; none of the lap's dark tufts there |
+| the fence | posts every 2.6 m (low: 5.2 m) 3.2 m beyond the left solid edge from the bridge's end to 168 m after it, three wires (low: one); in the lakeside fence's one mesh |
+
 ## The car
 
 ### Dimensions
@@ -369,7 +384,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,hud]` | the staging camera |
-| `?photo=d1`, `d3`, `d4`, `r1`, `r2`, `r3` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, r1 the approach to the tunnel by day, r2 the lakeside after the sky road by day, r3 the golden wood in the esses by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=d1`, `d3`, `d4`, `r1`, `r2`, `r3`, `r4` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, r1 the approach to the tunnel by day, r2 the lakeside after the sky road by day, r3 the golden wood in the esses by day, r4 the arm of the lake from the gully bridge by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -632,22 +647,30 @@ At the sky road's end the tarn, its shore's wood and the bank's stand come into 
 itself the wall of conifers that stood at the rail is gone and the stand on the bank has taken its place, at about
 the triangles the place cost before.
 
-**The golden wood, before and after** (e0b0b36 against the place, 2026-11-26; the same shape and method, an
-upright phone's shape; t = 22, 26 and 30 are the esses' three bends):
+**The golden wood and the arm of the lake, before and after** (e0b0b36 against these two places, 2026-11-26; the
+same shape and method, an upright phone's shape; t = 22, 26 and 30 are the esses' three bends, t = 84 and 87 the
+gully bridge, t = 90 the start of the long right):
 
 | tier, place | draw calls before | after | triangles before | after | trees before: full / reduced / impostors | after |
 | --- | --- | --- | --- | --- | --- | --- |
 | low, t = 22 | 125 | 121 | 316 k | 330 k | 0 / 39 / 1407 | 0 / 47 / 1184 |
 | low, t = 26 | 153 | 150 | 340 k | 376 k | 0 / 37 / 1045 | 0 / 49 / 965 |
 | low, t = 30 | 120 | 120 | 290 k | 311 k | 0 / 53 / 1624 | 0 / 45 / 1596 |
+| low, t = 84 | 101 | 102 | 228 k | 227 k | 0 / 0 / 1209 | 0 / 0 / 538 |
+| low, t = 87 | 112 | 113 | 265 k | 261 k | 0 / 4 / 1578 | 0 / 3 / 673 |
+| low, t = 90 | 107 | 107 | 299 k | 290 k | 0 / 43 / 1144 | 0 / 35 / 587 |
 | medium, t = 22 | 164 | 156 | 992 k | 1121 k | 36 / 42 / 3160 | 66 / 46 / 2891 |
 | medium, t = 26 | 210 | 200 | 1090 k | 1328 k | 30 / 48 / 2739 | 67 / 45 / 2732 |
 | medium, t = 30 | 165 | 158 | 1012 k | 1118 k | 49 / 54 / 2736 | 66 / 48 / 2707 |
+| medium, t = 84 | 125 | 128 | 649 k | 651 k | 0 / 0 / 2904 | 0 / 0 / 1318 |
+| medium, t = 87 | 151 | 150 | 811 k | 780 k | 6 / 35 / 2864 | 7 / 18 / 1211 |
+| medium, t = 90 | 147 | 148 | 949 k | 878 k | 40 / 56 / 1768 | 31 / 35 / 906 |
 
 In the esses the low tier draws 4 to 11 % more triangles for the same draw calls (the walls' trees stand closer
 to the road than the conifers they replace, so more of them are within the reduced form's reach); medium draws 10
 to 22 % more, because the first two rows keep the full form further out (`detail` 1.5 and 1.2) and twice as many
-trees are full at once.
+trees are full at once. At the arm of the lake both tiers cost what they did or a little less: the wood on the
+bank is gone, and the water is the lake's own sheet.
 
 ## Sound
 

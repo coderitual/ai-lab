@@ -19,6 +19,7 @@ import { GRASS } from './groundMaterial.js';
 import { LAKESIDE } from './lakeside.js';
 import { APPROACH, approachAt, approachesOf, beforeFace, meadowAt } from './approach.js';
 import { GOLDWOOD, goldwoodOf } from './goldwood.js';
+import { ARM } from './arm.js';
 
 const SURFACE_GRASS = 2;
 const EDGE = { RAIL: 0, ROCK: 1, WALL: 2, PARAPET: 3, TREES: 4 };
@@ -460,7 +461,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         // (ref lane: the circuit's own dark tufts give way to the meadow's tall grass on a tunnel's approach)
         // (nor on the lakeside's stretch, whose verge is the long meadow grass)
         // (nor in the golden wood, whose verge is pale grass under leaves)
-        if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5) && !((terrain.lakeside?.stretch(s) ?? 0) > 0.5) && !goldwood?.here(s)) grassItems.push(tuft);
+        if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5) && !((terrain.lakeside?.stretch(s) ?? 0) > 0.5) && !goldwood?.here(s) && !terrain.arm?.opens(s, side)) grassItems.push(tuft);
       }
     }
     if (T.bushes) {
@@ -479,7 +480,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const v = r.range(0.7, 1.2);
         // (on the lakeside's meadow the lap's own bushes are the meadow's: lit, warm, not the wood's dark green)
         // (in the golden wood they have turned with it: ochre and rust, not the wood's dark green)
-        const lit = terrain.lakeside?.open(s, side) ? [5, 4.2, 2.6] : goldwood?.here(s) ? GOLDWOOD.bush : [1, 1, 1];
+        const lit = terrain.lakeside?.open(s, side) || terrain.arm?.opens(s, side) ? [5, 4.2, 2.6] : goldwood?.here(s) ? GOLDWOOD.bush : [1, 1, 1];
         const bush = make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c, k) => c * v * lit[k]), h);
         // (ref lane: none on a tunnel's meadow, which is open grass to the fence; the numbers are drawn all the same)
         if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5)) bushItems.push(bush);
@@ -670,6 +671,35 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const warm = lr.range(-0.03, 0.05);
         rockItems.push(make(point.x, y - size * 0.35, point.z, lr.range(0, Math.PI * 2), [size * lr.range(1, 1.5), size * lr.range(1.1, 1.7), size * lr.range(0.9, 1.3)], [0.2 * v * (1 + warm), 0.195 * v, 0.18 * v * (1 - warm)], size * 1.7, lr.range(-0.25, 0.25)));
       }
+    }
+  }
+
+  // THE ARM OF THE LAKE (arm.js; the photograph r4), from a stream of its own: the long grass of the meadow (the
+  // same cards) along the left verge's outer part, thick against the barrier and the fence, and on down the bank
+  // towards the water, thinning.
+  const arm = terrain.arm;
+  if (arm) {
+    const ar = rng.fork('arm');
+    const span = ARM.open[1] - ARM.open[0];
+    const count = Math.round(span * MT.grass * ARM.grass.share);
+    for (let i = 0; i < count; i++) {
+      const s = track.wrap(arm.s0 + ARM.open[0] + ar.range(0, span));
+      const where = ar.next();
+      const far = ar.next();
+      const size = ar.range(0.55, 1);
+      const yaw = ar.range(0, Math.PI);
+      const shade = ar.range(0.75, 1.35);
+      if (inRanges(s, track.bridges, 2)) continue;
+      const edge = track.edgeAt(s, 1);
+      const lat = where < 0.55 ? edge - 1.6 + 5.4 * far : edge + 3.8 + 40 * far ** 1.5;
+      if (lat < pave + 1.2) continue;
+      const g = groundAt(s, lat, 1);
+      if (g.surface >= 0 && g.surface !== SURFACE_GRASS) continue;
+      if (g.y < arm.level + 0.3) continue;
+      track.pointAt(s, lat, point);
+      if (!ownStretch(s, point.x, point.z)) continue;
+      const h = (where < 0.55 ? 0.8 : 0.8 - 0.3 * far) * size;
+      meadowItems.push(make(point.x, g.y - 0.05, point.z, yaw, [h * 1.5, h, h * 1.5], ARM.grass.tint.map((c) => c * shade), h));
     }
   }
 

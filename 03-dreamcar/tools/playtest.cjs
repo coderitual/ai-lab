@@ -1645,9 +1645,10 @@ const SECTIONS = {
       && st4.time === preset4.time && Math.abs(clock4 - preset4.t) < 0.05 && !!place4 && place4.stretch === 1,
       `${st4.time}, ${clock4.toFixed(2)} s into the run, fov ${named4.fov}, ${place4 ? place4.along.toFixed(0) : '?'} m after the sky road`);
     await p4.close('photo r2');
-    // the golden wood's camera (design.md): the same, and its car is on that stretch
+    // the golden wood's and the arm of the lake's cameras (design.md): the same, and their cars are on those stretches
     for (const [name, where, what] of [
       ['r3', (g) => { const w = g.world.terrain.goldwood; return w ? { along: w.along(g.racers[0].vehicle.s), stretch: w.stretch(g.racers[0].vehicle.s) } : null; }, 'into the esses'],
+      ['r4', (g) => { const w = g.world.terrain.arm; return w ? { along: w.along(g.racers[0].vehicle.s), stretch: w.along(g.racers[0].vehicle.s) < 0 && w.along(g.racers[0].vehicle.s) > -337 ? 1 : 0 } : null; }, 'from the end of the gully bridge'],
     ]) {
       const p5 = await open(`?manual&q=low&photo=${name}`, { w: 640, h: 360, gpu: false });
       const preset5 = await p5.page.evaluate('window.__dreamcar.game.photo');
