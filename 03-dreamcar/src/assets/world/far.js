@@ -496,7 +496,9 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
       const r = mistRng.range(700, 2600);
       const x = mid.x + Math.cos(a) * r;
       const z = mid.z + Math.sin(a) * r * 0.9;
-      const h = terrain.heightAt(x, z);
+      // (where the sheets lie is chosen on the land as it was before the lakeside was shaped, terrain.before, so
+      // that shaping that one place moves no mist anywhere else; each sheet then thins over the ground as it is)
+      const h = (terrain.before ?? terrain).heightAt(x, z);
       track.locate(x, z, -1, spot);
       if (Math.abs(spot.lat) < 260) continue;
       if (h > 60) continue;
@@ -684,9 +686,10 @@ void main() {
     const x = mid.x + Math.cos(a) * r;
     const z = mid.z + Math.sin(a) * r;
     track.locate(x, z, -1, spot);
-    const h = terrain.heightAt(x, z);
+    // (chosen on the land as it was before the lakeside: see the mist above)
+    const h = (terrain.before ?? terrain).heightAt(x, z);
     if (Math.abs(spot.lat) < 300 || h < 40 || h > 250) continue;
-    lights.push({ x, y: h + 3, z, c: [1, 0.7, 0.4], i: 0.4, kind: 'farm' });
+    lights.push({ x, y: terrain.heightAt(x, z) + 3, z, c: [1, 0.7, 0.4], i: 0.4, kind: 'farm' });
     if (lights.filter((l) => l.kind === 'farm').length >= 2) break;
   }
   const lakeUniform = { value: new THREE.Vector4(lakeMid.x, lakeMid.z, lakeMid.rx, lakeMid.rz) };

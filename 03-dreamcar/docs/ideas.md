@@ -16,6 +16,13 @@ comparison stills and strike what is done.
   pale slopes: the far rings and the terrain's low hills in haze, where D1
   has sunlit trees and bushes in front of a back-lit massif. The massif's
   foot is hidden behind snowy beige hills of the terrain.
+- **The lakeside against its photograph** (design.md, "The lakeside"): the
+  asphalt is several times darker and there is no centre dash (the lap's
+  asphalt and the day's low sun); the tarn begins 60 m past the camera, so
+  the water is a narrower band than the photograph's lake; the headland's
+  trees stand as single cards against the sky; the far range's snow reads as
+  caps from here; a corner of the spur's stone still shows over the stand;
+  the slope at the end of the sky road has fewer trees than it had.
 - **The ground beside the sky road** reads from above as a pale, rippled
   bare slope (`docs/images/sky-road.jpg`), not the wooded valley under the
   columns of frame A.

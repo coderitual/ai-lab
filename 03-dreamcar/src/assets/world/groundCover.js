@@ -16,6 +16,7 @@ import { alphaMips, chainTexture } from './forestTextures.js';
 import { plantMaterial } from './treeMaterial.js';
 import { planeNoise } from './shading.js';
 import { GRASS } from './groundMaterial.js';
+import { LAKESIDE } from './lakeside.js';
 import { APPROACH, approachAt, approachesOf, beforeFace, meadowAt } from './approach.js';
 
 const SURFACE_GRASS = 2;
@@ -27,6 +28,24 @@ const TIER = {
   medium: { grass: 2.2, grassReach: 38, bushes: true, bushReach: 75, rockReach: 260 },
   high: { grass: 3.2, grassReach: 48, bushes: true, bushReach: 95, rockReach: 340 },
 };
+
+/**
+ * The lakeside's own growth (lakeside.js; the photograph r2), per tier: patches of flowers per metre of road and
+ * their reach (m), outcrops per 10 m of the bank, low bushes per metre. (Its long grass: LAKESIDE_LONG below.)
+ */
+const LAKESIDE_COVER = {
+  low: { flowers: 0, flowerReach: 0, outcrops: 2.4, bushes: 0 },
+  medium: { flowers: 2.6, flowerReach: 34, outcrops: 3.4, bushes: 1.1 },
+  high: { flowers: 3.2, flowerReach: 44, outcrops: 4, bushes: 1.5 },
+};
+/**
+ * The lakeside's long grass is the approach meadow's cards (MEADOW, `cover-meadow`): their tint here (the meadow's
+ * green warmed towards the photograph's yellow-green), and how many a metre of road against the approach's.
+ */
+const LAKESIDE_LONG = [1.3, 1.02, 0.6];
+const LAKESIDE_LONG_SHARE = 2;
+/** Flowers, linear albedo: dandelion yellow, and the white of anemones under the rail. */
+const FLOWER = { yellow: [0.8, 0.52, 0.02], white: [0.72, 0.72, 0.62] };
 
 /**
  * (ref lane) The tall grass of the meadow on a tunnel's approach (approach.js), per tier: tufts per metre of road and
@@ -237,6 +256,41 @@ function boulder(rng) {
 }
 
 /**
+ * A patch of flowers: a few small heads on a hand's breadth of ground, each a little diamond lying nearly flat at
+ * the top of its stalk's height, turned up a little towards one side. No stalks (they are thinner than a pixel).
+ */
+function flowers(rng) {
+  const pos = [];
+  const nor = [];
+  const shade = [];
+  const index = [];
+  for (let k = 0; k < 7; k++) {
+    const a = rng.range(0, Math.PI * 2);
+    const r = Math.sqrt(rng.next()) * 0.5;
+    const cx = Math.cos(a) * r;
+    const cz = Math.sin(a) * r;
+    const y = rng.range(0.1, 0.3);
+    const size = rng.range(0.045, 0.07);
+    const tilt = rng.range(0, Math.PI * 2);
+    const tx = Math.cos(tilt) * 0.5;
+    const tz = Math.sin(tilt) * 0.5;
+    const base = pos.length / 3;
+    for (const [dx, dz] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+      pos.push(cx + dx * size, y + (dx * tx + dz * tz) * size, cz + dz * size);
+      nor.push(-tx * 0.5, 1, -tz * 0.5);
+      shade.push(1, 0);
+    }
+    index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('aShade', new THREE.Float32BufferAttribute(shade, 2));
+  g.setIndex(index);
+  return g;
+}
+
+/**
  * One kind of scattered thing, drawn per view from cells within `reach` of the eye.
  * @param {object} o
  * @param {THREE.BufferGeometry} o.geometry @param {THREE.Material} o.material
@@ -402,7 +456,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const tint = GRASS.tuft.map((c, k) => (c + (GRASS.tuftDry[k] - c) * dry) * v);
         const tuft = make(point.x, g.y - 0.03, point.z, r.range(0, Math.PI), [h * 2.2, h, h * 2.2], tint, h);
         // (ref lane: the circuit's own dark tufts give way to the meadow's tall grass on a tunnel's approach)
-        if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5)) grassItems.push(tuft);
+        // (nor on the lakeside's stretch, whose verge is the long meadow grass)
+        if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5) && !((terrain.lakeside?.stretch(s) ?? 0) > 0.5)) grassItems.push(tuft);
       }
     }
     if (T.bushes) {
@@ -419,7 +474,9 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const y = terrain.heightOnTrack(s, lat);
         const h = r.range(0.5, 1.3);
         const v = r.range(0.7, 1.2);
-        const bush = make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c) => c * v), h);
+        // (on the lakeside's meadow the lap's own bushes are the meadow's: lit, warm, not the wood's dark green)
+        const lit = terrain.lakeside?.open(s, side) ? [5, 4.2, 2.6] : [1, 1, 1];
+        const bush = make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c, k) => c * v * lit[k]), h);
         // (ref lane: none on a tunnel's meadow, which is open grass to the fence; the numbers are drawn all the same)
         if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5)) bushItems.push(bush);
       }
@@ -510,6 +567,108 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
     }
   }
 
+  // THE LAKESIDE (lakeside.js; the photograph r2), from a stream of its own so that nothing else on the lap moves:
+  // tall grass against the rail on the lake's side and along the foot and the lip of the cut, flowers in it, and
+  // outcrops of rock in the bank (boulders sunk deep, in groups: the same faceted stone as the rest of the lap's).
+  const flowerItems = [];
+  const lakeside = terrain.lakeside;
+  if (lakeside) {
+    const lr = rng.fork('lakeside');
+    const C = LAKESIDE_COVER[tier] ?? LAKESIDE_COVER.medium;
+    const s0 = lakeside.s0;
+    const span = LAKESIDE.to - LAKESIDE.from;
+    const sAt = () => track.wrap(s0 + LAKESIDE.from + lr.range(0, span));
+    const flower = (s, lat, side, kind) => {
+      const g = groundAt(s, lat, side);
+      if (g.surface >= 0 && g.surface !== SURFACE_GRASS) return;
+      track.pointAt(s, lat, point);
+      const k = lr.range(0.8, 1.6);
+      flowerItems.push(make(point.x, g.y, point.z, lr.range(0, Math.PI * 2), [k, k, k], FLOWER[kind].map((c) => c * lr.range(0.85, 1.1)), 0.8));
+    };
+    // The long grass is the approach meadow's (the `cover-meadow` cards above: tall blades with pale seed heads,
+    // painted in their own colours), warmed towards the photograph's yellow-green: on the lake's side a continuous
+    // band from the paved margin to a little beyond the rail, and on down the bank to the water, thinning; on the
+    // land's side at the cut's foot and on its lip. (The first round's dark tufts of the lap's own grass are gone.)
+    const long = (s, lat, side, h) => {
+      const g = groundAt(s, lat, side);
+      if (g.surface >= 0 && g.surface !== SURFACE_GRASS) return;
+      if (g.y < lakeside.level + 0.2) return;
+      track.pointAt(s, lat, point);
+      const shade = lr.range(0.75, 1.35);
+      meadowItems.push(make(point.x, g.y - 0.05, point.z, lr.range(0, Math.PI), [h * 1.5, h, h * 1.5], LAKESIDE_LONG.map((c) => c * shade), h));
+    };
+    const perMetre = MT.grass * LAKESIDE_LONG_SHARE;
+    for (let i = 0; i < span * perMetre; i++) {
+      const s = sAt();
+      const edge = track.edgeAt(s, 1);
+      const where = lr.next();
+      const far = lr.next();
+      const size = lr.range(0.55, 1);
+      // half in the band at the rail, the rest down the bank, fewer and shorter the further down
+      if (where < 0.5) long(s, pave + 0.35 + (edge + 2.2 - pave - 0.35) * far, 1, 0.8 * size);
+      else long(s, edge + 2.2 + 32 * far ** 1.25, 1, (0.8 - 0.35 * far) * size);
+    }
+    for (let i = 0; i < span * perMetre * 0.45; i++) {
+      const s = sAt();
+      const edge = track.edgeAt(s, -1);
+      const c = terrain.cliffAt(s, -1);
+      const foot = lr.next() < 0.35;
+      long(s, -(foot ? lr.range(pave + 0.3, edge - 0.1) : edge + c.top + lr.range(0.2, 5)), -1, lr.range(0.4, foot ? 0.6 : 0.8));
+    }
+    for (let i = 0; i < span * C.flowers; i++) {
+      const s = sAt();
+      const left = lr.next() < 0.5;
+      if (left) {
+        const edge = track.edgeAt(s, 1);
+        flower(s, Math.max(pave + 0.3, edge + lr.range(-2.4, 2.5)), 1, lr.next() < 0.75 ? 'yellow' : 'white');
+      } else {
+        const edge = track.edgeAt(s, -1);
+        const c = terrain.cliffAt(s, -1);
+        const foot = lr.next() < 0.5;
+        flower(s, -(foot ? lr.range(pave + 0.3, edge - 0.15) : edge + c.top + lr.range(0.3, 4)), -1, 'yellow');
+      }
+    }
+    // low bushes down the bank to the water and along the shore, and on the land's bank among the outcrops
+    for (let i = 0; i < span * C.bushes; i++) {
+      const s = sAt();
+      const left = lr.next() < 0.7;
+      const side = left ? 1 : -1;
+      const edge = track.edgeAt(s, side);
+      const lat = side * (edge + (left ? lr.range(1.5, 34) : terrain.cliffAt(s, -1).top + lr.range(1, 16)));
+      track.pointAt(s, lat, point);
+      const y = terrain.heightAt(point.x, point.z);
+      if (y < lakeside.level + 0.15) continue;
+      const h = lr.range(0.5, 1.2);
+      const v = lr.range(2.4, 3.4);
+      if (lr.next() < 0.6) continue;
+      bushItems.push(make(point.x, y - 0.1, point.z, lr.range(0, Math.PI), [h * 1.5, h, h * 1.5], GRASS.bush.map((c, k) => c * v * [1.1, 0.95, 0.6][k]), h));
+    }
+    // outcrops in the bank on the right: groups of two to four stones, the largest a couple of metres across,
+    // sunk to their shoulders; and a few on the bank above the water
+    const groups = Math.round((span / 10) * C.outcrops);
+    for (let i = 0; i < groups; i++) {
+      const right = lr.next() < 0.8;
+      const s = sAt();
+      const side = right ? -1 : 1;
+      const edge = track.edgeAt(s, side);
+      const c = terrain.cliffAt(s, side);
+      const lat = side * (edge + (right ? c.top + lr.range(0.6, 15) : lr.range(4, 22)));
+      const count = 2 + lr.int(3);
+      const big = lr.range(1.0, right ? 2.6 : 1.5);
+      for (let k = 0; k < count; k++) {
+        const size = k === 0 ? big : big * lr.range(0.35, 0.7);
+        const ss = s + (k === 0 ? 0 : lr.range(-1, 1) * big * 1.4);
+        const ll = lat + (k === 0 ? 0 : lr.range(-1, 1) * big * 1.2);
+        if (Math.abs(ll) < track.edgeAt(ss, side) + c.top + 0.4) continue;
+        track.pointAt(ss, ll, point);
+        const y = terrain.heightAt(point.x, point.z);
+        const v = lr.range(0.85, 1.25);
+        const warm = lr.range(-0.03, 0.05);
+        rockItems.push(make(point.x, y - size * 0.35, point.z, lr.range(0, Math.PI * 2), [size * lr.range(1, 1.5), size * lr.range(1.1, 1.7), size * lr.range(0.9, 1.3)], [0.2 * v * (1 + warm), 0.195 * v, 0.18 * v * (1 - warm)], size * 1.7, lr.range(-0.25, 0.25)));
+      }
+    }
+  }
+
   const coverMaterial = plantMaterial({ map: texture, atmosphere, uniforms, wind: { height: 1, sway: 0.04 } });
   const rockMaterial = plantMaterial({ map: null, atmosphere, uniforms, wind: null, flat: true });
   const parts = [];
@@ -519,6 +678,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
   const rocks = scatter({ geometry: boulder(rng.fork('boulder')), material: rockMaterial, items: rockItems, reach: T.rockReach, name: 'cover-rocks', group });
   rocks.mesh.castShadow = tier !== 'low';
   parts.push(rocks);
+  if (flowerItems.length) parts.push(scatter({ geometry: flowers(rng.fork('flowers')), material: rockMaterial, items: flowerItems, reach: (LAKESIDE_COVER[tier] ?? LAKESIDE_COVER.medium).flowerReach, name: 'cover-flowers', group }));
   let meadowMap = null;
   let meadowMaterial = null;
   if (meadowItems.length) {
@@ -530,7 +690,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
   const frustum = new THREE.Frustum();
   const projView = new THREE.Matrix4();
   const eye = new THREE.Vector3();
-  const stats = { grass: grassItems.length, bushes: bushItems.length, rocks: rockItems.length, meadow: meadowItems.length, view: {}, ms: Math.round(performance.now() - started) };
+  const stats = { grass: grassItems.length, bushes: bushItems.length, rocks: rockItems.length, flowers: flowerItems.length, meadow: meadowItems.length, view: {}, ms: Math.round(performance.now() - started) };
   return {
     group,
     stats,

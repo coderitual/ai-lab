@@ -11,7 +11,9 @@
 //   kerbs.js        the red and white kerbs on the margins, from track.kerbs
 //   rock.js         the cut rock faces at the rock edges
 //   approach.js     the meadow on the tunnel's approach, as numbers (terrain, tunnel, forest, cover, meadow.js)
-//   lake.js         the water beside the straight
+//   lake.js         the water beside the straight, and the lakeside's tarn
+//   lakeside.js     one place after the sky road, shaped by hand beyond the edges: what the terrain, the
+//                   forest, the ground cover, the rock and the fence (fence.js) read to make it
 //   far.js          the mountains on the horizon, mist in the valleys, the village's lights at night
 //   forest.js       the trees (treeGeometry.js, forestTextures.js), planted from the Track and the ground
 //   groundCover.js  grass, bushes and rocks along the verges and under the trees
@@ -37,6 +39,7 @@ import { TIMES, placeLights } from './lighting.js';
 import { createGroundMaterial } from './groundMaterial.js';
 import { createLake } from './lake.js';
 import { createFar } from './far.js';
+import { createFence } from './fence.js';
 import { CASTER_LAYER, createForest } from './forest.js';
 import { createGroundCover } from './groundCover.js';
 import { selectBake } from './shading.js';
@@ -162,6 +165,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     material: groundMaterial.material,
     lights: { day: TIMES.day.sun.dir, night: TIMES.night.sun.dir, dusk: TIMES.dusk?.sun.dir },
   });
+  groundMaterial.setLakeside(terrain.lakeside?.paint ?? null);
   lap('terrain');
   const mirror = MIRROR[tier] && caps.hdr ? new PlanarMirror(renderer, caps, MIRROR[tier]) : null;
   if (mirror) mirror.uniforms.uMirrorPlane = { value: new THREE.Vector4(0, 1, 0, 0) };
@@ -173,6 +177,11 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   const rock = createRockFaces({ track, terrain, tier, rng: rng.fork('rock'), except: (s) => !!concreteCut(track, s) });
   lap('rock');
   const lake = createLake({ caps, atmosphere, heightAt: terrain.heightAt, ...terrain.lake });
+  // the lakeside's tarn (lakeside.js): the same water, at its own level, only in its own basin
+  const lakeside = terrain.lakeside;
+  const tarn = lakeside
+    ? createLake({ caps, atmosphere, heightAt: terrain.heightAt, level: lakeside.level, extent: lakeside.extent, cell: 24, within: (x, z) => lakeside.shore(x, z) > -22, name: 'tarn', ripple: 0.55, sky: 1.25, mirrors: lakeside.mirrors })
+    : null;
   lap('lake');
   // (the trees' alpha becomes coverage where the scene target is multisampled: the pipeline's rule, caps.js)
   const coverage = (TIERS[tier]?.msaa ?? 0) > 0 && !(caps.hdr && !caps.msaaHdr) && caps.maxSamples > 0;
@@ -192,6 +201,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   lap('structures');
   const studs = createStuds({ track, caps });
   lap('studs');
+  // the lakeside's fence on its bank (fence.js)
+  const fence = createFence({ track, terrain, tier, atmosphere, rng: rng.fork('fence') });
 
   // (picture lane) whatever runs the length of the lap in one mesh (rails, posts, kerbs, the lamps' glow) is cut
   // into 400 m pieces, so that each pass draws only the pieces it can see (engine/chunks.js). Smaller pieces cull
@@ -210,7 +221,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   }
   const smallReach = SMALL_REACH[tier] ?? SMALL_REACH.medium;
   const eye = new THREE.Vector3();
-  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, lake.mesh, forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
+  scene.add(studs.points, terrain.group, road.group, kerbs.mesh, rock.group, structures.group, lake.mesh, ...(tarn ? [tarn.mesh] : []), ...(fence ? [fence.mesh] : []), forest.group, cover.group, far.group, sky.dome, sky.stars, ...sun.objects);
   scene.fog = atmosphere.fog;
 
   let wetness = 0;
@@ -223,7 +234,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   };
   let startLights = 0;
   /** What the wet road's mirror leaves out: the road itself and what lies under or far beyond it. */
-  const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, lake.mesh, cover.group, far.group, ...structures.mirrorHidden];
+  const mirrorHidden = [road.group, kerbs.mesh, terrain.group, rock.group, lake.mesh, ...(tarn ? [tarn.mesh] : []), ...(fence ? [fence.mesh] : []), cover.group, far.group, ...structures.mirrorHidden];
   /** mirrorHidden and what the caller of prepareView adds (the cars' contact shadows, smoke and spray). */
   const mirrorHiddenAll = [];
   const mirrorPoint = new THREE.Vector3();
@@ -244,7 +255,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   }
 
   function probeLeavesOut() {
-    const list = [kerbs.mesh, cover.group];
+    const list = [kerbs.mesh, cover.group, ...(fence ? [fence.mesh] : [])];
     if (tier === 'low') {
       forest.group.traverse((o) => {
         if (/^forest-(reduced|full|floor)-/.test(o.name)) list.push(o);
@@ -308,6 +319,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     update(dt, simTime) {
       sky.update(dt, simTime);
       lake.update(simTime);
+      tarn?.update(simTime);
       forest.update(dt, simTime);
       far.update(dt, simTime);
       structures.update(dt);
@@ -394,6 +406,8 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
       terrain.dispose();
       road.dispose();
       lake.dispose();
+      tarn?.dispose();
+      fence?.dispose();
       rock.dispose();
       structures.dispose();
       studs.dispose();

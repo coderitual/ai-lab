@@ -83,6 +83,14 @@ const LOADS = [
         photo: { back: 45, right: 18, up: 24, yaw: 8, pitch: -20, fov: 55 },
         caption: 'The sky road: a left-hand bend of 576 m on piers, 42 m over the valley',
       },
+      // the lakeside (config.js PHOTOS.r2's camera and moment; design.md, "The lakeside")
+      {
+        name: 'lakeside',
+        dist: 2664,
+        photo: { back: 24, right: -2, up: 1.45, yaw: 5, pitch: 0, fov: 52 },
+        shutter: 0.1,
+        caption: 'The lakeside: out of the sky road above the tarn, the far range beyond it',
+      },
       {
         name: 'carousel',
         dist: 2800,

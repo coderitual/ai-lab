@@ -31,7 +31,7 @@ SwiftShader on four busy cores. Times below are from that machine.
 
 | script | what it does | checks | time here |
 | --- | --- | --- | --- |
-| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (112 166 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). `governor.test.mjs`: the quality governor run through made-up phones (engine.md, "The quality ladder"): the ladder's order and floors, a slow phone, a weak one, a 30 Hz cap alone and with a slow GPU, recovery, a cap that comes on later and one that goes, a hitch in a measurement, a second visit, no governor for stills, the tier guess (13 tests, under a second). `drift.test.mjs`: the feel: each device's turn-in time, the three assist levels, slides asked for, held and let go on every device, what the default level never lets happen, people's laps on the real road (7 tests). | 5 files | about 1 min |
+| `node tools/unit.mjs [name]` | Runs every `tools/unit/*.test.mjs` in its own Node process. `race.test.mjs`: the clock, the start, lines and sectors, gaps, medals, the board (82 checks). `track.test.mjs`: the road is closed, smooth, invertible to a hundredth of a millimetre, has the course's numbers, kerbs, lamps and sectors (112 166 checks). `vehicle.test.mjs`: the car's numbers against the targets (0 to 100, top speed, braking, grip, key steering, no spin at full lock, rail touches, no objects made while stepping) and laps of the real road by the autopilot at three paces, a thumb, a pad, keys and a ham-fisted keyboard driver, the crest, two autopilots side by side (37 tests). `governor.test.mjs`: the quality governor run through made-up phones (engine.md, "The quality ladder"): the ladder's order and floors, a slow phone, a weak one, a 30 Hz cap alone and with a slow GPU, recovery, a cap that comes on later and one that goes, a hitch in a measurement, a second visit, no governor for stills, the tier guess (13 tests, under a second). `drift.test.mjs`: the feel: each device's turn-in time, the three assist levels, slides asked for, held and let go on every device, what the default level never lets happen, people's laps on the real road (7 tests). `ground.test.mjs`, `structures.test.mjs`, `trackside.test.mjs`: nothing over the road, nothing inside its edges (techniques.md). `lakeside.test.mjs`: the lakeside shapes no ground inside any solid edge of the lap, its tarn's rim holds its water, and the hillsides beside the rest of the lap are what they were (4 tests). | 9 files | about 2 min |
 | `node tools/handling.mjs` | The car measured the way a road test would; prints the table of spec.md. `--json`, `--no-laps`. | (a table, not checks) | 6 s |
 | `node tools/trackmap.mjs out.svg` | Draws the circuit from above with its height, gradient and speed envelope, and prints its numbers (sections, structures, kerbs, dressing, lamps, sectors, pieces). `--png out.png`, `--fit a,b` (close the loop after an edit). | | under 1 s |
 | `node tools/playtest.cjs [URL] [sections]` | The run-through before a push: drives the game through its real inputs (keys, a stand-in for the gamepad API, touch, the HUD's buttons) and asks the page through `__dreamcar`. Sections: title, keys, results, three, board, lines, nostorage, split, pads, touch (the fixed controls upright and on its side, 76 checks: the slider's fixed centre, a thumb landing off it steering at once, no drift of the centre after a drag, the knob springing back; power with nothing touched on auto and only from GAS on manual; BRAKE lifting the power and reversing at a standstill; DRIFT; two and three fingers at once, a finger sliding off a pedal, pointercancel, blur and orientationchange; touches elsewhere doing nothing; the arrows; the first-run names; both halves of a tablet split), slide (a handbrake turn through the keys and one through the touch slider and DRIFT, the readout, the driving help kept and applied), window, hud (the touch controls among the boxes: at least 64 px, inside the safe area with a phone's insets stood in for, drawn where Input finds them; solo again on manual), options (with Steering and Throttle on touch, the readout, kept, and with no storage), start, photo, determinism, params, ladder (every level of low and medium by hand: each rung sheds what it says, resolution last and never under the floor, no program compiled; `?scale=`, `?shed=`, `?upscale=0`; a running page has a governor and stays on the ladder, `?dpr=` switches it off), tiers. Any console error, page error or WebGL warning fails that page. | about 250 | an hour or more |
@@ -64,7 +64,7 @@ pictures.
 
 | load | pictures |
 | --- | --- |
-| day | `title` (the menu over the hero picture), `car-front`, `car-rear` (on the grid before Drive), `approach` (the approach to the tunnel from photograph R1's camera, `?photo=r1`), `tunnel` (chase view in the bore), `sky-road` (from beside and below the deck), `carousel` (from above), `chase` (the second lap onto the straight at speed, into the sun), `og` (1200x630, `public/og.jpg`) |
+| day | `title` (the menu over the hero picture), `car-front`, `car-rear` (on the grid before Drive), `approach` (the approach to the tunnel from photograph R1's camera, `?photo=r1`), `tunnel` (chase view in the bore), `sky-road` (from beside and below the deck), `lakeside` (the photograph r2's camera: design.md, "The lakeside"), `carousel` (from above), `chase` (the second lap onto the straight at speed, into the sun), `og` (1200x630, `public/og.jpg`) |
 | dusk | `grid-dusk`: low behind the car under the gantry while the lamps count |
 | night | `night`: the end of the first lap onto the wet, lit straight |
 | split | `split`: two players in the esses |
@@ -99,7 +99,7 @@ node tools/screenshots.cjs                # if anything visible changed; look at
 | `stats()` | frame time, draw calls, triangles, programs, textures, buffer size, HUD writes, pixel ratio, render scale, `quality` (the governor: level, rungs shed, floor, the cap once found, trials), the pipeline's targets and what it draws now (samples, blur taps, occlusion samples, whether the frame went through the upscale), tier, `hdr`, GPU string |
 | `engine.setQualityStep(n)`, `engine.setRenderScale(x)` | place the quality ladder by hand (level 0: everything; engine.md), or only the render scale; the governor is then off. `game.pipeline.upscale = false` is the plain stretch |
 | `game.perfState()` | what the readout shows, as an object |
-| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`, `r1`); `photo(null)` ends it |
+| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`, `r1`, `r2`); `photo(null)` ends it |
 | `set(path, value)` | change a number of lighting.js or config.js and show it: `set('times.night.exposure', 20)`, `set('camera.chase.distance', 6)` |
 
 `window.__ready` is true once the first frame has been drawn.
@@ -381,6 +381,25 @@ Read this before believing anything above about a device.
 - **Wet grip.** The wet road at night is a look; the tyres do not notice it.
 - **Accessibility** beyond keyboard reachability of the buttons (screen
   readers, colour blindness, reduced motion) has not been considered.
+
+- **The lakeside** (2026-11-26; design.md and techniques.md, "The lakeside"): one stretch after the sky road shaped
+  after a photograph, in three rounds, the last on top of the merge with the approach to the tunnel (R1).
+  `node tools/unit.mjs`: 9 files passed (`lakeside.test.mjs` is new: 4 tests). The playtest's `keys`, `photo` and
+  `determinism` sections against the production build: 52 checks, 0 failed (one of them new: `?photo=r2` brings its
+  camera, its moment and its time of day, and its car is on the lakeside). After the merge `?photo=r1` at `medium`
+  1280x720 is the approach lane's last still pixel for pixel (0.00 % of pixels differ). Looked at, on software WebGL:
+  `?photo=r2` at `medium` 1280x720 by day, at golden hour and at night, and at `low` 960x540 by day; the chase view
+  on an upright phone's shape (393x852, `medium`) at lap 0:48.8 and 0:51 before and after; the wide chase view from
+  the middle of the sky road (1280x720, `medium`, lap 0:47) before and after. Before the merge, stills at the esses
+  (t = 24) and `?photo=d1` were the same pixel for pixel as before the lakeside. Measured against the photograph on
+  the staged pair (same size, side by side and blended half and half), mean luminance of eight regions: sky +3 %,
+  far peaks -14 %, water +1 %, grass in sun +6 %, tree crowns +3 %, rock +13 %, asphalt in sun -79 %, asphalt in
+  shade -86 % (the asphalt is the lap's own under a sun 16 degrees up and was not this place's to change). Draw
+  calls and triangles were counted at t = 48, 54 and 56.5 on `low` and `medium` after the second round (spec.md);
+  not again after the third, which adds the long grass to the meadow's one mesh, nor after the merge. Not verified:
+  the `high` tier, split screen at this place, anything in motion (stills only), whether the tarn's shore, the
+  meadow's edge and the far range hold up on a real GPU's precision and filtering, and any frame rate. The rest of
+  the playtest and the sound test were not run (no sound, rule, control or HUD code was touched).
 
 - **The return to main's version with fixes only** (2026-11-23 to 26: the far land's hole, no ground, structure or
   furniture over the road or inside its edges, the tree shadows' casters in split screen, the pad where the thumb

@@ -58,7 +58,7 @@ try {
     /**
      * The staging camera: { back, right, up, yaw, pitch, fov } (metres behind, right of and above the car's origin
      * in its level frame; degrees left of its heading and up; the lens top to bottom), the HUD hidden unless
-     * { hud: true }; null ends it; a name ('d1', 'd3', 'd4': config.js PHOTOS) is a reference frame's camera.
+     * { hud: true }; null ends it; a name ('d1', 'd3', 'd4', 'r2': config.js PHOTOS) is a reference frame's camera.
      * Also ?photo=back,right,up,yaw,pitch,fov or ?photo=d1 in the address.
      */
     photo: (o) => game.setPhoto(o),

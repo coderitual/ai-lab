@@ -492,8 +492,9 @@ export class Game {
   /**
    * The staging camera for comparison stills: every view's camera at `o` ({ back, right, up, yaw, pitch, fov }:
    * metres behind, right of and above its car's origin in the car's level frame, degrees left of its heading and
-   * up, the lens top to bottom), the HUD hidden unless `o.hud`; null gives the views back to their rigs.
-   * @param {{ back?: number, right?: number, up?: number, yaw?: number, pitch?: number, fov?: number, hud?: boolean }|null} o
+   * up, the lens top to bottom), the HUD hidden unless `o.hud`; `o.shutter`: the share of the game's motion-blur
+   * shutter the picture is taken with (1 without it); null gives the views back to their rigs.
+   * @param {{ back?: number, right?: number, up?: number, yaw?: number, pitch?: number, fov?: number, hud?: boolean, shutter?: number }|null} o
    */
   setPhoto(o) {
     if (typeof o === 'string') o = PHOTOS[o] || null;
@@ -1088,7 +1089,8 @@ export class Game {
       view.frame.exposure = view.exposure * fade;
       view.frame.look = time.look;
       // the shutter opens with speed; while the camera itself dives at the start it is held short
-      view.frame.motionBlur = lerp(VIEW.motionBlurSlow, VIEW.motionBlur, clamp01(speed / VIEW.blurSpeed) ** 1.5) * lerp(VIEW.diveShutter, 1, view.rig.settled);
+      // (a staged camera that stands by the road, not by the car, brings a shorter shutter of its own: PHOTOS)
+      view.frame.motionBlur = lerp(VIEW.motionBlurSlow, VIEW.motionBlur, clamp01(speed / VIEW.blurSpeed) ** 1.5) * lerp(VIEW.diveShutter, 1, view.rig.settled) * (this.photo?.shutter ?? 1);
       view.frame.cut = view.frame.cut || view.rig.cut;
     }
 

@@ -132,7 +132,16 @@ export function createRockFaces({ track, terrain, tier, rng, except = null }) {
     geometry.setAttribute('aBake', new THREE.BufferAttribute(bake, 4));
     // aMask.y = 2: a cut face (groundMaterial.js draws it as bedded limestone whatever the facets' slopes)
     const mask = new Float32Array(count * 2);
+    // (3: the lakeside's weathered cut, where terrain.lakeside says the face is its own)
+    const lakeside = terrain.lakeside ?? null;
     for (let v = 0; v < count; v++) mask[v * 2 + 1] = 2;
+    if (lakeside && side < 0) {
+      const spot = { index: -1, s: 0, lat: 0 };
+      for (let v = 0; v < count; v++) {
+        track.locate(pos[v * 3], pos[v * 3 + 2], spot.index, spot);
+        if (lakeside.stretch(spot.s) > 0.5) mask[v * 2 + 1] = 3;
+      }
+    }
     geometry.setAttribute('aMask', new THREE.BufferAttribute(mask, 2));
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
