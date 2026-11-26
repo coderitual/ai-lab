@@ -36,6 +36,17 @@ export const CANOPY = {
 };
 
 const tables = new WeakMap();
+const opened = new WeakMap();
+
+/**
+ * Says where a wood the Track names does not stand after all (the lakeside clears the lake's side of its stretch):
+ * `open(s, side)` true there. Asked before the first canopyOpen of that Track.
+ * @param {object} track @param {(s: number, side: number) => boolean} open
+ */
+export function openCanopy(track, open) {
+  opened.set(track, open);
+  tables.delete(track);
+}
 
 /** Per Track sample and side, smoothed along the road: the wooded share, the wood's near face (m from the centre line) and height. */
 function tableOf(track) {
@@ -44,6 +55,7 @@ function tableOf(track) {
   const n = track.count;
   const ds = track.ds;
   const span = Math.max(1, Math.round(CANOPY.reach / ds));
+  const open = opened.get(track);
   t = [1, -1].map((side) => {
     const slopes = side > 0 ? track.farSlopeL : track.farSlopeR;
     const wooded = new Uint8Array(n);
@@ -51,7 +63,7 @@ function tableOf(track) {
     const heightRaw = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const wood = track.woodAt ? track.woodAt(i * ds, side) : null;
-      if (!wood) continue;
+      if (!wood || open?.(i * ds, side)) continue;
       wooded[i] = 1;
       nearRaw[i] = track.edgeAt(i * ds, side) + CANOPY.clear - CANOPY.overhang;
       heightRaw[i] = (CANOPY.height[wood] ?? CANOPY.height.mixed) + Math.max(0, slopes ? slopes[i] : 0) * (CANOPY.overhang + CANOPY.depth);

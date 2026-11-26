@@ -75,6 +75,7 @@ face stands in front of it, `rock.js`); further out it blends over 10 to
 100 m into a field made on a 16 m grid from the road itself (rising inside
 the loop, falling towards the lake and the valleys, a ridge over the tunnel,
 a ravine under the sky road), with ridged noise on top; far away, mountains.
+One place is then shaped by hand beyond the edges ("The lakeside", below).
 
 It is drawn in three pieces that meet without cracks: a **band** that follows
 the road row by row with the Track's samples, its columns on the corridor's
@@ -585,10 +586,103 @@ and railing, the banner as a colour.
 - **Laps are integers.** Line crossings are interpolated inside the step and
   rounded to whole milliseconds once; every reader uses that integer.
 
+## The lakeside: one place shaped by hand
+
+`src/assets/world/lakeside.js`, read by `terrain.js`, `index.js` (the tarn's
+water), `forest.js`, `groundCover.js`, `rock.js` and `fence.js`. design.md
+("The lakeside") says what the place is; this is how it is made without
+moving anything else on the lap.
+
+**Found from the Track, in a frame of its own.** The place is measured from
+the start of a named section (`carousel`: the end of the viaduct), never from
+map coordinates: `u` metres along the road's heading there, `v` metres to its
+left. The tarn is an ellipse in that frame with three sine waves round its
+shore for bays and headlands; `shore(x, z)` is how far inside it a point is.
+
+**The ground.** `terrain.js` asks `lakeside.ground(x, z, h, s, lat)` at the end
+of its height function, for the corridor's neighbourhood and for the open
+land alike. It returns `h` blended towards the basin and its bench, by a
+weight that is 1 on the tarn and its rim, falls to nothing in a straight
+ramp 45 to 300 m beyond the shore (115 m towards the valley under the sky
+road: the sun stands 16 degrees up beyond the tarn, and a long flank there
+laid the valley beside the deck in its own shade; a short one is a headwall
+at the valley's end), is nothing to the right of the road or beside any other
+stretch, and rises from 0 to 1 between 1 and 28 m beyond the solid edge
+(128 m beside the deck): so inside the
+edges the ground is exactly `track.profile()`, and the bank from the rail
+down to the water is that blend. The rim stands 1.4 m over the water on the
+road's side (the water shows from the road and from the deck) and 6 to 14 m
+on the far sides. On the right the rock edge's cliff is asked to be 1.3 to
+2.6 m (`cliff()`), the hillside's slope behind it 0.13 (`far()`), and between
+17 and 46 m beyond the edge that gives way to what the Track's own numbers
+make (`bankEnds()`): the ground between two legs of the road is a blend of
+what each asks for, and without that the far side of the spur fell by up to
+19 m.
+
+**The pass and the far range.** The same function caps the land in a sector
+from the stretch (3 to 80 degrees left of the road, 300 m to 5 km out) at the
+eye's height less 4 m plus 3 % of the distance, leaves a hill 44 m higher
+straight ahead between 300 and 1000 m (inside the distance trees are drawn
+to, and planted by `forest.js`), and raises a ridge across the pass 3.3 km out
+with peaks from ridged noise. That ridge is the terrain's far land, 100 m
+cells, so it is lit, baked and hazed like the rest; where `lakeside.wood()`
+answers with a negative forest mask the ground material lays snow in patches
+(the snow the lap's own hills do not have: `gSnow` in `groundMaterial.js` is
+that negative mask and nothing else).
+
+**The water** is `lake.js` again: a second sheet at the tarn's level over its
+own box, 24 m cells, kept only within 22 m of the shore (`within`), because a
+sheet 70 m over the valley floor would otherwise show over every low place
+round it; its ripples are deeper than the lake's (it mirrors more of the high
+blue sky and less of the pale horizon under the sun).
+
+**Nothing else moves.** Three things would have moved the whole lap's
+scenery if the place had simply been built in:
+- *The forest draws its random numbers in one stream, and what it draws
+  depends on the ground.* So the lap's own trees are planted from the land as
+  it was (`terrain.before.heightAt`, `forestAt`: the same functions with the
+  place left out), exactly as before; then `lakeside.clears()` removes those
+  on the water, on the lake's bank and on the right-hand bank, the rest are
+  seated on the new ground where it changed, and the place is planted from
+  `rng.fork('lakeside')`: rows on the bank, the spruces and saplings by the
+  rail, the wood round the shore, the hill ahead.
+- *Each tree's own numbers* (how it is turned, leans and is tinted, where
+  its patches of floor lie) used to be drawn tree after tree when the meshes
+  were made: take one tree out of the list and every later tree changed its
+  green. They are now drawn when the lap's trees have been planted and before
+  any is cleared, kept on the tree, and the place's trees draw theirs from
+  their own streams.
+- *The ground cover* draws the same numbers whatever the ground is; the
+  place's tall grass, flowers, bushes and outcrops are added from a fork of
+  their own, to the same instanced meshes (the flowers are one more: a patch
+  of seven small diamonds, untextured, in the rocks' material).
+- *The mist and the farm lights* (`far.js`) choose their places by trying
+  points and looking at the ground's height; they look at the land as it was
+  (`terrain.before`), and then lie on the land as it is.
+- *The bank's trees and the crest.* The leg that comes back from the carousel
+  runs 60 m away along the top of the same spur, with open sides by the
+  Track's word. No tree is planted within 75 m of it whose top would stand
+  more than 1.5 m over that road.
+- *The canopy* (`canopy.js`: how much sky the roadside woods hide, which
+  darkens the verge and opens the exposure) reads the Track's woods; the
+  place tells it where a wood the Track names no longer stands
+  (`openCanopy`).
+
+**The low tier** keeps all of it in a simpler form: the ground on its 14 m
+grid, half the trees, a tuft of grass every 0.8 m drawn to 26 m (the tier has
+no grass elsewhere), no flowers or bushes, fewer outcrops, every other fence
+post (three-sided) and one wire.
+
+`tools/unit/lakeside.test.mjs` holds the promises: the ground inside every
+solid edge of the lap unchanged, the tarn's rim above its water as far as the
+sheet may reach, no ground moved within half a metre of an edge, and the
+hillsides 3, 15 and 40 m beyond the edges of the rest of the lap what they
+were.
+
 ## The staging camera
 
 `setPhoto` in `src/game/Game.js`, `_photo` in `src/game/Cameras.js`.
-`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, which also set the moment of the autopilot's run and the time of day) places every view's
+`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, `r2`, which also set the moment of the autopilot's run and the time of day) places every view's
 camera `back` m behind, `right` m right of and `up` m above the car's origin
 in the car's level frame (its heading only, not its pitch or roll), turned
 `yaw` degrees left of the heading and `pitch` degrees up, with a lens of
@@ -596,7 +690,9 @@ in the car's level frame (its heading only, not its pitch or roll), turned
 but the car's pose, so with `?manual` the same run gives the same picture. The
 HUD hides unless `hud: true`; `photo(null)` gives the views back to their
 rigs. `?photo=back,right,up,yaw,pitch,fov[,hud]` does the same from the
-address. A camera ahead of the car looking back at it has a negative `back`
+address. A pose may carry `shutter`, the share of the game's motion-blur
+shutter its picture is taken with (`r2`: a tenth; the others ride with the
+car at the game's own). A camera ahead of the car looking back at it has a negative `back`
 and a `yaw` near 180. `tools/screenshots.cjs` stages every picture of the
 docs with it, at distances along an autopilot run.
 

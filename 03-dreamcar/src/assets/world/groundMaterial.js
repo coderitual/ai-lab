@@ -222,7 +222,10 @@ float gScrub = smoothstep( 0.06, 0.16, gSlope + ( gMid.b - 0.5 ) * 0.12 ) * smoo
 // (env lane) the wood's edge broken by clumps of crowns, not a soft blend
 float gForest = smoothstep( 0.3, 0.6, vMask.x + ( gMid.b - 0.5 ) * 0.5 + ( gLarge.b - 0.5 ) * 0.3 ) * step( 0.02, vMask.x ) * ( 1.0 - gRock );
 // (env lane: no snow on the hills round the circuit; the far massif is the SKY lane's)
-float gSnow = 0.0 * smoothstep( 290.0, 350.0, vGroundPos.y + 70.0 * ( gLarge.a - 0.5 ) ) * ( 1.0 - smoothstep( 0.45, 0.7, gSlope ) );
+// (lakeside: but for the far range that closes the pass beyond the tarn, where the terrain asks for it with a
+// negative forest mask: that much snow, lying in streaks and patches, not on the steepest rock)
+float gSnowAsk = clamp( -vMask.x, 0.0, 1.0 );
+float gSnow = gSnowAsk * smoothstep( 0.42, 0.58, 0.55 * gMid.a + 0.45 * gLarge.a + 0.5 * ( gSnowAsk - 0.5 ) ) * ( 1.0 - smoothstep( 0.5, 0.75, gSlope ) );
 
 // meadow: lush where gLarge.r is low, dry and paler where it is high, higher up a little browner
 vec3 gLush = ${v3(GRASS.lush)};
@@ -244,6 +247,8 @@ float gBedTone = fract( sin( floor( gBed ) * 12.9898 ) * 43758.5453 );
 vec3 gLime = mix( vec3( 0.15, 0.15, 0.145 ), vec3( 0.26, 0.255, 0.24 ), 0.3 + 0.7 * gBedTone ) * ( 0.8 + 0.3 * gDetRock.g );
 float gStreak = smoothstep( 0.55, 0.8, texture2D( uLarge, vec2( ( vGroundPos.x + vGroundPos.z ) / 23.0, vGroundPos.y / 400.0 ) ).b );
 gLime *= 1.0 - 0.45 * gStreak;
+// (lakeside) aMask.y = 3: a weathered cut in darker, browner stone under lichen and moss (the photograph r2's bank)
+gLime = mix( gLime, gLime * vec3( 0.43, 0.37, 0.29 ) * ( 0.75 + 0.5 * gDet.r ), step( 2.5, vMask.y ) );
 gRockCol = mix( gRockCol, gLime, gCut );
 vec3 gSnowCol = vec3( 0.72, 0.74, 0.78 ) * ( 0.9 + 0.2 * gDet.r ) * uSnowLight;
 
@@ -315,7 +320,7 @@ groundThrough = ${v3(GRASS.through)} * ( 0.6 + 0.4 * gVerge ) * groundGrass * gF
 gAlbedo = mix( gAlbedo, vec3( 0.03, 0.045, 0.02 ) * ( 0.7 + 0.6 * gDet.r ), gScrub * 0.85 );
 gAlbedo = mix( gAlbedo, gForestCol, gForest );
 // (seen from the road a clump is crowns, not forest floor)
-gAlbedo = mix( gAlbedo, gCanopy * 1.3, gClump * ( 1.0 - min( vMask.x * 3.0, 1.0 ) ) );
+gAlbedo = mix( gAlbedo, gCanopy * 1.3, gClump * ( 1.0 - clamp( vMask.x * 3.0, 0.0, 1.0 ) ) );
 gAlbedo = mix( gAlbedo, gScreeCol, gScree );
 gAlbedo = mix( gAlbedo, gRockCol, gRock );
 gAlbedo = mix( gAlbedo, gSnowCol, gSnow );

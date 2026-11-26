@@ -18,6 +18,7 @@ parts work. Written for whoever changes it next.
 | | |
 | --- | --- |
 | ![Golden hour on the grid](images/grid-dusk.jpg) | ![The wet night](images/night.jpg) |
+| ![The lakeside after the sky road](images/lakeside.jpg) | |
 
 ## Keeping this current
 

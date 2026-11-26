@@ -340,12 +340,16 @@ export const CAMERA = {
  * from the start of a run at RULES.autopilotPace; `time`, the time of day), used when the address does not give
  * them. D1: the run-up to the line, low behind and right of the car, yawed left; D3: the ledge's first bend, low
  * behind and left, looking down it; D4: the grid at golden hour just after the lights go out (the lamps show green), low on the lake side behind
- * the car, looking forward and right at the land side with the gantry's lamps in the picture.
+ * the car, looking forward and right at the land side with the gantry's lamps in the picture. R2 (a photograph, not
+ * a game frame: design.md, "The lakeside"): out of the sky road above the tarn, on the paved margin outside the left
+ * edge line at eye height, looking along the road and a little left, the car 24 m ahead; a tenth of the game's
+ * shutter (`shutter`), because a photograph of a verge is taken standing still.
  */
 export const PHOTOS = {
   d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
   d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
+  r2: { back: 24, right: -2, up: 1.45, yaw: 5, pitch: 0, fov: 52, shutter: 0.1, t: 56.45, time: 'day' },
 };
 
 /**

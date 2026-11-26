@@ -1,5 +1,6 @@
 // The lake beside the straight: one level sheet at the Track's lake level,
-// cut out by the ground itself where the shore rises through it.
+// cut out by the ground itself where the shore rises through it. The tarn of
+// the lakeside (lakeside.js) is a second, smaller sheet of the same water.
 //
 // Cheap on purpose. Its colour is mostly what it reflects: a standard
 // material, nearly smooth, takes the sky from the environment map with the
@@ -13,7 +14,7 @@ import * as THREE from 'three';
 import { gradientField, normalTexture } from '../../engine/noise.js';
 
 /** Grid of the sheet (m); the shore is drawn by the ground, so it can be coarse. */
-const CELL = 40;
+const DEFAULT_CELL = 40;
 /** How far the ripples drift, metres per second, and their size (m per repeat). */
 const DRIFT = [0.05, 0.022];
 const RIPPLE = 9;
@@ -25,8 +26,14 @@ const RIPPLE = 9;
  * @param {(x: number, z: number) => number} options.heightAt the ground
  * @param {number} options.level the water's height
  * @param {{ x0: number, x1: number, z0: number, z1: number }} options.extent where to lay the sheet
+ * @param {number} [options.cell] the sheet's grid (m)
+ * @param {(x: number, z: number) => boolean} [options.within] where this water may lie at all (a sheet above the
+ *   valley floor must not show over lower ground beyond its own basin)
+ * @param {string} [options.name]
+ * @param {number} [options.ripple] the ripples' relief (the normal map's scale): more of it mirrors more of the high, blue sky
+ * @param {number} [options.sky] how much of the sky's light the water mirrors (1: all of it)
  */
-export function createLake({ caps, atmosphere, heightAt, level, extent }) {
+export function createLake({ caps, atmosphere, heightAt, level, extent, cell: CELL = DEFAULT_CELL, within = null, name = 'lake', ripple = 0.35, sky = 1 }) {
   const nx = Math.ceil((extent.x1 - extent.x0) / CELL) + 1;
   const nz = Math.ceil((extent.z1 - extent.z0) / CELL) + 1;
   const pos = new Float32Array(nx * nz * 3);
@@ -40,7 +47,7 @@ export function createLake({ caps, atmosphere, heightAt, level, extent }) {
       const x = extent.x0 + i * CELL;
       const z = extent.z0 + j * CELL;
       const depth = level - heightAt(x, z);
-      keep[v] = depth > -6 ? 1 : 0;
+      keep[v] = depth > -6 && (!within || within(x, z)) ? 1 : 0;
       const t = Math.min(1, Math.max(0, depth / 4));
       pos[v * 3] = x;
       pos[v * 3 + 1] = level;
@@ -83,12 +90,13 @@ export function createLake({ caps, atmosphere, heightAt, level, extent }) {
       roughness: 0.06,
       metalness: 0,
       normalMap: ripples,
-      normalScale: new THREE.Vector2(0.35, 0.35),
+      normalScale: new THREE.Vector2(ripple, ripple),
+      envMapIntensity: sky,
     }),
   );
   material.name = 'lake';
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = 'lake';
+  mesh.name = name;
   mesh.receiveShadow = true;
   mesh.matrixAutoUpdate = false;
 

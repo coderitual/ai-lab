@@ -476,6 +476,17 @@ same framing, and listing what still differs (ideas.md keeps the lists).
   over the road carrying columns of round start lamps; boards, a tyre wall, a
   low concrete wall; the asphalt in shade, the car's tail lamps lit.
 
+- **R2**, a photograph (free licence), not a game: a country road in early
+  summer sweeping gently right along a hillside above a lake. On the left a
+  steel guard rail on wooden posts with tall grass and dandelions growing
+  against it, a dark pine at the frame's edge, the blue water below and, far
+  beyond it, a range of blue peaks streaked with snow under cumulus in a deep
+  blue sky. On the right a low cut of dark rock under a bank of grass and
+  outcrops, a wire fence on wooden posts, and a row of full, sunlit birches
+  and broadleaves. Warm pale asphalt with a white edge line and a yellow
+  centre dash, the shadow of a tree lying across it. It is the spec for one
+  place only: "The lakeside", below.
+
 Day answers to D1, D3 and A; golden hour to D4 and D2; the wet night to two
 further night references of the owner's (a wet street at night with lamps
 mirrored in it). Nothing is taken from any of them but the quality, the
@@ -483,6 +494,69 @@ light, the materials, the vegetation, the composition and the sense of speed:
 no names, logos, HUD artwork or layout, track shapes, liveries or lettering.
 The car itself is checked against four daylight photographs of the owner's
 car (car.md), which also stay out of the repository.
+
+## The lakeside
+
+One place on the lap answers to a photograph instead of a game frame (R2,
+above): the 170 m where the road leaves the sky road and climbs along the
+hillside to the carousel (s = 2588 to 2758 m, lap time about 0:50 to 0:53).
+It was the barest stretch of the lap: a wall of conifers on the left, a nine
+metre rock face on the right, bald slopes beyond. The road, its edges, its
+kerbs, its lamps and boards are what they were; everything that changed is
+scenery beyond the solid edges, and one module describes it
+(`src/assets/world/lakeside.js`).
+
+- **The lake's side (left).** The conifers that stood along the rail are gone
+  from this stretch. The ground falls from the rail down a grass bank to a
+  tarn 6.5 m under the road where the stretch begins (the road climbs away
+  from it: 13 m over it by the bend), about 5 ha of water held on a bench above the valley
+  under the sky road. Tall grass grows against the rail on both sides of it,
+  with dandelions and a few white flowers in it; low bushes and a stone or two
+  go down the bank; a dark spruce or two stand close behind the rail where
+  the stretch begins and a couple of birch saplings further on, whose shadows
+  lie across the road. The rail itself is the circuit's own (two W-beams on
+  steel posts, where the photograph has one on wooden posts): what cars hit
+  did not move.
+- **The far shore.** A wood of conifers, birches and limes stands round the
+  tarn down to the water, but not on its southern end: there the bench ends
+  in a headwall above the valley under the sky road, with a low open rim. Beyond it the hills that ringed the course, nine
+  degrees high from here, are cut through by a pass 3 to 80 degrees left of
+  the road, so that the land falls away behind the far shore and a range of
+  peaks with snow in streaks closes the valley three kilometres off, about
+  five degrees high. Straight ahead, where a bald dome a kilometre away
+  closed the road, a lower wooded hill does.
+- **The land's side (right).** The rock face is a low cut, 1.3 to 2.6 m, in
+  darker, browner stone than the lap's pale limestone; above it a gentle bank
+  of meadow with outcrops of faceted rock sunk in it, a stock fence of
+  weathered posts and three wires two metres back from the lip, and behind
+  the fence loose rows of birches (pale trunks), limes, hornbeams and maples,
+  green, with the sun on them. From 17 m back the bank gives way to the
+  hillside the Track asks for, so that the spur keeps its shape on the side
+  of the leg that comes back from the carousel.
+- **The light** is the day's own: the sun 16 degrees up, 67 degrees left of
+  this stretch's heading, so it stands over the lake, the road and the bank
+  are lit from the left and shadows fall across the road to the right.
+
+The comparison camera is `?photo=r2`: 1.45 m up on the paved margin just
+outside the left edge line, 24 m behind the car (no further: the sun's
+shadow map is laid round the car, and the shadows in the foreground are part
+of the picture), turned 5 degrees left.
+
+What still differs from the photograph, by measurement on the staged pair
+(tools.md): the asphalt and the grass are several times darker than the
+photograph's (its sun is high and its asphalt pale and warm; ours is the
+lap's dark asphalt under a sun at 16 degrees, and neither the light nor the
+asphalt is this place's to change); there is no yellow centre dash; the
+trees are the lap's own, more yellow-green and brighter than the
+photograph's; the far range is darker and its snow lies in caps more than in
+streaks; the rail is the circuit's; the bend at the end is the carousel,
+tighter than the photograph's sweep, and the road climbs at 6 %.
+
+One side effect, seen from the sky road: the headwall under the tarn faces
+away from the day's sun and lies in its own shade, where the valley's sunlit
+slope showed before. In the wide chase view from the middle of the deck (lap
+0:46 to 0:48) it is a dark face under the tarn's rim; in an upright phone's
+picture it is out of the frame.
 
 ## The tunnel
 

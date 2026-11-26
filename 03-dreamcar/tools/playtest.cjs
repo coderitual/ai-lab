@@ -1627,6 +1627,24 @@ const SECTIONS = {
     check('?photo=d4: the named camera, its time of day and its moment', !!preset && Math.abs(named.fov - preset.fov) < 0.01 && !named.hud
       && st.time === preset.time && Math.abs(clock - preset.t) < 0.05, `${st.time}, ${st.phase}, ${clock.toFixed(2)} s into the run, fov ${named.fov}`);
     await p3.close('photo d4');
+    // the lakeside's camera (design.md, "The lakeside"): the same, and its car is on that stretch
+    const p4 = await open('?manual&q=low&photo=r2', { w: 640, h: 360, gpu: false });
+    const preset4 = await p4.page.evaluate('window.__dreamcar.game.photo');
+    const st4 = await p4.state();
+    const named4 = await p4.page.evaluate(() => {
+      const c = window.__dreamcar.game.views[0].camera;
+      return { fov: c.fov, hud: !document.querySelector('.hud').hidden };
+    });
+    const clock4 = await p4.page.evaluate('window.__dreamcar.game.race.clock + window.__dreamcar.game.race.lead');
+    const place4 = await p4.page.evaluate(() => {
+      const g = window.__dreamcar.game;
+      const side = g.world.terrain.lakeside;
+      return side ? { along: side.along(g.racers[0].vehicle.s), stretch: side.stretch(g.racers[0].vehicle.s) } : null;
+    });
+    check('?photo=r2: the named camera, its time of day and its moment, on the lakeside', !!preset4 && Math.abs(named4.fov - preset4.fov) < 0.01 && !named4.hud
+      && st4.time === preset4.time && Math.abs(clock4 - preset4.t) < 0.05 && !!place4 && place4.stretch === 1,
+      `${st4.time}, ${clock4.toFixed(2)} s into the run, fov ${named4.fov}, ${place4 ? place4.along.toFixed(0) : '?'} m after the sky road`);
+    await p4.close('photo r2');
   },
 
   /** The same run is the same run: twice by keys, and by the autopilot at 30, 60 and 144 frames a second. */

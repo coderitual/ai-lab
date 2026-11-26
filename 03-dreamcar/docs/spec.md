@@ -79,6 +79,20 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 The start area, the pit building, the stands, the town and the woods are
 scenery beyond the barriers; design.md describes them.
 
+**The lakeside** (`LAKESIDE` in `src/assets/world/lakeside.js`; design.md):
+scenery too, beyond the edges of s = 2588 to 2758 m (6 to 176 m after the sky
+road, easing in and out over 24 m).
+
+| | |
+| --- | --- |
+| the tarn | 5.4 ha, an ellipse 336 by 224 m turned 15 degrees left of the road with bays, its middle 172 m along and 165 m left of the frame's origin (s = 2642 m); its surface 78.0 m above the line, 6.5 m under the road at s = 2582 and 13 m under it at s = 2732; up to 5 m deep |
+| its bench | the rim 1.4 m over the water on the road's side, 6 to 14 m on the far sides, full height 55 m from the shore, falling to the valley in a straight ramp from 45 to 300 m from it (to 115 m towards the valley under the sky road: a headwall); the bank from the road begins 1 m beyond the solid edge and is all bench by 28 m (beside the deck: by 128 m) |
+| the right-hand bank | the cut 1.3 to 2.6 m high (it was 9 m), then 0.13 rise per metre, giving way to the Track's hillside between 17 and 46 m beyond the edge |
+| the pass | from 3 degrees (beyond 480 m: 12 degrees right) to 64 (gone by 82) degrees left of the road, 300 (full by 650) to 4300 (gone by 5000) m out: no ground over the eye's height less 4 m plus 3 % of the distance; a hill 44 m more straight ahead, 300 to 1000 m out; a range across it 3.3 km out, 430 m from foot to crest, 150 to 480 m over the pass's floor before the far land's 100 m lattice samples it |
+| trees | the lap's own cleared on the water, between the road and the shore and for 46 m on the right; planted: four rows on the right-hand bank 7.5 to 52 m beyond the edge (birch 20 to 50 % of each), two spruces, a fir and two birch saplings behind the rail, hazel and birch saplings down the lake's bank, a wood on the bench from 5 m back from the tarn's shore (55 % conifers), a wood on the hill ahead (70 % conifers); no tree of the bank within 75 m of the leg that comes back from the carousel if its top would stand more than 1.5 m over that road |
+| ground cover | per tier (low / medium / high): tufts of tall grass per metre of road 1.2 / 5 / 7 on the lake's side and 1.2 times that on the land's, flower patches 0 / 1.6 / 2.2 per metre drawn to 0 / 30 / 40 m, bushes 0 / 1.1 / 1.5 per metre, groups of outcrops 2.4 / 3.4 / 4 per 10 m |
+| the fence | posts every 2.6 m (low: 5.2 m), 1.05 to 1.25 m high, 2.2 m behind the cut's lip; three wires (low: one); one draw call |
+
 ## The car
 
 ### Dimensions
@@ -343,7 +357,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,hud]` | the staging camera |
-| `?photo=d1`, `d3`, `d4` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=d1`, `d3`, `d4`, `r2` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, r2 the lakeside after the sky road by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -557,6 +571,22 @@ counts once): the asphalt 2071 lines and 73 lookups; the car's paint 2045 and
 the massif 1632 and 61; concrete and the town 1604 to 1996 and 58. All of
 them carry three.js's physical material (the environment map, the shadow
 map's filter, the lights' loops) under the demo's own code.
+
+**The lakeside, before and after** (1f27e8a against the lakeside's commit, 2026-11-26; the same shape and
+method; t = 48 is the sky road's first third, t = 54 its end with the tarn ahead, t = 56.5 the lakeside itself):
+
+| tier, place | draw calls before | after | triangles before | after | trees after: full / reduced / impostors |
+| --- | --- | --- | --- | --- | --- |
+| low, t = 48 | 119 | 119 | 264 k | 264 k | 0 / 0 / 680 |
+| low, t = 54 | 116 | 121 | 237 k | 247 k | 0 / 5 / 704 |
+| low, t = 56.5 | 110 | 111 | 254 k | 249 k | 0 / 16 / 764 |
+| medium, t = 48 | 139 | 139 | 678 k | 678 k | 0 / 0 / 1145 |
+| medium, t = 54 | 152 | 158 | 740 k | 790 k | 7 / 3 / 1424 |
+| medium, t = 56.5 | 145 | 142 | 838 k | 736 k | 18 / 6 / 1372 |
+
+At the sky road's end the tarn, its shore's wood and the bank come into view (five or six more draw calls: the
+water, the fence, the flowers, a few more forms of tree); on the stretch itself the wall of conifers that stood at
+the rail is gone, and with it 14 of the 14.5 layers of tree cards that covered an upright phone's picture there.
 
 ## Sound
 
