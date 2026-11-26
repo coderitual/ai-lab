@@ -360,3 +360,12 @@ Read this before believing anything above about a device.
 - **Wet grip.** The wet road at night is a look; the tyres do not notice it.
 - **Accessibility** beyond keyboard reachability of the buttons (screen
   readers, colour blindness, reduced motion) has not been considered.
+
+- **The return to main's version with fixes only** (2026-11-23 to 26: the far land's hole, no ground, structure or
+  furniture over the road or inside its edges, the tree shadows' casters in split screen, the pad where the thumb
+  lands and the pedal gauge, the quality ladder, the upscale and the readout). `node tools/unit.mjs`: 8 files passed;
+  `node tools/handling.mjs` ran. The whole playtest against a production build: 705 checks, 0 failed (690 in one
+  run; its tiers section was cut off by a restart of the machine and passed 15 of 15 run again alone). The sound test
+  against the dev server: 62 checks, 0 failed. Stills at an upright phone's size at the places of the owner's
+  screenshots (lap 0:17.8 and 0:49.4): no slab. Not verified: anything on a real phone or GPU, any frame rate, the
+  ladder taken in a running game.
