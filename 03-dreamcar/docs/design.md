@@ -138,7 +138,7 @@ line, m; speeds are the autopilot's at full pace):
 | Lakeside straight | 4686 to 250 | 700 m, level, along the shore (the line 450 m along it); lamps every 30 m on alternating sides; 225 to 279 km/h |
 | Shore bend | 250 to 657 | a banked right of 220 m radius (9 degrees) away from the water, starting to climb; about 200 km/h |
 | Forest esses | 657 to 1409 | right 260 m, left 330 m, right 240 m, climbing at 5 to 6 per cent; 205 to 240 km/h |
-| The tunnel | 1409 to 2006 | a rock cutting faced in concrete at its end, the lit box (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out between retaining walls with acoustic screens; up to 255 km/h |
+| The tunnel | 1409 to 2006 | an alpine meadow with low walls at the road's edge and a headwall and hood set into the hillside ("The approach to the tunnel"), the lit box (1479 to 1828, 349 m, bending right at 1000 m radius) and a cutting out between retaining walls with acoustic screens; up to 255 km/h |
 | The sky road | 2006 to 2582 | on piers: a 576 m left of 300 m radius, banked 10 degrees, the valley 42 m under its middle; about 230 to 257 km/h |
 | The carousel | 2582 to 2915 | a 150 m climb, then 190 degrees right round a spur at 55 m radius, banked 8 degrees: the only heavy braking of the lap, 90 km/h |
 | The crest | 2915 to 3115 | the top (108 m), in the open, the lake far below; the car goes light over it at about 160 km/h |
@@ -350,7 +350,8 @@ needs no `--eval`. It reads nothing but the car's pose: with `?manual&t=…` it
 is the same picture every time. The reference frames' cameras are named
 places (`PHOTOS` in game/config.js): `?photo=d1` (the run-up to the line,
 day, t 100 s), `?photo=d3` (the ledge's first bend, day, t 78.8 s) and
-`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green); a name
+`?photo=d4` (the grid at golden hour, t 5.5 s, just after the lights go out: the lamps show green), and
+`?photo=r1` (the approach to the tunnel, day, t 34.85 s: photograph R1's camera, with the car behind it); a name
 brings its own moment of the autopilot's run and its time of day unless the
 address gives `t` or `time`, and also works on the handle
 (`__dreamcar.photo('d1')`). The camera moves with the car, so the engine's
@@ -484,14 +485,19 @@ no names, logos, HUD artwork or layout, track shapes, liveries or lettering.
 The car itself is checked against four daylight photographs of the owner's
 car (car.md), which also stay out of the repository.
 
+One place has a photograph of a real road as its reference instead of a frame
+from a game: **R1**, the approach to the tunnel (below, "The approach to the
+tunnel"). It is free to use, stays out of the repository like the others, and
+nothing in it is copied literally.
+
 ## The tunnel
 
 The owner's own video is the spec (37 s, filmed from the passenger seat of
 his car one autumn evening; it stays out of the repository, as the reference
 frames do). It is read here as measurements and words; nothing of the real
-place (its signs' text, its names, its numbers) is copied. One more frame,
-from a racing game, is the reference for the portal on the forest side only,
-for its light, materials and composition: nothing of its content.
+place (its signs' text, its names, its numbers) is copied. The portal on the forest side (the entrance) and
+the land round it have a reference of their own, photograph R1: the next
+section.
 
 **The approach (the video's first 12 s).** A wide road falling gently into an
 open cutting. Pale, smooth retaining walls of cast concrete about 5 m high
@@ -508,12 +514,6 @@ parapet band along its top and a two-rail railing on it. The mouth is a dark,
 clean rectangle, wider than the carriageway by the walkways, about 5.5 to
 6.5 m high; inside it the lines of fittings converge as bright dashes, and
 green down arrows hang over the lanes just inside.
-
-**The portal on the forest side (the game's frame).** Lower and wider, of
-weathered grey concrete with dark streaks, a lintel band standing out over
-the mouth with small lamps under it; a sloped concrete revetment leading to
-it on one side; a black and white chevron board beside the mouth; a banner
-board on top; big trees over it and their dappled shade on the road.
 
 **Inside (from 13 s).** A box (cut and cover), not a round bore: about 15 m
 wall to wall and 6.5 m high, with a chamfer about a metre across where wall
@@ -542,12 +542,78 @@ blooming rectangle that grows; the world reappears in it as the eye adapts.
 | on the walls | green lights, doors, signs, fire points | guidance lights every 12.5 m at 1 m; a door with a lit frame and a sign every 60 m, alternating sides; a fire point between |
 | under the ceiling | lane signals, jet fans, pipe, trays | lane signals at the entrance and every 120 m; jet fans in pairs every 110 m from 70 m in; a pipe and a tray the whole length (not on low) |
 | out of the exit | retaining walls about 5 m, screens 3 to 4 m | walls as high as the cut (5 m: the `cutting` preset), screens 2.4 m at the portal, 0.6 m higher every 26 m up to 4.2 m, for 110 m |
-| into the entrance | (the game's frame) | sloped revetments over the last 75 m, upright at the face and leaning back 0.22 m per metre from 10 m out; a gantry 110 m before the portal |
+| into the entrance | (photograph R1: the next section) | a meadow, low walls, a headwall and a hood; a gantry 185 m before the portal |
 
 What still differs from the video: the road keeps its own dark asphalt (the
 video's is pale concrete-grey); there are no lamp posts in the cutting; the
 signs are pictograms of our own and carry no text or numbers; there is no
 traffic.
+
+## The approach to the tunnel
+
+Lap time about 0:27 to 0:33. It was a cutting between two bare concrete
+walls with a box portal and a bald hump behind; the owner's reference for it
+is **R1**, a photograph of a real alpine road (free licence; out of the
+repository; nothing in it copied literally, and none of its signs' faces or
+lettering).
+
+**R1 in words.** Taken from the road, low, a little right of the middle of
+the right-hand lane, 200 m before a tunnel. The road sweeps towards the
+mouth, which sits left of the middle of the picture, two fifths of the way
+up. The mouth is set INTO a hillside that fills the upper two thirds of the
+picture and leaves no sky: bright, sunlit, lush meadow green (133 182 43 in
+the picture), darker where the ground folds, with dark spruce woods across
+the top left, scattered broadleaves and bushes in a loose line down the
+middle, single spruces and a dark timber hut with a grey roof on the meadow
+right of and above the portal. The portal is clean pale concrete: a hood
+with a rounded arch standing out of a level-topped headwall that runs on to
+the right until the meadow has climbed to its top; on the left a long low
+wall runs away along the road with a fence over it. On the verge, right up
+to the road's edge, tall lit grass gone to seed (straw heads over green) and
+small flowers; a wire fence on wooden posts between verge and meadow; a
+guard rail nearer the mouth; black and white marker posts at the edge, red
+and white striped ones between the lanes; in the right foreground a sign
+post: a lamp box, a warning triangle, a blue square with a white field and a
+tunnel's arch. The asphalt is pale grey and sunlit, its lines crisp white.
+The light is high and soft; nothing casts a long shadow.
+
+**How it is built** (approach.js holds the numbers; entrance.js, meadow.js,
+terrain.js, forest.js, groundCover.js, groundMaterial.js read them):
+
+| | R1 | the build |
+|---|---|---|
+| the land | a mouth set into a hillside | the cutting is gone: from 88 m before the face the ground beyond the solid edges is a meadow, rising 0.45 to 0.55 m per metre on the hill's side (the right), a low shoulder on the other; over the bore the hill climbs 0.6 m per metre to 75 m over the crown (it was a ridge 40 m over it) |
+| at the road's edge | grass to the asphalt, a guard rail | the Track's solid edge is unchanged (a rail to 70 m before the face, a wall's from there): where it is a wall's a low concrete wall 0.8 m high stands on it, of the portal's concrete, the meadow behind and above; no tyre wall stands on the meadow |
+| the portal | a hood with a rounded arch, a level headwall, a wall running down into the grass | a hood 2.6 m deep and 0.8 m thick, its arch upright to 3.4 m and rounded to 7.4 m at the front, falling to the box's own opening at the face (the box is unchanged: 17 m by 6.4 m); a headwall 10 m high, level on the hill's side for 23 m to where the meadow reaches its top, falling 0.36 m per metre on the other for 17 m; pale concrete |
+| the meadow | lush and sunlit, with tone in it: lighter yellow-green rises, darker blue-green hollows, terracettes, a pale path | its own green in the ground's material where the terrain marks it (linear albedo 0.097 0.2 0.043), open from 190 m before the face: yellower on the rises and darker and bluer in the hollows at two scales, terracettes along the contours where it is steep, the mower's swathes where it is not, a few pale trodden paths, the blades' fine noise; no rock, scree or scrub on it |
+| the verge | a wall of tall seed-headed grass with pale tops, flowers | cards of tall grass with straw ears, one in three with a few flowers, on the verge's outer part and for 12 m behind the barrier (12 a metre of road and side on medium, 2.5 on low), and a taller wall of it from the verge's outer edge to the fence (10 more a metre, 2 on low); the circuit's own dark tufts and bushes are left out there |
+| trees | a dense dark spruce stand above left, low round bushes and small broadleaves in clumps along the hollows, single spruces | whatever the forest had planted on the meadow is taken out; a spruce wood on the low side (from 52 m beyond the edge before the face, so that its shade stays off the road, from 20 m behind it) and the same along the hill's crest over the bore, so the skyline is trees: a dense dark mass of spruce and fir on a 4.4 m lattice, each tree half as wide again as it grew and sunk a sixth of its height so that its skirt lies on the grass and no stem shows, 10 to 22 m over the ground, tinted dark and towards blue, no larch; its edge towards the meadow is the circuit's own autumn broadleaves, low (6 to 12 m), with hazel in front; four single spruces on the meadow, full and skirted; ten clumps of hazel bushes 2.4 to 4.2 m high with young limes and hornbeams of 4.5 to 7 m among them, tinted a mid green; no tall single tree with a bare stem |
+| the hut | dark timber, grey roof | a chalet 7.2 by 5 m (stone plinth, dark timber, a shingle roof with deep eaves, a door and two shuttered windows) right of and above the portal, and a hay barn higher up; shapes of our own |
+| fence, posts | wire on wooden posts; marker posts | posts every 3.5 m with four wires (7 m and two on low) along the hill's side from 190 m out and along the other wall; black and white marker posts every 24 m; red and white ones on the left wall and red and white boards on the hood's jambs (ours stand at the edges: nothing may stand in the road) |
+| the sign | lamp box, triangle, blue square | the same three on two legs behind the rail 82 m before the face; the triangle and the square each carry an arch of our own drawing; no lettering, no numbers |
+| the camera | `?photo=r1` | 1.3 m over the right-hand edge line 90 m before the face, turned 17 degrees right of the car's heading and 6 up, a 36 degree lens; the car is 6 m behind it |
+
+The tunnel's sign gantry stood 110 m before the portal, where its shadow lay
+across this picture's foreground; it stands 185 m before it now. The banner
+and the chevron board of the old entrance are gone.
+
+**What still differs from R1** (measured on the medium still, spec.md "The
+approach to the tunnel"): our asphalt is the circuit's own dark asphalt, a
+third as bright as the photograph's pale grey, and has a red and white kerb
+where the photograph has a white line and gravel; the mouth shows the lit
+box (our tunnel's entrance zone is lit 2.4 times as brightly as its
+interior) where the photograph's is black; our spruce wood is lit from the
+front by a sun 16 degrees up and reads 1.6 times as bright as the
+photograph's shaded woods and greener, with autumn broadleaves along its
+edge where the photograph has none, and there is a strip of sky over it
+where the photograph's far hillside goes on up; our broadleaves are the circuit's
+hazels and young limes, smaller and sparser than the photograph's bushes; at the game's
+own shutter the picture is streaked by speed (the camera moves with the car
+at 190 km/h: the comparison pair is taken with the shutter cut to a ninth,
+as the screenshot tool does for staged pictures); our portal is twice as large in the picture (the
+camera stands at 90 m, not 200 m: further back the road's bend and the
+gantry come between); the light is the day's low warm sun from behind, with
+long shadows, not a high soft one.
 
 ## Left out on purpose (for now)
 

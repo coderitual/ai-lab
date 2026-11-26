@@ -64,7 +64,7 @@ pictures.
 
 | load | pictures |
 | --- | --- |
-| day | `title` (the menu over the hero picture), `car-front`, `car-rear` (on the grid before Drive), `tunnel` (chase view in the bore), `sky-road` (from beside and below the deck), `carousel` (from above), `chase` (the second lap onto the straight at speed, into the sun), `og` (1200x630, `public/og.jpg`) |
+| day | `title` (the menu over the hero picture), `car-front`, `car-rear` (on the grid before Drive), `approach` (the approach to the tunnel from photograph R1's camera, `?photo=r1`), `tunnel` (chase view in the bore), `sky-road` (from beside and below the deck), `carousel` (from above), `chase` (the second lap onto the straight at speed, into the sun), `og` (1200x630, `public/og.jpg`) |
 | dusk | `grid-dusk`: low behind the car under the gantry while the lamps count |
 | night | `night`: the end of the first lap onto the wet, lit straight |
 | split | `split`: two players in the esses |
@@ -99,7 +99,7 @@ node tools/screenshots.cjs                # if anything visible changed; look at
 | `stats()` | frame time, draw calls, triangles, programs, textures, buffer size, HUD writes, pixel ratio, render scale, `quality` (the governor: level, rungs shed, floor, the cap once found, trials), the pipeline's targets and what it draws now (samples, blur taps, occlusion samples, whether the frame went through the upscale), tier, `hdr`, GPU string |
 | `engine.setQualityStep(n)`, `engine.setRenderScale(x)` | place the quality ladder by hand (level 0: everything; engine.md), or only the render scale; the governor is then off. `game.pipeline.upscale = false` is the plain stretch |
 | `game.perfState()` | what the readout shows, as an object |
-| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`); `photo(null)` ends it |
+| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`, `r1`); `photo(null)` ends it |
 | `set(path, value)` | change a number of lighting.js or config.js and show it: `set('times.night.exposure', 20)`, `set('camera.chase.distance', 6)` |
 
 `window.__ready` is true once the first frame has been drawn.
@@ -250,6 +250,27 @@ machine without a GPU, and only what is listed here.
   on `high`, in split screen, in motion or with a player driving; the
   playtest (which has no tunnel section) and the soundtest were not run (the
   sound's tunnel reverb reads the Track's sky, which did not move).
+- **The approach to the tunnel** (ref lane: the meadow, the entrance's
+  headwall and hood, the low walls, the tall grass, the fence, posts, sign and
+  huts, the trees cleared and planted, the gantry moved to 185 m; `?photo=r1`):
+  stills on software WebGL from `?photo=r1` at `medium` 1280x720 (at the
+  game's shutter, and with the shutter cut to a ninth for the pair) and at
+  `low` 960x540, put beside photograph R1 as a pair and a 50/50 overlay, with
+  mean colour and luminance measured in six matching regions (spec.md has the
+  table: meadow, concrete and verge within 15 per cent, the wood at 1.6,
+  the asphalt and the mouth far off and why); the chase view at `medium`
+  1280x720 at t = 36 and upright at 393x852 at t = 34, 35 and 36, before and
+  after; at `low` by day at t = 34, 36, 38 and 43.5 (the exit, unchanged), at
+  golden hour and by night at t = 35 and 36. Draw calls and triangles counted
+  before and after at t = 34 and 36 on `low` and `medium` (spec.md).
+  `node tools/unit.mjs` passed (8 files; trackside.test.mjs now walks the
+  meadow's furniture too), and the playtest's `keys`, `photo` and
+  `determinism` sections against the production build (49 checks; the
+  autopilot's lap is 98.368 s, as before). Not looked at on `high`, in split
+  screen, in motion or with a player driving; the other playtest sections
+  and the soundtest were not run; the playtest's photo section does not load
+  `r1` itself; `docs/images/approach.jpg` is the screenshot tool's picture of
+  the place, the other pictures were not regenerated (none shows it).
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.

@@ -68,7 +68,15 @@ const LOADS = [
         photo: { back: 5.8, right: -3.2, up: 1.1, yaw: -29, pitch: -4, fov: 34 },
         caption: 'Three-quarter rear, into the sun',
       },
-      { name: 'tunnel', start: true, dist: 1640, caption: 'In the tunnel: a lit bore of 349 m with a gentle right-hand bend' },
+      // the approach to the tunnel from photograph R1's camera (PHOTOS.r1 in game/config.js): the car is behind it
+      {
+        name: 'approach',
+        start: true,
+        dist: 1379,
+        photo: { back: -6, right: 3.2, up: 1.3, yaw: -17, pitch: 6, fov: 36 },
+        caption: 'The approach to the tunnel: a meadow, and the portal set into the hillside',
+      },
+      { name: 'tunnel', dist: 1640, caption: 'In the tunnel: a lit bore of 349 m with a gentle right-hand bend' },
       {
         name: 'sky-road',
         dist: 2240,

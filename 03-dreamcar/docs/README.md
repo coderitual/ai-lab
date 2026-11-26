@@ -18,6 +18,7 @@ parts work. Written for whoever changes it next.
 | | |
 | --- | --- |
 | ![Golden hour on the grid](images/grid-dusk.jpg) | ![The wet night](images/night.jpg) |
+| ![The approach to the tunnel: a meadow, the portal set into the hillside](images/approach.jpg) | ![In the tunnel](images/tunnel.jpg) |
 
 ## Keeping this current
 

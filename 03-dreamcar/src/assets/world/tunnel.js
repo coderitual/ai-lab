@@ -2,9 +2,8 @@
 // at each end, the cuttings that lead to them and the ground closed over the
 // portals' cuts. The owner's video (docs/design.md, "The tunnel") is the
 // spec for the inside, the cutting with its acoustic screens and the exit
-// portal; the entrance, which faces the woods, is a lower, weathered portal at
-// the end of sloped concrete revetments, a chevron board beside its mouth and
-// a banner over it.
+// portal; the entrance is set into a meadow on the hillside, after a
+// photograph ("The approach to the tunnel"; entrance.js, approach.js).
 //
 // The box (measured in the road's frame: `s` along it, `lat` to the left, `h`
 // up from the centre line's height; the section is upright, not banked): a
@@ -41,9 +40,11 @@ import * as THREE from 'three';
 import { GLSL_HASH, GLSL_NOISE } from '../../engine/glsl.js';
 import { PROBE_LAYER } from '../../engine/ReflectionProbe.js';
 import { levelFrame } from './furniture.js';
+import { GLOW, PAINT, Parts, UNIT_BOX, pictogram, place } from './parts.js';
 import { LAMP_KINDS, SPOT_GLSL } from './lamps.js';
 import { BORE_UNIFORMS, extend, withBake } from './shading.js';
-import { DESIGN, paintBoard } from './signs.js';
+import { APPROACH, approachesOf } from './approach.js';
+import { buildApron, buildEntrance, buildLowWalls } from './entrance.js';
 
 /** The ceiling over the road: TUNNEL.height in game/trackLayout.js (the cameras keep under it). */
 const CEILING = 6.4;
@@ -97,50 +98,26 @@ const DAYLIGHT = 5;
 const FACE_WIDE = 9;
 const LINTEL = { height: 1.1, out: 0.6 };
 /**
- * The cuttings: concrete instead of the rock faces (rock.js leaves these stretches to us: concreteCut). Before the
- * entrance sloped revetments (`slope` m out per m up, upright at the face and leaning back over the first `upright`
- * m) for `entrance` m; after the exit upright retaining walls for `exit` m. Beside the mouths they stand up to `back`
- * m behind the solid edge (the terrain's cliff rises from 0.8 m behind it: terrain.js FOOT).
+ * Concrete instead of the rock faces (rock.js leaves these stretches to us: concreteCut). After the exit upright
+ * retaining walls for `exit` m; beside the mouth they stand up to `back` m behind the solid edge (the terrain's cliff
+ * rises from 0.8 m behind it: terrain.js FOOT). Before the entrance, for `entrance` m, there is no cutting at all: a
+ * meadow, and a low wall at the edge (approach.js, entrance.js).
  */
-const CUT = { entrance: 75, exit: 110, slope: 0.22, back: 0.7, upright: 10 };
+const CUT = { entrance: APPROACH.before + APPROACH.ease, exit: 110, back: 0.7 };
 /** The acoustic screens on the exit's walls: `screen` m high at the portal, `rise` higher every `step` m, up to `top`; posts every `post` m. */
 const SCREEN = { screen: 2.4, step: 26, rise: 0.6, top: 4.2, post: 4 };
 /** The sign gantry over the approach to the entrance: how far before the portal, the bottom chord's height. */
-const GANTRY = { before: 110, height: 6.6 };
-
-/** Colours (linear) of what is painted or bare. */
-const PAINT = {
-  housing: [0.06, 0.065, 0.07],
-  steel: [0.32, 0.33, 0.34],
-  galvanised: [0.42, 0.43, 0.42],
-  pipe: [0.28, 0.1, 0.06],
-  fan: [0.5, 0.5, 0.48],
-  fanInside: [0.03, 0.03, 0.035],
-  door: [0.16, 0.17, 0.17],
-  signal: [0.025, 0.025, 0.03],
-  blue: [0.01, 0.07, 0.32],
-  white: [0.8, 0.8, 0.78],
-  black: [0.02, 0.02, 0.02],
-  banner: [0.75, 0.2, 0.03],
-};
-/** Radiance (scene units, linear) of what glows. */
-const GLOW = {
-  green: [0.06, 0.6, 0.18],
-  guide: [0.15, 3.2, 0.6],
-  red: [2.6, 0.1, 0.12],
-  arrow: [0.3, 3.0, 0.9],
-  signal: [0.3, 5.0, 1.3],
-  warm: [3.2, 2.6, 1.8],
-};
+const GANTRY = { before: 185, height: 6.6 };
 
 /**
- * Where the tunnel's concrete cuttings take the place of the rock faces: 'slope' (the revetments before an entrance),
+ * Where the tunnel's own walls take the place of the rock faces: 'slope' (the meadow's low walls before an entrance),
  * 'screen' (the retaining walls after an exit) or null. rock.js draws no rock there.
  * @param {object} track @param {number} s
  */
 export function concreteCut(track, s) {
   for (const t of track.tunnels ?? []) {
-    if (track.delta(t.s0 - CUT.entrance, s) >= 0 && track.delta(s, t.s0) >= 0) return 'slope';
+    // (and the first metres inside: the terrain keeps the approach's low wall to the row behind the face)
+    if (track.delta(t.s0 - CUT.entrance, s) >= 0 && track.delta(s, t.s0) >= -8) return 'slope';
     if (track.delta(t.s1, s) >= 0 && track.delta(s, t.s1 + CUT.exit) >= 0) return 'screen';
   }
   return null;
@@ -173,109 +150,6 @@ function section(W) {
   return [...right, ...half.reverse().slice(1)];
 }
 
-/** What one material's parts add up to: positions, normals, vertex colours, appended piece by piece. */
-class Parts {
-  constructor() {
-    this.pos = [];
-    this.nor = [];
-    this.col = [];
-    this.index = [];
-  }
-  get empty() {
-    return this.index.length === 0;
-  }
-  /** A geometry (indexed or not) placed by a matrix, in one colour. */
-  add(geometry, matrix, color) {
-    const p = geometry.attributes.position;
-    const n = geometry.attributes.normal;
-    const base = this.pos.length / 3;
-    const v = new THREE.Vector3();
-    const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
-    for (let i = 0; i < p.count; i++) {
-      v.fromBufferAttribute(p, i).applyMatrix4(matrix);
-      this.pos.push(v.x, v.y, v.z);
-      if (n) v.fromBufferAttribute(n, i).applyMatrix3(normalMatrix).normalize();
-      else v.set(0, 1, 0);
-      this.nor.push(v.x, v.y, v.z);
-      this.col.push(color[0], color[1], color[2]);
-    }
-    if (geometry.index) for (let i = 0; i < geometry.index.count; i++) this.index.push(base + geometry.index.getX(i));
-    else for (let i = 0; i < p.count; i++) this.index.push(base + i);
-  }
-  /** A flat convex polygon (corners in order), one colour, its normal from the corners. */
-  poly(points, color) {
-    if (points.length < 3) return;
-    const a = points[0];
-    const nrm = new THREE.Vector3().subVectors(points[1], a).cross(new THREE.Vector3().subVectors(points[2], a)).normalize();
-    const base = this.pos.length / 3;
-    for (const q of points) {
-      this.pos.push(q.x, q.y, q.z);
-      this.nor.push(nrm.x, nrm.y, nrm.z);
-      this.col.push(color[0], color[1], color[2]);
-    }
-    for (let k = 1; k < points.length - 1; k++) this.index.push(base, base + k, base + k + 1);
-  }
-  /** A strip of rows of points (each row the same count; a point doubled is a crease), normals from the winding. */
-  strip(rows, color) {
-    const m = rows[0].length;
-    const base = this.pos.length / 3;
-    const a = new THREE.Vector3();
-    const b = new THREE.Vector3();
-    for (let r = 0; r < rows.length; r++) {
-      const r0 = rows[Math.max(0, r - 1)];
-      const r1 = rows[Math.min(rows.length - 1, r + 1)];
-      const row = rows[r];
-      for (let k = 0; k < m; k++) {
-        if (k < m - 1) a.subVectors(row[k + 1], row[k]);
-        if (k === m - 1 || a.lengthSq() < 1e-8) a.subVectors(row[k], row[Math.max(0, k - 1)]);
-        b.subVectors(r1[k], r0[k]);
-        const nrm = a.cross(b).normalize();
-        this.pos.push(row[k].x, row[k].y, row[k].z);
-        this.nor.push(nrm.x, nrm.y, nrm.z);
-        this.col.push(color[0], color[1], color[2]);
-      }
-    }
-    for (let r = 0; r < rows.length - 1; r++) {
-      for (let k = 0; k < m - 1; k++) {
-        const v = base + r * m + k;
-        this.index.push(v, v + 1, v + m, v + 1, v + m + 1, v + m);
-      }
-    }
-  }
-  build() {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    g.setIndex(this.index);
-    g.computeBoundingSphere();
-    return g;
-  }
-}
-
-const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
-const _q = new THREE.Quaternion();
-const _e = new THREE.Euler();
-const _s = new THREE.Vector3();
-
-/**
- * The road's level frame at s, turned to face `out` (+1 along the road, -1 back along it): `P(lat, h, along)` a point
- * in it, `M(lat, h, along, size, tilt)` a matrix for a unit shape centred there (x across, y up, z along; `tilt`
- * [x, y, z] radians in that frame). Facing out of a portal, +lat is the right hand of whoever looks into the mouth.
- */
-function place(track, s, out = 1) {
-  const f = levelFrame(track, s, {});
-  const ahead = f.ahead.clone().multiplyScalar(out);
-  const left = f.flat.clone().multiplyScalar(out);
-  const yaw = Math.atan2(ahead.x, ahead.z);
-  const P = (lat, h, along = 0) => new THREE.Vector3(f.pos.x + left.x * lat + ahead.x * along, f.pos.y + h, f.pos.z + left.z * lat + ahead.z * along);
-  const M = (lat, h, along, size, tilt = null) => {
-    _q.setFromEuler(_e.set(tilt?.[0] ?? 0, yaw + (tilt?.[1] ?? 0), tilt?.[2] ?? 0, 'YXZ'));
-    return new THREE.Matrix4().compose(P(lat, h, along), _q, _s.set(size[0], size[1], size[2]));
-  };
-  return { f, P, M, yaw };
-}
-
 /**
  * @param {object} options
  * @param {object} options.track
@@ -296,6 +170,7 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
   const probeHidden = [];
   const eye = new THREE.Vector3();
   const spec = LAMP_KINDS.tunnel;
+  const approaches = approachesOf(track);
 
   // materials, shared by every tunnel
   const glowMaterial = atmosphere.patch(new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true }));
@@ -465,8 +340,11 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
         veils.push({ light, at, outward: ahead, mesh: veil });
         disposables.push(sheet, light);
       }
-      buildPortal({ track, terrain, s, out, Wb, cast, paint, glow, low });
-      const lid = buildLid(track, terrain, s, out, Wb);
+      // (ref lane) the entrance is set into a meadow (entrance.js): a headwall, a hood, and the ground behind them
+      const entrance = out < 0;
+      if (entrance) buildEntrance({ track, A: approaches[which], Wb, ceiling: CEILING, cast, paint, glow, low });
+      else buildPortal({ track, terrain, s, Wb, cast, paint, glow, low });
+      const lid = entrance ? buildApron({ track, terrain, A: approaches[which], low }) : buildLid(track, terrain, s, out, Wb);
       const lidMesh = new THREE.Mesh(lid, terrain.material);
       lidMesh.name = 'tunnel-lid';
       lidMesh.receiveShadow = true;
@@ -474,14 +352,10 @@ export function createTunnels({ track, terrain, atmosphere, lamps, tier = 'mediu
       group.add(lidMesh);
       disposables.push(lid);
     }
-    // ---- the cuttings, the gantry, the banner
-    buildCuttings({ track, terrain, t, Wb, cast, paint, screens, low });
+    // ---- the low walls before the entrance, the cutting after the exit, the gantry
+    buildLowWalls({ track, terrain, A: approaches[which], Wb, cast, low });
+    buildCutting({ track, terrain, t, Wb, cast, paint, screens, low });
     buildGantry({ track, terrain, s: t.s0 - GANTRY.before, paint, glow, low });
-    const banner = buildBanner({ track, terrain, s: t.s0, paint, low });
-    if (banner) {
-      group.add(banner.mesh);
-      disposables.push(...banner.disposables);
-    }
 
     for (const [parts, material, name, shadow] of [
       [glow, glowMaterial, 'tunnel-glow', false],
@@ -570,20 +444,16 @@ function arrow(glow, M, lat, h, face, color) {
 }
 
 /**
- * One portal: a headwall with the box's mouth in it, the shell's reveal, a lintel over the mouth, a coping, and what
- * its end asks for. `out`: -1 at the entrance (outside is behind s), +1 at the exit. The entrance (towards the woods):
- * weathered and darker, lamps under its lintel, a chevron board at the mouth's right, a banner over it (buildBanner).
- * The exit (the owner's video): a plain pale headwall with a railing along its parapet. Both: signal heads beside the
- * mouth and a blue sign with the tunnel's pictogram.
+ * The exit's portal (the owner's video): a plain pale headwall with the box's mouth in it, the shell's reveal, a
+ * lintel over the mouth, a coping with a railing along it, signal heads beside the mouth. (The entrance is
+ * entrance.js's: a headwall and a hood set into a meadow.)
  */
-function buildPortal({ track, terrain, s, out, Wb, cast, paint, glow, low }) {
-  void terrain;
-  const entrance = out < 0;
-  const { P, M } = place(track, s, out);
+function buildPortal({ track, terrain, s, Wb, cast, paint, glow, low }) {
+  const { P, M } = place(track, s, 1);
   const top = faceTop(terrain, P);
   const wide = Wb + FACE_WIDE;
   const deep = -4;
-  const ink = entrance ? [0.36, 0.35, 0.32] : [0.52, 0.52, 0.5];
+  const ink = [0.52, 0.52, 0.5];
   // the face: a rectangle with the mouth cut out of it
   const shape = new THREE.Shape([new THREE.Vector2(-wide, deep), new THREE.Vector2(wide, deep), new THREE.Vector2(wide, top), new THREE.Vector2(-wide, top)]);
   shape.holes.push(new THREE.Path([new THREE.Vector2(-Wb, -0.3), new THREE.Vector2(-Wb, CEILING), new THREE.Vector2(Wb, CEILING), new THREE.Vector2(Wb, -0.3)]));
@@ -600,20 +470,9 @@ function buildPortal({ track, terrain, s, out, Wb, cast, paint, glow, low }) {
   cast.add(UNIT_BOX, M(0, top + 0.2, 0.05, [2 * wide + 0.4, 0.4, 0.9]), ink.map((c) => c * 1.05));
   for (const side of [1, -1]) cast.add(UNIT_BOX, M(side * (wide - 0.3), (top + deep) / 2, -0.4, [0.6, top - deep, 0.8]), ink);
 
-  if (entrance) {
-    // lamps under the lintel, warm and small; the chevron board at the right of the mouth
-    for (let k = 0; k < 8; k++) {
-      const lat = -Wb + 1 + ((2 * Wb - 2) * k) / 7;
-      glow.add(UNIT_BOX, M(lat, CEILING - 0.03, 0.25, [0.22, 0.03, 0.14]), GLOW.warm);
-      if (!low) paint.add(UNIT_BOX, M(lat, CEILING + 0.03, 0.25, [0.3, 0.1, 0.2]), PAINT.housing);
-    }
-    // (it stands on the verge between the kerb and the wall, a step out from the face)
-    chevrons(paint, P, Wb - 0.6, 0.1, 0.6, 2.4, 0.11, 1.2);
-  } else {
-    // the parapet's railing: posts and two rails along the top
-    for (let k = 0; k < (low ? 1 : 2); k++) paint.add(UNIT_BOX, M(0, top + 0.75 + 0.42 * k, 0.1, [2 * wide, 0.06, 0.06]), PAINT.galvanised);
-    if (!low) for (let lat = -wide + 0.5; lat <= wide; lat += 2) paint.add(UNIT_BOX, M(lat, top + 0.8, 0.1, [0.06, 1.2, 0.06]), PAINT.galvanised);
-  }
+  // the parapet's railing: posts and two rails along the top
+  for (let k = 0; k < (low ? 1 : 2); k++) paint.add(UNIT_BOX, M(0, top + 0.75 + 0.42 * k, 0.1, [2 * wide, 0.06, 0.06]), PAINT.galvanised);
+  if (!low) for (let lat = -wide + 0.5; lat <= wide; lat += 2) paint.add(UNIT_BOX, M(lat, top + 0.8, 0.1, [0.06, 1.2, 0.06]), PAINT.galvanised);
   // signal heads hanging under the lintel's front at the mouth's corners, facing whoever comes towards it from outside
   for (const side of [1, -1]) {
     const lat = side * (Wb - 0.7);
@@ -621,59 +480,6 @@ function buildPortal({ track, terrain, s, out, Wb, cast, paint, glow, low }) {
     paint.add(UNIT_BOX, M(lat, CEILING - 0.8, LINTEL.out - 0.2, [0.36, 0.8, 0.26]), PAINT.signal);
     glow.add(UNIT_BOX, M(lat, CEILING - 1.0, LINTEL.out - 0.06, [0.2, 0.2, 0.02]), GLOW.signal);
   }
-}
-
-/** A part of a sign: a unit box `size` big at (x, y, z) in the sign's own frame (`base`: its middle, facing +z). */
-const sub = (base, x, y, z, size) => base.clone().multiply(new THREE.Matrix4().compose(_s.set(x, y, z), _q.identity(), new THREE.Vector3(...size)));
-
-/** The tunnel's pictogram: a blue square with a white mouth drawn in bars, on a sign whose middle and facing are `base`. */
-function pictogram(paint, base) {
-  paint.add(UNIT_BOX, sub(base, 0, 0, 0, [1.0, 1.0, 0.04]), PAINT.blue);
-  paint.add(UNIT_BOX, sub(base, 0, 0.24, 0.03, [0.62, 0.06, 0.02]), PAINT.white);
-  for (const e of [-0.28, 0.28]) paint.add(UNIT_BOX, sub(base, e, -0.01, 0.03, [0.06, 0.5, 0.02]), PAINT.white);
-  paint.add(UNIT_BOX, sub(base, 0, -0.3, 0.03, [0.8, 0.04, 0.02]), PAINT.white);
-}
-
-/** A black and white chevron board on a portal's face: its middle `l` across, foot `h0` up, `w` by `hgt`, stripes `band` wide. */
-function chevrons(paint, P, l, h0, w, hgt, band, along = 0.08) {
-  for (let k = -Math.ceil(w / band) - 1; k * band < hgt + w; k++) {
-    const a = k * band;
-    const b = a + band;
-    // the stripe between h = a + x and h = b + x for x across the board, clipped to it
-    const poly = clip(
-      [
-        [-w / 2, a - w / 2],
-        [w / 2, a + w / 2],
-        [w / 2, b + w / 2],
-        [-w / 2, b - w / 2],
-      ],
-      0,
-      hgt,
-    );
-    if (poly.length >= 3) paint.poly(poly.map(([x, y]) => P(l + x, h0 + y, along)), (k & 1) === 0 ? PAINT.white : PAINT.black);
-  }
-}
-
-/** A convex polygon [x, y][] clipped to lo <= y <= hi. */
-function clip(points, lo, hi) {
-  let list = points;
-  for (const [limit, keep] of [
-    [lo, (y) => y >= lo],
-    [hi, (y) => y <= hi],
-  ]) {
-    const next = [];
-    for (let i = 0; i < list.length; i++) {
-      const p = list[i];
-      const q = list[(i + 1) % list.length];
-      if (keep(p[1])) next.push(p);
-      if (keep(p[1]) !== keep(q[1])) {
-        const u = (limit - p[1]) / (q[1] - p[1]);
-        next.push([p[0] + (q[0] - p[0]) * u, limit]);
-      }
-    }
-    list = next;
-  }
-  return list;
 }
 
 /** How high a portal's face stands above the road: a little above the ground just behind it. */
@@ -687,72 +493,62 @@ function faceTop(terrain, P) {
 }
 
 /**
- * The cuttings either side of a tunnel, where rock.js leaves the edge to us (concreteCut): before the entrance a
- * sloped revetment of weathered concrete from the solid edge up to the top of the terrain's cliff and over its lip;
- * after the exit an upright retaining wall of pale concrete with a cap, and on it the acoustic screens between steel
- * posts, stepping up away from the portal.
+ * The cutting after a tunnel's exit, where rock.js leaves the edge to us (concreteCut): an upright retaining wall of
+ * pale concrete with a cap, and on it the acoustic screens between steel posts, stepping up away from the portal.
+ * (Before the entrance there is no cutting: low walls in a meadow, entrance.js.)
  */
-function buildCuttings({ track, terrain, t, Wb, cast, paint, screens, low }) {
+function buildCutting({ track, terrain, t, Wb, cast, paint, screens, low }) {
   const prof = { y: 0 };
   const step = low ? 4 : 2;
-  for (const [kind, s0, s1] of [
-    ['slope', t.s0 - CUT.entrance, t.s0 + 0.5],
-    ['screen', t.s1 - 0.5, t.s1 + CUT.exit],
-  ]) {
-    for (const side of [1, -1]) {
-      const rows = [];
-      const screenRows = [];
-      const n = Math.ceil((s1 - s0) / step);
-      for (let r = 0; r <= n; r++) {
-        const s = track.wrap(s0 + ((s1 - s0) * r) / n);
-        const f = levelFrame(track, s, {});
-        // beside the mouth the walls stand back a little towards the box's own (but never behind the foot of the
-        // terrain's cliff, which would then stand in front of them), and stand upright, leaning back further out
-        const solid = track.edgeAt(s, side);
-        const edge = solid + Math.min(CUT.back, Math.max(0, Wb - solid));
-        const yE = track.profile(s, side * solid, prof).y;
-        const fromFace = Math.abs(track.delta(kind === 'slope' ? t.s0 : t.s1, s));
-        const h = Math.max(0, terrain.cliffAt(s, side).height);
-        const at = (d, y) => new THREE.Vector3(f.pos.x + f.flat.x * side * (edge + d), y, f.pos.z + f.flat.z * side * (edge + d));
-        if (kind === 'slope') {
-          const lean = CUT.slope * h * Math.min(1, fromFace / CUT.upright);
-          rows.push([at(0, yE - 0.5), at(0, yE + 0.15), at(lean, yE + h), at(lean, yE + h), at(lean + 0.6, yE + h + 0.05), at(lean + 0.6, yE + h + 0.05), at(lean + 1.2, yE + h - 1.2)]);
-        } else {
-          const top = yE + h;
-          rows.push([at(0.02, yE - 0.5), at(0.02, top), at(0.02, top), at(0.62, top), at(0.62, top), at(0.62, top - 1.5)]);
-          // the screen's height: lowest at the portal, a step up every SCREEN.step m
-          const away = track.delta(t.s1, s);
-          const hs = Math.min(SCREEN.top, SCREEN.screen + SCREEN.rise * Math.floor(Math.max(0, away) / SCREEN.step));
-          if (h > 0.5) screenRows.push({ f, bottom: at(0.32, top), hs, topY: top });
-          else screenRows.push(null);
-        }
-      }
-      cast.strip(rows, kind === 'slope' ? [0.34, 0.33, 0.3] : [0.56, 0.55, 0.52]);
-      // the blue sign on the exit's wall, on the right of whoever looks into the mouth from outside, facing the road
-      if (kind === 'screen' && side > 0) {
-        const s = track.wrap(t.s1 + 10);
-        const edge = track.edgeAt(s, side) + Math.min(CUT.back, Math.max(0, Wb - track.edgeAt(s, side)));
-        pictogram(paint, place(track, s).M(side * (edge - 0.01), 2.7, 0, [1, 1, 1], [0, -Math.PI / 2, 0]));
-      }
-      // the screens: a flat panel from post to post, as high as the lower of its two ends (the steps are square)
-      const every = Math.max(1, Math.round(SCREEN.post / step));
-      screenRows.forEach((a, k) => {
-        if (!a) return;
-        const b = screenRows[k - 1];
-        if (b) {
-          const hs = Math.min(a.hs, b.hs);
-          screens.poly([b.bottom, a.bottom, a.bottom.clone().setY(a.topY + hs), b.bottom.clone().setY(b.topY + hs)], [1, 1, 1]);
-        }
-        if (k % every === 0) {
-          const m = new THREE.Matrix4().compose(
-            a.bottom.clone().setY(a.topY + a.hs / 2 + 0.05),
-            new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a.f.yaw),
-            new THREE.Vector3(0.16, a.hs + 0.1, 0.16),
-          );
-          paint.add(UNIT_BOX, m, PAINT.steel);
-        }
-      });
+  const s0 = t.s1 - 0.5;
+  const s1 = t.s1 + CUT.exit;
+  for (const side of [1, -1]) {
+    const rows = [];
+    const screenRows = [];
+    const n = Math.ceil((s1 - s0) / step);
+    for (let r = 0; r <= n; r++) {
+      const s = track.wrap(s0 + ((s1 - s0) * r) / n);
+      const f = levelFrame(track, s, {});
+      // beside the mouth the walls stand back a little towards the box's own (but never behind the foot of the
+      // terrain's cliff, which would then stand in front of them)
+      const solid = track.edgeAt(s, side);
+      const edge = solid + Math.min(CUT.back, Math.max(0, Wb - solid));
+      const yE = track.profile(s, side * solid, prof).y;
+      const h = Math.max(0, terrain.cliffAt(s, side).height);
+      const at = (d, y) => new THREE.Vector3(f.pos.x + f.flat.x * side * (edge + d), y, f.pos.z + f.flat.z * side * (edge + d));
+      const top = yE + h;
+      rows.push([at(0.02, yE - 0.5), at(0.02, top), at(0.02, top), at(0.62, top), at(0.62, top), at(0.62, top - 1.5)]);
+      // the screen's height: lowest at the portal, a step up every SCREEN.step m
+      const away = track.delta(t.s1, s);
+      const hs = Math.min(SCREEN.top, SCREEN.screen + SCREEN.rise * Math.floor(Math.max(0, away) / SCREEN.step));
+      if (h > 0.5) screenRows.push({ f, bottom: at(0.32, top), hs, topY: top });
+      else screenRows.push(null);
     }
+    cast.strip(rows, [0.56, 0.55, 0.52]);
+    // the blue sign on the wall, on the right of whoever looks into the mouth from outside, facing the road
+    if (side > 0) {
+      const s = track.wrap(t.s1 + 10);
+      const edge = track.edgeAt(s, side) + Math.min(CUT.back, Math.max(0, Wb - track.edgeAt(s, side)));
+      pictogram(paint, place(track, s).M(side * (edge - 0.01), 2.7, 0, [1, 1, 1], [0, -Math.PI / 2, 0]));
+    }
+    // the screens: a flat panel from post to post, as high as the lower of its two ends (the steps are square)
+    const every = Math.max(1, Math.round(SCREEN.post / step));
+    screenRows.forEach((a, k) => {
+      if (!a) return;
+      const b = screenRows[k - 1];
+      if (b) {
+        const hs = Math.min(a.hs, b.hs);
+        screens.poly([b.bottom, a.bottom, a.bottom.clone().setY(a.topY + hs), b.bottom.clone().setY(b.topY + hs)], [1, 1, 1]);
+      }
+      if (k % every === 0) {
+        const m = new THREE.Matrix4().compose(
+          a.bottom.clone().setY(a.topY + a.hs / 2 + 0.05),
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a.f.yaw),
+          new THREE.Vector3(0.16, a.hs + 0.1, 0.16),
+        );
+        paint.add(UNIT_BOX, m, PAINT.steel);
+      }
+    });
   }
 }
 
@@ -783,39 +579,6 @@ function buildGantry({ track, terrain, s, paint, glow, low }) {
   }
   // the tunnel's pictogram on the right-hand post, facing the road before it
   pictogram(paint, M(-reach, 2.8, -0.3, [1, 1, 1], [0, Math.PI, 0]));
-}
-
-/**
- * The banner over the entrance: one of the circuit's made-up boards (signs.js), on posts on the headwall's coping.
- * On the low tier its field's colour only, in the painted steel's mesh.
- */
-function buildBanner({ track, terrain, s, paint, low }) {
-  const { P, M } = place(track, s, -1);
-  const top = faceTop(terrain, P) + 0.4;
-  const w = 11;
-  const h = 2.75;
-  const foot = top + 0.6;
-  const lat = 2;
-  for (const e of [-w / 2 + 1, w / 2 - 1]) paint.add(UNIT_BOX, M(lat + e, (top + foot) / 2 + 0.3, -0.2, [0.12, foot - top + 0.6, 0.12]), PAINT.steel);
-  if (low) {
-    paint.add(UNIT_BOX, M(lat, foot + h / 2, -0.1, [w, h, 0.08]), PAINT.banner);
-    return null;
-  }
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
-  paintBoard(canvas.getContext('2d'), [0, 0, 512, 128], DESIGN.arvent);
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 4;
-  const geometry = new THREE.PlaneGeometry(w, h);
-  const material = new THREE.MeshStandardMaterial({ map, roughness: 0.7, side: THREE.DoubleSide });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.applyMatrix4(M(lat, foot + h / 2, -0.1, [1, 1, 1]));
-  mesh.name = 'tunnel-banner';
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return { mesh, disposables: [geometry, material, map] };
 }
 
 /**
