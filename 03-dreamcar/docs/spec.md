@@ -41,7 +41,7 @@ run of `tools/handling.mjs`.
 | `straight` | Lakeside straight | 4686 to 250 (700 m) | finish 340 m, pitIn 110 m, the line, grid 40 m, gridRun 210 m; level | 225 to 279 |
 | `sweep` | Shore bend | 250 to 657 | right R 220 through 80°, banked 9°; 100 m straight climbing to 5 % | 196 to 225 |
 | `esses` | Forest esses | 657 to 1409 | right R 260 55° (bank 8°), left R 330 40° (7°), right R 240 65° (9°); 4 to 5.5 % | 204 to 240 |
-| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens) | 216 to 255 |
+| `tunnel` | The tunnel | 1409 to 2006 | a meadow with low walls at the edge for 70 m (no cutting: "The approach to the tunnel" below); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens) | 216 to 255 |
 | `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers: left R 300 through 110°, banked 10°, ground 42 m under the middle | 229 to 257 |
 | `carousel` | The carousel | 2582 to 2915 | 150 m climb at 6 %, then right R 55 through 190°, banked 8° | 90 to 229 |
 | `crest` | The crest | 2915 to 3115 | 200 m straight over the top | 108 to 161 |
@@ -63,7 +63,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | | |
 | --- | --- |
 | barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; the walkways' kerb faces in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
-| structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
+| structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 185 m before it; at its entrance a headwall 10 m high and 40 m long with a hood 2.6 m deep (entrance.js), low walls 0.8 m high on the solid edges for 68 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
 | tyre walls | 8 runs, on the outside of the fast bends |
 | trackside boards | 11 runs, both walls of the straight included |
@@ -343,7 +343,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,hud]` | the staging camera |
-| `?photo=d1`, `d3`, `d4` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=d1`, `d3`, `d4`, `r1` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, r1 the approach to the tunnel by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -479,6 +479,38 @@ In the tunnel by night the wet road's mirror is no longer drawn (the road
 there is dry) and its calls go to the probe's second face
 (`PROBE.tunnelFaces`). The approach was over both call budgets before the
 tunnel changed and still is.
+
+**The approach to the tunnel** (ref lane, 2026-11-26; `node tools/perfcount.cjs`, 402x874, day, level 0, one
+frame on average of four, at t = 34 (s 1339 m, 140 m before the portal) and t = 36 (s 1446 m, 33 m before it)),
+before and after the cutting became a meadow:
+
+| tier, t | before: calls, triangles (scene / shadow / probe calls) | after |
+| --- | --- | --- |
+| low, 34 | 136, 295 k (90 / 27 / 10) | 132, 284 k (85 / 27 / 11) |
+| low, 36 | 133, 295 k (84 / 29 / 11) | 137, 298 k (86 / 30 / 12) |
+| medium, 34 | 190, 951 k (123 / 33 / 17) | 169, 838 k (106 / 34 / 12) |
+| medium, 36 | 179, 860 k (110 / 36 / 16) | 181, 881 k (113 / 34 / 17) |
+
+At t = 34 the wood beside the road is gone (no full or reduced trees in view, where medium drew 17 and 23); at
+t = 36 the meadow's tall grass, its furniture and the nearer bushes add 2 to 4 calls and 3 to 21 k triangles. More
+trees are in view as impostors (two triangles each: 1174 to 1281 on low where there were 409 to 489, 2051 to 2520
+on medium where there were 1248 to 1556), and more of them cast (89 and 145 at t = 36, where 57 and 68 did).
+
+The still from `?photo=r1` beside photograph R1 (medium, 1280x720, the shutter cut to a ninth; mean colour and
+relative luminance Y of matching regions, each picture's own boxes):
+
+| region | R1: sRGB, Y | ours: sRGB, Y | ours / R1 |
+| --- | --- | --- | --- |
+| hillside meadow | 133 182 43, 0.418 | 138 176 62, 0.371 | 0.89 |
+| portal concrete | 184 198 180, 0.569 | 209 205 189, 0.610 | 1.07 |
+| verge grass | 131 144 15, 0.254 | 107 118 63, 0.182 | 0.72 |
+| spruce wood | 8 33 34, 0.013 | 35 58 35, 0.047 | 3.5 |
+| asphalt | 177 192 197, 0.513 | 117 116 117, 0.176 | 0.34 |
+| the mouth | 14 29 35, 0.014 | 136 137 137, 0.269 | 19 |
+
+The meadow and the concrete are within 15 per cent; the verge is not (the circuit's own dark tufts stand among
+the meadow's); the wood, the asphalt and the mouth are the circuit's own trees, asphalt and tunnel lighting, which
+this place does not change (design.md lists what differs).
 
 None of these was measured on a real GPU or phone.
 

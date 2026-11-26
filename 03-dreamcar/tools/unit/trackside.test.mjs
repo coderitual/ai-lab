@@ -15,6 +15,8 @@ import { LAYOUT } from '../../src/game/trackLayout.js';
 import { createTrack } from '../../src/game/track.js';
 import { createBuilder } from '../../src/assets/world/builder.js';
 import { buildTrackside } from '../../src/assets/world/trackside.js';
+import { createMeadow } from '../../src/assets/world/meadow.js';
+import { createRng } from '../../src/engine/rng.js';
 
 let failures = 0;
 function test(name, fn) {
@@ -68,6 +70,20 @@ for (const tier of ['low', 'medium']) {
     b.build({}, group, { name: 'trackside' });
     nb.build({}, group, { name: 'trackside-low' });
     const { worst, vertices } = deepest(group);
+    if (worst.inside > TOLERANCE) {
+      failures++;
+      console.log(`      ${worst.mesh} reaches ${worst.inside.toFixed(2)} m inside the edge at s = ${worst.s.toFixed(0)} m, ${worst.lat.toFixed(1)} m off the centre line`);
+    }
+    return `${vertices} vertices; the deepest ${worst.inside.toFixed(2)} m inside at s = ${worst.s?.toFixed(0)} m`;
+  });
+}
+
+// (ref lane) the meadow on the tunnel's approach: its fence, marker posts, sign and huts (meadow.js)
+for (const tier of ['low', 'medium']) {
+  test(`${tier}: no vertex of the meadow's furniture lies inside the solid edges`, () => {
+    const terrain = { ...TERRAIN, heightAt: () => 60, cliffAt: () => ({ height: 1, top: 0.86, rock: 1 }) };
+    const meadow = createMeadow({ track, terrain, atmosphere: { patch: (m) => m }, tier, rng: createRng(1).fork('meadow') });
+    const { worst, vertices } = deepest(meadow.group);
     if (worst.inside > TOLERANCE) {
       failures++;
       console.log(`      ${worst.mesh} reaches ${worst.inside.toFixed(2)} m inside the edge at s = ${worst.s.toFixed(0)} m, ${worst.lat.toFixed(1)} m off the centre line`);

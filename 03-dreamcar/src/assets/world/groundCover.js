@@ -16,6 +16,7 @@ import { alphaMips, chainTexture } from './forestTextures.js';
 import { plantMaterial } from './treeMaterial.js';
 import { planeNoise } from './shading.js';
 import { GRASS } from './groundMaterial.js';
+import { APPROACH, approachAt, approachesOf, beforeFace, meadowAt } from './approach.js';
 
 const SURFACE_GRASS = 2;
 const EDGE = { RAIL: 0, ROCK: 1, WALL: 2, PARAPET: 3, TREES: 4 };
@@ -26,6 +27,102 @@ const TIER = {
   medium: { grass: 2.2, grassReach: 38, bushes: true, bushReach: 75, rockReach: 260 },
   high: { grass: 3.2, grassReach: 48, bushes: true, bushReach: 95, rockReach: 340 },
 };
+
+/**
+ * (ref lane) The tall grass of the meadow on a tunnel's approach (approach.js), per tier: tufts per metre of road and
+ * side, and their reach (m). The low tier keeps a few, near: the place is not the place without them.
+ */
+const MEADOW = {
+  low: { grass: 2.5, reach: 30 },
+  medium: { grass: 12, reach: 42 },
+  high: { grass: 16, reach: 52 },
+};
+
+/** A linear colour as a canvas colour. */
+const css = (c, k = 1) => `rgb(${c.map((v) => Math.round(255 * Math.min(1, Math.max(0, v * k)) ** (1 / 2.2))).join(',')})`;
+
+/**
+ * The meadow's grass, three tufts side by side (a card each): tall blades in the meadow's own green (GRASS.alp),
+ * yellowing upwards, with straw seed heads; the third with a few flowers. Painted in its own colours (the cards keep
+ * them: aShade.y = 1).
+ */
+function meadowTexture(rng) {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.lineCap = 'round';
+  const third = size / 3;
+  const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+  const STRAW = [0.5, 0.44, 0.17];
+  for (let col = 0; col < 3; col++) {
+    const cx = (col + 0.5) * third;
+    const blades = col === 1 ? 46 : 36;
+    for (let k = 0; k < blades; k++) {
+      const x = cx + rng.range(-1, 1) * rng.range(4, third * 0.4);
+      const tall = k % 4 === 0;
+      const hgt = (tall ? rng.range(0.74, 0.97) : rng.range(0.3, 0.72)) * size * (col === 1 ? 0.8 : 1);
+      const bend = (x - cx) * rng.range(0.1, 0.5) + rng.range(-7, 7);
+      const v = rng.range(0.75, 1.3);
+      // the blade in three pieces, greener low down and yellower towards its tip
+      let px = x;
+      let py = size;
+      for (let seg = 1; seg <= 3; seg++) {
+        const f = seg / 3;
+        const qx = Math.min((col + 1) * third - 3, Math.max(col * third + 3, x + bend * f * f));
+        const qy = size - hgt * f;
+        ctx.strokeStyle = css(mix(GRASS.alp, mix(GRASS.alpSeed, STRAW, 0.4), 0.2 + 0.6 * f), v * (1.25 + 0.5 * f));
+        ctx.lineWidth = (tall ? 1.5 : 2.1) * (1.15 - 0.5 * f);
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(qx, qy);
+        ctx.stroke();
+        px = qx;
+        py = qy;
+      }
+      if (tall) {
+        // a seed head: a long pale straw ear at the tip
+        ctx.fillStyle = css(mix(STRAW, GRASS.alpSeed, rng.range(0, 0.5)), rng.range(0.8, 1.2));
+        ctx.beginPath();
+        ctx.ellipse(px, py + 5, 1.9, rng.range(6, 11), Math.atan2(bend, hgt) * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    if (col === 2) {
+      // a few flowers among the blades: white with a yellow eye, yellow, one violet
+      for (const [fx, fy, r, c] of [
+        [-16, 0.52, 3.6, [0.85, 0.85, 0.8]],
+        [9, 0.66, 3.2, [0.85, 0.85, 0.8]],
+        [20, 0.42, 3.0, [0.8, 0.62, 0.05]],
+        [-5, 0.36, 2.8, [0.8, 0.62, 0.05]],
+        [-24, 0.3, 2.6, [0.3, 0.12, 0.5]],
+      ]) {
+        const x = cx + fx;
+        const y = size * (1 - fy);
+        ctx.strokeStyle = css(GRASS.alp, 0.9);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + rng.range(-3, 3), size);
+        ctx.stroke();
+        ctx.fillStyle = css(c);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        if (c[2] > 0.7) {
+          ctx.fillStyle = css([0.8, 0.6, 0.05]);
+          ctx.beginPath();
+          ctx.arc(x, y, r * 0.38, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+  const { levels } = alphaMips(ctx.getImageData(0, 0, size, size).data, size, size, {
+    regions: [0, 1, 2].map((col) => [Math.round(col * third), 0, Math.round((col + 1) * third), size]),
+  });
+  return chainTexture(levels);
+}
 
 /** A small canvas: grass blades (left half) and a leafy bush (right half). Drawn pale; tinted per instance. */
 function coverTexture(rng) {
@@ -77,7 +174,7 @@ function coverTexture(rng) {
 }
 
 /** Crossed upright cards standing on y = 0, `n` of them, `w` wide and `h` tall, picturing [u0, u1] of the map. */
-function cards(n, w, h, u0, u1) {
+function cards(n, w, h, u0, u1, { own = 0, strips = false } = {}) {
   const pos = [];
   const nor = [];
   const uv = [];
@@ -88,17 +185,20 @@ function cards(n, w, h, u0, u1) {
     const dx = Math.cos(a) * w * 0.5;
     const dz = Math.sin(a) * w * 0.5;
     const base = pos.length / 3;
+    // (`strips`: each card pictures its own share of [u0, u1], so a plant of n cards shows n drawings)
+    const ua = strips ? u0 + ((u1 - u0) * (q + 0.02)) / n : u0;
+    const ub = strips ? u0 + ((u1 - u0) * (q + 0.98)) / n : u1;
     for (const [s, y, u, v, ao] of [
-      [-1, 0, u0, 1, 0.55],
-      [1, 0, u1, 1, 0.55],
-      [1, h, u1, 0, 1],
-      [-1, h, u0, 0, 1],
+      [-1, 0, ua, 1, 0.55],
+      [1, 0, ub, 1, 0.55],
+      [1, h, ub, 0, 1],
+      [-1, h, ua, 0, 1],
     ]) {
       pos.push(dx * s, y, dz * s);
       // lit like the ground it grows from
       nor.push(dx * s * 0.15, 1, dz * s * 0.15);
       uv.push(u, v);
-      shade.push(ao, 0);
+      shade.push(ao, own);
     }
     index.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
@@ -317,7 +417,9 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const y = terrain.heightOnTrack(s, lat);
         const h = r.range(0.5, 1.3);
         const v = r.range(0.7, 1.2);
-        bushItems.push(make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c) => c * v), h));
+        const bush = make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c) => c * v), h);
+        // (ref lane: none on a tunnel's meadow, which is open grass to the fence; the numbers are drawn all the same)
+        if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5)) bushItems.push(bush);
       }
     }
     // rocks: fallen at the foot of the rock faces, and boulders on the slopes beyond the rails
@@ -345,7 +447,42 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       const v = r.range(0.75, 1.15);
       const warm = r.range(-0.04, 0.04);
       const item = make(point.x, y - size * 0.18, point.z, r.range(0, Math.PI * 2), [size * r.range(0.8, 1.4), size, size * r.range(0.8, 1.3)], [0.16 * v * (1 + warm), 0.155 * v, 0.14 * v * (1 - warm)], size * 1.5, r.range(-0.3, 0.3));
-      rockItems.push(item);
+      // (ref lane: no fallen rock at the foot of the low walls on a tunnel's approach; the numbers are drawn all the same)
+      if (!(kind === EDGE.ROCK && (approachAt(track, s)?.k ?? 0) > 0.5)) rockItems.push(item);
+    }
+  }
+
+  // (ref lane) the tall grass of the meadows on the tunnels' approaches: thick on the verge's outer part and for a
+  // dozen metres behind the barrier, from before the place begins to the portal's hood
+  const meadowItems = [];
+  const MT = MEADOW[tier] ?? MEADOW.high;
+  {
+    const mr = rng.fork('meadow');
+    for (const A of approachesOf(track)) {
+      for (const side of [1, -1]) {
+        for (let s = A.s0 - APPROACH.open - 20; s < A.s0 - APPROACH.hood.depth - 0.5; s += 1 / MT.grass) {
+          const where = mr.next();
+          const far = mr.next();
+          const size = mr.range(0.55, 1);
+          const yaw = mr.range(0, Math.PI);
+          const jitter = mr.range(-0.4, 0.4);
+          const shade = mr.range(0.5, 1.5);
+          const sw = track.wrap(s + jitter);
+          const edge = track.edgeAt(sw, side);
+          const c = terrain.cliffAt(sw, side);
+          // a third on the verge (its outer part: the mown strip by the road stays), the rest behind the barrier
+          const onVerge = where < 0.34;
+          const lat = side * (onVerge ? pave + 0.5 + (edge - pave - 0.7) * Math.sqrt(far) : edge + c.top + 0.25 + 12 * far ** 1.6);
+          const beyond = Math.max(0, Math.abs(lat) - edge);
+          if (mr.next() > meadowAt(A, side, beforeFace(track, A, sw), beyond)) continue;
+          const g = groundAt(sw, lat, side);
+          if (g.surface >= 0 && g.surface !== SURFACE_GRASS) continue;
+          track.pointAt(sw, lat, point);
+          if (!ownStretch(sw, point.x, point.z)) continue;
+          const h = (onVerge ? 0.6 : 0.95) * size;
+          meadowItems.push(make(point.x, g.y - 0.05, point.z, yaw, [h * 1.5, h, h * 1.5], [shade, shade, shade], h));
+        }
+      }
     }
   }
 
@@ -358,11 +495,18 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
   const rocks = scatter({ geometry: boulder(rng.fork('boulder')), material: rockMaterial, items: rockItems, reach: T.rockReach, name: 'cover-rocks', group });
   rocks.mesh.castShadow = tier !== 'low';
   parts.push(rocks);
+  let meadowMap = null;
+  let meadowMaterial = null;
+  if (meadowItems.length) {
+    meadowMap = meadowTexture(rng.fork('meadow-texture'));
+    meadowMaterial = plantMaterial({ map: meadowMap, atmosphere, uniforms, wind: { height: 1, sway: 0.07 } });
+    parts.push(scatter({ geometry: cards(3, 1, 1, 0, 1, { own: 0.5, strips: true }), material: meadowMaterial, items: meadowItems, reach: MT.reach, name: 'cover-meadow', group }));
+  }
 
   const frustum = new THREE.Frustum();
   const projView = new THREE.Matrix4();
   const eye = new THREE.Vector3();
-  const stats = { grass: grassItems.length, bushes: bushItems.length, rocks: rockItems.length, view: {}, ms: Math.round(performance.now() - started) };
+  const stats = { grass: grassItems.length, bushes: bushItems.length, rocks: rockItems.length, meadow: meadowItems.length, view: {}, ms: Math.round(performance.now() - started) };
   return {
     group,
     stats,
@@ -377,6 +521,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       coverMaterial.dispose();
       rockMaterial.dispose();
       texture.dispose();
+      meadowMaterial?.dispose();
+      meadowMap?.dispose();
     },
   };
 }

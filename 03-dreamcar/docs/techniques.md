@@ -551,22 +551,100 @@ glass, and a little wide on the flanks. A correction for the ceiling's plane in
 the car's materials, as `carGround` corrects for the road's, would put them
 exactly; it has not been made.
 
-**The portals and the cuttings.** The faces are a rectangle with the mouth
-cut out (ShapeGeometry), a reveal, a lintel standing out, a coping. The
-entrance (towards the woods) is weathered, with warm lamps under its lintel, a
-chevron board and a banner (one of the circuit's made-up boards, signs.js
-`paintBoard`, on its own canvas); the exit is pale, with a railing on its
-parapet. Out of the exit, upright retaining walls as high as the terrain's
+**The exit's portal and cutting.** The face is a rectangle with the mouth
+cut out (ShapeGeometry), a reveal, a lintel standing out, a coping, pale,
+with a railing on its parapet. (The entrance is the next section's.) Out of
+the exit, upright retaining walls as high as the terrain's
 cliff there (the `cutting` preset makes it 5 m) carry the acoustic screens:
 one quad from post to post, as high as the lower of its two ends, so the
 steps are square; their slats and rails are a shader on world position
-(`screenShader`), not geometry. Into the entrance, sloped revetments over the
-last 75 m, upright at the face. Both stand where rock.js would put its rock
+(`screenShader`), not geometry. They stand where rock.js would put its rock
 faces (`concreteCut` tells it where not to), in front of the terrain's own
 cliff (never more than 0.7 m behind the solid edge: the cliff's foot is at
 0.8 m). Everything of one material is one mesh per tunnel; world/index.js cuts
 it into 400 m pieces. On low: no housings, no pipe or tray, a plainer gantry
-and railing, the banner as a colour.
+and railing.
+
+## The approach to the tunnel: a meadow
+
+`src/assets/world/approach.js` (the numbers and the few functions everything
+else reads), `entrance.js`, `meadow.js`; the reference is docs/design.md,
+"The approach to the tunnel". The Track is not touched: the place is made
+entirely beyond its solid edges.
+
+**The ground.** terrain.js builds the hillside beside the road from two
+numbers per sample and side: the height of the cliff behind a rock edge and
+the far slope. On an approach (per sample: which one, and a share `k` that
+is 1 from the face to 88 m out and eases to 0 over 14 m more) the cliff
+becomes a low wall's height (0.7 m, standing nearly upright: a lean of 0.06
+instead of 0.3, so that a wall 0.9 m wide covers it) and the slope beyond it
+is `rise()`: the meadow's. The ground over the bore is `coverOver()`: 0.6 m
+per metre up to 75 m over the crown, easing back to the ridge's 40 m between
+110 and 230 m in, so the exit's side is as it was.
+
+**The step at the face.** In front of the headwall the meadow is low at the
+road and climbs away from it; behind it the hill stands as high as the wall
+holds it (`behindFace()`: the wall's top less 0.25 m, or the ground in front
+where that is higher, so that beyond the wall's ends the land is one
+surface). A height field cannot hold a wall, and each of the terrain's three
+meshes meets the step differently. The band's last row before a portal is a
+Track sample just inside the box: it is built with the ground IN FRONT
+(`front` in `nearAt`), so the band ends at the face without a wedge up to
+the bench. A triangle of the grid with corners on both sides of the face,
+any of them within the wall's length, would be a ramp through the wall: it
+is left out (`throughFace`). What that opens is closed by the tunnel's apron
+(`buildApron`): the terrain's own height function with its material, behind
+the face from end to end for 1.75 cells, and in front of it only beyond the
+band's reach. Its rows nearest the face read the height 1.6 m further in:
+the height function turns from one ground to the other over a metre.
+
+**The headwall and the hood.** The headwall's outline is `headwallTop()`:
+level on the hill's side out to where the ground in front has climbed to
+within 0.35 m of it (found by walking `frontGround()` when the approach is
+made, so wall and land cannot disagree), falling with the spur's flank on the
+other. Its face is a ShapeGeometry with the opening cut out: the hood's arch
+(a superellipse of exponent 2.5 over upright jambs) cut off at the box's
+ceiling, so the plate closes the box's upper corners. The hood's soffit is a
+ruled surface from that opening to the full arch 2.6 m out: the bore is the
+box's, and the arch is only ever wider and higher than it. `Parts.poly` and
+`Parts.strip` take a direction their front must face: a face whose normal
+points away from what it shows shades itself, because the shadow map's bias
+is laid along the normal (the first headwall was lit from 100 m away and
+dark from 30 m, inside the shadow map's box).
+
+**The meadow.** The terrain writes a negative `aMask.y` where `meadowAt()`
+says the meadow is (band, grid and apron; a gravel trap keeps its own mask),
+and the ground's shader reads it as `gMeadow`: its own green (`GRASS.alp`),
+yellower on the rises and darker and bluer in the hollows (`alpSeed`,
+`alpHollow`, from two scales of the large field), terracettes (thin dark
+lines at world heights 1.15 m apart, bent by noise, only on steep ground),
+the mower's swathes on gentle ground, pale paths where a broad field crosses
+its middle (`alpPath`); no scree, scrub or clumps, rock only on faces steeper than 0.9,
+long grass instead of the mown verge, and no shade of a canopy that is no
+longer there. The tall grass is one more kind of ground cover: three crossed
+cards a tuft, each picturing its own third of a small canvas painted in the
+meadow's own colours (so they are kept: `aShade.y`), 12 tufts a metre of
+road and side on medium within 42 m of the eye, 2.5 and 30 m on low.
+
+**Trees.** The forest is planted from one stream of random numbers, in
+order, so a tree left out early would move every tree after it. The
+approach is therefore cleared AFTER the forest is planted (whatever stands
+where `meadowAt()` or `woodAt()` say), and planted by hand from a stream of
+its own (`rng.fork('approach')`): the rest of the lap's trees stand exactly
+where they stood. Ground cover does the same in its own way: a bush or a
+fallen rock on the meadow is drawn from the stream and not kept. The spruce
+wood on the low side begins 52 m beyond the edge before the face: the day's
+sun stands 16 degrees up behind and a little to that side, and a wood nearer
+laid its shade over the road and the left meadow. Behind the face (where
+shadows fall into the hill) it comes to 20 m, and a stand along the crest
+over the bore makes the skyline. On the open meadow there are only clumps of
+hazel and young broadleaves given their own low heights: a full-grown
+broadleaf alone on a slope is a crown on a bare stem.
+
+**The furniture** (meadow.js) is one mesh of vertex colours and one matte
+material: fence posts and wires, marker posts, the sign (boxes and
+polygons; the pictograms are polygons too), the chalet and the barn. It is
+hidden from the car's probe and the wet road's mirror.
 
 ## Determinism
 
@@ -588,7 +666,7 @@ and railing, the banner as a colour.
 ## The staging camera
 
 `setPhoto` in `src/game/Game.js`, `_photo` in `src/game/Cameras.js`.
-`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, which also set the moment of the autopilot's run and the time of day) places every view's
+`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, `r1`, which also set the moment of the autopilot's run and the time of day) places every view's
 camera `back` m behind, `right` m right of and `up` m above the car's origin
 in the car's level frame (its heading only, not its pitch or roll), turned
 `yaw` degrees left of the heading and `pitch` degrees up, with a lens of
