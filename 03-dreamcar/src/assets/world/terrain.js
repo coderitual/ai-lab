@@ -34,6 +34,7 @@ import * as THREE from 'three';
 import { planeNoise, smoothstep, withBake } from './shading.js';
 import { CANOPY, canopyOpen } from './canopy.js';
 import { createLakeside } from './lakeside.js';
+import { goldwoodOf } from './goldwood.js';
 import { APPROACH, approachAt, approachesOf, beforeFace, behindFace, coverOver, meadowAt, rise as approachRise, woodAt as approachWood } from './approach.js';
 
 // The Track's EDGE and SURFACE values (the world never imports from game/).
@@ -108,6 +109,9 @@ export function createTerrain({ track, tier, rng, material, lights }) {
   const lakeLevel = track.layout?.lakeLevel ?? -1.8;
   // the lakeside (lakeside.js): one place where the land beyond the solid edges is shaped by hand
   const lakeside = createLakeside(track, rng.fork('lakeside'));
+
+  // the golden wood (goldwood.js): the esses in autumn; it moves no ground, only marks the band beside the road
+  const goldwood = goldwoodOf(track);
 
   // ---- per sample: what the road asks of the land on each side
   const wrap = (s) => track.wrap(s);
@@ -632,6 +636,7 @@ const FOOT = 0.8;
         for (let k = 0; k < BAND_OUT.length; k++) offs[7 + k] = top + BAND_OUT[k];
         const gravel = (side > 0 ? track.vergeL : track.vergeR)[i] === SURFACE_GRAVEL;
         const woodHere = track.woodAt ? !!track.woodAt(s, side) && !lakeside?.open(s, side) : false;
+        const gold = goldwood ? goldwood.stretch(s) : 0;
         let lastOwn = 0;
         for (let k = 0; k < cols; k++) {
           let lat = side * (edge + offs[k]);
@@ -663,7 +668,9 @@ const FOOT = 0.8;
           verge[v * 4 + 1] = s + lapOffset;
           verge[v * 4 + 2] = Math.abs(lat) - edge;
           // w: 0 on a verge with no wood behind it, 0.4 under woods (leaf litter); vertices without the attribute read 1
-          verge[v * 4 + 3] = woodHere ? 0.4 : 0;
+          // (the golden wood, goldwood.js: up to 0.09 more, by how much of that place it is; the ground's material
+          // paints its pale grass and fallen leaves from it)
+          verge[v * 4 + 3] = woodHere ? 0.4 + 0.09 * gold : 0;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
           // (ref lane) a negative aMask.y is the meadow of a tunnel's approach (groundMaterial.js), verge and all
@@ -1098,6 +1105,8 @@ const FOOT = 0.8;
      * and seat again what stands on it.
      */
     lakeside,
+    /** The golden wood (goldwood.js), or null: a stretch of the Track; it moves no ground. */
+    goldwood,
     before: { heightAt: (x, z) => heightAt(x, z, true), forestAt: (x, z) => forestAt(x, z, true) },
     bakeAt,
     bake4At,

@@ -1645,6 +1645,24 @@ const SECTIONS = {
       && st4.time === preset4.time && Math.abs(clock4 - preset4.t) < 0.05 && !!place4 && place4.stretch === 1,
       `${st4.time}, ${clock4.toFixed(2)} s into the run, fov ${named4.fov}, ${place4 ? place4.along.toFixed(0) : '?'} m after the sky road`);
     await p4.close('photo r2');
+    // the golden wood's camera (design.md): the same, and its car is on that stretch
+    for (const [name, where, what] of [
+      ['r3', (g) => { const w = g.world.terrain.goldwood; return w ? { along: w.along(g.racers[0].vehicle.s), stretch: w.stretch(g.racers[0].vehicle.s) } : null; }, 'into the esses'],
+    ]) {
+      const p5 = await open(`?manual&q=low&photo=${name}`, { w: 640, h: 360, gpu: false });
+      const preset5 = await p5.page.evaluate('window.__dreamcar.game.photo');
+      const st5 = await p5.state();
+      const named5 = await p5.page.evaluate(() => {
+        const c = window.__dreamcar.game.views[0].camera;
+        return { fov: c.fov, hud: !document.querySelector('.hud').hidden };
+      });
+      const clock5 = await p5.page.evaluate('window.__dreamcar.game.race.clock + window.__dreamcar.game.race.lead');
+      const place5 = await p5.page.evaluate(`(${where.toString()})(window.__dreamcar.game)`);
+      check(`?photo=${name}: the named camera, its time of day and its moment, in its place`, !!preset5 && Math.abs(named5.fov - preset5.fov) < 0.01 && !named5.hud
+        && st5.time === preset5.time && Math.abs(clock5 - preset5.t) < 0.05 && !!place5 && place5.stretch === 1,
+        `${st5.time}, ${clock5.toFixed(2)} s into the run, fov ${named5.fov}, ${place5 ? place5.along.toFixed(0) : '?'} m ${what}`);
+      await p5.close(`photo ${name}`);
+    }
   },
 
   /** The same run is the same run: twice by keys, and by the autopilot at 30, 60 and 144 frames a second. */

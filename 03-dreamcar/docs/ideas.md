@@ -23,6 +23,12 @@ comparison stills and strike what is done.
   trees stand as single cards against the sky; the far range's snow reads as
   caps from here; a corner of the spur's stone still shows over the stand;
   the slope at the end of the sky road has fewer trees than it had.
+- **The golden wood against its photograph** (design.md, "The golden wood"):
+  the crowns are the lap's round broadleaves, not slim aspens on pale
+  trunks; the wall down the road and the verge's grass are lighter and
+  yellower than the photograph's; the second bend lies in its hillside's
+  shade whatever grows there; a few pale forked birch stems show at the
+  barrier from a low camera.
 - **The ground beside the sky road** reads from above as a pale, rippled
   bare slope (`docs/images/sky-road.jpg`), not the wooded valley under the
   columns of frame A.

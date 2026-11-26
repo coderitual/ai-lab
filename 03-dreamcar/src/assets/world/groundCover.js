@@ -18,6 +18,7 @@ import { planeNoise } from './shading.js';
 import { GRASS } from './groundMaterial.js';
 import { LAKESIDE } from './lakeside.js';
 import { APPROACH, approachAt, approachesOf, beforeFace, meadowAt } from './approach.js';
+import { GOLDWOOD, goldwoodOf } from './goldwood.js';
 
 const SURFACE_GRASS = 2;
 const EDGE = { RAIL: 0, ROCK: 1, WALL: 2, PARAPET: 3, TREES: 4 };
@@ -429,6 +430,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
     };
   };
 
+  const goldwood = goldwoodOf(track);
   const grassItems = [];
   const bushItems = [];
   const rockItems = [];
@@ -457,7 +459,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const tuft = make(point.x, g.y - 0.03, point.z, r.range(0, Math.PI), [h * 2.2, h, h * 2.2], tint, h);
         // (ref lane: the circuit's own dark tufts give way to the meadow's tall grass on a tunnel's approach)
         // (nor on the lakeside's stretch, whose verge is the long meadow grass)
-        if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5) && !((terrain.lakeside?.stretch(s) ?? 0) > 0.5)) grassItems.push(tuft);
+        // (nor in the golden wood, whose verge is pale grass under leaves)
+        if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5) && !((terrain.lakeside?.stretch(s) ?? 0) > 0.5) && !goldwood?.here(s)) grassItems.push(tuft);
       }
     }
     if (T.bushes) {
@@ -475,7 +478,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const h = r.range(0.5, 1.3);
         const v = r.range(0.7, 1.2);
         // (on the lakeside's meadow the lap's own bushes are the meadow's: lit, warm, not the wood's dark green)
-        const lit = terrain.lakeside?.open(s, side) ? [5, 4.2, 2.6] : [1, 1, 1];
+        // (in the golden wood they have turned with it: ochre and rust, not the wood's dark green)
+        const lit = terrain.lakeside?.open(s, side) ? [5, 4.2, 2.6] : goldwood?.here(s) ? GOLDWOOD.bush : [1, 1, 1];
         const bush = make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c, k) => c * v * lit[k]), h);
         // (ref lane: none on a tunnel's meadow, which is open grass to the fence; the numbers are drawn all the same)
         if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5)) bushItems.push(bush);
@@ -665,6 +669,35 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const v = lr.range(0.85, 1.25);
         const warm = lr.range(-0.03, 0.05);
         rockItems.push(make(point.x, y - size * 0.35, point.z, lr.range(0, Math.PI * 2), [size * lr.range(1, 1.5), size * lr.range(1.1, 1.7), size * lr.range(0.9, 1.3)], [0.2 * v * (1 + warm), 0.195 * v, 0.18 * v * (1 - warm)], size * 1.7, lr.range(-0.25, 0.25)));
+      }
+    }
+  }
+
+  // THE GOLDEN WOOD (goldwood.js; the photograph r3), from a stream of its own: long pale grass, bleached and gone
+  // to seed (the approach meadow's cards), along the outer part of both verges and against the barrier's foot. The
+  // strip by the kerb stays short under its drift of leaves.
+  if (goldwood) {
+    const gr = rng.fork('goldwood');
+    const G = GOLDWOOD;
+    const perMetre = MT.grass * G.grass.share;
+    for (const side of [1, -1]) {
+      for (let d = G.from; d < G.to; d += 1 / perMetre) {
+        const where = gr.next();
+        const size = gr.next();
+        const yaw = gr.range(0, Math.PI);
+        const shade = gr.range(0.7, 1.3);
+        const s = track.wrap(goldwood.s0 + d + gr.range(-0.4, 0.4));
+        if (!goldwood.here(s)) continue;
+        const edge = track.edgeAt(s, side);
+        // most of it in the last metre and a half before the barrier and just behind it, the rest thinning inwards
+        const lat = side * (where < 0.7 ? edge - 1.5 + 2.4 * ((where / 0.7) ** 0.8) : pave + 1.6 + (edge - pave - 3) * ((where - 0.7) / 0.3));
+        if (Math.abs(lat) < pave + 1.5) continue;
+        const g = groundAt(s, lat, side);
+        if (g.surface >= 0 && g.surface !== SURFACE_GRASS) continue;
+        track.pointAt(s, lat, point);
+        if (!ownStretch(s, point.x, point.z)) continue;
+        const h = G.grass.height[0] + (G.grass.height[1] - G.grass.height[0]) * size;
+        meadowItems.push(make(point.x, g.y - 0.05, point.z, yaw, [h * 1.5, h, h * 1.5], G.grass.tint.map((c) => c * shade), h));
       }
     }
   }

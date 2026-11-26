@@ -68,10 +68,18 @@ const LOADS = [
         photo: { back: 5.8, right: -3.2, up: 1.1, yaw: -29, pitch: -4, fov: 34 },
         caption: 'Three-quarter rear, into the sun',
       },
+      // the golden wood (config.js PHOTOS.r3's camera and moment; design.md, "The golden wood"): the car is behind it
+      {
+        name: 'golden-wood',
+        start: true,
+        dist: 869,
+        photo: { back: -6, right: -2.2, up: 1.45, yaw: -26, pitch: 5, fov: 50 },
+        shutter: 0.1,
+        caption: 'The golden wood: the forest esses between walls of turned broadleaves',
+      },
       // the approach to the tunnel from photograph R1's camera (PHOTOS.r1 in game/config.js): the car is behind it
       {
         name: 'approach',
-        start: true,
         dist: 1379,
         photo: { back: -6, right: 3.2, up: 1.3, yaw: -17, pitch: 6, fov: 36 },
         caption: 'The approach to the tunnel: a meadow, and the portal set into the hillside',

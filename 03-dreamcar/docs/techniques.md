@@ -789,10 +789,66 @@ sheet may reach, no ground moved within half a metre of an edge, and the
 hillsides 3, 15 and 40 m beyond the edges of the rest of the lap what they
 were.
 
+## The golden wood: a place that moves no ground
+
+`src/assets/world/goldwood.js`, read by `forest.js`, `terrain.js`,
+`groundMaterial.js` and `groundCover.js`. design.md ("The golden wood") says
+what the place is. It is a stretch of the Track (from a named section, as the
+lakeside is) and nothing but numbers: no ground moves, so it needs no
+`terrain.before` and no test of the corridor.
+
+**The walls.** After every other stage has planted and every tree has drawn
+its own numbers (the same rule as the lakeside: nothing else on the lap may
+change), the lap's trees within 38 m beyond both solid edges of the stretch
+are taken out and five rows a side are planted from `rng.fork('goldwood')`.
+Three things make a wall of them rather than trees standing in a row, all of
+them options `addTree` already had from the approach and the lakeside: `sink`
+(a quarter of each tree stands under the ground, so its foliage begins at the
+grass), `slim` above one (crowns 1.38 times as wide as they grew, so they
+close), and rows that get taller away from the road. One option is new:
+`gold`, the share of trees that turn whatever their species' readiness (a
+hornbeam turns in 15 % of the lap's woods; here 86 % of everything has).
+Nothing else is new: the trees, their forms per tier, their floor of grass
+and fallen leaves and their shadows are the forest's own.
+
+**The sun's side.** By day the sun stands 16 degrees up square on the left of
+the esses. A wall there as tall as the one across the road would lay the
+whole road in shade (as the conifers it replaces did). So on the side the
+sun stands on, a tree's height is capped by the sun's own ray: the ray that
+reaches the middle of the road half a metre above it passes over the place
+where the tree stands at `fall * distance / square` metres (`fall` the sun's
+rise per metre, `square` how squarely it stands across the road), and the
+crown may reach that high over the ground it stands on and no higher. The
+wall on that side is therefore low at the barrier and rises away from it at
+the sun's angle: seen from the road it is as tall as the sun is high, the
+light comes over it and through its top, and the far wall stands in it. Where
+the hillside itself reaches the ray, no cap is applied (a hill shades the
+road with or without trees). The sun is `TIMES.day.sun.dir` of
+`lighting.js`: at golden hour and at night the walls are what the day made
+them.
+
+**The ground.** The band of terrain beside the road carries the verge in
+track terms for the ground's material (`aVerge`); its fourth number was 0 on
+an open verge and 0.4 under woods. In the golden wood it is up to 0.09 more
+(`0.4 + 0.09 * stretch`): the material reads that as how much of the place a
+pixel is, without a new attribute, a uniform or a branch for the rest of the
+lap. There the verge is pale dry grass under flecks of fallen leaves in three
+tones (two scales of the detail texture's litter channel that never line up;
+far off, where the detail fades to its mean, the leaves' share of the ground
+instead), thickest in a drift along the paved margin and at the barrier's
+foot; behind the barrier the same litter lies over the wood's floor out to
+26 m. The long grass at the verge's outer edge is the approach meadow's
+`cover-meadow` cards again, bleached by a tint, from the place's own stream;
+the lap's dark tufts are left out on the stretch (their numbers are drawn all
+the same).
+
+**The low tier** keeps the first two rows whole and 70, 60 and 50 % of the
+three behind, half the young growth, and a fifth as many cards of grass.
+
 ## The staging camera
 
 `setPhoto` in `src/game/Game.js`, `_photo` in `src/game/Cameras.js`.
-`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, `r1`, `r2`, which also set the moment of the autopilot's run and the time of day) places every view's
+`__dreamcar.photo({ back, right, up, yaw, pitch, fov })` (or a name from `PHOTOS` in `config.js`: `d1`, `d3`, `d4`, `r1`, `r2`, `r3`, which also set the moment of the autopilot's run and the time of day) places every view's
 camera `back` m behind, `right` m right of and `up` m above the car's origin
 in the car's level frame (its heading only, not its pitch or roll), turned
 `yaw` degrees left of the heading and `pitch` degrees up, with a lens of
@@ -801,7 +857,7 @@ but the car's pose, so with `?manual` the same run gives the same picture. The
 HUD hides unless `hud: true`; `photo(null)` gives the views back to their
 rigs. `?photo=back,right,up,yaw,pitch,fov[,hud]` does the same from the
 address. A pose may carry `shutter`, the share of the game's motion-blur
-shutter its picture is taken with (`r2`: a tenth; the others ride with the
+shutter its picture is taken with (`r2`, `r3`: a tenth; the others ride with the
 car at the game's own). A camera ahead of the car looking back at it has a negative `back`
 and a `yaw` near 180. `tools/screenshots.cjs` stages every picture of the
 docs with it, at distances along an autopilot run.
