@@ -465,6 +465,13 @@ const FOOT = 0.8;
     const d = Math.max(0, Math.abs(spot.lat) - track.edgeAt(spot.s, side));
     return forestOf(x, z, heightOf(x, z, spot.s, spot.lat, raw), 0, spot.s, spot.lat, d, raw);
   }
+  /** How steep the ground is at a point: 1 - the normal's y (the ground material's own measure). */
+  const SPUR_STEEP = 0.17;
+  function steepAt(x, z) {
+    const hx = (heightAt(x + 2, z) - heightAt(x - 2, z)) / 4;
+    const hz = (heightAt(x, z + 2) - heightAt(x, z - 2)) / 4;
+    return 1 - 1 / Math.hypot(hx, 1, hz);
+  }
   const pointScratch = new THREE.Vector3();
   function heightOnTrack(s, lat) {
     track.pointAt(s, lat, pointScratch);
@@ -597,6 +604,8 @@ const FOOT = 0.8;
           verge[v * 4 + 3] = woodHere ? 0.4 : 0;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
+          // (the lakeside's spur: its steep ground is the bank's weathered stone, aMask.y = 3, not the lap's grey rock)
+          if (lakeside && k >= 7 && lakeside.spur(pt.x, pt.z, s, lat) > 0.5 && steepAt(pt.x, pt.z) > SPUR_STEEP) mask[v * 2 + 1] = 3;
         }
         ext[half][i] = edge + offs[lastOwn];
         if (bandStep > 1) for (let b = 1; b < bandStep && i + b < n; b++) ext[half][i + b] = ext[half][i];
@@ -847,6 +856,7 @@ const FOOT = 0.8;
           const d = s === null ? 1e9 : Math.max(0, Math.abs(gLat[k]) - track.edgeAt(s, gLat[k] >= 0 ? 1 : -1));
           mask[v * 2] = forestOf(x, z, y, 1 - inv, s, gLat[k], d);
           mask[v * 2 + 1] = smoothstep(0.6, 0.9, 1 - inv) * 0.5;
+          if (lakeside && s !== null && 1 - inv > SPUR_STEEP && lakeside.spur(x, z, s, gLat[k]) > 0.5) mask[v * 2 + 1] = 3;
         }
       }
       const index = [];
@@ -1000,6 +1010,11 @@ const FOOT = 0.8;
     before: { heightAt: (x, z) => heightAt(x, z, true), forestAt: (x, z) => forestAt(x, z, true) },
     bakeAt,
     bake4At,
+    /**
+     * The day's sun at a point `y` m high over the map (0..1): what a crown standing up out of a shaded slope gets,
+     * where bakeAt answers for the ground under it.
+     */
+    sunAt: (x, z, y) => marchSun(x, z, y, dirs[0], 2600),
     cliffAt: (s, side) => ({ ...cliffAt(s, side) }),
     stats: { vertices, triangles, gridTriangles, ms: Math.round(performance.now() - started), phases },
     dispose() {

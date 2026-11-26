@@ -45,9 +45,9 @@ export function createFence({ track, terrain, tier, atmosphere, rng }) {
   const p = new THREE.Vector3();
   const tops = [];
   /** A post: a prism from 0.3 m under the ground to its top, leaning by (lx, lz) per metre. */
-  const post = (x, y, z, h, yaw, lx, lz, tone) => {
+  const post = (x, y, z, h, yaw, lx, lz, tone, thick = FENCE.thick) => {
     const base = pos.length / 3;
-    const r = FENCE.thick * 0.71;
+    const r = thick * 0.71;
     for (let k = 0; k < sides; k++) {
       const a = yaw + (k / sides) * Math.PI * 2;
       const dx = Math.cos(a) * r;
@@ -76,6 +76,17 @@ export function createFence({ track, terrain, tier, atmosphere, rng }) {
     tops.push(post(p.x, y, p.z, h, rng.range(0, Math.PI), rng.range(-0.05, 0.05), rng.range(-0.05, 0.05), rng.range(0.8, 1.2)));
     posts++;
   }
+  // the lake's side: the photograph's rail stands on wooden posts. The circuit's steel rail stays what it is; a
+  // weathered wooden post stands close behind it every few metres, its top a hand above the beam.
+  const fenceTops = tops.length;
+  for (let d = LAKESIDE.from + 1; d <= LAKESIDE.to; d += step * 1.5) {
+    const s = track.wrap(lakeside.s0 + d);
+    const lat = track.edgeAt(s, 1) + 0.36;
+    track.pointAt(s, lat, p);
+    post(p.x, terrain.heightOnTrack(s, lat), p.z, rng.range(1.2, 1.3), rng.range(0, Math.PI), rng.range(-0.03, 0.03), rng.range(-0.03, 0.03), rng.range(0.9, 1.3), 0.15);
+    posts++;
+  }
+  tops.length = fenceTops;
   // the wires: an upright ribbon from post to post, in two pieces with a little sag between
   for (let i = 0; i < tops.length - 1; i++) {
     const a = tops[i];

@@ -35,11 +35,11 @@ const TIER = {
  */
 const LAKESIDE_COVER = {
   low: { grass: 1.2, reach: 26, flowers: 0, flowerReach: 0, outcrops: 2.4, bushes: 0 },
-  medium: { grass: 5, reach: 0, flowers: 1.6, flowerReach: 30, outcrops: 3.4, bushes: 1.1 },
-  high: { grass: 7, reach: 0, flowers: 2.2, flowerReach: 40, outcrops: 4, bushes: 1.5 },
+  medium: { grass: 8, reach: 0, flowers: 2.6, flowerReach: 34, outcrops: 3.4, bushes: 1.1 },
+  high: { grass: 10, reach: 0, flowers: 3.2, flowerReach: 44, outcrops: 4, bushes: 1.5 },
 };
-/** The tall grass against the light: the tufts' green times this (the sun stands beyond the rail and shines through the blades). */
-const LAKESIDE_GLOW = 2.8;
+/** The tall grass of the lakeside's meadow, linear albedo over the cover texture: long warm blades and straw (the photograph's), lit. */
+const LAKESIDE_GRASS = { green: [0.3, 0.27, 0.07], straw: [0.42, 0.36, 0.14] };
 /** Flowers, linear albedo: dandelion yellow, and the white of anemones under the rail. */
 const FLOWER = { yellow: [0.8, 0.52, 0.02], white: [0.72, 0.72, 0.62] };
 
@@ -368,7 +368,9 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const y = terrain.heightOnTrack(s, lat);
         const h = r.range(0.5, 1.3);
         const v = r.range(0.7, 1.2);
-        bushItems.push(make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c) => c * v), h));
+        // (on the lakeside's meadow the lap's own bushes are the meadow's: lit, warm, not the wood's dark green)
+        const lit = terrain.lakeside?.open(s, side) ? [5, 4.2, 2.6] : [1, 1, 1];
+        bushItems.push(make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c, k) => c * v * lit[k]), h));
       }
     }
     // rocks: fallen at the foot of the rock faces, and boulders on the slopes beyond the rails
@@ -417,9 +419,9 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       const g = groundAt(s, lat, side);
       if (g.surface >= 0 && g.surface !== SURFACE_GRASS) return;
       track.pointAt(s, lat, point);
-      const v = lr.range(0.9, 1.3) * LAKESIDE_GLOW;
+      const v = lr.range(0.8, 1.25);
       const dry = lr.next() ** 2;
-      const tint = GRASS.tuft.map((c, k) => (c + (GRASS.tuftDry[k] - c) * dry) * v);
+      const tint = LAKESIDE_GRASS.green.map((c, k) => (c + (LAKESIDE_GRASS.straw[k] - c) * dry) * v);
       grassItems.push(make(point.x, g.y - 0.04, point.z, lr.range(0, Math.PI), [h * 1.7, h, h * 1.7], tint, h));
     };
     const flower = (s, lat, side, kind) => {
@@ -433,7 +435,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       // the lake's side: thickest right at the rail (both sides of it), thinning down the bank
       const s = sAt();
       const edge = track.edgeAt(s, 1);
-      const off = lr.next() < 0.6 ? lr.range(-0.9, 0.9) : lr.range(-2.2, 6);
+      const off = lr.next() < 0.6 ? lr.range(-1.1, 1.4) : lr.range(-2.4, 9);
       tuft(s, Math.max(pave + 0.25, edge + off), 1, lr.range(0.35, 0.8) * (1 - 0.3 * Math.min(1, Math.abs(off) / 4)));
     }
     for (let i = 0; i < span * C.grass * 1.2; i++) {
@@ -469,8 +471,8 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
       const y = terrain.heightAt(point.x, point.z);
       if (y < lakeside.level + 0.15) continue;
       const h = lr.range(0.5, 1.2);
-      const v = lr.range(3.2, 4.6);
-      bushItems.push(make(point.x, y - 0.1, point.z, lr.range(0, Math.PI), [h * 1.5, h, h * 1.5], GRASS.bush.map((c) => c * v), h));
+      const v = lr.range(4.5, 6.5);
+      bushItems.push(make(point.x, y - 0.1, point.z, lr.range(0, Math.PI), [h * 1.5, h, h * 1.5], GRASS.bush.map((c, k) => c * v * [1.1, 0.95, 0.6][k]), h));
     }
     // outcrops in the bank on the right: groups of two to four stones, the largest a couple of metres across,
     // sunk to their shoulders; and a few on the bank above the water

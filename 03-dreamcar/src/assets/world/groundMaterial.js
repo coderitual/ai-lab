@@ -115,6 +115,17 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
     uLarge: { value: large },
     /** (look lane) the snow's albedo, times this: 1 by day; low at night, when the moonlit peaks read as dusk */
     uSnowLight: { value: 1 },
+    /**
+     * The lakeside (lakeside.js `paint`; all zero without it): its frame on the map (origin x, z and the unit vector
+     * along the road), its meadow's box in that frame (u0, u1, v0, v1), the box's soft edge (m) with the water's
+     * level, the meadow's two greens, and the eye of its pass (x, z) for the far range's streaks of snow.
+     */
+    uSideFrame: { value: new THREE.Vector4(0, 0, 1, 0) },
+    uSideBox: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uSideSoft: { value: new THREE.Vector2(1, -1e4) },
+    uSideLit: { value: new THREE.Vector3() },
+    uSideHollow: { value: new THREE.Vector3() },
+    uSideEye: { value: new THREE.Vector2() },
   };
 
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
@@ -156,6 +167,17 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
     setTime(time) {
       uniforms.uSnowLight.value = time.name === 'night' ? 0.25 : 1;
     },
+    /** @param {{ ox: number, oz: number, tx: number, tz: number, meadow: object, eye: number[], level: number }|null} paint lakeside.js `paint` */
+    setLakeside(paint) {
+      if (!paint) return;
+      const m = paint.meadow;
+      uniforms.uSideFrame.value.set(paint.ox, paint.oz, paint.tx, paint.tz);
+      uniforms.uSideBox.value.set(m.u[0], m.u[1], m.v[0], m.v[1]);
+      uniforms.uSideSoft.value.set(m.soft, paint.level);
+      uniforms.uSideLit.value.fromArray(m.lit);
+      uniforms.uSideHollow.value.fromArray(m.hollow);
+      uniforms.uSideEye.value.fromArray(paint.eye);
+    },
     textures: [detail, detailNormal, rockNormal, large],
     dispose() {
       material.dispose();
@@ -170,6 +192,12 @@ uniform sampler2D uDetailN;
 uniform sampler2D uRockN;
 uniform sampler2D uLarge;
 uniform float uSnowLight;
+uniform vec4 uSideFrame;
+uniform vec4 uSideBox;
+uniform vec2 uSideSoft;
+uniform vec3 uSideLit;
+uniform vec3 uSideHollow;
+uniform vec2 uSideEye;
 varying vec2 vMask;
 varying vec4 vVerge;  // the band beside the road: m beyond the margin, s, m beyond the barrier, 0 (1 elsewhere)
 varying vec3 vGroundPos;
@@ -224,8 +252,16 @@ float gForest = smoothstep( 0.3, 0.6, vMask.x + ( gMid.b - 0.5 ) * 0.5 + ( gLarg
 // (env lane: no snow on the hills round the circuit; the far massif is the SKY lane's)
 // (lakeside: but for the far range that closes the pass beyond the tarn, where the terrain asks for it with a
 // negative forest mask: that much snow, lying in streaks and patches, not on the steepest rock)
+// (streaks: the snow lies in the gullies, which run down the range's face, towards and away from the place it is seen
+// from; so its pattern is fine across that line and long along it)
 float gSnowAsk = clamp( -vMask.x, 0.0, 1.0 );
-float gSnow = gSnowAsk * smoothstep( 0.42, 0.58, 0.55 * gMid.a + 0.45 * gLarge.a + 0.5 * ( gSnowAsk - 0.5 ) ) * ( 1.0 - smoothstep( 0.5, 0.75, gSlope ) );
+float gSnow = 0.0;
+if ( gSnowAsk > 0.0 ) {
+  vec2 sd = vGroundPos.xz - uSideEye;
+  float streak = texture2D( uLarge, vec2( atan( sd.y, sd.x ) * 9.0, length( sd ) / 2600.0 ) ).a;
+  float fine = texture2D( uLarge, vec2( atan( sd.y, sd.x ) * 31.0, length( sd ) / 900.0 ) ).r;
+  gSnow = smoothstep( 0.4, 0.56, 0.6 * streak + 0.4 * fine + 0.75 * ( gSnowAsk - 0.5 ) ) * ( 1.0 - smoothstep( 0.55, 0.8, gSlope ) );
+}
 
 // meadow: lush where gLarge.r is low, dry and paler where it is high, higher up a little browner
 vec3 gLush = ${v3(GRASS.lush)};
@@ -234,6 +270,24 @@ vec3 gGrass = mix( gLush, gDry, smoothstep( 0.45, 0.85, gLarge.r + vGroundPos.y 
 gGrass *= 0.78 + 0.44 * gDet.r;
 gGrass = mix( gGrass, ${v3(GRASS.straw)} * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.6, 0.85, gMid.b ) * 0.5 );
 gGrass *= 0.72 + 0.56 * gMid.r;
+// (lakeside) the meadow between the road and the tarn: long grass in the photograph's warm green, lighter on the
+// rises and where the blades catch the light, darker in the hollows and between the tussocks, with a fine grain
+float gSide = 0.0;
+{
+  vec2 sp = vGroundPos.xz - uSideFrame.xy;
+  float su = dot( sp, uSideFrame.zw );
+  float sv = dot( sp, vec2( uSideFrame.w, -uSideFrame.z ) );
+  gSide = smoothstep( uSideBox.x, uSideBox.x + uSideSoft.x, su ) * ( 1.0 - smoothstep( uSideBox.y - uSideSoft.x, uSideBox.y, su ) )
+    * smoothstep( uSideBox.z, uSideBox.z + 3.0, sv ) * ( 1.0 - smoothstep( uSideBox.w - uSideSoft.x, uSideBox.w, sv ) )
+    * smoothstep( uSideSoft.y - 0.4, uSideSoft.y + 0.5, vGroundPos.y );
+  if ( gSide > 0.0 ) {
+    float tussock = smoothstep( 0.3, 0.75, 0.6 * gDet.r + 0.4 * gMid.r );
+    float swell = texture2D( uLarge, vGroundPos.xz / 37.0 ).b;
+    vec3 meadow = mix( uSideHollow, uSideLit, clamp( 0.15 + 0.85 * tussock + 0.5 * ( swell - 0.5 ), 0.0, 1.0 ) );
+    meadow *= 0.86 + 0.28 * gDet2.r;
+    gGrass = mix( gGrass, meadow, gSide );
+  }
+}
 // forest floor near, the canopy's colour far away
 vec3 gFloor = vec3( 0.04, 0.034, 0.024 ) * ( 0.7 + 0.6 * gDet.a );
 vec3 gCanopy = vec3( 0.02, 0.034, 0.017 ) * ( 0.7 + 0.5 * gLarge.b ) * ( 0.75 + 0.5 * gMid.r );

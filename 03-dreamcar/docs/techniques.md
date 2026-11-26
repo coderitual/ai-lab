@@ -668,6 +668,29 @@ scenery if the place had simply been built in:
   place tells it where a wood the Track names no longer stands
   (`openCanopy`).
 
+**Paint and light that belong to the place.**
+- *The meadow.* The ground's material takes the place's frame and a box in it
+  as uniforms (`setLakeside`, zero without the place) and, inside the box and
+  above the water, mixes the meadow's two greens by the detail and the
+  90 m fields (tussocks and swells) with a fine grain: no vertex attribute,
+  so nothing bleeds along a triangle into the wood or the snow.
+- *The stand on the bank.* Trees are planted 3.2 m deep (the foliage begins
+  low), 1.3 times as wide (crowns overlap) and carry a tone over their own
+  green (`tone` on a tree: darker, less yellow); the forest mask under them
+  is the wood's floor.
+- *Crowns in the sun on shaded ground.* A tree's baked sun is the ground's
+  under it; on the bench's flanks that is shade while the crown stands in
+  the light. The place's trees ask `terrain.sunAt(x, z, y)` at two thirds of
+  their height and take the greater.
+- *The spur* is marked `aMask.y = 3` where it is steep (the bank's weathered
+  stone instead of the lap's grey rock) and planted from its own stream.
+- *The water's far bank.* `lake.js` takes `mirrors(x, z)`: per vertex, how
+  much of what the water mirrors there is a dark wooded shore; the mirrored
+  sky gives way to a dark green by that much. No pass, no texture.
+- *Snow in streaks.* Where the far range asks for snow the pattern is read
+  in polar coordinates round the pass's eye: fine across the fall line, long
+  down it.
+
 **The low tier** keeps all of it in a simpler form: the ground on its 14 m
 grid, half the trees, a tuft of grass every 0.8 m drawn to 26 m (the tier has
 no grass elsewhere), no flowers or bushes, fewer outcrops, every other fence

@@ -164,6 +164,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     material: groundMaterial.material,
     lights: { day: TIMES.day.sun.dir, night: TIMES.night.sun.dir, dusk: TIMES.dusk?.sun.dir },
   });
+  groundMaterial.setLakeside(terrain.lakeside?.paint ?? null);
   lap('terrain');
   const mirror = MIRROR[tier] && caps.hdr ? new PlanarMirror(renderer, caps, MIRROR[tier]) : null;
   if (mirror) mirror.uniforms.uMirrorPlane = { value: new THREE.Vector4(0, 1, 0, 0) };
@@ -178,7 +179,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
   // the lakeside's tarn (lakeside.js): the same water, at its own level, only in its own basin
   const lakeside = terrain.lakeside;
   const tarn = lakeside
-    ? createLake({ caps, atmosphere, heightAt: terrain.heightAt, level: lakeside.level, extent: lakeside.extent, cell: 24, within: (x, z) => lakeside.shore(x, z) > -22, name: 'tarn', ripple: 0.9, sky: 1 })
+    ? createLake({ caps, atmosphere, heightAt: terrain.heightAt, level: lakeside.level, extent: lakeside.extent, cell: 24, within: (x, z) => lakeside.shore(x, z) > -22, name: 'tarn', ripple: 0.55, sky: 1.25, mirrors: lakeside.mirrors })
     : null;
   lap('lake');
   // (the trees' alpha becomes coverage where the scene target is multisampled: the pipeline's rule, caps.js)

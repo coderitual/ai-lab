@@ -362,25 +362,24 @@ Read this before believing anything above about a device.
   readers, colour blindness, reduced motion) has not been considered.
 
 - **The lakeside** (2026-11-26; design.md and techniques.md, "The lakeside"): one stretch after the sky road shaped
-  after a photograph. `node tools/unit.mjs`: 9 files passed (`lakeside.test.mjs` is new: 4 tests). The playtest's
-  `keys`, `photo` and `determinism` sections against a production build: 52 checks, 0 failed (one of them new: `?photo=r2` brings its camera, its moment and its time of day, and its car is on the lakeside).
-  Looked at, on software WebGL: `?photo=r2` at `medium` 1280x720 by day, at golden hour and at night, and at `low`
-  960x540 by day; the chase view on an upright phone's shape (393x852, `medium`) at lap 0:51 before and after;
-  stills at four other places of the lap before and after, `low` 960x540: the esses (t = 24) and `?photo=d1` are
-  the same picture pixel for pixel; the crest (t = 66) differs in 1.5 % of its pixels (the land beyond the carousel
-  seen over its barrier); the middle of the sky road (t = 52) in 14 % (the tarn's headwall where the valley's far
-  slope was: design.md says what that costs). Measured against the photograph on the staged pair (same size, side by side and blended
-  half and half): mean colour and luminance of eight regions. Against the
-  photograph's luminance: sky +3 %, far peaks -26 %, water -15 %, rock +10 %, tree crowns +41 %, grass in sun
-  -44 %, asphalt in sun -79 %, asphalt in shade -91 %. Hue within 10 degrees for the sky, the peaks, the crowns and
-  the rock; the water is bluer (205 against 163 degrees, both nearly grey), the grass greener (79 against 41) and
-  the asphalt neutral grey where the photograph's is warm. So only the sky, the water and the rock are within the
-  15 % asked for; the asphalt and the grass are the lap's own under a sun 16 degrees up, the crowns are the lap's
-  trees, and none of those is this place's to change. Draw calls
-  and triangles counted at t = 48, 54 and 56.5 on `low` and `medium` before and after (spec.md). Not verified: the
-  `high` tier, split screen at this place, anything in motion (stills only), the place by night beyond one still,
-  whether the tarn's shore and the far range hold up on a real GPU's precision and filtering, and any frame rate.
-  The rest of the playtest and the sound test were not run (no sound, rule, control or HUD code was touched).
+  after a photograph, in two rounds. `node tools/unit.mjs`: 9 files passed (`lakeside.test.mjs` is new: 4 tests).
+  The playtest's `keys`, `photo` and `determinism` sections against the production build: 52 checks, 0 failed (one
+  of them new: `?photo=r2` brings its camera, its moment and its time of day, and its car is on the lakeside).
+  Looked at, on software WebGL: `?photo=r2` at `medium` 1280x720 by day; the chase view on an upright phone's shape
+  (393x852, `medium`) at lap 0:48.8 and 0:51 before and after; the wide chase view from the middle of the sky road
+  (1280x720, `medium`, lap 0:47) before and after; stills at other places of the lap before and after, `low`
+  960x540: the esses (t = 24) and `?photo=d1` are the same picture pixel for pixel, the crest (t = 66) differs in
+  1.7 % of its pixels (the land beyond the carousel and a crown of the spur's wood over its barrier). Measured
+  against the photograph on the staged pair (same size, side by side and blended half and half), mean luminance of
+  eight regions: sky +3 %, far peaks -14 %, water -2 %, grass in sun -13 %, tree crowns +3 %, rock +10 %, asphalt in
+  sun -79 %, asphalt in shade -86 %. Hue within 15 degrees for the sky, the peaks, the crowns, the grass and the
+  rock; the water is bluer (209 against 163 degrees, both nearly grey). The asphalt is the lap's own under a sun
+  16 degrees up and was not this place's to change. Draw calls and triangles counted at t = 48, 54 and 56.5 on
+  `low` and `medium` before and after (spec.md). Not verified: the second round at golden hour and at night and on
+  the `low` tier by eye (the first round was; the counts and the playtest ran on `low`), the `high` tier, split
+  screen at this place, anything in motion (stills only), whether the tarn's shore, the meadow's edge and the far
+  range hold up on a real GPU's precision and filtering, and any frame rate. The rest of the playtest and the sound
+  test were not run (no sound, rule, control or HUD code was touched).
 
 - **The return to main's version with fixes only** (2026-11-23 to 26: the far land's hole, no ground, structure or
   furniture over the road or inside its edges, the tree shadows' casters in split screen, the pad where the thumb

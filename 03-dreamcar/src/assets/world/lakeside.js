@@ -38,9 +38,9 @@ export const LAKESIDE = {
    * to the left of the road (degrees), and its headlands: [waves round the shore, share of the radius, phase].
    */
   tarn: {
-    u: 172,
+    u: 203,
     v: 165,
-    a: 168,
+    a: 150,
     b: 112,
     turn: 15,
     bays: [
@@ -59,7 +59,7 @@ export const LAKESIDE = {
    * headwall lies in its own shade, so its rim is kept at `least` too (south of `farU` along the frame), and no
    * wood stands on it: from the sky road the water shows over it.
    */
-  rim: { least: 1.4, lo: 4.5, span: 8, full: 55, out: [45, 300], far: [60, 180], south: 115, southU: [-70, 110], farU: [0, 130] },
+  rim: { least: 1.4, lo: 4.5, span: 8, full: 55, out: [45, 300], far: [60, 180], south: 115, southU: [-20, 160], farU: [50, 180] },
   /**
    * The pass beyond the tarn: seen from the stretch the hills round the course stood 9 degrees high across the water
    * and hid the massif (far.js), whose long right-hand ridge lies that way. In a sector of the frame from `eye`
@@ -80,13 +80,15 @@ export const LAKESIDE = {
     ahead: [360, 480],
     aheadFrom: -12,
     hill: { left: [6, 22], rise: 44, range: [300, 620, 660, 1000] },
+    /** A wooded headland behind the tarn's far shore, left of the middle of the picture: the same, between `angle` degrees. */
+    headland: { angle: [3, 9, 21, 31], rise: 40, range: [430, 620, 700, 1000] },
     /**
      * The range that closes the pass: a ridge of peaks across it `at` m out (wandering by `wander`), `half` m from
      * foot to crest, its crest `relief[0]` to `relief[0] + relief[1]` m over the pass's floor (on the far land's
      * 100 m lattice about five degrees above the eye: no higher than the hills that stood there), between `angle` degrees; snow lies in
      * streaks on the upper `snow` of each peak (groundMaterial.js draws it where the forest mask is negative).
      */
-    peaks: { at: 3300, wander: 240, half: 430, relief: [150, 330], angle: [10, 22, 60, 76], snow: [0.2, 0.5] },
+    peaks: { at: 3300, wander: 240, half: 430, relief: [170, 340], angle: [10, 22, 60, 76], snow: [0.08, 0.4] },
   },
   /**
    * The bank from the road down to the bench: it begins `guard[0]` m beyond the solid edge and is all bench by
@@ -96,6 +98,11 @@ export const LAKESIDE = {
   guard: [1, 28],
   deck: 100,
   deckEase: 90,
+  /**
+   * The meadow (groundMaterial.js): on the lake's side of the stretch the grass is the photograph's, long, warm and
+   * lit, in the frame's box u, v (m; `soft` m of easing at its ends; it stops at the water) with its own albedo.
+   */
+  meadow: { u: [-55, 215], v: [3, 75], soft: 18, lit: [0.245, 0.185, 0.043], hollow: [0.14, 0.12, 0.036] },
   /** The right-hand side: the cut's height (lo + noise * span, m) and the bank's rise per metre behind it. */
   cut: { lo: 1.3, span: 1.3 },
   bank: 0.13,
@@ -111,29 +118,34 @@ export const LAKESIDE = {
    * lattice, share planted; none south of `south` m along the frame).
    */
   planting: {
+    /**
+     * The stand on the bank is a wall of full crowns, not single trees: trunks `sink` m into the ground (so that the
+     * foliage begins two to three metres up), crowns `wide` times their width (they overlap), and the stand's own
+     * tone over each tree's green (darker and less yellow than the lap's sunlit woods: the photograph's olive).
+     */
+    stand: { sink: 3.2, wide: 1.3, tone: [0.44, 0.5, 0.52] },
+    /** The spur behind the bank and inside the carousel: a wood on it from `from` m beyond the road's edge, lattice, share planted, heights. */
+    spur: { along: [70, 345], from: 15, reach: 85, lattice: 5.2, density: 0.78, height: [9, 15], over: 9, tone: [0.62, 0.7, 0.72] },
     bank: [
-      { off: [7.5, 10], step: [7, 11], gap: 0.62, birch: 0.5, height: [9, 13], birchHeight: [11, 15], detail: 2.2, inside: 0, r: 3.6 },
-      { off: [13, 19], step: [8, 13], gap: 0.6, birch: 0.35, height: [10, 15], birchHeight: [12, 16], detail: 1.8, inside: 0.05, r: 4 },
-      { off: [23, 34], step: [8, 13], gap: 0.72, birch: 0.25, height: [14, 19], birchHeight: [14, 18], detail: 1.4, inside: 0.1, r: 4.5 },
-      { off: [38, 52], step: [7, 11], gap: 0.9, birch: 0.2, height: [13, 19], birchHeight: [13, 17], detail: 1, inside: 0.2, r: 4.5 },
+      { off: [6.5, 9], step: [4.2, 6.2], gap: 2, birch: 0.35, height: [13, 17], birchHeight: [14, 18], detail: 2.4, inside: 0.1, r: 2.6 },
+      { off: [11, 15], step: [4.5, 6.5], gap: 2, birch: 0.25, height: [15, 19], birchHeight: [15, 19], detail: 2, inside: 0.45, r: 2.8 },
+      { off: [17, 24], step: [5, 7], gap: 2, birch: 0.2, height: [16, 21], birchHeight: [16, 20], detail: 1.6, inside: 0.6, r: 3 },
     ],
     pines: [
-      [72, 6, 'spruce', [16, 18]],
-      [80, 12.5, 'spruce', [12, 14]],
-      [89, 6, 'birch', [6, 8]],
-      [97, 8.5, 'birch', [7, 9]],
-      [106, 10, 'fir', [6, 8]],
+      [89, 6, 'birch', [5, 6.5]],
+      [97, 8.5, 'birch', [5.5, 7]],
+      [108, 7, 'birch', [4.5, 6]],
     ],
     /** No tree of the bank within `within` m of another stretch's centre line whose top would stand more than `over` m above that road. */
     other: { within: 75, over: 1.5 },
     shrubs: { step: [5, 10], off: [5, 16], birch: 0.2 },
-    shore: { from: 5, reach: 250, lattice: 6.5, density: 0.8, conifer: 0.55, south: 20 },
+    shore: { from: 5, reach: 250, lattice: 6.5, density: 0.8, conifer: 0.55, south: -1e9, tone: [0.6, 0.68, 0.72] },
     /**
      * The hill that closes the road's end of the picture, beyond the carousel: it stands above the lap's tree line and
      * was a smooth dark dome. A wood of its own, seen only as cards: in the pass's frame from `angle[0]` to
      * `angle[1]` degrees left of the road and `range` metres out, no nearer than `clear` m to any road's edge.
      */
-    hill: { angle: [-28, 24], range: [320, 1000], lattice: 9, density: 0.75, conifer: 0.7, clear: 45 },
+    hill: { angle: [-28, 40], range: [320, 1000], lattice: 6.5, density: 0.85, conifer: 0.8, clear: 45 },
   },
 };
 
@@ -234,7 +246,11 @@ function build(track, rng, section) {
   }
   function passedFloor(P, a, r, h) {
     const hill = (1 - smoothstep(P.hill.left[0], P.hill.left[1], a)) * smoothstep(P.hill.range[0], P.hill.range[1], r) * (1 - smoothstep(P.hill.range[2], P.hill.range[3], r));
-    const cap = eyeY - P.under + P.slope * r + P.hill.rise * hill;
+    const H = P.headland;
+    const head = smoothstep(H.angle[0], H.angle[1], a) * (1 - smoothstep(H.angle[2], H.angle[3], a)) * smoothstep(H.range[0], H.range[1], r) * (1 - smoothstep(H.range[2], H.range[3], r));
+    const cap = eyeY - P.under + P.slope * r + P.hill.rise * hill + H.rise * head;
+    // (the headland is raised, not only left standing: the land there was the valley's floor)
+    if (head > 0 && h < cap) h += (cap - h) * head;
     if (h <= cap) return h;
     const from = P.angle[0] + (P.aheadFrom - P.angle[0]) * smoothstep(P.ahead[0], P.ahead[1], r);
     const w = smoothstep(from, from + P.angle[1] - P.angle[0], a) * (1 - smoothstep(P.angle[2], P.angle[3], a)) * smoothstep(P.range[0], P.range[1], r) * (1 - smoothstep(P.range[2], P.range[3], r));
@@ -335,6 +351,18 @@ function build(track, rng, section) {
      * the road and the shore are open; the bench round the tarn is wooded; the right-hand bank is meadow.
      */
     wood(x, z, f, s = null, lat = 0) {
+      if (!near(x, z) || shore(x, z) < -L.planting.shore.reach) {
+        // the hill ahead and the headland behind the far shore: wooded all over (their trees are cards a long way off)
+        const pdu = toU(x, z) - L.pass.eye[0];
+        const pdv = toV(x, z) - L.pass.eye[1];
+        const pr = Math.hypot(pdu, pdv);
+        const H = L.planting.hill;
+        if (pr > H.range[0] && pr < H.range[1] + 80) {
+          const pa = (Math.atan2(pdv, pdu) * 180) / Math.PI;
+          const w = smoothstep(H.angle[0], H.angle[0] + 8, pa) * (1 - smoothstep(H.angle[1] - 6, H.angle[1] + 4, pa)) * smoothstep(H.range[0], H.range[0] + 80, pr) * (1 - smoothstep(H.range[1], H.range[1] + 80, pr));
+          if (w > 0 && f >= 0) f = Math.max(f, 0.92 * w);
+        }
+      }
       if (!near(x, z)) {
         // the range across the pass: bare above its feet, snow in streaks high up (a negative mask: that much snow)
         const du = toU(x, z) - L.pass.eye[0];
@@ -352,8 +380,11 @@ function build(track, rng, section) {
         lat = spot.lat;
       }
       if (lat < 0) {
-        const w = stretch(s) * (1 - smoothstep(L.clearRight - 14, L.clearRight, -lat - track.edgeAt(s, -1)));
-        return f * (1 - w);
+        const d = -lat - track.edgeAt(s, -1);
+        const w = stretch(s) * (1 - smoothstep(L.clearRight - 14, L.clearRight, d));
+        // meadow up to the fence, the wood's own floor under the stand behind it
+        const under = 0.75 * smoothstep(4.5, 7.5, d);
+        return f + (under - f) * w;
       }
       const q = shore(x, z);
       const w = say(x, z, q, s, lat);
@@ -375,7 +406,7 @@ function build(track, rng, section) {
       if (q > -3) return true;
       track.locate(x, z, -1, spot);
       const d = along(spot.s);
-      if (d < L.from - L.ease - 20 || d > L.to + L.ease + 10) return false;
+      if (d < L.from - L.ease + 6 || d > L.to + L.ease + 10) return false;
       const beyond = Math.abs(spot.lat) - track.edgeAt(spot.s, spot.lat >= 0 ? 1 : -1);
       if (spot.lat < 0) return beyond < L.clearRight;
       return -q < 140 && beyond < 110;
@@ -386,6 +417,40 @@ function build(track, rng, section) {
       const du = toU(x, z) - L.pass.eye[0];
       const dv = toV(x, z) - L.pass.eye[1];
       return [(Math.atan2(dv, du) * 180) / Math.PI, Math.hypot(du, dv)];
+    },
+
+    /**
+     * 0..1 how much a point is the spur's: the hillside to the right of the stretch behind its bank, and the knob
+     * inside the carousel (scenery beyond the edges: clothed in the bank's stone and wood).
+     */
+    spur(x, z, s = null, lat = 0) {
+      if (!near(x, z)) return 0;
+      if (s === null) {
+        track.locate(x, z, -1, spot);
+        s = spot.s;
+        lat = spot.lat;
+      }
+      if (lat >= 0) return 0;
+      const S = L.planting.spur;
+      const d = along(s);
+      const beyond = -lat - track.edgeAt(s, -1);
+      return smoothstep(S.along[0] - 40, S.along[0], d) * (1 - smoothstep(S.along[1], S.along[1] + 30, d)) * smoothstep(S.from - 4, S.from, beyond) * (1 - smoothstep(S.reach, S.reach + 15, beyond));
+    },
+
+    /** What the ground's material needs to paint the place: the frame, the meadow's box in it, the pass's eye. */
+    get paint() {
+      const [ex, ez] = [ox + tx * L.pass.eye[0] + lx * L.pass.eye[1], oz + tz * L.pass.eye[0] + lz * L.pass.eye[1]];
+      return { ox, oz, tx, tz, lx, lz, meadow: L.meadow, eye: [ex, ez], level };
+    },
+
+    /**
+     * 0..1 how much of what the tarn mirrors at a point is its wooded far shore (lake.js `mirrors`): a band along
+     * the banks away from the road, widest on the far side.
+     */
+    mirrors(x, z) {
+      const q = shore(x, z);
+      const far = smoothstep(70, 150, toV(x, z));
+      return far * (1 - smoothstep(18, 70, q));
     },
 
     /** True where the bench and the tarn have any say over the ground (the lake's side, beyond the edges). */

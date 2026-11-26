@@ -509,17 +509,24 @@ scenery beyond the solid edges, and one module describes it
 - **The lake's side (left).** The conifers that stood along the rail are gone
   from this stretch. The ground falls from the rail down a grass bank to a
   tarn 6.5 m under the road where the stretch begins (the road climbs away
-  from it: 13 m over it by the bend), about 5 ha of water held on a bench above the valley
-  under the sky road. Tall grass grows against the rail on both sides of it,
-  with dandelions and a few white flowers in it; low bushes and a stone or two
-  go down the bank; a dark spruce or two stand close behind the rail where
-  the stretch begins and a couple of birch saplings further on, whose shadows
-  lie across the road. The rail itself is the circuit's own (two W-beams on
-  steel posts, where the photograph has one on wooden posts): what cars hit
-  did not move.
+  from it: 13 m over it by the bend), about 5 ha of water held on a bench
+  above the valley under the sky road. The bank is a meadow of long grass in
+  the photograph's warm yellow-green, lighter on its rises and darker in its
+  hollows, lit; tall pale-tipped tufts grow against the rail on both sides
+  of it, with dandelions and a few white flowers in them; low lit bushes and
+  a stone or two go down the bank, and a few bushy birch saplings stand
+  behind the rail, whose shadows lie across the road. No tall tree with a
+  bare trunk stands here (the owner has ruled those out). The rail itself is
+  the circuit's own (two W-beams on steel posts): what cars hit did not move;
+  a weathered wooden post stands close behind it every four metres, as the
+  photograph's rail has. The water mirrors the sky brightly, and along its
+  far banks the dark of the wood that stands over them.
 - **The far shore.** A wood of conifers, birches and limes stands round the
-  tarn down to the water, but not on its southern end: there the bench ends
-  in a headwall above the valley under the sky road, with a low open rim. Beyond it the hills that ringed the course, nine
+  tarn down to the water, darker than the lap's sunlit woods, and behind it,
+  left of the middle of the picture, a wooded headland 40 m high. The tarn
+  begins 60 m past the end of the sky road, so that the valley beside the
+  deck keeps its own sunlit slope; the bench's southern end is a wooded
+  slope with a low rim. Beyond it the hills that ringed the course, nine
   degrees high from here, are cut through by a pass 3 to 80 degrees left of
   the road, so that the land falls away behind the far shore and a range of
   peaks with snow in streaks closes the valley three kilometres off, about
@@ -529,10 +536,16 @@ scenery beyond the solid edges, and one module describes it
   darker, browner stone than the lap's pale limestone; above it a gentle bank
   of meadow with outcrops of faceted rock sunk in it, a stock fence of
   weathered posts and three wires two metres back from the lip, and behind
-  the fence loose rows of birches (pale trunks), limes, hornbeams and maples,
-  green, with the sun on them. From 17 m back the bank gives way to the
-  hillside the Track asks for, so that the spur keeps its shape on the side
-  of the leg that comes back from the carousel.
+  the fence a stand of birches (pale trunks), limes, hornbeams and maples
+  three rows deep: full crowns that begin two to three metres up and run
+  into one another, a wall of foliage in a dark olive green with deep shade
+  inside it and the wood's own floor under it. From 17 m back the bank gives
+  way to the hillside the Track asks for, so that the spur keeps its shape on
+  the side of the leg that comes back from the carousel; that spur, which
+  stood as bare grey facets over the bank and inside the carousel, is clothed:
+  the bank's browner stone on its steep ground, grass on the rest, and a wood
+  of firs and dark broadleaves from its foot to its skyline, none of them
+  tall enough to stand far into the view from the leg along its top.
 - **The light** is the day's own: the sun 16 degrees up, 67 degrees left of
   this stretch's heading, so it stands over the lake, the road and the bank
   are lit from the left and shadows fall across the road to the right.
@@ -552,11 +565,12 @@ photograph's; the far range is darker and its snow lies in caps more than in
 streaks; the rail is the circuit's; the bend at the end is the carousel,
 tighter than the photograph's sweep, and the road climbs at 6 %.
 
-One side effect, seen from the sky road: the headwall under the tarn faces
-away from the day's sun and lies in its own shade, where the valley's sunlit
-slope showed before. In the wide chase view from the middle of the deck (lap
-0:46 to 0:48) it is a dark face under the tarn's rim; in an upright phone's
-picture it is out of the frame.
+Seen from the sky road: the first version's tarn began at the deck's end,
+and its bench rose out of the valley beside the last spans on the side away
+from the day's sun: a dark face under the tarn's rim in the wide chase view
+at lap 0:46 to 0:48. The tarn was moved 60 m on; the ground beside the deck
+is the valley's own again, and what rises to the bench beyond it is side-lit
+and wooded.
 
 ## The tunnel
 

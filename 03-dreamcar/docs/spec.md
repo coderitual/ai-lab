@@ -85,13 +85,13 @@ road, easing in and out over 24 m).
 
 | | |
 | --- | --- |
-| the tarn | 5.4 ha, an ellipse 336 by 224 m turned 15 degrees left of the road with bays, its middle 172 m along and 165 m left of the frame's origin (s = 2642 m); its surface 78.0 m above the line, 6.5 m under the road at s = 2582 and 13 m under it at s = 2732; up to 5 m deep |
-| its bench | the rim 1.4 m over the water on the road's side, 6 to 14 m on the far sides, full height 55 m from the shore, falling to the valley in a straight ramp from 45 to 300 m from it (to 115 m towards the valley under the sky road: a headwall); the bank from the road begins 1 m beyond the solid edge and is all bench by 28 m (beside the deck: by 128 m) |
+| the tarn | 4.8 ha, an ellipse 300 by 224 m turned 15 degrees left of the road with bays, its middle 203 m along and 165 m left of the frame's origin (s = 2642 m), so that it begins 60 m past the end of the sky road; its surface 78.0 m above the line, 6.5 m under the road at s = 2582 and 13 m under it at s = 2732; up to 5 m deep; it mirrors the sky at 1.25 with ripples of 0.55, and its wooded shore within 18 to 70 m of its far banks |
+| its bench | the rim 1.4 m over the water on the road's side and at its southern end, 6 to 14 m on the far sides, full height 55 m from the shore, falling to the valley in a straight ramp from 45 to 300 m from it (to 115 m at its southern end); the bank from the road begins 1 m beyond the solid edge and is all bench by 28 m (beside the deck: by 128 m) |
 | the right-hand bank | the cut 1.3 to 2.6 m high (it was 9 m), then 0.13 rise per metre, giving way to the Track's hillside between 17 and 46 m beyond the edge |
-| the pass | from 3 degrees (beyond 480 m: 12 degrees right) to 64 (gone by 82) degrees left of the road, 300 (full by 650) to 4300 (gone by 5000) m out: no ground over the eye's height less 4 m plus 3 % of the distance; a hill 44 m more straight ahead, 300 to 1000 m out; a range across it 3.3 km out, 430 m from foot to crest, 150 to 480 m over the pass's floor before the far land's 100 m lattice samples it |
-| trees | the lap's own cleared on the water, between the road and the shore and for 46 m on the right; planted: four rows on the right-hand bank 7.5 to 52 m beyond the edge (birch 20 to 50 % of each), two spruces, a fir and two birch saplings behind the rail, hazel and birch saplings down the lake's bank, a wood on the bench from 5 m back from the tarn's shore (55 % conifers), a wood on the hill ahead (70 % conifers); no tree of the bank within 75 m of the leg that comes back from the carousel if its top would stand more than 1.5 m over that road |
-| ground cover | per tier (low / medium / high): tufts of tall grass per metre of road 1.2 / 5 / 7 on the lake's side and 1.2 times that on the land's, flower patches 0 / 1.6 / 2.2 per metre drawn to 0 / 30 / 40 m, bushes 0 / 1.1 / 1.5 per metre, groups of outcrops 2.4 / 3.4 / 4 per 10 m |
-| the fence | posts every 2.6 m (low: 5.2 m), 1.05 to 1.25 m high, 2.2 m behind the cut's lip; three wires (low: one); one draw call |
+| the pass | from 3 degrees (beyond 480 m: 12 degrees right) to 64 (gone by 82) degrees left of the road, 300 (full by 650) to 4300 (gone by 5000) m out: no ground over the eye's height less 4 m plus 3 % of the distance; a hill 44 m more straight ahead, 300 to 1000 m out, and a wooded headland 40 m more 9 to 21 degrees left, 430 to 1000 m out (raised where the land was lower); a range across it 3.3 km out, 430 m from foot to crest, 170 to 510 m over the pass's floor before the far land's 100 m lattice samples it, snow in streaks on all but its feet |
+| trees | the lap's own cleared on the water, between the road and the shore and for 46 m on the right; planted: a stand three rows deep on the right-hand bank 6.5 to 24 m beyond the edge, a trunk every 4 to 7 m, 13 to 21 m tall, sunk 3.2 m, 1.3 times as wide, toned [0.44, 0.5, 0.52] (birch 20 to 35 % of each row); three bushy birch saplings behind the rail, hazel and birch saplings down the lake's bank; a wood on the bench from 5 m back from the tarn's shore (55 % conifers); a wood on the hill ahead and the headland (80 % conifers); a wood on the spur 15 to 85 m beyond the right edge from 70 to 345 m after the sky road, 9 to 15 m tall, none standing more than 9 m over the returning leg within 70 m of it; no tree of the bank within 75 m of that leg if its top would stand more than 1.5 m over its road |
+| ground cover | per tier (low / medium / high): tufts of tall grass per metre of road 1.2 / 8 / 10 on the lake's side and 1.2 times that on the land's, flower patches 0 / 2.6 / 3.2 per metre drawn to 0 / 34 / 44 m, bushes 0 / 1.1 / 1.5 per metre, groups of outcrops 2.4 / 3.4 / 4 per 10 m; the meadow's paint in the ground's material over a box 270 by 72 m on the lake's side |
+| the fence | posts every 2.6 m (low: 5.2 m), 1.05 to 1.25 m high, 2.2 m behind the cut's lip; three wires (low: one); a wooden post 1.2 to 1.3 m high behind the left-hand rail every 3.9 m (low: 7.8 m); one draw call |
 
 ## The car
 
@@ -578,15 +578,16 @@ method; t = 48 is the sky road's first third, t = 54 its end with the tarn ahead
 | tier, place | draw calls before | after | triangles before | after | trees after: full / reduced / impostors |
 | --- | --- | --- | --- | --- | --- |
 | low, t = 48 | 119 | 119 | 264 k | 264 k | 0 / 0 / 680 |
-| low, t = 54 | 116 | 121 | 237 k | 247 k | 0 / 5 / 704 |
-| low, t = 56.5 | 110 | 111 | 254 k | 249 k | 0 / 16 / 764 |
+| low, t = 54 | 116 | 122 | 237 k | 250 k | 0 / 8 / 829 |
+| low, t = 56.5 | 110 | 113 | 254 k | 264 k | 0 / 27 / 866 |
 | medium, t = 48 | 139 | 139 | 678 k | 678 k | 0 / 0 / 1145 |
-| medium, t = 54 | 152 | 158 | 740 k | 790 k | 7 / 3 / 1424 |
-| medium, t = 56.5 | 145 | 142 | 838 k | 736 k | 18 / 6 / 1372 |
+| medium, t = 54 | 152 | 167 | 740 k | 831 k | 14 / 17 / 1660 |
+| medium, t = 56.5 | 145 | 148 | 838 k | 830 k | 37 / 10 / 1609 |
 
-At the sky road's end the tarn, its shore's wood and the bank come into view (five or six more draw calls: the
-water, the fence, the flowers, a few more forms of tree); on the stretch itself the wall of conifers that stood at
-the rail is gone, and with it 14 of the 14.5 layers of tree cards that covered an upright phone's picture there.
+At the sky road's end the tarn, its shore's wood and the bank's stand come into view (6 draw calls more on low,
+15 on medium: the water, the fence, the flowers, more forms of tree; 5 and 12 % more triangles); on the stretch
+itself the wall of conifers that stood at the rail is gone and the stand on the bank has taken its place, at about
+the triangles the place cost before.
 
 ## Sound
 

@@ -330,7 +330,7 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
    *   heights times this, or height: [lo, hi] its own range (m); detail: how far out it keeps its finer levels of
    *   detail (1: the tier's distances; trees behind others need less); lean: [x, z, rad] leaning that way by so much
    */
-  function addTree(x, y, z, species, { road, turned, inside, young = 1, height = null, detail = 1, lean = null, slim = 1, from = plantRng }) {
+  function addTree(x, y, z, species, { road, turned, inside, young = 1, height = null, detail = 1, lean = null, slim = 1, from = plantRng, tone = null, crownSun = false }) {
     const data = SPECIES_DATA[SPECIES[species]];
     const variants = VARIANTS_OF[species];
     const variant = variants[from.int(variants.length)];
@@ -342,7 +342,7 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     const ready = turned * data.turns;
     const roll = from.next();
     const turn = data.autumn.length ? (roll < ready ? 0.75 + 0.25 * from.next() : ready * 0.35 * from.next()) : 0;
-    trees.push({ x, y, z, variant, h, rank: from.next(), road, turned: turn, inside, detail, lean, slim });
+    trees.push({ x, y, z, variant, h, rank: from.next(), road, turned: turn, inside, detail, lean, slim, tone, crownSun });
     occupy(x, z);
   }
   const point = new THREE.Vector3();
@@ -677,7 +677,8 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
       if (blocked(x, z, o.clear ?? 0) || !free(x, z, o.r ?? 3)) return false;
       const y = seat(x, z);
       if (o.height && hidesView(x, z, y + o.height[1])) return false;
-      addTree(x, y - 0.15, z, species, { road: true, turned: 0, inside: 0, from: lr, ...o });
+      const { sink = 0.15, r: _room, clear: _clear, ...rest } = o;
+      addTree(x, y - sink, z, species, { road: true, turned: 0, inside: 0, from: lr, crownSun: true, ...rest });
       return true;
     };
     const s0 = lakeside.s0;
@@ -691,20 +692,21 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
         const roll = lr.next();
         const species = roll < row.birch ? BIRCH : roll < row.birch + 0.25 ? LIME : roll < row.birch + 0.45 ? HORNBEAM : roll < 0.97 ? MAPLE : SPECIES.indexOf('spruce');
         const tall = species === BIRCH ? row.birchHeight : row.height;
-        put(s, -(track.edgeAt(s, -1) + lr.range(row.off[0], row.off[1])), species, { height: tall, detail: row.detail, inside: row.inside, r: row.r });
+        put(s, -(track.edgeAt(s, -1) + lr.range(row.off[0], row.off[1])), species, { height: tall, detail: row.detail, inside: row.inside, r: row.r, sink: P.stand.sink, slim: P.stand.wide, tone: P.stand.tone });
       }
     }
     // the lake's side: a tall dark conifer or two where the stretch begins (the photograph's pines at the frame's
     // left edge), and low hazel on the bank under the rail, never tall enough to hide the water
     for (const [d, beyond, species, height] of P.pines) {
       const s = track.wrap(s0 + d);
-      put(s, track.edgeAt(s, 1) + beyond, SPECIES.indexOf(species), { height, detail: 2, r: 2.5 });
+      // (the conifer sunk a little so that its crown comes down to the grass; the saplings sunk more: bushy, no bare stem)
+      put(s, track.edgeAt(s, 1) + beyond, SPECIES.indexOf(species), { height, detail: 2, r: 2.5, sink: species === 'birch' ? 1.6 : 1.2, slim: species === 'birch' ? 1.5 : 1.15, tone: P.stand.tone });
     }
     for (let d = LAKESIDE.from; d < LAKESIDE.to; d += lr.range(P.shrubs.step[0], P.shrubs.step[1])) {
       const s = track.wrap(s0 + d);
       if (!here(s)) continue;
       const sapling = lr.next() < P.shrubs.birch;
-      put(s, track.edgeAt(s, 1) + lr.range(P.shrubs.off[0], P.shrubs.off[1]), sapling ? BIRCH : HAZEL, { young: sapling ? 0.38 : lr.range(0.6, 1), detail: 0.8, r: 2.2 });
+      put(s, track.edgeAt(s, 1) + lr.range(P.shrubs.off[0], P.shrubs.off[1]), sapling ? BIRCH : HAZEL, { young: sapling ? 0.38 : lr.range(0.6, 1), detail: 0.8, r: 2.2, sink: sapling ? 1.4 : 0.15, slim: sapling ? 1.5 : 1 });
     }
     // the shore: a wood round the tarn, from a few metres back from the water, thinning where the bench gives way
     // (not between the road and the water along the stretch: that bank is open)
@@ -729,7 +731,7 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
         // birches and alder-like limes at the water's edge, conifers and broadleaves mixed behind
         const edge = m < W.from + 14;
         const species = edge ? (kind < 0.5 ? BIRCH : kind < 0.75 ? LIME : kind < 0.9 ? HORNBEAM : FIR) : kind < W.conifer ? NEEDLE[kind < W.conifer * 0.6 ? 0 : 1] : kind < W.conifer + 0.18 ? BIRCH : kind < W.conifer + 0.32 ? LIME : kind < W.conifer + 0.4 ? HORNBEAM : MAPLE;
-        addTree(px, y - 0.2, pz, species, { road: false, turned: 0.03, inside: edge ? 0.2 : 0.7, detail: edge ? 0.8 : 0.5, from: lr });
+        addTree(px, y - 0.2, pz, species, { road: false, turned: 0.03, inside: edge ? 0.2 : 0.7, detail: edge ? 0.8 : 0.5, from: lr, tone: W.tone, crownSun: true });
       }
     }
   }
@@ -754,7 +756,40 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
         const slope = Math.max(Math.abs(terrain.heightAt(px + 2, pz) - y), Math.abs(terrain.heightAt(px, pz + 2) - y)) / 2;
         if (slope > 0.9) continue;
         const species = kind < H.conifer ? NEEDLE[kind < H.conifer * 0.6 ? 0 : 1] : kind < H.conifer + 0.12 ? BIRCH : kind < H.conifer + 0.22 ? LIME : MAPLE;
-        addTree(px, y - 0.2 - slope * 0.6, pz, species, { road: false, turned: 0.03, inside: 0.75, detail: 0.5, from: lr });
+        addTree(px, y - 0.2 - slope * 0.6, pz, species, { road: false, turned: 0.03, inside: 0.75, detail: 0.5, from: lr, tone: LAKESIDE.planting.shore.tone, crownSun: true });
+      }
+    }
+    // THE SPUR behind the bank and inside the carousel (LAKESIDE.planting.spur): it stood as bare grey facets over
+    // the bank's trees. A wood on it, sunk deep on its steep ground, firs and dark broadleaves, none tall enough to
+    // stand far into the view from the leg that comes back along its top.
+    {
+      const sr = rng.fork('lakeside-spur');
+      const S = LAKESIDE.planting.spur;
+      const back = [];
+      for (let s = 0; s < track.length; s += 4) {
+        const a = lakeside.along(s);
+        if (a < 330 || a > 900) continue;
+        track.pointAt(s, 0, point);
+        if (lakeside.near(point.x, point.z)) back.push(point.x, point.y, point.z);
+      }
+      const [cx, cz] = lakeside.at(120, -60);
+      for (let z = cz - 260; z < cz + 260; z += S.lattice) {
+        for (let x = cx - 260; x < cx + 260; x += S.lattice) {
+          const px = x + sr.range(-0.45, 0.45) * S.lattice;
+          const pz = z + sr.range(-0.45, 0.45) * S.lattice;
+          const roll = sr.next();
+          const rank = sr.next();
+          const kind = sr.next();
+          const tall = sr.range(S.height[0], S.height[1]);
+          if (rank > Math.max(T.keep, 0.7) || roll > S.density) continue;
+          if (lakeside.spur(px, pz) < 0.5 || blocked(px, pz, 4) || !free(px, pz, 2.6)) continue;
+          const y = terrain.heightAt(px, pz);
+          let over = false;
+          for (let k = 0; k < back.length && !over; k += 3) over = (back[k] - px) ** 2 + (back[k + 2] - pz) ** 2 < 70 ** 2 && y + tall - 2 > back[k + 1] + S.over;
+          if (over) continue;
+          const species = kind < 0.3 ? FIR : kind < 0.55 ? LIME : kind < 0.8 ? HORNBEAM : kind < 0.92 ? MAPLE : BIRCH;
+          addTree(px, y - 2, pz, species, { road: false, turned: 0.03, inside: 0.5, detail: 0.9, height: [tall, tall + 1], slim: 1.25, from: sr, tone: S.tone, crownSun: true });
+        }
       }
     }
   }
@@ -804,11 +839,14 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
       const hue = between(-1, 1, t.own[5]) * data.hue;
       const green = [data.green[0] * (1 + 0.35 * hue), data.green[1], data.green[2] * (1 - 0.6 * hue)];
       const autumn = data.autumn.length ? data.autumn[Math.floor(t.own[6] * data.autumn.length)] : green;
-      for (let c = 0; c < 3; c++) tints[i * 3 + c] = v * (green[c] + (autumn[c] - green[c]) * t.turned);
+      // (a stand's own tone over its trees' greens: the lakeside's are darker and less yellow)
+      for (let c = 0; c < 3; c++) tints[i * 3 + c] = v * (green[c] + (autumn[c] - green[c]) * t.turned) * (t.tone ? t.tone[c] : 1);
       places[i * 2] = t.inside;
       places[i * 2 + 1] = t.turned;
       terrain.bakeAt(t.x, t.z, bake, 0);
       // a crown stands up out of a valley's shade a little; and it never sees less sky than half
+      // (a tree on ground that lies in its own shade: the sun at its crown, not at its foot)
+      if (t.crownSun && terrain.sunAt) bake[0] = Math.max(bake[0], terrain.sunAt(t.x, t.z, t.y + t.h * 0.65));
       bakes[i * 3] = Math.min(1, bake[0] * 1.1 + 0.05);
       bakes[i * 3 + 1] = Math.min(1, bake[1] * 1.1 + 0.05);
       bakes[i * 3 + 2] = Math.max(0.5, bake[2]);

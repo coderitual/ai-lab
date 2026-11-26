@@ -12,6 +12,7 @@
 
 import * as THREE from 'three';
 import { gradientField, normalTexture } from '../../engine/noise.js';
+import { extend } from './shading.js';
 
 /** Grid of the sheet (m); the shore is drawn by the ground, so it can be coarse. */
 const DEFAULT_CELL = 40;
@@ -32,8 +33,11 @@ const RIPPLE = 9;
  * @param {string} [options.name]
  * @param {number} [options.ripple] the ripples' relief (the normal map's scale): more of it mirrors more of the high, blue sky
  * @param {number} [options.sky] how much of the sky's light the water mirrors (1: all of it)
+ * @param {(x: number, z: number) => number} [options.mirrors] 0..1 how much of what the water mirrors at a point is
+ *   a dark wooded shore and not the sky (the band of reflection along a far bank): the sky's mirror is dimmed and
+ *   greened by that much there. A number per vertex, no pass and no texture.
  */
-export function createLake({ caps, atmosphere, heightAt, level, extent, cell: CELL = DEFAULT_CELL, within = null, name = 'lake', ripple = 0.35, sky = 1 }) {
+export function createLake({ caps, atmosphere, heightAt, level, extent, cell: CELL = DEFAULT_CELL, within = null, name = 'lake', ripple = 0.35, sky = 1, mirrors = null }) {
   const nx = Math.ceil((extent.x1 - extent.x0) / CELL) + 1;
   const nz = Math.ceil((extent.z1 - extent.z0) / CELL) + 1;
   const pos = new Float32Array(nx * nz * 3);
@@ -41,6 +45,7 @@ export function createLake({ caps, atmosphere, heightAt, level, extent, cell: CE
   const shallow = [0.03, 0.04, 0.03];
   const deep = [0.004, 0.009, 0.011];
   const keep = new Uint8Array(nx * nz);
+  const shore = new Float32Array(nx * nz);
   for (let j = 0; j < nz; j++) {
     for (let i = 0; i < nx; i++) {
       const v = j * nx + i;
@@ -53,6 +58,7 @@ export function createLake({ caps, atmosphere, heightAt, level, extent, cell: CE
       pos[v * 3 + 1] = level;
       pos[v * 3 + 2] = z;
       for (let c = 0; c < 3; c++) col[v * 3 + c] = shallow[c] + (deep[c] - shallow[c]) * t;
+      shore[v] = mirrors ? mirrors(x, z) : 0;
     }
   }
   const index = [];
@@ -68,6 +74,7 @@ export function createLake({ caps, atmosphere, heightAt, level, extent, cell: CE
   geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nx * nz * 3).map((_, k) => (k % 3 === 1 ? 1 : 0)), 3));
+  geometry.setAttribute('aShore', new THREE.BufferAttribute(shore, 1));
   geometry.setIndex(index);
 
   const size = 256;
@@ -94,6 +101,20 @@ export function createLake({ caps, atmosphere, heightAt, level, extent, cell: CE
       envMapIntensity: sky,
     }),
   );
+  if (mirrors) {
+    // the wooded shore's reflection: where the vertex says so the mirrored sky gives way to the wood's dark green
+    extend(material, 'lake-mirrors', (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float aShore;\nvarying float vShore;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvShore = aShore;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vShore;')
+        .replace(
+          '#include <aomap_fragment>',
+          '#include <aomap_fragment>\n{ float w = smoothstep( 0.0, 1.0, vShore ); vec3 sky = reflectedLight.indirectSpecular; reflectedLight.indirectSpecular = mix( sky, vec3( 0.25, 0.42, 0.2 ) * dot( sky, vec3( 0.07 ) ), w ); reflectedLight.directSpecular *= 1.0 - 0.8 * w; }',
+        );
+    });
+  }
   material.name = 'lake';
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = name;
