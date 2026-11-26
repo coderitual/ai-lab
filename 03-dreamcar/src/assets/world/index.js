@@ -10,6 +10,7 @@
 //   road.js         the pavement and its asphalt, its wetness and the wet road's mirror (with PlanarMirror)
 //   kerbs.js        the red and white kerbs on the margins, from track.kerbs
 //   rock.js         the cut rock faces at the rock edges
+//   approach.js     the meadow on the tunnel's approach, as numbers (terrain, tunnel, forest, cover, meadow.js)
 //   lake.js         the water beside the straight, and the lakeside's tarn
 //   lakeside.js     one place after the sky road, shaped by hand beyond the edges: what the terrain, the
 //                   forest, the ground cover, the rock and the fence (fence.js) read to make it

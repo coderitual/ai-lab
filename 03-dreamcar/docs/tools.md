@@ -64,7 +64,7 @@ pictures.
 
 | load | pictures |
 | --- | --- |
-| day | `title` (the menu over the hero picture), `car-front`, `car-rear` (on the grid before Drive), `tunnel` (chase view in the bore), `sky-road` (from beside and below the deck), `lakeside` (the photograph r2's camera: design.md, "The lakeside"), `carousel` (from above), `chase` (the second lap onto the straight at speed, into the sun), `og` (1200x630, `public/og.jpg`) |
+| day | `title` (the menu over the hero picture), `car-front`, `car-rear` (on the grid before Drive), `approach` (the approach to the tunnel from photograph R1's camera, `?photo=r1`), `tunnel` (chase view in the bore), `sky-road` (from beside and below the deck), `lakeside` (the photograph r2's camera: design.md, "The lakeside"), `carousel` (from above), `chase` (the second lap onto the straight at speed, into the sun), `og` (1200x630, `public/og.jpg`) |
 | dusk | `grid-dusk`: low behind the car under the gantry while the lamps count |
 | night | `night`: the end of the first lap onto the wet, lit straight |
 | split | `split`: two players in the esses |
@@ -99,7 +99,7 @@ node tools/screenshots.cjs                # if anything visible changed; look at
 | `stats()` | frame time, draw calls, triangles, programs, textures, buffer size, HUD writes, pixel ratio, render scale, `quality` (the governor: level, rungs shed, floor, the cap once found, trials), the pipeline's targets and what it draws now (samples, blur taps, occlusion samples, whether the frame went through the upscale), tier, `hdr`, GPU string |
 | `engine.setQualityStep(n)`, `engine.setRenderScale(x)` | place the quality ladder by hand (level 0: everything; engine.md), or only the render scale; the governor is then off. `game.pipeline.upscale = false` is the plain stretch |
 | `game.perfState()` | what the readout shows, as an object |
-| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`, `r2`); `photo(null)` ends it |
+| `photo({ back, right, up, yaw, pitch, fov, hud })` or `photo('d1')` | the staging camera (techniques.md); a name is one of `PHOTOS` in config.js (`d1`, `d3`, `d4`, `r1`, `r2`); `photo(null)` ends it |
 | `set(path, value)` | change a number of lighting.js or config.js and show it: `set('times.night.exposure', 20)`, `set('camera.chase.distance', 6)` |
 
 `window.__ready` is true once the first frame has been drawn.
@@ -250,6 +250,27 @@ machine without a GPU, and only what is listed here.
   on `high`, in split screen, in motion or with a player driving; the
   playtest (which has no tunnel section) and the soundtest were not run (the
   sound's tunnel reverb reads the Track's sky, which did not move).
+- **The approach to the tunnel** (ref lane: the meadow, the entrance's
+  headwall and hood, the low walls, the tall grass, the fence, posts, sign and
+  huts, the trees cleared and planted, the gantry moved to 185 m; `?photo=r1`):
+  stills on software WebGL from `?photo=r1` at `medium` 1280x720 (at the
+  game's shutter, and with the shutter cut to a ninth for the pair) and at
+  `low` 960x540, put beside photograph R1 as a pair and a 50/50 overlay, with
+  mean colour and luminance measured in six matching regions (spec.md has the
+  table: meadow, concrete and verge within 15 per cent, the wood at 1.6,
+  the asphalt and the mouth far off and why); the chase view at `medium`
+  1280x720 at t = 36 and upright at 393x852 at t = 34, 35 and 36, before and
+  after; at `low` by day at t = 34, 36, 38 and 43.5 (the exit, unchanged), at
+  golden hour and by night at t = 35 and 36. Draw calls and triangles counted
+  before and after at t = 34 and 36 on `low` and `medium` (spec.md).
+  `node tools/unit.mjs` passed (8 files; trackside.test.mjs now walks the
+  meadow's furniture too), and the playtest's `keys`, `photo` and
+  `determinism` sections against the production build (49 checks; the
+  autopilot's lap is 98.368 s, as before). Not looked at on `high`, in split
+  screen, in motion or with a player driving; the other playtest sections
+  and the soundtest were not run; the playtest's photo section does not load
+  `r1` itself; `docs/images/approach.jpg` is the screenshot tool's picture of
+  the place, the other pictures were not regenerated (none shows it).
 - **No WebGL errors**: the playtest fails a page on any; the night-time
   `GL_INVALID_OPERATION` of the first frame (the mirror drawn before the
   sun's shadow map existed) was found and fixed by the look lane.
@@ -362,24 +383,23 @@ Read this before believing anything above about a device.
   readers, colour blindness, reduced motion) has not been considered.
 
 - **The lakeside** (2026-11-26; design.md and techniques.md, "The lakeside"): one stretch after the sky road shaped
-  after a photograph, in two rounds. `node tools/unit.mjs`: 9 files passed (`lakeside.test.mjs` is new: 4 tests).
-  The playtest's `keys`, `photo` and `determinism` sections against the production build: 52 checks, 0 failed (one
-  of them new: `?photo=r2` brings its camera, its moment and its time of day, and its car is on the lakeside).
-  Looked at, on software WebGL: `?photo=r2` at `medium` 1280x720 by day; the chase view on an upright phone's shape
-  (393x852, `medium`) at lap 0:48.8 and 0:51 before and after; the wide chase view from the middle of the sky road
-  (1280x720, `medium`, lap 0:47) before and after; stills at other places of the lap before and after, `low`
-  960x540: the esses (t = 24) and `?photo=d1` are the same picture pixel for pixel, the crest (t = 66) differs in
-  1.7 % of its pixels (the land beyond the carousel and a crown of the spur's wood over its barrier). Measured
-  against the photograph on the staged pair (same size, side by side and blended half and half), mean luminance of
-  eight regions: sky +3 %, far peaks -14 %, water -2 %, grass in sun -13 %, tree crowns +3 %, rock +10 %, asphalt in
-  sun -79 %, asphalt in shade -86 %. Hue within 15 degrees for the sky, the peaks, the crowns, the grass and the
-  rock; the water is bluer (209 against 163 degrees, both nearly grey). The asphalt is the lap's own under a sun
-  16 degrees up and was not this place's to change. Draw calls and triangles counted at t = 48, 54 and 56.5 on
-  `low` and `medium` before and after (spec.md). Not verified: the second round at golden hour and at night and on
-  the `low` tier by eye (the first round was; the counts and the playtest ran on `low`), the `high` tier, split
-  screen at this place, anything in motion (stills only), whether the tarn's shore, the meadow's edge and the far
-  range hold up on a real GPU's precision and filtering, and any frame rate. The rest of the playtest and the sound
-  test were not run (no sound, rule, control or HUD code was touched).
+  after a photograph, in three rounds, the last on top of the merge with the approach to the tunnel (R1).
+  `node tools/unit.mjs`: 9 files passed (`lakeside.test.mjs` is new: 4 tests). The playtest's `keys`, `photo` and
+  `determinism` sections against the production build: 52 checks, 0 failed (one of them new: `?photo=r2` brings its
+  camera, its moment and its time of day, and its car is on the lakeside). After the merge `?photo=r1` at `medium`
+  1280x720 is the approach lane's last still pixel for pixel (0.00 % of pixels differ). Looked at, on software WebGL:
+  `?photo=r2` at `medium` 1280x720 by day, at golden hour and at night, and at `low` 960x540 by day; the chase view
+  on an upright phone's shape (393x852, `medium`) at lap 0:48.8 and 0:51 before and after; the wide chase view from
+  the middle of the sky road (1280x720, `medium`, lap 0:47) before and after. Before the merge, stills at the esses
+  (t = 24) and `?photo=d1` were the same pixel for pixel as before the lakeside. Measured against the photograph on
+  the staged pair (same size, side by side and blended half and half), mean luminance of eight regions: sky +3 %,
+  far peaks -14 %, water +1 %, grass in sun +6 %, tree crowns +3 %, rock +13 %, asphalt in sun -79 %, asphalt in
+  shade -86 % (the asphalt is the lap's own under a sun 16 degrees up and was not this place's to change). Draw
+  calls and triangles were counted at t = 48, 54 and 56.5 on `low` and `medium` after the second round (spec.md);
+  not again after the third, which adds the long grass to the meadow's one mesh, nor after the merge. Not verified:
+  the `high` tier, split screen at this place, anything in motion (stills only), whether the tarn's shore, the
+  meadow's edge and the far range hold up on a real GPU's precision and filtering, and any frame rate. The rest of
+  the playtest and the sound test were not run (no sound, rule, control or HUD code was touched).
 
 - **The return to main's version with fixes only** (2026-11-23 to 26: the far land's hole, no ground, structure or
   furniture over the road or inside its edges, the tree shadows' casters in split screen, the pad where the thumb

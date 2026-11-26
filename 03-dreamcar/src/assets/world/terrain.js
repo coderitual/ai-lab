@@ -34,6 +34,7 @@ import * as THREE from 'three';
 import { planeNoise, smoothstep, withBake } from './shading.js';
 import { CANOPY, canopyOpen } from './canopy.js';
 import { createLakeside } from './lakeside.js';
+import { APPROACH, approachAt, approachesOf, beforeFace, behindFace, coverOver, meadowAt, rise as approachRise, woodAt as approachWood } from './approach.js';
 
 // The Track's EDGE and SURFACE values (the world never imports from game/).
 const EDGE_ROCK = 1;
@@ -138,9 +139,31 @@ export function createTerrain({ track, tier, rng, material, lights }) {
     return out;
   };
   const cliffL = cliffOf(rockL, track.farSlopeL);
-  // (the lakeside's cut on the right is lower than the Track's rock edge would make it; the land `before` it is
-  // kept too: see `before` in what this returns)
+  // (cliffR0: the right-hand cliffs before the lakeside lowers its cut; the land `before` it keeps them)
   const cliffR0 = cliffOf(rockR, track.farSlopeR);
+  // (ref lane) the approach to a tunnel's entrance is a meadow, not a cutting (approach.js): per sample, which
+  // approach it belongs to and how much of the place it is. There the edge's cliff is a low wall's height, standing
+  // nearly upright behind the wall, and the slopes beyond it are the meadow's (nearAt)
+  const approaches = approachesOf(track);
+  const apI = new Int8Array(n).fill(-1);
+  const apK = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const z = approachAt(track, i * ds);
+    if (!z) continue;
+    apI[i] = approaches.indexOf(z.A);
+    apK[i] = z.k;
+    // (the edge is a wall's right up to the face: its kind changes there, and the eased share would halve it)
+    if (z.a < 7) rockL[i] = rockR[i] = 1;
+    cliffL[i] += (rockL[i] * APPROACH.wall - cliffL[i]) * z.k;
+    cliffR0[i] += (rockR[i] * APPROACH.wall - cliffR0[i]) * z.k;
+  }
+  /** The approach at s (the nearer sample's), or null. */
+  const approachOf = (s) => {
+    const i = Math.floor(wrap(s) / ds) % n;
+    const k = apI[i] >= 0 ? apI[i] : apI[i + 1 === n ? 0 : i + 1];
+    return k >= 0 ? approaches[k] : null;
+  };
+  // (the lakeside's cut on the right is lower than the Track's rock edge would make it)
   const cliffR = lakeside ? cliffR0.map((h, i) => lakeside.cliff(i * ds, -1, h)) : cliffR0;
   /** The cliff's foot starts this far beyond the edge, and climbs this far out per metre up. */
   /** Bridges shorter than this (m) span a gully across them rather than a valley along them. */
@@ -154,7 +177,8 @@ const FOOT = 0.8;
   for (const t of track.tunnels) {
     for (let i = Math.ceil(t.s0 / ds); i <= Math.floor(t.s1 / ds); i++) {
       const s = i * ds;
-      cover[i % n] = 2.5 + Math.min(40, 0.35 * Math.min(s - t.s0, t.s1 - s));
+      // (ref lane) a hillside behind the entrance, the ridge's own height towards the exit (approach.js)
+      cover[i % n] = coverOver(s - t.s0, t.s1 - s);
     }
   }
   for (const b of track.bridges) {
@@ -315,15 +339,20 @@ const FOOT = 0.8;
   // ---- layer 1: the corridor and the hillside just beyond it
   const prof = { y: 0, surface: 0 };
   /** The cliff behind the edge on one side at s. */
-  const cliff = { top: 0, height: 0, rock: 0 };
+  const cliff = { top: 0, height: 0, rock: 0, lean: LEAN };
   function cliffAt(s, side, raw = false) {
     cliff.rock = read(side > 0 ? rockL : rockR, s);
     cliff.height = read(side > 0 ? cliffL : raw ? cliffR0 : cliffR, s);
-    cliff.top = cliff.height > 0.01 ? FOOT * cliff.rock + LEAN * cliff.height : 0;
+    cliff.lean = LEAN + (APPROACH.lean - LEAN) * read(apK, s);
+    cliff.top = cliff.height > 0.01 ? FOOT * cliff.rock + cliff.lean * cliff.height : 0;
     return cliff;
   }
-  /** Height of the corridor and its hillside at track coordinates, before the land takes over. */
-  function nearAt(s, lat, edge, d, raw = false) {
+  /**
+   * Height of the corridor and its hillside at track coordinates, before the land takes over. `front`: as seen from
+   * in front of a portal's face (the band's last row before an entrance: the ground the headwall stands in, not the
+   * ground it holds back). `raw`: the land before the lakeside was shaped.
+   */
+  function nearAt(s, lat, edge, d, front = false, raw = false) {
     let y;
     if (d <= 0) y = track.profile(s, lat, prof).y;
     else {
@@ -333,23 +362,36 @@ const FOOT = 0.8;
       let beyond = d;
       if (c.height > 0.01) {
         const foot = FOOT * c.rock;
-        y += c.height * smoothstep(0, 1, (d - foot) / (LEAN * c.height));
+        y += c.height * smoothstep(0, 1, (d - foot) / (c.lean * c.height));
         beyond = Math.max(0, d - c.top);
       }
       let far = read(side > 0 ? track.farSlopeL : track.farSlopeR, s);
       if (lakeside && !raw) far = lakeside.far(s, side, far);
-      y += far * 40 * (1 - Math.exp(-beyond / 40));
+      let up = far * 40 * (1 - Math.exp(-beyond / 40));
+      // (ref lane) on a tunnel's approach, the meadow's slopes
+      const k = read(apK, s);
+      const A = k > 0 ? approachOf(s) : null;
+      if (A) up += (approachRise(A, side, beforeFace(track, A, s), beyond) - up) * k;
+      y += up;
       // (the lakeside's low cut and gentle bank give way to the hillside the Track asks for, so that the spur it
       // shares with the leg that comes back from the carousel keeps its shape on that leg's side)
       const back = lakeside && !raw ? lakeside.bankEnds(s, side, d) : 0;
-      if (back > 0) y += (nearAt(s, lat, edge, d, true) - y) * back;
+      if (back > 0) y += (nearAt(s, lat, edge, d, front, true) - y) * back;
     }
     // over a bore the ground stays above its crown, falling away to the sides; under a deck it keeps clear of it.
     // Both ease to nothing at their ends, so the ground is continuous along the road (except in the portals,
     // which are cut open)
-    const zone = zoneOf(s);
-    if (zone === 1) y = Math.max(y, read(track.py, s) + BORE_HEIGHT + read(cover, s) - 0.35 * Math.max(0, d - 4));
-    else if (zone === 2) y = Math.min(y, read(track.py, s) - read(ravine, s) - 0.02 * Math.abs(lat));
+    const zone = front ? 0 : zoneOf(s);
+    if (zone === 1) {
+      const road = read(track.py, s);
+      let floor = road + BORE_HEIGHT + read(cover, s) - 0.35 * Math.max(0, d - 4);
+      // (ref lane) behind an entrance's headwall the ground stands as high as the wall holds it
+      for (const A of approaches) {
+        const u = track.delta(A.s0, s);
+        if (u > -1.5 && u < 40) floor = Math.max(floor, road + behindFace(A, lat, u));
+      }
+      y = Math.max(y, floor);
+    } else if (zone === 2) y = Math.min(y, read(track.py, s) - read(ravine, s) - 0.02 * Math.abs(lat));
     return y;
   }
   // Where another stretch of road lies beside this one (the hairpins' legs), the ground between them is shared:
@@ -406,15 +448,15 @@ const FOOT = 0.8;
   phases.gap = Math.round(performance.now() - started);
 
   /** H at a point whose track coordinates are known (`raw`: the land before the lakeside was shaped). */
-  function heightOf(x, z, s, lat, raw = false) {
-    const h = heightBefore(x, z, s, lat, raw);
+  function heightOf(x, z, s, lat, front = false, raw = false) {
+    const h = heightBefore(x, z, s, lat, front, raw);
     return lakeside && !raw ? lakeside.ground(x, z, h, s, lat) : h;
   }
-  function heightBefore(x, z, s, lat, raw) {
+  function heightBefore(x, z, s, lat, front, raw) {
     const side = lat >= 0 ? 1 : -1;
     const edge = track.edgeAt(s, side);
     const d = Math.max(0, Math.abs(lat) - edge);
-    let near = nearAt(s, lat, edge, d, raw);
+    let near = nearAt(s, lat, edge, d, front, raw);
     let reach = 1;
     if (d > 0) {
       const half = side > 0 ? 0 : 1;
@@ -433,7 +475,7 @@ const FOOT = 0.8;
         const sideB = latB >= 0 ? 1 : -1;
         const edgeB = track.edgeAt(sB, sideB);
         const dB = Math.max(0, Math.abs(latB) - edgeB);
-        const hB = nearAt(sB, latB, edgeB, dB, raw);
+        const hB = nearAt(sB, latB, edgeB, dB, false, raw);
         // Where one of the two is on a deck its ground is a ravine's floor far below: each then keeps its own
         // hillside for the first third of the way and they meet in a scarp between (so the bank the Track asks for
         // behind a wall is there, and the valley under the deck has a side), instead of one long ramp
@@ -456,14 +498,14 @@ const FOOT = 0.8;
   function heightAt(x, z, raw = false) {
     if (!near(x, z)) return raw ? land(x, z) : landAt(x, z);
     track.locate(x, z, -1, spot);
-    return heightOf(x, z, spot.s, spot.lat, raw);
+    return heightOf(x, z, spot.s, spot.lat, false, raw);
   }
   function forestAt(x, z, raw = false) {
     if (!near(x, z)) return forestOf(x, z, raw ? land(x, z) : landAt(x, z), 0, null, 0, 0, raw);
     track.locate(x, z, -1, spot);
     const side = spot.lat >= 0 ? 1 : -1;
     const d = Math.max(0, Math.abs(spot.lat) - track.edgeAt(spot.s, side));
-    return forestOf(x, z, heightOf(x, z, spot.s, spot.lat, raw), 0, spot.s, spot.lat, d, raw);
+    return forestOf(x, z, heightOf(x, z, spot.s, spot.lat, false, raw), 0, spot.s, spot.lat, d, raw);
   }
   /** How steep the ground is at a point: 1 - the normal's y (the ground material's own measure). */
   const SPUR_STEEP = 0.17;
@@ -499,7 +541,25 @@ const FOOT = 0.8;
       clear *= smoothstep(OPEN_VIEW, OPEN_VIEW * 1.4, d);
     }
     f = Math.max(f, patch * (1 - smoothstep(330, 420, y)) * clear);
+    // (ref lane) a tunnel's approach: no wood on its meadow, the spruce wood beside it
+    if (s !== null) {
+      const p = placeOf(s, lat, d);
+      if (p) f = Math.max(f * (1 - p.meadow), p.wood);
+    }
     return f * (1 - smoothstep(0.55, 0.8, slope));
+  }
+  /** What a point near a tunnel's approach is (approach.js): { meadow, wood } 0..1 each, or null away from any. */
+  const place = { meadow: 0, wood: 0 };
+  function placeOf(s, lat, d) {
+    for (const A of approaches) {
+      const a = beforeFace(track, A, s);
+      if (a > APPROACH.open + 40 || a < -APPROACH.behind - 70) continue;
+      const side = lat >= 0 ? 1 : -1;
+      place.meadow = meadowAt(A, side, a, d);
+      place.wood = approachWood(A, side, a, d);
+      return place;
+    }
+    return null;
   }
 
   // ---- the band
@@ -587,13 +647,15 @@ const FOOT = 0.8;
           if (k > lastOwn) lat = side * (edge + offs[lastOwn]);
           track.pointAt(s, lat, pt);
           const d = Math.max(0, Math.abs(lat) - edge);
-          const y = heightOf(pt.x, pt.z, s, lat);
+          // (the last row before an entrance is a sample just inside it: it carries the ground in front of the face)
+          const y = heightOf(pt.x, pt.z, s, lat, cover[i] >= 0 && apI[i] >= 0);
           const v = (r * 2 + half) * cols + k;
           pos[v * 3] = pt.x;
           pos[v * 3 + 1] = y;
           pos[v * 3 + 2] = pt.z;
           bake4At(pt.x, pt.z, bake, v * 4);
           // the verge and the bank under the woods see less sky (canopy.js; under the crowns it has no meaning)
+          const sky = bake[v * 4 + 2];
           if (Math.abs(lat) < edge + CANOPY.clear) bake[v * 4 + 2] *= canopyOpen(track, s, lat);
           const slope = k >= 2 && k <= 6 && c.height > 0.01 ? 0.9 : 0;
           mask[v * 2] = k <= 1 ? 0 : forestOf(pt.x, pt.z, y, slope, s, lat, d);
@@ -604,8 +666,13 @@ const FOOT = 0.8;
           verge[v * 4 + 3] = woodHere ? 0.4 : 0;
           // the verge and the cliff's foot are loose stone where the verge is gravel
           mask[v * 2 + 1] = gravel ? (k <= 2 ? 1 : k <= 6 ? 0.6 : 0.3 * (1 - smoothstep(4, 12, d))) : 0;
+          // (ref lane) a negative aMask.y is the meadow of a tunnel's approach (groundMaterial.js), verge and all
+          const p = gravel ? null : placeOf(s, lat, d);
+          if (p && p.meadow > 0) mask[v * 2 + 1] = -p.meadow;
+          // (and its verge is under no canopy: the wood beside it is cleared)
+          if (p && p.meadow > 0 && Math.abs(lat) < edge + CANOPY.clear) bake[v * 4 + 2] += (sky - bake[v * 4 + 2]) * p.meadow;
           // (the lakeside's spur: its steep ground is the bank's weathered stone, aMask.y = 3, not the lap's grey rock)
-          if (lakeside && k >= 7 && lakeside.spur(pt.x, pt.z, s, lat) > 0.5 && steepAt(pt.x, pt.z) > SPUR_STEEP) mask[v * 2 + 1] = 3;
+          if (lakeside && !(p && p.meadow > 0) && k >= 7 && lakeside.spur(pt.x, pt.z, s, lat) > 0.5 && steepAt(pt.x, pt.z) > SPUR_STEEP) mask[v * 2 + 1] = 3;
         }
         ext[half][i] = edge + offs[lastOwn];
         if (bandStep > 1) for (let b = 1; b < bandStep && i + b < n; b++) ext[half][i + b] = ext[half][i];
@@ -795,6 +862,26 @@ const FOOT = 0.8;
       }
     }
   }
+  // (ref lane) An entrance's headwall holds the hill back along its whole length: the ground steps up across the
+  // line of its face. A triangle of the grid with corners on both sides of that line, any of them within the wall's
+  // length, would be a ramp through the wall: it is left out (the band lies in front of the wall, the tunnel's apron
+  // behind it and beyond the band's reach: entrance.js). Per grid point: 1 in front of a face, 2 behind it, +4 within
+  // the wall's length.
+  const gFace = new Uint8Array(gw * gh);
+  for (const A of approaches) {
+    for (let k = 0; k < gw * gh; k++) {
+      if (gS[k] < 0) continue;
+      const along = track.delta(A.s0, gS[k]);
+      if (Math.abs(along) >= cell * 1.5) continue;
+      const side = gLat[k] >= 0 ? 1 : -1;
+      const walled = Math.abs(gLat[k]) - A.edge[side] < (side === A.up ? A.upEnd : A.downEnd) + 3;
+      gFace[k] = (along < 0 ? 1 : 2) | (walled ? 4 : 0);
+    }
+  }
+  const throughFace = (p, q, r) => {
+    const any = gFace[p] | gFace[q] | gFace[r];
+    return (any & 7) === 7;
+  };
   const gridGeometries = [];
   // A triangle of the grid that reaches over the road. A cell is dropped only where all its corners lie
   // under the band; a cell with corners both under it and beyond it (where the band stops short: on a deck and at its
@@ -856,7 +943,9 @@ const FOOT = 0.8;
           const d = s === null ? 1e9 : Math.max(0, Math.abs(gLat[k]) - track.edgeAt(s, gLat[k] >= 0 ? 1 : -1));
           mask[v * 2] = forestOf(x, z, y, 1 - inv, s, gLat[k], d);
           mask[v * 2 + 1] = smoothstep(0.6, 0.9, 1 - inv) * 0.5;
-          if (lakeside && s !== null && 1 - inv > SPUR_STEEP && lakeside.spur(x, z, s, gLat[k]) > 0.5) mask[v * 2 + 1] = 3;
+          const p = s === null ? null : placeOf(s, gLat[k], d);
+          if (p && p.meadow > 0) mask[v * 2 + 1] = -p.meadow;
+          if (lakeside && !(p && p.meadow > 0) && s !== null && 1 - inv > SPUR_STEEP && lakeside.spur(x, z, s, gLat[k]) > 0.5) mask[v * 2 + 1] = 3;
         }
       }
       const index = [];
@@ -869,13 +958,15 @@ const FOOT = 0.8;
           const c11 = covered[k00 + gw + 1];
           const v = b * w + a;
           const drop = (p, q, r) => (p && q && r) || p === 2 || q === 2 || r === 2;
+          const k10 = k00 + 1;
+          const k01 = k00 + gw;
           // and none over the road: tested where a corner lies within two cells of a corridor
           const nearRoad = (q) => gS[q] >= 0 && Math.abs(gLat[q]) < track.edgeAt(gS[q], gLat[q] >= 0 ? 1 : -1) + 2 * cell;
           const over = (p, q, r) =>
             (nearRoad(p) || nearRoad(q) || nearRoad(r)) &&
             standsOverRoad(...[p, q, r].flatMap((m) => [minX + (m % gw) * cell, pos[(((m / gw) | 0) - cj) * w * 3 + ((m % gw) - ci) * 3 + 1], minZ + ((m / gw) | 0) * cell]));
-          if (!drop(c00, c01, c10) && !over(k00, k00 + gw, k00 + 1)) index.push(v, v + w, v + 1);
-          if (!drop(c10, c01, c11) && !over(k00 + 1, k00 + gw, k00 + gw + 1)) index.push(v + 1, v + w, v + w + 1);
+          if (!drop(c00, c01, c10) && !throughFace(k00, k01, k10) && !over(k00, k01, k10)) index.push(v, v + w, v + 1);
+          if (!drop(c10, c01, c11) && !throughFace(k10, k01, k01 + 1) && !over(k10, k01, k01 + 1)) index.push(v + 1, v + w, v + w + 1);
         }
       }
       if (!index.length) continue;
@@ -1016,6 +1107,17 @@ const FOOT = 0.8;
      */
     sunAt: (x, z, y) => marchSun(x, z, y, dirs[0], 2600),
     cliffAt: (s, side) => ({ ...cliffAt(s, side) }),
+    /** The grid's cell (m): what stands in a portal's opening covers the cells the grid leaves out there. */
+    cell,
+    /** How far beyond the solid edge the band's ground reaches at least (m): beyond it the grid is the ground. */
+    bandReach: BAND_OUT[BAND_OUT.length - 1],
+    /** { meadow, wood } 0..1 at a point near a tunnel's approach (approach.js), or null away from any. */
+    placeAt(x, z) {
+      if (!near(x, z)) return null;
+      track.locate(x, z, -1, spot);
+      const p = placeOf(spot.s, spot.lat, Math.max(0, Math.abs(spot.lat) - track.edgeAt(spot.s, spot.lat >= 0 ? 1 : -1)));
+      return p ? { ...p } : null;
+    },
     stats: { vertices, triangles, gridTriangles, ms: Math.round(performance.now() - started), phases },
     dispose() {
       group.traverse((o) => o.isMesh && o.geometry.dispose());

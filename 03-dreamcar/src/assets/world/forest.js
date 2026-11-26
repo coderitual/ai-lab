@@ -42,6 +42,7 @@ import { bakeImpostors } from './impostors.js';
 import { planeNoise, smoothstep } from './shading.js';
 import { GRASS } from './groundMaterial.js';
 import { LAKESIDE } from './lakeside.js';
+import { APPROACH, approachesOf } from './approach.js';
 import { growTrees } from './treeGeometry.js';
 import { createTreeUniforms, impostorDepthMaterial, impostorMaterial, plantMaterial, treeDepthMaterial, treeMaterial } from './treeMaterial.js';
 import { SPECIES, SPECIES_DATA, VARIANTS, VARIANTS_OF } from './treeSpecies.js';
@@ -252,7 +253,7 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
   // is the tier's)
   const T = forDevice(TIER, tier, caps);
   const noise = planeNoise(rng.int(1 << 30));
-  const plantRng = rng.fork('plant');
+  let plantRng = rng.fork('plant');
 
   // ---------------------------------------------------------------- planting
   /** @type {{ x: number, y: number, z: number, variant: number, h: number, rank: number, road: boolean, turned: number, inside: number }[]} */
@@ -330,7 +331,7 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
    *   heights times this, or height: [lo, hi] its own range (m); detail: how far out it keeps its finer levels of
    *   detail (1: the tier's distances; trees behind others need less); lean: [x, z, rad] leaning that way by so much
    */
-  function addTree(x, y, z, species, { road, turned, inside, young = 1, height = null, detail = 1, lean = null, slim = 1, from = plantRng, tone = null, crownSun = false }) {
+  function addTree(x, y, z, species, { road, turned, inside, young = 1, height = null, detail = 1, lean = null, slim = 1, from = plantRng, tone = null, sink = 0, crownSun = false }) {
     const data = SPECIES_DATA[SPECIES[species]];
     const variants = VARIANTS_OF[species];
     const variant = variants[from.int(variants.length)];
@@ -342,7 +343,9 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     const ready = turned * data.turns;
     const roll = from.next();
     const turn = data.autumn.length ? (roll < ready ? 0.75 + 0.25 * from.next() : ready * 0.35 * from.next()) : 0;
-    trees.push({ x, y, z, variant, h, rank: from.next(), road, turned: turn, inside, detail, lean, slim, tone, crownSun });
+    // (tone: its tint times this, rgb; sink: this share of its height stands under the ground, so that a conifer's
+    // skirt reaches the grass and no bare stem shows: the approach to the tunnel; crownSun: the lakeside)
+    trees.push({ x, y: y - sink * h, z, variant, h, rank: from.next(), road, turned: turn, inside, detail, lean, slim, tone, crownSun });
     occupy(x, z);
   }
   const point = new THREE.Vector3();
@@ -619,6 +622,119 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
       addTree(px, y - 0.2 - slope * 0.6, pz, pickSpecies(nearMix, y, false, turned), { road: false, turned, inside: 0.75, detail: 0.5 });
     }
   }
+  // (ref lane) THE APPROACH TO A TUNNEL'S ENTRANCE (approach.js; the reference is photograph R1): an open alpine
+  // meadow. Whatever the stages above planted on it is taken out again (so that they draw the same random numbers
+  // as before and the rest of the forest stands where it stood), and the place is planted by hand from a stream of
+  // its own: a dark spruce wood on the side away from the hill, standing far enough from the road that the day's low
+  // sun, which comes from behind and a little from that side, does not lay its shade across the road at the mouth;
+  // groups of spruce and a few green broadleaves on the hillside over the portal.
+  for (const A of approachesOf(track)) {
+    const SPRUCE = SPECIES.indexOf('spruce');
+    /** The meadow's bushes: a mid green (the circuit's broadleaf greens lean to yellow; here only its autumn trees are yellow). */
+    const MID = [0.6, 1, 1.05];
+    track.pointAt(A.s0, 0, point);
+    const cx = point.x;
+    const cz = point.z;
+    const reach = APPROACH.behind + APPROACH.wide.up + 160;
+    let kept = 0;
+    for (let i = 0; i < trees.length; i++) {
+      const tree = trees[i];
+      let out = false;
+      if (Math.abs(tree.x - cx) < reach && Math.abs(tree.z - cz) < reach) {
+        const p = terrain.placeAt(tree.x, tree.z);
+        out = !!p && (p.meadow > 0.25 || p.wood > 0.05);
+      }
+      if (!out) trees[kept++] = tree;
+    }
+    trees.length = kept;
+    plantRng = rng.fork('approach');
+    /** A point of the place: `u` metres into the hill from the face (negative: before it), `lat` metres left of the centre line. */
+    const at = (u, lat) => track.pointAt(track.wrap(A.s0 + u), lat, point);
+    const plant = (u, lat, species, o = {}) => {
+      at(u, lat);
+      const y = terrain.heightAt(point.x, point.z);
+      if (y < lakeLevel + 0.5) return;
+      addTree(point.x, y - 0.25, point.z, species, { road: false, turned: 0, inside: 0.4, detail: 0.6, ...o });
+    };
+    // The spruce wood: a dense dark mass, as the photograph's. A close jittered lattice over where approach.js says
+    // it stands; every tree wide (half as wide again as it grew), its lowest sixth under the ground so that its skirt
+    // lies on the grass and no stem shows, heights 10 to 22 m over the ground, tinted dark and towards blue; spruce
+    // and fir only (a larch would be a yellow one among them).
+    const DARK = [0.4, 0.5, 0.66];
+    const dense = () => ({ inside: 0.75, detail: 0.5, height: [12, 26], slim: 1.5, sink: 0.16, tone: DARK });
+    const W = APPROACH.wood;
+    const down = -A.up;
+    const fromAt = (u) => (u > 13 ? APPROACH.wide.downBehind + 4 : W.from);
+    for (let u = -APPROACH.open - 12; u < W.behind + 30; u += 4.4) {
+      for (let d = APPROACH.wide.downBehind - 2; d < W.to + 30; d += 4.4) {
+        const uu = u + plantRng.range(-1.8, 1.8);
+        const dd = d + plantRng.range(-1.8, 1.8);
+        const roll = plantRng.next();
+        const kind = plantRng.next();
+        at(uu, down * (track.edgeAt(track.wrap(A.s0 + uu), down) + dd));
+        const p = terrain.placeAt(point.x, point.z);
+        if (!p || roll > p.wood * 0.97) continue;
+        plant(uu, down * (track.edgeAt(track.wrap(A.s0 + uu), down) + dd), kind < 0.65 ? SPRUCE : FIR, dense());
+      }
+    }
+    // its edge towards the meadow is soft: the circuit's own autumn broadleaves, low, and hazel in front of them
+    for (let u = -APPROACH.open; u < W.behind; u += 8.5) {
+      const uu = u + plantRng.range(-2.5, 2.5);
+      const edge = track.edgeAt(track.wrap(A.s0 + uu), down);
+      const d = fromAt(uu) - 4 + plantRng.range(-1.5, 1.5);
+      at(uu, down * (edge + d));
+      plant(uu, down * (edge + d), pickSpecies('broadleaf', point.y, false, 0.7), { turned: 0.7, inside: 0.1, detail: 0.8, height: [7, 12] });
+      plant(uu + plantRng.range(2, 6), down * (edge + d - plantRng.range(3, 6)), HAZEL, { inside: 0, detail: 0.8, height: [2.2, 3.8], tone: MID });
+    }
+    // the same dark stand along the hill's crest over the bore, so that the skyline is trees and not a bare curve
+    const up = A.up;
+    for (let u = 105; u < 235; u += 5) {
+      for (let r = -70; r < 95; r += 5) {
+        const keep = plantRng.next();
+        const uu = u + plantRng.range(-2, 2);
+        const rr = r + plantRng.range(-2, 2);
+        const kind = plantRng.next();
+        // (thinning towards its lower edge and its ends: a ragged front, not a hedge)
+        const edge = Math.min((uu - 105) / 22, (235 - uu) / 20, (rr + 70) / 25, (95 - rr) / 30);
+        if (keep > Math.min(1, Math.max(0.15, edge))) continue;
+        plant(uu, up * rr, kind < 0.7 ? SPRUCE : FIR, dense());
+      }
+    }
+    for (let r = -62; r < 88; r += 9) {
+      const rr = r + plantRng.range(-3, 3);
+      plant(99 + plantRng.range(-4, 3), up * rr, pickSpecies('broadleaf', 60, false, 0.6), { turned: 0.6, inside: 0.1, detail: 0.8, height: [6, 10] });
+    }
+    // four single spruces on the meadow, each full and skirted to the grass
+    for (const [u, r] of [
+      [28, 68],
+      [86, 96],
+      [-44, 92],
+      [132, 44],
+    ]) {
+      plant(u, up * r, SPRUCE, { inside: 0, detail: 1, height: [15, 21], slim: 1.5, sink: 0.14, tone: [0.5, 0.6, 0.72] });
+    }
+    // and low growth in clumps where the meadow folds: hazel bushes with a young broadleaf or two among them (short,
+    // branched from near the ground, green). No tall single trees on the open meadow.
+    for (const [u, r, n, spread] of [
+      [18, -14, 6, 7],
+      [30, 6, 5, 6],
+      [52, -4, 7, 8],
+      [44, 46, 5, 6],
+      [80, 22, 6, 7],
+      [12, 52, 4, 5],
+      [-30, 44, 5, 6],
+      [-70, 70, 6, 8],
+      [96, 70, 6, 8],
+      [66, 108, 5, 7],
+    ]) {
+      for (let k = 0; k < n; k++) {
+        const a = plantRng.range(0, Math.PI * 2);
+        const q = spread * Math.sqrt(plantRng.next());
+        const young = plantRng.next() < 0.3;
+        plant(u + Math.cos(a) * q * 1.6, up * (r + Math.sin(a) * q), young ? (plantRng.next() < 0.5 ? LIME : HORNBEAM) : HAZEL, young ? { inside: 0, detail: 1, height: [4.5, 7], tone: MID } : { inside: 0, detail: 1, height: [2.4, 4.2], tone: MID });
+      }
+    }
+  }
 
   // THE LAKESIDE (lakeside.js; the photograph r2): the lap's own trees give way on the water, on the bank between
   // the road and the shore and on the right-hand bank, and whatever else stands on the ground the place changed is
@@ -705,8 +821,13 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     for (let d = LAKESIDE.from; d < LAKESIDE.to; d += lr.range(P.shrubs.step[0], P.shrubs.step[1])) {
       const s = track.wrap(s0 + d);
       if (!here(s)) continue;
-      const sapling = lr.next() < P.shrubs.birch;
-      put(s, track.edgeAt(s, 1) + lr.range(P.shrubs.off[0], P.shrubs.off[1]), sapling ? BIRCH : HAZEL, { young: sapling ? 0.38 : lr.range(0.6, 1), detail: 0.8, r: 2.2, sink: sapling ? 1.4 : 0.15, slim: sapling ? 1.5 : 1 });
+      // (groups of two or three birch saplings, irregular, in the stand's tone: no round bush stands alone here)
+      const beyond = lr.range(P.shrubs.off[0], P.shrubs.off[1]);
+      const count = 2 + lr.int(2);
+      for (let k = 0; k < count; k++) {
+        const tall = lr.range(P.shrubs.height[0], P.shrubs.height[1]);
+        put(track.wrap(s + (k ? lr.range(-2.6, 2.6) : 0)), track.edgeAt(s, 1) + beyond + (k ? lr.range(-2, 2.4) : 0), BIRCH, { height: [tall, tall + 0.5], detail: 1.2, r: 1.3, sink: tall * 0.3, slim: lr.range(1.2, 1.9), tone: P.stand.tone });
+      }
     }
     // the shore: a wood round the tarn, from a few metres back from the water, thinning where the bench gives way
     // (not between the road and the water along the stretch: that bank is open)

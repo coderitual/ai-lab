@@ -41,7 +41,7 @@ run of `tools/handling.mjs`.
 | `straight` | Lakeside straight | 4686 to 250 (700 m) | finish 340 m, pitIn 110 m, the line, grid 40 m, gridRun 210 m; level | 225 to 279 |
 | `sweep` | Shore bend | 250 to 657 | right R 220 through 80°, banked 9°; 100 m straight climbing to 5 % | 196 to 225 |
 | `esses` | Forest esses | 657 to 1409 | right R 260 55° (bank 8°), left R 330 40° (7°), right R 240 65° (9°); 4 to 5.5 % | 204 to 240 |
-| `tunnel` | The tunnel | 1409 to 2006 | rock cutting 70 m (its last 75 m faced with concrete revetments); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens) | 216 to 255 |
+| `tunnel` | The tunnel | 1409 to 2006 | a meadow with low walls at the edge for 70 m (no cutting: "The approach to the tunnel" below); the box 1479 to 1828 (349 m, right R 1000 through 20°); cutting 178 m (`cutting`: 5 m deep; its first 110 m between retaining walls with acoustic screens) | 216 to 255 |
 | `viaduct` | The sky road | 2006 to 2582 (576 m) | on piers: left R 300 through 110°, banked 10°, ground 42 m under the middle | 229 to 257 |
 | `carousel` | The carousel | 2582 to 2915 | 150 m climb at 6 %, then right R 55 through 190°, banked 8° | 90 to 229 |
 | `crest` | The crest | 2915 to 3115 | 200 m straight over the top | 108 to 161 |
@@ -63,7 +63,7 @@ All of it is Track data (`track.kerbs`, `tyreWalls`, `boards`,
 | | |
 | --- | --- |
 | barriers | steel rail by default; a low concrete wall the whole length of the straight on the lake side, and on the land side along the pits (the 110 m before the line and the 40 m after it); a rail on the rest of the land side, with open mown paddock behind it on the 340 m run-up to the line and the maples close behind it on the 210 m after the grid (`paddock`, `grove`); cut rock at the cuttings, the carousel and the ledge; the walkways' kerb faces in the tunnel and parapets on the bridges, 1.5 m beyond the pavement |
-| structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 110 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
+| structures | the tunnel's box 349 m, a 1 m walkway 0.22 m high behind each kerb face, walls 17 m apart, flat ceiling 6.4 m over the road (`TUNNEL`; tunnel.js); a sign gantry 185 m before it; at its entrance a headwall 10 m high and 40 m long with a hood 2.6 m deep (entrance.js), low walls 0.8 m high on the solid edges for 68 m before it; two bridges on piers, 913 m in all: `viaduct` 2006 to 2582 (drop 42 m), `gully` 3778 to 4115 (drop 26 m) |
 | kerbs | 15 runs, 3855 m in all, 1.2 m wide, flush at the road and rising 4 cm to the outside with a 0.9 m saw-tooth, ramped over 4 m at each end (`KERB`); on the inside of every bend under 800 m radius and the outside of the exits of those under 500 m; surface `KERB`, grip 0.9 |
 | tyre walls | 8 runs, on the outside of the fast bends |
 | trackside boards | 11 runs, both walls of the straight included |
@@ -85,12 +85,12 @@ road, easing in and out over 24 m).
 
 | | |
 | --- | --- |
-| the tarn | 4.8 ha, an ellipse 300 by 224 m turned 15 degrees left of the road with bays, its middle 203 m along and 165 m left of the frame's origin (s = 2642 m), so that it begins 60 m past the end of the sky road; its surface 78.0 m above the line, 6.5 m under the road at s = 2582 and 13 m under it at s = 2732; up to 5 m deep; it mirrors the sky at 1.25 with ripples of 0.55, and its wooded shore within 18 to 70 m of its far banks |
-| its bench | the rim 1.4 m over the water on the road's side and at its southern end, 6 to 14 m on the far sides, full height 55 m from the shore, falling to the valley in a straight ramp from 45 to 300 m from it (to 115 m at its southern end); the bank from the road begins 1 m beyond the solid edge and is all bench by 28 m (beside the deck: by 128 m) |
+| the tarn | 4.8 ha, an ellipse 300 by 224 m turned 15 degrees left of the road with bays, its middle 203 m along and 153 m left of the frame's origin (s = 2642 m), so that it begins 60 m past the end of the sky road; its surface 78.0 m above the line, 6.5 m under the road at s = 2582 and 13 m under it at s = 2732; up to 5 m deep; it mirrors the sky at 1.25 with ripples of 0.55, and its wooded shore within 18 to 70 m of its far banks |
+| its bench | the rim 1.0 m over the water on the road's side and at its southern end, 6 to 14 m on the far sides, full height 55 m from the shore, falling to the valley in a straight ramp from 45 to 300 m from it (to 115 m at its southern end); the bank from the road begins 1 m beyond the solid edge and is all bench by 28 m (beside the deck: by 128 m) |
 | the right-hand bank | the cut 1.3 to 2.6 m high (it was 9 m), then 0.13 rise per metre, giving way to the Track's hillside between 17 and 46 m beyond the edge |
 | the pass | from 3 degrees (beyond 480 m: 12 degrees right) to 64 (gone by 82) degrees left of the road, 300 (full by 650) to 4300 (gone by 5000) m out: no ground over the eye's height less 4 m plus 3 % of the distance; a hill 44 m more straight ahead, 300 to 1000 m out, and a wooded headland 40 m more 9 to 21 degrees left, 430 to 1000 m out (raised where the land was lower); a range across it 3.3 km out, 430 m from foot to crest, 170 to 510 m over the pass's floor before the far land's 100 m lattice samples it, snow in streaks on all but its feet |
-| trees | the lap's own cleared on the water, between the road and the shore and for 46 m on the right; planted: a stand three rows deep on the right-hand bank 6.5 to 24 m beyond the edge, a trunk every 4 to 7 m, 13 to 21 m tall, sunk 3.2 m, 1.3 times as wide, toned [0.44, 0.5, 0.52] (birch 20 to 35 % of each row); three bushy birch saplings behind the rail, hazel and birch saplings down the lake's bank; a wood on the bench from 5 m back from the tarn's shore (55 % conifers); a wood on the hill ahead and the headland (80 % conifers); a wood on the spur 15 to 85 m beyond the right edge from 70 to 345 m after the sky road, 9 to 15 m tall, none standing more than 9 m over the returning leg within 70 m of it; no tree of the bank within 75 m of that leg if its top would stand more than 1.5 m over its road |
-| ground cover | per tier (low / medium / high): tufts of tall grass per metre of road 1.2 / 8 / 10 on the lake's side and 1.2 times that on the land's, flower patches 0 / 2.6 / 3.2 per metre drawn to 0 / 34 / 44 m, bushes 0 / 1.1 / 1.5 per metre, groups of outcrops 2.4 / 3.4 / 4 per 10 m; the meadow's paint in the ground's material over a box 270 by 72 m on the lake's side |
+| trees | the lap's own cleared on the water, between the road and the shore and for 46 m on the right; planted: a stand three rows deep on the right-hand bank 6.5 to 24 m beyond the edge, a trunk every 4 to 7 m, 13 to 21 m tall, sunk 3.2 m, 1.3 times as wide, toned [0.44, 0.5, 0.52] (birch 20 to 35 % of each row); three bushy birch saplings behind the rail and groups of two or three more every 16 to 28 m, 3 to 7 m tall, in the stand's tone; a wood on the bench from 5 m back from the tarn's shore (55 % conifers); a wood on the hill ahead and the headland (80 % conifers); a wood on the spur 15 to 85 m beyond the right edge from 70 to 345 m after the sky road, 9 to 15 m tall, none standing more than 9 m over the returning leg within 70 m of it; no tree of the bank within 75 m of that leg if its top would stand more than 1.5 m over its road |
+| ground cover | per tier (low / medium / high): long grass (the approach meadow's cards, `cover-meadow`, tinted [1.3, 1.02, 0.6]) 5 / 24 / 32 a metre of road on the lake's side, half in the band at the rail and half down the bank to 34 m, and 0.45 of that on the land's; none of the lap's own tufts on the stretch; flower patches 0 / 2.6 / 3.2 per metre drawn to 0 / 34 / 44 m, bushes 0 / 1.1 / 1.5 per metre, groups of outcrops 2.4 / 3.4 / 4 per 10 m; the meadow's paint in the ground's material over a box 270 by 72 m on the lake's side |
 | the fence | posts every 2.6 m (low: 5.2 m), 1.05 to 1.25 m high, 2.2 m behind the cut's lip; three wires (low: one); a wooden post 1.2 to 1.3 m high behind the left-hand rail every 3.9 m (low: 7.8 m); one draw call |
 
 ## The car
@@ -357,7 +357,7 @@ Read once by `src/engine/params.js`.
 | `?t=N` | with `?manual`: run N seconds before the first frame |
 | `?seed=N` | the run's random numbers |
 | `?photo=back,right,up,yaw,pitch,fov[,hud]` | the staging camera |
-| `?photo=d1`, `d3`, `d4`, `r2` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, r2 the lakeside after the sky road by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
+| `?photo=d1`, `d3`, `d4`, `r1`, `r2` | named places of it (`PHOTOS` in config.js): the camera of a reference frame (d1 the run-up to the line by day, d3 the ledge's first bend by day, d4 the grid at golden hour, r1 the approach to the tunnel by day, r2 the lakeside after the sky road by day) with its own moment of the autopilot's run and time of day, unless `?t=` or `?time=` give them |
 | `?nodraw` | no drawing (tests) |
 | `?post=0`, `?shadows=0`, `?probe=0`, `?fx=0` | leave out the frame's passes, the sun's shadows, the car's reflection probe, the effects |
 | `?ldr` | the 8-bit fallback of the frame |
@@ -493,6 +493,37 @@ In the tunnel by night the wet road's mirror is no longer drawn (the road
 there is dry) and its calls go to the probe's second face
 (`PROBE.tunnelFaces`). The approach was over both call budgets before the
 tunnel changed and still is.
+
+**The approach to the tunnel** (ref lane, 2026-11-26; `node tools/perfcount.cjs`, 402x874, day, level 0, one
+frame on average of four, at t = 34 (s 1339 m, 140 m before the portal) and t = 36 (s 1446 m, 33 m before it)),
+before and after the cutting became a meadow:
+
+| tier, t | before: calls, triangles (scene / shadow / probe calls) | after |
+| --- | --- | --- |
+| low, 34 | 136, 295 k (90 / 27 / 10) | 132, 285 k (85 / 27 / 11) |
+| low, 36 | 133, 295 k (84 / 29 / 11) | 136, 299 k (86 / 30 / 12) |
+| medium, 34 | 190, 951 k (123 / 33 / 17) | 168, 841 k (105 / 34 / 12) |
+| medium, 36 | 179, 860 k (110 / 36 / 16) | 181, 882 k (112 / 34 / 18) |
+
+At t = 34 the wood beside the road is gone (no full or reduced trees in view, where medium drew 17 and 23); at
+t = 36 the meadow's tall grass, its furniture and the nearer bushes add 2 to 3 calls and 4 to 22 k triangles. More
+trees are in view as impostors, two triangles each (the spruce wood is a close lattice), and more of them cast.
+
+The still from `?photo=r1` beside photograph R1 (medium, 1280x720, the shutter cut to a ninth; mean colour and
+relative luminance Y of matching regions, each picture's own boxes):
+
+| region | R1: sRGB, Y | ours: sRGB, Y | ours / R1 |
+| --- | --- | --- | --- |
+| hillside meadow | 133 182 43, 0.418 | 138 176 62, 0.371 | 0.89 |
+| portal concrete | 184 198 180, 0.569 | 209 205 189, 0.610 | 1.07 |
+| verge grass | 131 144 15, 0.254 | 122 131 67, 0.217 | 0.85 |
+| spruce wood | 8 33 34, 0.013 | 16 38 30, 0.022 | 1.6 |
+| asphalt | 177 192 197, 0.513 | 117 116 117, 0.176 | 0.34 |
+| the mouth | 14 29 35, 0.014 | 136 137 137, 0.269 | 19 |
+
+The meadow, the concrete and the verge are within 15 per cent. The wood is dark but still 1.6 times the
+photograph's (hue 145 against 181): it is lit from the front by a low sun. The asphalt and the mouth are the
+circuit's own asphalt and tunnel lighting, which this place does not change (design.md lists what differs).
 
 None of these was measured on a real GPU or phone.
 

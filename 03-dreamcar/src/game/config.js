@@ -349,6 +349,8 @@ export const PHOTOS = {
   d1: { back: 9, right: 9.7, up: 1.5, yaw: 25, pitch: 6.8, fov: 46, t: 100, time: 'day' },
   d3: { back: 8.5, right: -1.2, up: 1.5, yaw: 8, pitch: 0, fov: 46, t: 78.8, time: 'day' },
   d4: { back: 9, right: -2.5, up: 0.5, yaw: -21, pitch: 3.5, fov: 40, t: 5.5, time: 'dusk' },
+  // (ref lane) R1, the approach to the tunnel: low over the right-hand edge line 90 m before the mouth, the car behind the camera
+  r1: { back: -6, right: 3.2, up: 1.3, yaw: -17, pitch: 6, fov: 36, t: 34.85, time: 'day' },
   r2: { back: 24, right: -2, up: 1.45, yaw: 5, pitch: 0, fov: 52, shutter: 0.1, t: 56.45, time: 'day' },
 };
 

@@ -18,6 +18,7 @@
 // follow each other in a fixed order that never puts the same two side by
 // side. Faces are big fields of flat colour: at speed they streak cleanly.
 
+import { approachAt } from './approach.js';
 import * as THREE from 'three';
 import { levelFrame } from './furniture.js';
 import { BOARD_COUNT, DESIGN, TALL_COUNT } from './signs.js';
@@ -196,6 +197,8 @@ export function buildTrackside({ track, terrain, tier, b, nb, signs }) {
       const s = track.wrap(s0 + (k + 0.5) * pitch);
       // behind a low wall a tyre wall would not show: none there
       if (kindAt(s, side) === EDGE_WALL) continue;
+      // (ref lane) nor on the meadow of a tunnel's approach, where the edge is a low wall with a fence behind it
+      if ((approachAt(track, s)?.k ?? 0) > 0) continue;
       levelFrame(track, s, frame);
       const p = spot(s, side, track.edgeAt(s, side) + TYRE.r + inset);
       const g = groundAt(p, p.y) - 0.05;

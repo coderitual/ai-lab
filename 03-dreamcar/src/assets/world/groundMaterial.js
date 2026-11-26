@@ -44,6 +44,16 @@ export const GRASS = {
   tuft: [0.045, 0.065, 0.027],
   tuftDry: [0.07, 0.07, 0.034],
   bush: [0.046, 0.064, 0.028],
+  /**
+   * (ref lane) The alpine meadow on a tunnel's approach (approach.js; the reference is photograph R1): a lush, sunlit
+   * hay meadow, far greener and lighter than the autumn grass round the rest of the lap, mottled with a yellower
+   * green where it has gone to seed. Only where the terrain marks it (a negative aMask.y).
+   */
+  alp: [0.097, 0.2, 0.043],
+  alpSeed: [0.165, 0.21, 0.048],
+  /** its hollows (damper, darker, bluer) and its trodden paths (pale earth and short grass) */
+  alpHollow: [0.05, 0.122, 0.044],
+  alpPath: [0.2, 0.19, 0.12],
   floor: [0.2, 0.19, 0.36],
 };
 const v3 = (c) => `vec3( ${c.map((x) => x.toFixed(4)).join(', ')} )`;
@@ -244,9 +254,13 @@ float gSlope = 1.0 - gN.y;
 // (env lane) aMask.y = 2 marks a cut rock face (rock.js): rock whatever its facets' slopes
 float gCut = step( 1.5, vMask.y );
 float gRock = gCut + ( 1.0 - gCut ) * smoothstep( 0.2, 0.34, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
-float gScree = max( min( vMask.y, 1.0 ), smoothstep( 0.68, 0.8, gMid.a ) * smoothstep( 0.12, 0.25, gSlope ) * 0.7 ) * ( 1.0 - gRock );
+// (ref lane) a negative aMask.y marks the meadow of a tunnel's approach: grass on slopes that would be rock or
+// scrub elsewhere, no scree, no clumps of wood
+float gMeadow = clamp( -vMask.y, 0.0, 1.0 );
+gRock = mix( gRock, gCut + ( 1.0 - gCut ) * smoothstep( 0.4, 0.52, gSlope ), gMeadow );
+float gScree = max( min( vMask.y, 1.0 ), smoothstep( 0.68, 0.8, gMid.a ) * smoothstep( 0.12, 0.25, gSlope ) * 0.7 * ( 1.0 - gMeadow ) ) * ( 1.0 - gRock );
 // (env lane) scrub: dark clumps of box and juniper on the moderate slopes, between meadow and rock
-float gScrub = smoothstep( 0.06, 0.16, gSlope + ( gMid.b - 0.5 ) * 0.12 ) * smoothstep( 0.35, 0.6, gDet.r * 0.5 + gMid.g * 0.7 ) * ( 1.0 - gRock );
+float gScrub = smoothstep( 0.06, 0.16, gSlope + ( gMid.b - 0.5 ) * 0.12 ) * smoothstep( 0.35, 0.6, gDet.r * 0.5 + gMid.g * 0.7 ) * ( 1.0 - gRock ) * ( 1.0 - gMeadow );
 // (env lane) the wood's edge broken by clumps of crowns, not a soft blend
 float gForest = smoothstep( 0.3, 0.6, vMask.x + ( gMid.b - 0.5 ) * 0.5 + ( gLarge.b - 0.5 ) * 0.3 ) * step( 0.02, vMask.x ) * ( 1.0 - gRock );
 // (env lane: no snow on the hills round the circuit; the far massif is the SKY lane's)
@@ -270,6 +284,28 @@ vec3 gGrass = mix( gLush, gDry, smoothstep( 0.45, 0.85, gLarge.r + vGroundPos.y 
 gGrass *= 0.78 + 0.44 * gDet.r;
 gGrass = mix( gGrass, ${v3(GRASS.straw)} * ( 0.8 + 0.4 * gDet.r ), smoothstep( 0.6, 0.85, gMid.b ) * 0.5 );
 gGrass *= 0.72 + 0.56 * gMid.r;
+{
+  // the alpine meadow: its own green, mottled at the detail's scale and in broad swathes gone to seed
+  // Its tone has structure at every scale: broad swathes lighter and yellower on the rises and darker and bluer in
+  // the hollows (two fields, about 90 m and 35 m), terracettes (the level steps cattle tread into a slope: thin dark
+  // lines along the contours, a metre or so apart, only where it is steep), the mower's swathes across the gentler
+  // ground, a few pale trodden paths (the thin lines where a broad field crosses its middle), and the blades' own
+  // fine noise.
+  vec4 gAlpA = texture2D( uLarge, vGroundPos.xz / 37.0 + vec2( 0.13, 0.71 ) );
+  float swell = 0.55 * gMid.b + 0.3 * gAlpA.r + 0.15 * gLarge.r;
+  vec3 alp = mix( ${v3(GRASS.alp)}, ${v3(GRASS.alpSeed)}, smoothstep( 0.5, 0.72, swell ) * 0.8 );
+  alp = mix( alp, ${v3(GRASS.alpHollow)}, smoothstep( 0.5, 0.3, swell ) * 0.75 );
+  float terrace = vGroundPos.y / 1.15 + 1.6 * gAlpA.g + 0.5 * gDet.g;
+  float tStep = smoothstep( 0.0, 0.16, fract( terrace ) ) * ( 1.0 - smoothstep( 0.2, 0.36, fract( terrace ) ) );
+  float tread = tStep * smoothstep( 0.06, 0.14, gSlope ) * ( 1.0 - smoothstep( 60.0, 240.0, gDist ) * 0.6 );
+  alp *= 1.0 - 0.3 * tread;
+  float swathe = abs( fract( ( vGroundPos.x * 0.8 + vGroundPos.z * 0.6 ) / 5.2 + 0.5 * gAlpA.b ) * 2.0 - 1.0 );
+  alp *= 1.0 + 0.1 * ( smoothstep( 0.35, 0.65, swathe ) - 0.5 ) * ( 1.0 - smoothstep( 0.05, 0.12, gSlope ) );
+  float path = ( 1.0 - smoothstep( 0.004, 0.013, abs( texture2D( uLarge, vGroundPos.xz / 310.0 + vec2( 0.4, 0.2 ) ).b - 0.5 ) ) ) * smoothstep( 0.45, 0.6, gLarge.g );
+  alp = mix( alp, ${v3(GRASS.alpPath)} * ( 0.8 + 0.4 * gDet.b ), path * 0.55 );
+  alp *= ( 0.78 + 0.44 * gDet.r ) * ( 0.9 + 0.2 * gMid.r ) * ( 0.9 + 0.2 * gDet2.r );
+  gGrass = mix( gGrass, alp, gMeadow );
+}
 // (lakeside) the meadow between the road and the tarn: long grass in the photograph's warm green, lighter on the
 // rises and where the blades catch the light, darker in the hollows and between the tussocks, with a fine grain
 float gSide = 0.0;
@@ -281,10 +317,14 @@ float gSide = 0.0;
     * smoothstep( uSideBox.z, uSideBox.z + 3.0, sv ) * ( 1.0 - smoothstep( uSideBox.w - uSideSoft.x, uSideBox.w, sv ) )
     * smoothstep( uSideSoft.y - 0.4, uSideSoft.y + 0.5, vGroundPos.y );
   if ( gSide > 0.0 ) {
-    float tussock = smoothstep( 0.3, 0.75, 0.6 * gDet.r + 0.4 * gMid.r );
+    // tone at three scales: swathes lighter on the rises and darker and greener in the hollows (fields of about
+    // 35 m and 11 m), tussocks at the detail's scale, and the blades' own fine grain
     float swell = texture2D( uLarge, vGroundPos.xz / 37.0 ).b;
-    vec3 meadow = mix( uSideHollow, uSideLit, clamp( 0.15 + 0.85 * tussock + 0.5 * ( swell - 0.5 ), 0.0, 1.0 ) );
-    meadow *= 0.86 + 0.28 * gDet2.r;
+    float gSward = texture2D( uLarge, vGroundPos.xz / 11.0 + vec2( 0.31, 0.57 ) ).r;
+    float tussock = smoothstep( 0.3, 0.75, 0.6 * gDet.r + 0.4 * gMid.r );
+    float gLit = smoothstep( 0.38, 0.62, 0.45 * swell + 0.4 * gSward + 0.15 * gMid.b );
+    vec3 meadow = mix( uSideHollow, uSideLit, clamp( 0.12 + 0.7 * gLit + 0.3 * tussock, 0.0, 1.0 ) );
+    meadow *= ( 0.8 + 0.4 * gDet2.r ) * ( 0.88 + 0.24 * gDet.r );
     gGrass = mix( gGrass, meadow, gSide );
   }
 }
@@ -329,17 +369,17 @@ if ( gVerge > 0.0 ) {
   // (finish lane) a little less bare earth than it had: without the glow of the light through the blades, a narrow
   // verge under the woods read as all earth and leaves
   float bare = smoothstep( 0.5, 0.68, 0.55 * gDet2.r + 0.45 * gMid.a + 0.35 * ( 1.0 - smoothstep( 0.0, 2.2, vd ) ) - 0.2 * gDet.r );
-  earth = max( earth, narrow * bare );
+  earth = max( earth, narrow * bare * ( 1.0 - gMeadow ) );
   vec3 earthCol = mix( vec3( 0.075, 0.058, 0.04 ), vec3( 0.15, 0.125, 0.095 ), gDet.b ) * ( 0.75 + 0.4 * gDet2.g );
   // a few stones thrown out onto the grass beyond it
   float stones = smoothstep( 0.82, 0.9, gDet.b ) * ( 1.0 - smoothstep( 0.4, 2.0, vd - rag ) );
   // long grass at the barrier's foot, and all over a narrow verge
-  float rough = max( smoothstep( -1.2, -0.3, vVerge.z ), narrow );
+  float rough = max( max( smoothstep( -1.2, -0.3, vVerge.z ), narrow ), gMeadow );
   vec3 roughCol = gGrass * ( 0.75 + 0.7 * smoothstep( 0.35, 0.7, gDet.r ) );
   vec3 vergeCol = mix( mown, roughCol, rough );
   vergeCol = mix( vergeCol, earthCol, max( earth, stones * 0.8 ) );
   // fallen leaves drifted against the barrier's foot under woods (frame D4)
-  float leaves = gWoodBehind * smoothstep( -1.6, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
+  float leaves = gWoodBehind * ( 1.0 - gMeadow ) * smoothstep( -1.6, -0.4, vVerge.z + 0.6 * ( gDet2.r - 0.5 ) ) * smoothstep( 0.35, 0.6, gDet.a + 0.2 * gMid.r );
   vergeCol = mix( vergeCol, mix( vec3( 0.2, 0.075, 0.02 ), vec3( 0.09, 0.04, 0.015 ), gDet.b ), leaves );
   gGrass = mix( gGrass, vergeCol, gVerge );
   gVergeEarth = gVerge * max( earth, stones * 0.8 );
@@ -363,7 +403,7 @@ if ( gVerge > 0.0 ) {
   }
 }
 // (env lane) clumps of trees and hedges across open meadow beyond the verge, so no slope reads as bare
-float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) );
+float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) ) * ( 1.0 - gMeadow );
 gForest = max( gForest, gClump );
 vec3 gAlbedo = gGrass;
 // blades let some light through, the mown verge most (bare earth none)

@@ -39,7 +39,7 @@ export const LAKESIDE = {
    */
   tarn: {
     u: 203,
-    v: 165,
+    v: 153,
     a: 150,
     b: 112,
     turn: 15,
@@ -59,7 +59,7 @@ export const LAKESIDE = {
    * headwall lies in its own shade, so its rim is kept at `least` too (south of `farU` along the frame), and no
    * wood stands on it: from the sky road the water shows over it.
    */
-  rim: { least: 1.4, lo: 4.5, span: 8, full: 55, out: [45, 300], far: [60, 180], south: 115, southU: [-20, 160], farU: [50, 180] },
+  rim: { least: 1.0, lo: 4.5, span: 8, full: 55, out: [45, 300], far: [60, 180], south: 115, southU: [-20, 160], farU: [50, 180] },
   /**
    * The pass beyond the tarn: seen from the stretch the hills round the course stood 9 degrees high across the water
    * and hid the massif (far.js), whose long right-hand ridge lies that way. In a sector of the frame from `eye`
@@ -102,7 +102,7 @@ export const LAKESIDE = {
    * The meadow (groundMaterial.js): on the lake's side of the stretch the grass is the photograph's, long, warm and
    * lit, in the frame's box u, v (m; `soft` m of easing at its ends; it stops at the water) with its own albedo.
    */
-  meadow: { u: [-55, 215], v: [3, 75], soft: 18, lit: [0.245, 0.185, 0.043], hollow: [0.14, 0.12, 0.036] },
+  meadow: { u: [-55, 215], v: [3, 75], soft: 18, lit: [0.26, 0.195, 0.045], hollow: [0.05, 0.068, 0.028] },
   /** The right-hand side: the cut's height (lo + noise * span, m) and the bank's rise per metre behind it. */
   cut: { lo: 1.3, span: 1.3 },
   bank: 0.13,
@@ -132,13 +132,13 @@ export const LAKESIDE = {
       { off: [17, 24], step: [5, 7], gap: 2, birch: 0.2, height: [16, 21], birchHeight: [16, 20], detail: 1.6, inside: 0.6, r: 3 },
     ],
     pines: [
-      [89, 6, 'birch', [5, 6.5]],
-      [97, 8.5, 'birch', [5.5, 7]],
-      [108, 7, 'birch', [4.5, 6]],
+      [91, 6.5, 'birch', [5, 6.5]],
+      [93.5, 8.2, 'birch', [3.6, 4.6]],
+      [106, 7, 'birch', [4.5, 6]],
     ],
     /** No tree of the bank within `within` m of another stretch's centre line whose top would stand more than `over` m above that road. */
     other: { within: 75, over: 1.5 },
-    shrubs: { step: [5, 10], off: [5, 16], birch: 0.2 },
+    shrubs: { step: [16, 28], off: [5, 15], height: [3.2, 6.5] },
     shore: { from: 5, reach: 250, lattice: 6.5, density: 0.8, conifer: 0.55, south: -1e9, tone: [0.6, 0.68, 0.72] },
     /**
      * The hill that closes the road's end of the picture, beyond the carousel: it stands above the lap's tree line and
