@@ -33,9 +33,9 @@ const TIER = {
  * side, and their reach (m). The low tier keeps a few, near: the place is not the place without them.
  */
 const MEADOW = {
-  low: { grass: 2.5, reach: 30 },
-  medium: { grass: 12, reach: 42 },
-  high: { grass: 16, reach: 52 },
+  low: { grass: 2.5, reach: 30, wall: 2 },
+  medium: { grass: 12, reach: 42, wall: 10 },
+  high: { grass: 16, reach: 52, wall: 14 },
 };
 
 /** A linear colour as a canvas colour. */
@@ -54,13 +54,13 @@ function meadowTexture(rng) {
   ctx.lineCap = 'round';
   const third = size / 3;
   const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
-  const STRAW = [0.5, 0.44, 0.17];
+  const STRAW = [0.66, 0.56, 0.2];
   for (let col = 0; col < 3; col++) {
     const cx = (col + 0.5) * third;
     const blades = col === 1 ? 46 : 36;
     for (let k = 0; k < blades; k++) {
       const x = cx + rng.range(-1, 1) * rng.range(4, third * 0.4);
-      const tall = k % 4 === 0;
+      const tall = k % 3 === 0;
       const hgt = (tall ? rng.range(0.74, 0.97) : rng.range(0.3, 0.72)) * size * (col === 1 ? 0.8 : 1);
       const bend = (x - cx) * rng.range(0.1, 0.5) + rng.range(-7, 7);
       const v = rng.range(0.75, 1.3);
@@ -82,9 +82,9 @@ function meadowTexture(rng) {
       }
       if (tall) {
         // a seed head: a long pale straw ear at the tip
-        ctx.fillStyle = css(mix(STRAW, GRASS.alpSeed, rng.range(0, 0.5)), rng.range(0.8, 1.2));
+        ctx.fillStyle = css(mix(STRAW, GRASS.alpSeed, rng.range(0.1, 0.4)), rng.range(0.85, 1.15));
         ctx.beginPath();
-        ctx.ellipse(px, py + 5, 1.9, rng.range(6, 11), Math.atan2(bend, hgt) * 0.6, 0, Math.PI * 2);
+        ctx.ellipse(px, py + 5, 2.1, rng.range(7, 12), Math.atan2(bend, hgt) * 0.6, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -400,7 +400,9 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         // (finish lane) the grass's own green (groundMaterial.js GRASS), a few tufts gone to straw
         const dry = r.next() ** 2;
         const tint = GRASS.tuft.map((c, k) => (c + (GRASS.tuftDry[k] - c) * dry) * v);
-        grassItems.push(make(point.x, g.y - 0.03, point.z, r.range(0, Math.PI), [h * 2.2, h, h * 2.2], tint, h));
+        const tuft = make(point.x, g.y - 0.03, point.z, r.range(0, Math.PI), [h * 2.2, h, h * 2.2], tint, h);
+        // (ref lane: the circuit's own dark tufts give way to the meadow's tall grass on a tunnel's approach)
+        if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5)) grassItems.push(tuft);
       }
     }
     if (T.bushes) {
@@ -481,6 +483,28 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
           if (!ownStretch(sw, point.x, point.z)) continue;
           const h = (onVerge ? 0.6 : 0.95) * size;
           meadowItems.push(make(point.x, g.y - 0.05, point.z, yaw, [h * 1.5, h, h * 1.5], [shade, shade, shade], h));
+        }
+        // and a wall of it, taller, from the verge's outer edge to the fence: `wall` more a metre (the photograph's
+        // right foreground; on the other side it stands before the low wall)
+        for (let s = A.s0 - APPROACH.open - 20; s < A.s0 - APPROACH.hood.depth - 0.5; s += 1 / MT.wall) {
+          const across = mr.next();
+          const size = mr.range(0.85, 1.3);
+          const yaw = mr.range(0, Math.PI);
+          const shade = mr.range(0.8, 1.5);
+          const keep = mr.next();
+          const sw = track.wrap(s + mr.range(-0.4, 0.4));
+          const edge = track.edgeAt(sw, side);
+          const lat = side * (edge - 1.1 + 3.6 * across);
+          const beyond = Math.max(0, Math.abs(lat) - edge);
+          // (not in the wall itself, nor in the first step behind it)
+          if (beyond > 0 && beyond < terrain.cliffAt(sw, side).top + 0.2) continue;
+          if (keep > meadowAt(A, side, beforeFace(track, A, sw), beyond)) continue;
+          const g = groundAt(sw, lat, side);
+          if (g.surface >= 0 && g.surface !== SURFACE_GRASS) continue;
+          track.pointAt(sw, lat, point);
+          if (!ownStretch(sw, point.x, point.z)) continue;
+          const h = 1.05 * size;
+          meadowItems.push(make(point.x, g.y - 0.05, point.z, yaw, [h * 1.3, h, h * 1.3], [shade, shade, shade], h));
         }
       }
     }

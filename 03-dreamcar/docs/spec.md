@@ -486,15 +486,14 @@ before and after the cutting became a meadow:
 
 | tier, t | before: calls, triangles (scene / shadow / probe calls) | after |
 | --- | --- | --- |
-| low, 34 | 136, 295 k (90 / 27 / 10) | 132, 284 k (85 / 27 / 11) |
-| low, 36 | 133, 295 k (84 / 29 / 11) | 137, 298 k (86 / 30 / 12) |
-| medium, 34 | 190, 951 k (123 / 33 / 17) | 169, 838 k (106 / 34 / 12) |
-| medium, 36 | 179, 860 k (110 / 36 / 16) | 181, 881 k (113 / 34 / 17) |
+| low, 34 | 136, 295 k (90 / 27 / 10) | 132, 285 k (85 / 27 / 11) |
+| low, 36 | 133, 295 k (84 / 29 / 11) | 136, 299 k (86 / 30 / 12) |
+| medium, 34 | 190, 951 k (123 / 33 / 17) | 168, 841 k (105 / 34 / 12) |
+| medium, 36 | 179, 860 k (110 / 36 / 16) | 181, 882 k (112 / 34 / 18) |
 
 At t = 34 the wood beside the road is gone (no full or reduced trees in view, where medium drew 17 and 23); at
-t = 36 the meadow's tall grass, its furniture and the nearer bushes add 2 to 4 calls and 3 to 21 k triangles. More
-trees are in view as impostors (two triangles each: 1174 to 1281 on low where there were 409 to 489, 2051 to 2520
-on medium where there were 1248 to 1556), and more of them cast (89 and 145 at t = 36, where 57 and 68 did).
+t = 36 the meadow's tall grass, its furniture and the nearer bushes add 2 to 3 calls and 4 to 22 k triangles. More
+trees are in view as impostors, two triangles each (the spruce wood is a close lattice), and more of them cast.
 
 The still from `?photo=r1` beside photograph R1 (medium, 1280x720, the shutter cut to a ninth; mean colour and
 relative luminance Y of matching regions, each picture's own boxes):
@@ -503,14 +502,14 @@ relative luminance Y of matching regions, each picture's own boxes):
 | --- | --- | --- | --- |
 | hillside meadow | 133 182 43, 0.418 | 138 176 62, 0.371 | 0.89 |
 | portal concrete | 184 198 180, 0.569 | 209 205 189, 0.610 | 1.07 |
-| verge grass | 131 144 15, 0.254 | 107 118 63, 0.182 | 0.72 |
-| spruce wood | 8 33 34, 0.013 | 35 58 35, 0.047 | 3.5 |
+| verge grass | 131 144 15, 0.254 | 122 131 67, 0.217 | 0.85 |
+| spruce wood | 8 33 34, 0.013 | 16 38 30, 0.022 | 1.6 |
 | asphalt | 177 192 197, 0.513 | 117 116 117, 0.176 | 0.34 |
 | the mouth | 14 29 35, 0.014 | 136 137 137, 0.269 | 19 |
 
-The meadow and the concrete are within 15 per cent; the verge is not (the circuit's own dark tufts stand among
-the meadow's); the wood, the asphalt and the mouth are the circuit's own trees, asphalt and tunnel lighting, which
-this place does not change (design.md lists what differs).
+The meadow, the concrete and the verge are within 15 per cent. The wood is dark but still 1.6 times the
+photograph's (hue 145 against 181): it is lit from the front by a low sun. The asphalt and the mouth are the
+circuit's own asphalt and tunnel lighting, which this place does not change (design.md lists what differs).
 
 None of these was measured on a real GPU or phone.
 

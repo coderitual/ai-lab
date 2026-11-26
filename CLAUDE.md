@@ -112,12 +112,6 @@ to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
   light of each time of day (`src/assets/world/lighting.js`: sky, fog, lamps,
   wetness, the car's lamps, exposure and the grade all read its tables), and
   the numbers of the run (`src/game/config.js`).
-- The approach to the tunnel is a meadow after a photograph (R1,
-  `docs/design.md`, "The approach to the tunnel"). Its numbers are defined
-  once (`src/assets/world/approach.js`: read by the terrain, the tunnel's
-  entrance, the forest, the ground cover and the meadow's furniture) and it is
-  made entirely beyond the solid edges. Stage `?photo=r1` beside the
-  photograph when anything there changes.
 - Layers: `engine/` knows nothing about cars or roads; `assets/` builds what
   is visible and may import `engine/`, never `game/`; `game/` is the run
   (physics, rules, cameras, HUD, sound, flow).

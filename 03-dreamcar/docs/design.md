@@ -583,11 +583,11 @@ terrain.js, forest.js, groundCover.js, groundMaterial.js read them):
 | | R1 | the build |
 |---|---|---|
 | the land | a mouth set into a hillside | the cutting is gone: from 88 m before the face the ground beyond the solid edges is a meadow, rising 0.45 to 0.55 m per metre on the hill's side (the right), a low shoulder on the other; over the bore the hill climbs 0.6 m per metre to 75 m over the crown (it was a ridge 40 m over it) |
-| at the road's edge | grass to the asphalt, a guard rail | the Track's solid edge is unchanged (a rail to 70 m before the face, a wall's from there): where it is a wall's a low concrete wall 0.8 m high stands on it, the meadow behind and above; the one on the side away from the hill, which turns its face from the sun, is cast paler |
+| at the road's edge | grass to the asphalt, a guard rail | the Track's solid edge is unchanged (a rail to 70 m before the face, a wall's from there): where it is a wall's a low concrete wall 0.8 m high stands on it, of the portal's concrete, the meadow behind and above; no tyre wall stands on the meadow |
 | the portal | a hood with a rounded arch, a level headwall, a wall running down into the grass | a hood 2.6 m deep and 0.8 m thick, its arch upright to 3.4 m and rounded to 7.4 m at the front, falling to the box's own opening at the face (the box is unchanged: 17 m by 6.4 m); a headwall 10 m high, level on the hill's side for 23 m to where the meadow reaches its top, falling 0.36 m per metre on the other for 17 m; pale concrete |
 | the meadow | lush and sunlit, with tone in it: lighter yellow-green rises, darker blue-green hollows, terracettes, a pale path | its own green in the ground's material where the terrain marks it (linear albedo 0.097 0.2 0.043), open from 190 m before the face: yellower on the rises and darker and bluer in the hollows at two scales, terracettes along the contours where it is steep, the mower's swathes where it is not, a few pale trodden paths, the blades' fine noise; no rock, scree or scrub on it |
-| the verge | tall seed-headed grass, flowers | cards of tall grass with straw ears, one in three with a few flowers, on the verge's outer part and for 12 m behind the barrier: 12 a metre of road and side on medium, 2.5 on low |
-| trees | a dense dark spruce stand above left, low round bushes and small broadleaves in clumps along the hollows, single spruces | whatever the forest had planted on the meadow is taken out; a spruce wood on the low side (from 52 m beyond the edge before the face, so that its shade stays off the road, from 20 m behind it) and a spruce stand along the hill's crest over the bore, so the skyline is trees; eight groups of spruce on the hillside; ten clumps of hazel bushes 2.4 to 4.2 m high with young limes and hornbeams of 4.5 to 7 m among them (the existing species, none turned); no tall single tree on the open meadow |
+| the verge | a wall of tall seed-headed grass with pale tops, flowers | cards of tall grass with straw ears, one in three with a few flowers, on the verge's outer part and for 12 m behind the barrier (12 a metre of road and side on medium, 2.5 on low), and a taller wall of it from the verge's outer edge to the fence (10 more a metre, 2 on low); the circuit's own dark tufts and bushes are left out there |
+| trees | a dense dark spruce stand above left, low round bushes and small broadleaves in clumps along the hollows, single spruces | whatever the forest had planted on the meadow is taken out; a spruce wood on the low side (from 52 m beyond the edge before the face, so that its shade stays off the road, from 20 m behind it) and the same along the hill's crest over the bore, so the skyline is trees: a dense dark mass of spruce and fir on a 4.4 m lattice, each tree half as wide again as it grew and sunk a sixth of its height so that its skirt lies on the grass and no stem shows, 10 to 22 m over the ground, tinted dark and towards blue, no larch; its edge towards the meadow is the circuit's own autumn broadleaves, low (6 to 12 m), with hazel in front; four single spruces on the meadow, full and skirted; ten clumps of hazel bushes 2.4 to 4.2 m high with young limes and hornbeams of 4.5 to 7 m among them, tinted a mid green; no tall single tree with a bare stem |
 | the hut | dark timber, grey roof | a chalet 7.2 by 5 m (stone plinth, dark timber, a shingle roof with deep eaves, a door and two shuttered windows) right of and above the portal, and a hay barn higher up; shapes of our own |
 | fence, posts | wire on wooden posts; marker posts | posts every 3.5 m with four wires (7 m and two on low) along the hill's side from 190 m out and along the other wall; black and white marker posts every 24 m; red and white ones on the left wall and red and white boards on the hood's jambs (ours stand at the edges: nothing may stand in the road) |
 | the sign | lamp box, triangle, blue square | the same three on two legs behind the rail 82 m before the face; the triangle and the square each carry an arch of our own drawing; no lettering, no numbers |
@@ -602,11 +602,12 @@ approach to the tunnel"): our asphalt is the circuit's own dark asphalt, a
 third as bright as the photograph's pale grey, and has a red and white kerb
 where the photograph has a white line and gravel; the mouth shows the lit
 box (our tunnel's entrance zone is lit 2.4 times as brightly as its
-interior) where the photograph's is black; our spruces are sunlit from the
-front by a sun 16 degrees up and read three times as bright as the
-photograph's shaded woods, and there is a strip of sky over them where the
-photograph's far hillside goes on up; our broadleaves are the circuit's
-hazels and young limes, yellower than the photograph's bushes; at the game's
+interior) where the photograph's is black; our spruce wood is lit from the
+front by a sun 16 degrees up and reads 1.6 times as bright as the
+photograph's shaded woods and greener, with autumn broadleaves along its
+edge where the photograph has none, and there is a strip of sky over it
+where the photograph's far hillside goes on up; our broadleaves are the circuit's
+hazels and young limes, smaller and sparser than the photograph's bushes; at the game's
 own shutter the picture is streaked by speed (the camera moves with the car
 at 190 km/h: the comparison pair is taken with the shutter cut to a ninth,
 as the screenshot tool does for staged pictures); our portal is twice as large in the picture (the

@@ -257,7 +257,7 @@ machine without a GPU, and only what is listed here.
   game's shutter, and with the shutter cut to a ninth for the pair) and at
   `low` 960x540, put beside photograph R1 as a pair and a 50/50 overlay, with
   mean colour and luminance measured in six matching regions (spec.md has the
-  table: meadow and concrete within 15 per cent, the verge at 0.72, the wood,
+  table: meadow, concrete and verge within 15 per cent, the wood at 1.6,
   the asphalt and the mouth far off and why); the chase view at `medium`
   1280x720 at t = 36 and upright at 393x852 at t = 34, 35 and 36, before and
   after; at `low` by day at t = 34, 36, 38 and 43.5 (the exit, unchanged), at

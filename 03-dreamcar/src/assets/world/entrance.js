@@ -139,9 +139,7 @@ export function buildLowWalls({ track, terrain, A, Wb, cast, low }) {
   const step = low ? 4 : 2;
   const s1 = A.s0 - APPROACH.hood.depth;
   for (const side of [1, -1]) {
-    // (the wall on the side away from the hill turns its face from the day's sun: it is cast paler, so that it reads
-    // as a pale kerb under the meadow and not as a dark band)
-    const cap = PALE.map((c) => c * (side === A.up ? 1.05 : 1.7));
+    const cap = PALE.map((c) => c * 1.05);
     const kinds = side > 0 ? track.kindL : track.kindR;
     // from where the edge becomes a wall's (the Track's kind 1: what stands there is solid)
     let s0 = s1;

@@ -639,7 +639,12 @@ laid its shade over the road and the left meadow. Behind the face (where
 shadows fall into the hill) it comes to 20 m, and a stand along the crest
 over the bore makes the skyline. On the open meadow there are only clumps of
 hazel and young broadleaves given their own low heights: a full-grown
-broadleaf alone on a slope is a crown on a bare stem.
+broadleaf alone on a slope is a crown on a bare stem. The spruce wood is the
+existing spruce and fir made a mass by three numbers a tree may now carry
+(`addTree`): `slim` 1.5 (half as wide again), `sink` (a sixth of its height
+under the ground: the skirt lies on the grass and no stem shows) and `tone`
+(its tint times a dark blue-green), on a lattice of 4.4 m so that the crowns
+overlap. No species and no tree elsewhere is changed.
 
 **The furniture** (meadow.js) is one mesh of vertex colours and one matte
 material: fence posts and wires, marker posts, the sign (boxes and
