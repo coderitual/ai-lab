@@ -20,6 +20,7 @@ import * as THREE from 'three';
 import { fieldTexture, gradientField, normalTexture, valueField, worleyField } from '../../engine/noise.js';
 import { extend, withBake } from './shading.js';
 import { GOLDWOOD } from './goldwood.js';
+import { ARM } from './arm.js';
 
 /**
  * (finish lane) The one green of the grass, linear albedo: the meadow (lush where it is damp, drier and a little
@@ -137,6 +138,14 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
     uSideLit: { value: new THREE.Vector3() },
     uSideHollow: { value: new THREE.Vector3() },
     uSideEye: { value: new THREE.Vector2() },
+    /**
+     * The arm of the lake (arm.js `paint`; all zero without it): its frame on the map, its bank's box in that frame
+     * (u0, u1, the greatest v, the water's level) and the long right's arc (where it begins along u, its radius,
+     * and from how far beyond the road's centre line the bank's grass is painted: from, full).
+     */
+    uArmFrame: { value: new THREE.Vector4(0, 0, 1, 0) },
+    uArmBox: { value: new THREE.Vector4(0, 0, 0, -1e4) },
+    uArmArc: { value: new THREE.Vector4(0, 1, 0, 1) },
   };
 
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
@@ -189,6 +198,13 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
       uniforms.uSideHollow.value.fromArray(m.hollow);
       uniforms.uSideEye.value.fromArray(paint.eye);
     },
+    /** @param {object|null} paint arm.js `paint` */
+    setArm(paint) {
+      if (!paint) return;
+      uniforms.uArmFrame.value.set(paint.ox, paint.oz, paint.tx, paint.tz);
+      uniforms.uArmBox.value.set(paint.box[0], paint.box[1], paint.box[2], paint.level);
+      uniforms.uArmArc.value.set(paint.begin, paint.radius, paint.clear[0], paint.clear[1]);
+    },
     textures: [detail, detailNormal, rockNormal, large],
     dispose() {
       material.dispose();
@@ -209,6 +225,9 @@ uniform vec2 uSideSoft;
 uniform vec3 uSideLit;
 uniform vec3 uSideHollow;
 uniform vec2 uSideEye;
+uniform vec4 uArmFrame;
+uniform vec4 uArmBox;
+uniform vec4 uArmArc;
 varying vec2 vMask;
 varying vec4 vVerge;  // the band beside the road: m beyond the margin, s, m beyond the barrier, 0 (1 elsewhere)
 varying vec3 vGroundPos;
@@ -255,11 +274,13 @@ float gSlope = 1.0 - gN.y;
 // (env lane) aMask.y = 2 marks a cut rock face (rock.js): rock whatever its facets' slopes
 float gCut = step( 1.5, vMask.y );
 float gRock = gCut + ( 1.0 - gCut ) * smoothstep( 0.2, 0.34, gSlope + ( gLarge.b - 0.5 ) * 0.22 + ( gMid.g - 0.5 ) * 0.4 * smoothstep( 0.05, 0.16, gSlope ) );
+// (the arm of the lake: under its dark wood, a forest mask over 1, steep ground is wooded too, not bare rock)
+gRock *= 1.0 - 0.9 * smoothstep( 1.02, 1.3, vMask.x ) * ( 1.0 - gCut );
 // (ref lane) a negative aMask.y marks the meadow of a tunnel's approach: grass on slopes that would be rock or
 // scrub elsewhere, no scree, no clumps of wood
 float gMeadow = clamp( -vMask.y, 0.0, 1.0 );
 gRock = mix( gRock, gCut + ( 1.0 - gCut ) * smoothstep( 0.4, 0.52, gSlope ), gMeadow );
-float gScree = max( min( vMask.y, 1.0 ), smoothstep( 0.68, 0.8, gMid.a ) * smoothstep( 0.12, 0.25, gSlope ) * 0.7 * ( 1.0 - gMeadow ) ) * ( 1.0 - gRock );
+float gScree = max( min( vMask.y, 1.0 ), smoothstep( 0.68, 0.8, gMid.a ) * smoothstep( 0.12, 0.25, gSlope ) * 0.7 * ( 1.0 - gMeadow ) * ( 1.0 - 0.9 * smoothstep( 1.02, 1.3, vMask.x ) ) ) * ( 1.0 - gRock );
 // (env lane) scrub: dark clumps of box and juniper on the moderate slopes, between meadow and rock
 float gScrub = smoothstep( 0.06, 0.16, gSlope + ( gMid.b - 0.5 ) * 0.12 ) * smoothstep( 0.35, 0.6, gDet.r * 0.5 + gMid.g * 0.7 ) * ( 1.0 - gRock ) * ( 1.0 - gMeadow );
 // (env lane) the wood's edge broken by clumps of crowns, not a soft blend
@@ -329,9 +350,33 @@ float gSide = 0.0;
     gGrass = mix( gGrass, meadow, gSide );
   }
 }
+// (the arm of the lake) the bank between the road and the water: long uneven grass, darker and greyer than the
+// lap's verges, in the same structure as the lakeside's meadow; found per pixel from the place's frame (on the
+// water's side of the road: beyond its centre line on the straight, outside its arc in the long right)
+float gArm = 0.0;
+{
+  vec2 ap = vGroundPos.xz - uArmFrame.xy;
+  float au = dot( ap, uArmFrame.zw );
+  float av = dot( ap, vec2( uArmFrame.w, -uArmFrame.z ) );
+  float aRoad = au < uArmArc.x ? av : length( vec2( au - uArmArc.x, av + uArmArc.y ) ) - uArmArc.y;
+  gArm = smoothstep( uArmArc.z, uArmArc.w, aRoad ) * smoothstep( uArmBox.x, uArmBox.x + 30.0, au ) * ( 1.0 - smoothstep( uArmBox.y - 70.0, uArmBox.y, au ) )
+    * ( 1.0 - smoothstep( uArmBox.z - 50.0, uArmBox.z, av ) ) * smoothstep( uArmBox.w + 0.2, uArmBox.w + 1.4, vGroundPos.y );
+  if ( gArm > 0.0 ) {
+    float swell = texture2D( uLarge, vGroundPos.xz / 41.0 + vec2( 0.6, 0.2 ) ).b;
+    float gSward = texture2D( uLarge, vGroundPos.xz / 13.0 + vec2( 0.11, 0.47 ) ).r;
+    float tussock = smoothstep( 0.3, 0.75, 0.6 * gDet.r + 0.4 * gMid.r );
+    float gLit = smoothstep( 0.36, 0.64, 0.45 * swell + 0.4 * gSward + 0.15 * gMid.b );
+    vec3 bank = mix( ${v3(ARM.paint.hollow)}, ${v3(ARM.paint.lit)}, clamp( 0.1 + 0.65 * gLit + 0.3 * tussock, 0.0, 1.0 ) );
+    bank *= ( 0.8 + 0.4 * gDet2.r ) * ( 0.88 + 0.24 * gDet.r );
+    gGrass = mix( gGrass, bank, gArm );
+  }
+}
 // forest floor near, the canopy's colour far away
 vec3 gFloor = vec3( 0.04, 0.034, 0.024 ) * ( 0.7 + 0.6 * gDet.a );
 vec3 gCanopy = vec3( 0.02, 0.034, 0.017 ) * ( 0.7 + 0.5 * gLarge.b ) * ( 0.75 + 0.5 * gMid.r );
+// (the arm of the lake: a forest mask over 1 is its dark wood, on the far shores and the spurs beyond: conifers
+// seen from far off, darker and bluer than the lap's broadleaf canopy)
+gCanopy *= mix( vec3( 1.0 ), vec3( 0.42, 0.5, 0.62 ), smoothstep( 1.02, 1.3, vMask.x ) );
 vec3 gForestCol = mix( gFloor, gCanopy, smoothstep( 120.0, 400.0, gDist ) );
 vec3 gScreeCol = vec3( 0.17, 0.162, 0.145 ) * ( 0.6 + 0.8 * gDet.b );
 vec4 gDetRock = mix( vec4( 0.5 ), groundSample( uDetail, vGroundPos, gN, ${(DETAIL_SCALE * 2.7).toFixed(2)} ), 0.4 + 0.6 * gFade );
@@ -418,7 +463,7 @@ if ( gVerge > 0.0 ) {
 }
 // (env lane) fields on the valley floor: a patchwork of meadows and crops between hedges, far from the road
 {
-  float fieldZone = ( 1.0 - smoothstep( 0.05, 0.12, gSlope ) ) * ( 1.0 - smoothstep( 40.0, 90.0, vGroundPos.y ) ) * step( 0.5, vVerge.w ) * smoothstep( 60.0, 140.0, gDist );
+  float fieldZone = ( 1.0 - smoothstep( 0.05, 0.12, gSlope ) ) * ( 1.0 - smoothstep( 40.0, 90.0, vGroundPos.y ) ) * step( 0.5, vVerge.w ) * smoothstep( 60.0, 140.0, gDist ) * ( 1.0 - gArm );
   if ( fieldZone > 0.0 ) {
     vec2 fp = mat2( 0.92, 0.39, -0.39, 0.92 ) * vGroundPos.xz / vec2( 130.0, 75.0 );
     vec2 fc = floor( fp );
@@ -433,7 +478,7 @@ if ( gVerge > 0.0 ) {
   }
 }
 // (env lane) clumps of trees and hedges across open meadow beyond the verge, so no slope reads as bare
-float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) ) * ( 1.0 - gMeadow );
+float gClump = smoothstep( 0.6, 0.68, gMid.g * 0.7 + gLarge.b * 0.3 + ( gDet.r - 0.5 ) * 0.15 ) * ( 1.0 - gRock ) * step( 0.5, vVerge.w ) * ( 1.0 - smoothstep( 0.25, 0.4, gSlope ) ) * ( 1.0 - gMeadow ) * ( 1.0 - gArm );
 gForest = max( gForest, gClump );
 vec3 gAlbedo = gGrass;
 // blades let some light through, the mown verge most (bare earth none)

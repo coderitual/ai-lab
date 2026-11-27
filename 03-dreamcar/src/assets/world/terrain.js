@@ -56,6 +56,8 @@ export const ROW_STEP = { low: 3, medium: 1, high: 1 };
  */
 export const PIECE = { low: 400, medium: 240, high: 160 };
 /** The land-shape field's cell (m). */
+/** How far the far land's lattice is sunk under the arm of the lake's fine ground (m). */
+const ARM_SINK = 60;
 const MACRO = 16;
 /** How far the grid reaches beyond the course's bounds (m). */
 const MARGIN = 260;
@@ -686,9 +688,6 @@ const FOOT = 0.8;
           // (ref lane) a negative aMask.y is the meadow of a tunnel's approach (groundMaterial.js), verge and all
           const p = gravel ? null : placeOf(s, lat, d);
           if (p && p.meadow > 0) mask[v * 2 + 1] = -p.meadow;
-          // (the arm of the lake: its open bank is the same grass, from the barrier out)
-          const bank = arm && !gravel && !(p && p.meadow > 0) && d > 0 ? arm.meadow(pt.x, pt.z, s, lat) : 0;
-          if (bank > 0) mask[v * 2 + 1] = -bank;
           // (and its verge is under no canopy: the wood beside it is cleared)
           if (p && p.meadow > 0 && Math.abs(lat) < edge + CANOPY.clear) bake[v * 4 + 2] += (sky - bake[v * 4 + 2]) * p.meadow;
           // (the lakeside's spur: its steep ground is the bank's weathered stone, aMask.y = 3, not the lap's grey rock)
@@ -747,7 +746,8 @@ const FOOT = 0.8;
         const e = Math.min(x - minX, gridX1 - x, z - minZ, gridZ1 - z);
         if (e < 220) {
           const far = bilinear(farHeight, farN, farN, farX0, farZ0, FAR_CELL, x, z);
-          gHeight[k] += (far - gHeight[k]) * smoothstep(220, 30, e);
+          // (but not where the arm of the lake's own fine ground runs on beyond the border: armPatch below)
+          gHeight[k] += (far - gHeight[k]) * smoothstep(220, 30, e) * (arm ? 1 - arm.fine(x, z) : 1);
         }
       }
     }
@@ -965,8 +965,8 @@ const FOOT = 0.8;
           mask[v * 2 + 1] = smoothstep(0.6, 0.9, 1 - inv) * 0.5;
           const p = s === null ? null : placeOf(s, gLat[k], d);
           if (p && p.meadow > 0) mask[v * 2 + 1] = -p.meadow;
-          const bank = arm && !(p && p.meadow > 0) ? arm.meadow(x, z, s, gLat[k]) : 0;
-          if (bank > 0) mask[v * 2 + 1] = -bank;
+          // (the arm of the lake: a strip of pale stones along its water's edge)
+          if (arm && !(p && p.meadow > 0)) mask[v * 2 + 1] = Math.max(mask[v * 2 + 1], 0.9 * arm.shingle(x, z));
           if (lakeside && !(p && p.meadow > 0) && s !== null && 1 - inv > SPUR_STEEP && lakeside.spur(x, z, s, gLat[k]) > 0.5) mask[v * 2 + 1] = 3;
         }
       }
@@ -1038,6 +1038,8 @@ const FOOT = 0.8;
         const moved = i === holeI0 || i === holeI1 || j === holeJ0 || j === holeJ1;
         pos[v * 3] = x;
         pos[v * 3 + 1] = moved ? bilinear(heights, m, m, x0, z0, FAR_CELL, x, z) : heights[v];
+        // (under the arm of the lake's fine ground the lattice is out of the way: armPatch below draws that ground)
+        if (arm && arm.fine(x, z) >= 1) pos[v * 3 + 1] -= ARM_SINK;
         pos[v * 3 + 2] = z;
         const h0 = heights[v] + 2;
         bake[v * 4] = marchSun(x, z, h0, dirs[0], 4000);
@@ -1092,6 +1094,86 @@ const FOOT = 0.8;
     return { level: lakeLevel, extent: base, sheet: { extent, cell: CELL, within } };
   }
 
+  // ---- the arm of the lake's fine ground (arm.js `fine`). The arm lies where the grid eases onto the far land and
+  // beyond it, on the 100 m lattice, where a shore is straight in pieces. Beyond the grid's rectangle a patch on a
+  // fine grid of its own draws the arm's own heights where the place says so, easing onto the lattice's facets at
+  // its rim (the grid does the same inside its rectangle, above; the lattice under the patch is sunk). Its lines
+  // lie on the grid's border, where both have the same height.
+  let armPatch = null;
+  if (arm) {
+    const c = tier === 'low' ? 28 : 14;
+    const e = arm.extent;
+    const pad = 240;
+    const px0 = minX - c * Math.ceil((minX - (e.x0 - pad)) / c);
+    const pz0 = minZ - c * Math.ceil((minZ - (e.z0 - pad)) / c);
+    const pw = Math.ceil((e.x1 + pad - px0) / c) + 1;
+    const ph = Math.ceil((e.z1 + pad - pz0) / c) + 1;
+    const lattice = (x, z) => bilinear(farHeight, farN, farN, farX0, farZ0, FAR_CELL, x, z);
+    const fine = new Float32Array(pw * ph);
+    const high = new Float32Array(pw * ph);
+    for (let j = 0; j < ph; j++) {
+      for (let i = 0; i < pw; i++) {
+        const x = px0 + i * c;
+        const z = pz0 + j * c;
+        const w = arm.fine(x, z);
+        fine[j * pw + i] = w;
+        // (at its rim the patch lies a little under the lattice's facets, so that the two never share a surface)
+        const l = lattice(x, z);
+        high[j * pw + i] = (w > 0 ? l + (heightAt(x, z) - l) * w : l) - 1.5 * (1 - smoothstep(0, 0.3, w));
+      }
+    }
+    const inRect = (x, z) => x >= minX - 1e-3 && x <= gridX1 + 1e-3 && z >= minZ - 1e-3 && z <= gridZ1 + 1e-3;
+    const slot = new Int32Array(pw * ph).fill(-1);
+    const pos = [];
+    const nor = [];
+    const bake = [];
+    const mask = [];
+    const index = [];
+    const at = (i, j) => {
+      const k = j * pw + i;
+      if (slot[k] >= 0) return slot[k];
+      const x = px0 + i * c;
+      const z = pz0 + j * c;
+      const y = high[k];
+      const hx = (high[j * pw + Math.min(pw - 1, i + 1)] - high[j * pw + Math.max(0, i - 1)]) / (2 * c);
+      const hz = (high[Math.min(ph - 1, j + 1) * pw + i] - high[Math.max(0, j - 1) * pw + i]) / (2 * c);
+      const inv = 1 / Math.hypot(hx, 1, hz);
+      pos.push(x, y, z);
+      nor.push(-hx * inv, inv, -hz * inv);
+      const h0 = y + 2;
+      bake.push(marchSun(x, z, h0, dirs[0], 4000), marchSun(x, z, h0, dirs[1], 4000), marchSky(x, z, h0), marchSun(x, z, h0, dirs[2], 4000));
+      const steep = 1 - inv;
+      const own = forestOf(x, z, y, steep, null, 0, 0);
+      const wooded = y < lakeLevel + 0.6 ? 0 : smoothstep(0.1, 0.26, noise.fbm(x / 230 + 11, z / 230, 4)) * (1 - smoothstep(0.55, 0.8, steep));
+      // (open where the place says its bank is open: own is 0 there by the place's word, not for want of a wood)
+      mask.push(own < 0 ? own : arm.open(x, z) > 0.5 || arm.shore(x, z) > -3 ? own : Math.max(own, wooded), Math.max(smoothstep(0.6, 0.9, steep) * 0.5, 0.9 * arm.shingle(x, z)));
+      slot[k] = pos.length / 3 - 1;
+      return slot[k];
+    };
+    for (let j = 0; j < ph - 1; j++) {
+      for (let i = 0; i < pw - 1; i++) {
+        const k = j * pw + i;
+        if (!(fine[k] > 0 || fine[k + 1] > 0 || fine[k + pw] > 0 || fine[k + pw + 1] > 0)) continue;
+        // (inside the grid's rectangle the grid is the ground)
+        if (inRect(px0 + (i + 0.5) * c, pz0 + (j + 0.5) * c)) continue;
+        const a = at(i, j);
+        const b = at(i + 1, j);
+        const d = at(i, j + 1);
+        const f = at(i + 1, j + 1);
+        index.push(a, d, b, b, d, f);
+      }
+    }
+    if (index.length) {
+      armPatch = new THREE.BufferGeometry();
+      armPatch.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      armPatch.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      armPatch.setAttribute('aBake', new THREE.Float32BufferAttribute(bake, 4));
+      armPatch.setAttribute('aMask', new THREE.Float32BufferAttribute(mask, 2));
+      armPatch.setIndex(index);
+      armPatch.computeBoundingSphere();
+    }
+  }
+
   // ---- assembled
   const group = new THREE.Group();
   group.name = 'terrain';
@@ -1100,6 +1182,13 @@ const FOOT = 0.8;
     mesh.name = bandGeometries.includes(geometry) ? 'terrain-band' : 'terrain-grid';
     mesh.receiveShadow = true;
     mesh.castShadow = true;
+    mesh.matrixAutoUpdate = false;
+    group.add(mesh);
+  }
+  if (armPatch) {
+    const mesh = new THREE.Mesh(armPatch, material);
+    mesh.name = 'terrain-arm';
+    mesh.receiveShadow = true;
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
   }

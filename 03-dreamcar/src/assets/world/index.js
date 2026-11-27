@@ -169,6 +169,7 @@ export function createWorld({ renderer, caps, tier, track, rng, params, keepOut 
     lights: { day: TIMES.day.sun.dir, night: TIMES.night.sun.dir, dusk: TIMES.dusk?.sun.dir },
   });
   groundMaterial.setLakeside(terrain.lakeside?.paint ?? null);
+  groundMaterial.setArm(terrain.arm?.paint ?? null);
   lap('terrain');
   const mirror = MIRROR[tier] && caps.hdr ? new PlanarMirror(renderer, caps, MIRROR[tier]) : null;
   if (mirror) mirror.uniforms.uMirrorPlane = { value: new THREE.Vector4(0, 1, 0, 0) };

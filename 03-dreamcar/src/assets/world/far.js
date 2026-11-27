@@ -524,7 +524,12 @@ export function createFar({ track, terrain, caps, tier, rng, atmosphere }) {
           const under = terrain.heightAt(x, z);
           pos.push(x, sheet.y, z);
           // how deep the sheet is over the ground here, scaled to 0..1, times the falloff to its rim
-          depth.push(smoothstep(0, 22, sheet.y - Math.max(under, terrain.lake.level)) * edge);
+          // (none over the arm of the lake or within half a kilometre of it, arm.js: the sheets were laid on the land as it was, and where that land
+          // is now water 30 m lower a sheet would hang over it as a pale slab)
+          // (nor is a sheet any deeper than it was where that place lowered the valley beyond)
+          const clear = terrain.arm ? 1 - smoothstep(-750, -480, terrain.arm.shore(x, z)) : 1;
+          const ground = terrain.arm ? Math.max(under, (terrain.before ?? terrain).heightAt(x, z)) : under;
+          depth.push(smoothstep(0, 22, sheet.y - Math.max(ground, terrain.lake.level)) * edge * clear);
         }
       }
       for (let j = 0; j < RES; j++) {

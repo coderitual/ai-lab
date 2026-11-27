@@ -37,17 +37,18 @@ export const GOLDWOOD = {
   clear: 38,
   /**
    * The walls. Rows of { off: metres beyond where trees may begin (2 m behind the solid edge), step: metres between
-   * trunks, height (m over the ground), r: the room a trunk needs, detail, inside, low: the share kept on the low
-   * tier }. Each tree stands `sink` of its height under the ground and is `wide` times as wide as it grew: the
+   * trunks, height (m over the ground), r: the room a trunk needs, detail (how far out it keeps its full form: the rows
+   * behind are seen through the first, and only as far as the reduced form), inside, low: the share kept on the
+   * low tier, deep: a tone over the stand's own (the rows behind are darker and browner: the depth of the wall) }. Each tree stands `sink` of its height under the ground and is `wide` times as wide as it grew: the
    * foliage begins at the grass and the crowns overlap, so that the trunks are dark lines half hidden in leaves and
    * never bare poles. `gold`: the share that has turned whatever its species.
    */
   rows: [
-    { off: [0.2, 1.6], step: [3.4, 4.8], height: [7.5, 10.5], r: 2.3, detail: 1.5, inside: 0.1, low: 1 },
-    { off: [3.6, 6.4], step: [3.8, 5.4], height: [10, 14], r: 2.6, detail: 1.2, inside: 0.35, low: 1 },
-    { off: [8.5, 12.5], step: [4.4, 6.2], height: [13, 17], r: 3, detail: 1, inside: 0.5, low: 0.7 },
-    { off: [15, 21], step: [5, 7], height: [15, 20], r: 3.2, detail: 0.8, inside: 0.6, low: 0.6 },
-    { off: [24, 33], step: [5.5, 8], height: [17, 22], r: 3.4, detail: 0.6, inside: 0.65, low: 0.5 },
+    { off: [0.2, 1.6], step: [3.4, 4.8], height: [7.5, 10.5], r: 2.3, detail: 1.05, inside: 0.1, low: 1, deep: [1, 1, 1] },
+    { off: [3.6, 6.4], step: [3.8, 5.4], height: [10, 14], r: 2.6, detail: 0.75, inside: 0.35, low: 1, deep: [0.95, 0.92, 0.95] },
+    { off: [8.5, 12.5], step: [4.4, 6.2], height: [13, 17], r: 3, detail: 0.5, inside: 0.5, low: 0.7, deep: [0.86, 0.8, 0.86] },
+    { off: [15, 21], step: [5, 7], height: [15, 20], r: 3.2, detail: 0.4, inside: 0.6, low: 0.6, deep: [0.8, 0.72, 0.8] },
+    { off: [24, 33], step: [5.5, 8], height: [17, 22], r: 3.4, detail: 0.35, inside: 0.65, low: 0.5, deep: [0.76, 0.66, 0.76] },
   ],
   sink: 0.24,
   wide: 1.38,
@@ -61,9 +62,10 @@ export const GOLDWOOD = {
   conifers: [3, 0.14],
   /**
    * The stand's own tone over each tree's colour (the photograph's aspens are a deep orange gold, darker and redder
-   * than the lap's lemon limes and birches in full sun): for the trees that turn gold, and for the maples.
+   * than the lap's lemon limes and birches in full sun): for the trees that turn gold, for the maples, for the
+   * birches (whose own yellow is the palest) and for the young birches at the barrier.
    */
-  tone: { gold: [0.34, 0.165, 0.22], maple: [0.44, 0.46, 0.8] },
+  tone: { gold: [0.33, 0.15, 0.2], maple: [0.42, 0.42, 0.75], birch: [0.33, 0.125, 0.16], young: [0.27, 0.1, 0.14] },
   /** A conifer's tone over its green (darker and bluer than the lap's sunlit spruces), and how wide it stands. */
   dark: [0.5, 0.6, 0.7],
   /**
@@ -72,9 +74,15 @@ export const GOLDWOOD = {
    * (16 degrees by day), so the sun comes over it and lies on the asphalt and on the wall across the road, as in
    * the photograph, instead of the whole road lying in the wall's shade. No crown is lower than `least` m; where
    * the hillside itself stands within `hill` m of that ray it shades the road with or without trees, and the rule
-   * lets them be.
+   * lets them be. `tone`: over the stand's own, on a crown the rule keeps low (it stands against the light).
    */
-  sun: { over: 0.5, least: 3.4, hill: 1.2 },
+  sun: { over: 0.5, least: 3.4, hill: 1.2, tone: [0.78, 0.62, 0.8] },
+  /**
+   * The hillsides above the walls, out to `reach` m beyond the edges: wherever the ground stands more than `above`
+   * m over the lake (where the lap's wood thins out) or is too steep for the lap's planting, and no tree stands,
+   * one is planted: lattice, share planted, share of dark conifers, heights (m), a tone over the stand's own.
+   */
+  upper: { reach: 300, lattice: 5, density: 0.95, conifer: 0.5, above: 70, height: [10, 17], deep: [0.72, 0.62, 0.72] },
   /** Low growth in front of the first row and between its trunks (hazel, turned): metres between, heights. */
   shrubs: { step: [3.2, 5.6], off: [-0.9, 0.6], height: [2.2, 3.6] },
   /**
@@ -83,11 +91,11 @@ export const GOLDWOOD = {
    * barrier's foot; behind the barrier the wood's floor is litter out to `floor` m beyond the solid edge.
    */
   ground: {
-    pale: [0.095, 0.055, 0.024],
+    pale: [0.066, 0.036, 0.016],
     leaf: [
-      [0.27, 0.115, 0.016],
-      [0.25, 0.062, 0.011],
-      [0.1, 0.04, 0.012],
+      [0.21, 0.085, 0.012],
+      [0.2, 0.048, 0.009],
+      [0.08, 0.032, 0.01],
     ],
     drift: 1.3,
     floor: [12, 26],
@@ -96,7 +104,7 @@ export const GOLDWOOD = {
    * The long pale grass (groundCover.js: the approach meadow's seed-headed cards, bleached): cards per metre of
    * road and side as a share of the meadow's, their tint over the cards' own green, and their heights (m).
    */
-  grass: { share: 0.4, tint: [0.62, 0.27, 0.12], height: [0.4, 0.7] },
+  grass: { share: 0.16, tint: [0.3, 0.11, 0.045], height: [0.35, 0.6] },
   /** The lap's low bushes under the first rows, turned with the wood: a tint over their green. */
   bush: [4.2, 1.9, 0.6],
 };

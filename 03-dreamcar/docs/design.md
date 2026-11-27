@@ -620,7 +620,10 @@ what grows beyond the solid edges, and one module describes it
   road (the owner has ruled those out). Young birch, lime and maple close
   the wall's foot at the barrier. From the fourth row back a dark spruce or
   fir stands among them here and there, an accent and never a row; the
-  lap's conifer wood begins behind, 38 m from the edge.
+  lap's conifer wood begins behind, 38 m from the edge. The rows behind are
+  darker and browner than the first, and the hillsides above the walls,
+  which were bare where they are steep or high, are clothed in the same
+  gold and in dark conifers.
 - **The sun on the road.** By day the sun stands 16 degrees up on the left
   of the esses. The wall on that side is therefore low at the barrier (about
   4 m) and rises away from the road at the sun's own angle, so that the
@@ -642,11 +645,12 @@ the first bend gives way to the second, looking along the right-hand wall,
 the car behind the camera.
 
 What still differs from the photograph, by measurement on the staged pair
-(tools.md): the near wall is within 13 % of the photograph's luminance and
-three degrees of its hue, but the wall further down the road is brighter and
-yellower (+62 %, hue 38 against 29: the low wall on the sun's side and the
-haze), the verge is paler (+67 %: long straw grass where the photograph has
-russet scrub and gravel) and the shade under the crowns is deeper (-46 %).
+(tools.md): the near wall is within 6 % of the photograph's luminance and
+two degrees of its hue; the wall further down the road is still brighter and
+yellower where a clump of limes at the bend stands square to the sun (+52 %
+in the measured patch, hue 38 against 29), the verge is paler (+36 %, hue 34
+against 29: straw grass and litter where the photograph has russet scrub and
+gravel) and the shade under the crowns is deeper (-49 %).
 The trees are the lap's broadleaves, rounder and fuller than aspens, with
 few pale trunks; the verge has a kerb and a steel rail and no gravel
 shoulder or fallen logs; the asphalt is the lap's grey without a centre
@@ -673,18 +677,27 @@ module describes it (`src/assets/world/arm.js`).
   long right it lies below the road on the left all the way round.
 - **The bank.** The woods that stood on the left of the road from the
   bridge's end round the first half of the long right are gone: a bank of
-  meadow grass falls from the rail to the water, steep under the bridge's
-  end and gentle further round, with long grass at the rail and down the
-  bank, a stock fence on weathered posts along its top for the first 170 m,
-  and groups of young birch and lime no taller than 5 m, so that nothing
-  stands between the road and the water. The rail, the tyre wall and the
+  long uneven grass, darker and greyer than the lap's mown verges, lighter
+  on its rises and darker in its hollows, falls from the rail to the water,
+  steep under the bridge's end and gentle further round, with long grass at
+  the rail and down the bank, a stock fence on weathered posts along its top
+  for the first 170 m, and groups of dark, irregular birch saplings no
+  taller than 5 m, so that nothing stands between the road and the water.
+  On the other side of the road dark spruce and fir are carried up the foot
+  of the massif behind the lap's own rows. The rail, the tyre wall and the
   boards on the outside of the bend are the circuit's own.
 - **The far shores.** West of the arm the hills rise straight from the
-  water, wooded (conifers and broadleaves, darker than the lap's sunlit
-  woods) with the pale hall of frame D3 on its hilltop behind them; south of
-  it the land that closed the valley is cut back to a shore 400 m further
-  off and rises behind it ridge after ridge to the far ranges, each paler in
-  the day's haze.
+  water under a dark wood (conifers mostly; the lap's own trees that stand
+  there take its tone), with the pale hall of frame D3 on its hilltop
+  behind them. A strip of pale stones lies along the water's edge, and the
+  shore is a curve with coves, not the far land's straight facets.
+- **The valley beyond.** South of the arm the land that closed the view is
+  a valley floor now, and on it stand the photograph's spurs: four dark
+  wooded ridges with uneven, falling crests that come down into the valley
+  from the left and the right by turns, the first to the arm's shore, each
+  behind and paler than the one before. Behind them a range of bare peaks
+  with snow in streaks closes the valley four kilometres off, the palest
+  thing below the sky.
 - **The light** is the day's own: the sun 16 degrees up on the right of the
   descent, so the bank below the road is in its own shade, and the water,
   the western shore and the ridges beyond are lit.
@@ -694,19 +707,30 @@ end, a long lens (24 degrees) down the road, the car behind the camera.
 
 What still differs from the photograph (tools.md): the photograph is a dim,
 overcast, nearly colourless exposure and ours is the lap's sunny day, which
-is not this place's to change. Against the sky, the far range and the water
-are as bright as the photograph's (within 15 %), but the middle ridge and
-the near slope are several times lighter and bluer: ours stand in sunlit
-haze, the photograph's in cloud shadow. The far range has no snow; the
-foreground is the bridge's parapet and the lap's asphalt, not a gravel verge
-with dry grass (the long grass and the fence begin where the bridge ends);
-there is no dark band of wood before the water, no sign, no centre line;
-the road bends right, not left. The arm's far shore lies on the terrain's
-100 m lattice: its line is straight in pieces.
+is not this place's to change. As shares of the sky's luminance: the near
+wooded slope 0.10 (the photograph 0.05), the spur behind it 0.15 (0.10), the
+far range 0.68 (0.96), the water 0.42 (0.46). The order is the photograph's,
+dark to pale with distance, but the day's haze lifts the near spurs (they
+cannot be darker than the air in front of them) and the range, grey rock
+under snow in streaks seen in its own shade, is not the brightest thing in
+the frame as the photograph's sunlit massif is. The spurs and the range are
+the far land's 100 m facets: planes with straight creases and no trees on
+them, where the photograph has gullied, wooded flanks; the snow's lower
+edge hangs in streaks. The foreground is the bridge's parapet and the lap's
+asphalt, not a gravel verge with dry grass (the long grass and the fence
+begin where the bridge ends); there is no dark band of wood before the
+water, no sign, no centre line; the road bends right, not left; the lap's
+lime-green rows on the right of the bridge's end are brighter than anything
+in the photograph, and a faintly paler band lies along the foot of the far
+bank.
 
 Seen from elsewhere: the ledge's first bend (frame D3) looks the same way,
-and its far ridge is lower and paler than it was, with a sliver of the arm
-under it; the hall on its hilltop and everything nearer are unchanged.
+and where a dark ridge closed its view behind the boards it now has the
+valley's spurs and the snow range, with a sliver of the arm under them; the
+hall on its hilltop and everything nearer are unchanged. From the straight
+at night the village across the lake has its western third on lower ground
+than it had (the valley floor), its lamps mirrored nearer the shore, and the
+floodlights of the long right light the open bank.
 
 ## The tunnel
 

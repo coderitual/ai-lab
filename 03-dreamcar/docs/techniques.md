@@ -842,6 +842,20 @@ foot; behind the barrier the same litter lies over the wood's floor out to
 the lap's dark tufts are left out on the stretch (their numbers are drawn all
 the same).
 
+**The depth of the wall.** Each row carries a tone over the stand's own
+(`deep`: the rows behind are darker and browner), the birches one of their
+own (their yellow is the palest), and a crown the sun's rule keeps low a
+third (it stands against the light and would glow lemon). Only the first
+two rows keep their full form any distance (`detail` 1.05 and 0.75; the
+three behind 0.5 to 0.35): they are seen through the first.
+
+**The hillsides above.** Where the land beside the stretch stands above the
+lap's tree line or is steeper than the lap plants, it was bare (a grey flank
+ahead of the second bend). A second stream fills it: a 5 m lattice out to
+300 m beyond the edges, a tree wherever the ground is over 70 m above the
+lake or steeper than 0.85 and none stands within 3 m: half dark conifers,
+half turned broadleaves in a darker tone, sunk on the steep ground.
+
 **The low tier** keeps the first two rows whole and 70, 60 and 50 % of the
 three behind, half the young growth, and a fifth as many cards of grass.
 
@@ -852,7 +866,7 @@ three behind, half the young growth, and a fifth as many cards of grass.
 design.md ("The arm of the lake") says what the place is; it is made the way
 the lakeside is (above), with these differences.
 
-**It only lowers.** `arm.ground(x, z, h, s, lat)` is asked after the
+**Round the water it only lowers.** `arm.ground(x, z, h, s, lat)` is asked after the
 lakeside's. The water is three overlapping ellipses in the place's frame with
 two waves along the shore; `most()` is the highest the ground may stand at a
 point: the bed inside the shore, a beach, and beyond it a bank that rises
@@ -861,7 +875,7 @@ water and the road. The ground becomes the lower of that and what it was
 (rounded where the two meet), by a weight that is nothing on the right of
 the road, inside any corridor and for 1.5 m beyond the left solid edge, all
 of it from 52 m beyond that edge, and nothing again beyond 240 m from the
-shore. A cap needs no blending at its far edge and can raise nothing: the
+shore. A cap needs no blending at its far edge and can raise nothing there: the
 hills behind the far shores, the pale hall's hilltop (landmarks.js looks for
 it from the ledge, 300 m behind the arm's west shore) and everything the
 place does not reach are bit for bit what they were.
@@ -869,11 +883,42 @@ place does not reach are bit for bit what they were.
 **The valley beyond.** South of the arm the land rose in one unbroken ramp
 to the far land's rim, five degrees high from the bridge, a single dark
 slope that hid the ranges of `far.js`. `passed()` scales it down in a sector
-from the bridge (16 degrees right to 48 left of the road, 0.9 to 5.3 km out,
-where there is no road): the land keeps 42 % of what it stood over 18 m. It
-is scaled, not capped, so its own ridges and gullies are still there, one
-behind the other and each paler in the haze, and the three far ranges stand
-over them.
+from the bridge (20 degrees right to 54 left of the road, 0.9 to 5.3 km out,
+where there is no road): the land keeps 22 % of what it stood over 14 m, a
+valley floor. On that floor stand four spurs and a range, the only ground
+the place raises. A spur is a segment in the sector's own frame, from a root
+at the valley's side to a tip in its middle: its crest falls from root to
+tip with knobs and saddles (ridged noise along it), its flanks fall away
+from the crest, gullied; they come from the left and the right by turns,
+each behind the one before, the first down to the arm's shore. Their forest
+mask is over 1, which the ground's material reads as dark wood: the canopy's
+colour darker and bluer, and no bare rock on steep ground under it. The
+range is the lakeside's (`peakAt`): a ridge of peaks across the valley 4 km
+out, bare, with snow in streaks high up where the mask is negative. All of
+it is the far land's 100 m lattice, lit, baked and hazed like the rest; the
+haze is what makes each spur paler than the one in front.
+
+**Fine ground for the shore.** The arm lies where the terrain's grid eases
+onto the far land's lattice, and its southern half beyond the grid, where a
+shore was the line of 100 m facets crossing the water: straight in pieces.
+`arm.fine(x, z)` is 1 within 110 m of the shore and 0 beyond 200 m. Inside
+the grid's rectangle the grid no longer eases onto the lattice by that much;
+beyond it `terrain.js` draws a patch (`terrain-arm`: a 14 m grid, 28 m on
+low) of the arm's own heights, eased onto the lattice's facets at its rim by
+the same weight (and 1.5 m under them there, so that the two never share a
+surface); the lattice's vertices under the patch are sunk 60 m out of the
+way. The patch's lines lie on the grid's border, where grid and patch have
+the same height by construction. The water is still cut by the ground, and
+the ground is now the shore's own curve.
+
+**The bank's grass** is painted per pixel from the place's frame, as the
+lakeside's meadow is from its own (`setArm`: the frame, a box in it, and
+the long right as an arc, so that only the water's side of the road is
+painted): the lakeside's structure of swells, sward and tussocks in two
+darker, greyer greens. The first version marked the bank's vertices as the
+approach's meadow instead, which read as a lawn with an edge wherever a
+triangle ended. A strip of pale stones lies along the water (`aMask.y` as
+loose stone within a few metres of the shore line).
 
 **One sheet of water.** The arm is the lake's own level, so it is the lake's
 own sheet: `terrain.lake.sheet` grows the sheet's box over the arm by whole
@@ -895,13 +940,18 @@ its streets along the contours and draws a random number at every step, and
 its western end lay on ground the arm lowered: it is now laid out on the
 land as it was (`terrain.before`, as the mist already was), and a lamp then
 stands on the land as it is, or not at all where there is water now. The
+mist's sheets were laid on the land as it was too: none lies within 480 m of
+the arm, and none is deeper than it was where the valley was lowered (a
+sheet over ground 30 m lower hung there as a pale slab). The
 canopy (`canopy.js`) is told the Track's wood on the water's side no longer
 stands; `openCanopy` now adds to what an earlier place said instead of
 replacing it.
 
 `tools/unit/arm.test.mjs` holds the promises: nothing moved inside any solid
 edge, within 1.5 m beyond a left one or anywhere on the right of the road;
-the place only lowers and only in its box and its pass; the arm is under water and joins
+round the water the place only lowers, and it raises ground only in the
+valley beyond, a kilometre from the bridge and 800 m from any road; the arm
+is under water and joins
 the lake; the hall stands where it stood; the rest of the lap keeps its
 hillsides.
 
