@@ -442,6 +442,30 @@ Read this before believing anything above about a device.
   facets cross the water, holds up on a real GPU's depth precision, and any frame rate. The rest of the playtest
   and the sound test were not run.
 
+- **The golden wood and the arm of the lake, second round** (2026-11-27, after the lead's review: the valley's
+  spurs and snow range, the arm's fine ground and shore, the bank's grass, the mist, the saplings and the massif's
+  foot at the arm; the hillsides, the rows' tones and their forms' distances in the esses). `node tools/unit.mjs`:
+  11 files passed on the final tree (`arm.test.mjs` now lets ground be raised only in the valley beyond the arm, a
+  kilometre from the bridge and at least 300 m from any road: 144 ha, none nearer than 822 m). The playtest's
+  `keys`, `photo` and `determinism` sections against the final build: 58 checks, 0 failed. Stills in the same run
+  before (e0b0b36) and after at `medium` 1280x720: `?photo=r1` 0.016 % of pixels differ at all (none by more than
+  8 in 255); `?photo=r2` 0.052 % (0.002 %); `?photo=d1` 3.1 % (0.41 %: the car's paint and, by a few levels, the
+  asphalt's mirror of what is behind the camera); `?photo=d3` 10.9 % (3.6 %): its far skyline is now the valley's
+  spurs and the snow range, on purpose. Looked at: `?photo=r3` and `?photo=r4` by day, at golden hour, at night and
+  on `low`; the chase view on an upright phone's shape at the same six moments as before; and at night from the
+  straight, 10 m up, looking across the lake at the village (far.js): its eastern two thirds are lamp for lamp
+  where they were, its western third stands on the valley's lowered floor, its lamps lower and their mirror images
+  nearer the shore. Against the photographs (the same boxes as the first round but for r4's three land regions,
+  moved onto the new range, spur and slope): r3 near wall +6 % (hue 32 against 30), far wall +52 % (38 against
+  29), verge +36 % (34 against 29), shade under the crowns -49 %; r4 as shares of the sky's luminance: near
+  wooded slope 0.10 (photograph 0.05), middle spur 0.15 (0.10), far range 0.68 (0.96), water 0.42 (0.46). Costs
+  are in spec.md (medium in the esses is now -8 to +7 % of the triangles it drew before the place). Regenerated
+  pictures: `golden-wood.jpg`, `lake-arm.jpg`, `split.jpg`. Not verified: the `high` tier; anything in motion;
+  whether the patch of fine ground meets the grid and the far land without a visible seam from every side (looked
+  at from the bridge, the long right and the ledge only); the snow's streaks and the 1.5 m gap under the patch's
+  rim on a real GPU's depth precision; the spurs from the crest and the plunge, which also look that way; any
+  frame rate. The rest of the playtest and the sound test were not run.
+
 - **The return to main's version with fixes only** (2026-11-23 to 26: the far land's hole, no ground, structure or
   furniture over the road or inside its edges, the tree shadows' casters in split screen, the pad where the thumb
   lands and the pedal gauge, the quality ladder, the upscale and the readout). `node tools/unit.mjs`: 8 files passed;

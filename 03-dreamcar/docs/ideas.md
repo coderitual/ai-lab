@@ -25,15 +25,18 @@ comparison stills and strike what is done.
   the slope at the end of the sky road has fewer trees than it had.
 - **The golden wood against its photograph** (design.md, "The golden wood"):
   the crowns are the lap's round broadleaves, not slim aspens on pale
-  trunks; the wall down the road and the verge's grass are lighter and
-  yellower than the photograph's; the second bend lies in its hillside's
-  shade whatever grows there; a few pale forked birch stems show at the
-  barrier from a low camera.
+  trunks; a clump at the bend down the road and the verge's grass are still
+  lighter and yellower than the photograph's; the second bend lies in its
+  hillside's shade whatever grows there; a few pale forked birch stems show
+  at the barrier from a low camera; the trees that clothe the hillsides
+  above the walls are single crowns from far off, not a closed wood.
 - **The arm of the lake against its photograph** (design.md, "The arm of the
-  lake"): the light is the sunny day's, so the ridges are hazy blue where
-  the photograph's are dark; no snow on the far range; the far shore's line
-  is the 100 m lattice's; the bank under the bridge's end is the meadow's
-  bright green in patches beside fields in strips; from the bridge the
+  lake"): the light is the sunny day's, so the spurs are hazy blue-grey
+  where the photograph's are near black; the spurs and the range are the far
+  land's 100 m facets (smooth planes with straight creases, no trees drawn
+  on them), and the snow's lower edge hangs in streaks that do not follow
+  the range's own gullies; the lap's lime-green rows on the right of the
+  bridge's end are the brightest thing near the road; from the bridge the
   foreground is a parapet, not a verge.
 - **The ground beside the sky road** reads from above as a pale, rippled
   bare slope (`docs/images/sky-road.jpg`), not the wooded valley under the

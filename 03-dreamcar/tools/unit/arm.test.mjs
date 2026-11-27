@@ -5,7 +5,8 @@
 //
 // 1. Inside every solid edge of the lap, and for a metre and a half beyond every left one, the ground is exactly
 //    what it was before the place was shaped; on the right of the road it is what it was everywhere.
-// 2. The place only ever lowers ground.
+// 2. Round the water the place only ever lowers ground; it raises ground only in the valley beyond the arm, a
+//    kilometre and more from the bridge and far from any road (its spurs and its far range).
 // 3. The arm holds water: well inside its shore the ground lies under the lake's level, and its water is one with
 //    the lake beside the straight.
 // 4. Beside the rest of the lap the hillsides are what they were.
@@ -80,15 +81,27 @@ if (place) {
     return `${checked} points`;
   });
 
-  test('the place only lowers ground, and only within its own box and its pass', () => {
+  test('round the water the place only lowers ground; it raises only the spurs and the range of the valley beyond', () => {
     let lowered = 0;
+    let raised = 0;
+    let highest = 0;
+    let roadless = Infinity;
     let deepest = 0;
     let nearest = Infinity;
     for (let z = track.bounds.minZ - 4800; z <= track.bounds.maxZ + 300; z += 25) {
       for (let x = track.bounds.minX - 2600; x <= track.bounds.maxX + 1400; x += 25) {
         const h = terrain.before.heightAt(x, z);
         const g = place.ground(x, z, h);
-        if (g > h + 1e-9) fail(`ground raised by ${(g - h).toFixed(2)} m at ${x}, ${z}`);
+        if (g > h + 1e-9) {
+          // (only the spurs and the range in the valley beyond: a kilometre from the bridge, far from any road)
+          const [, r] = place.bearing(x, z);
+          track.locate(x, z, -1, spot);
+          const off = Math.abs(spot.lat) - track.edgeAt(spot.s, spot.lat >= 0 ? 1 : -1);
+          raised++;
+          highest = Math.max(highest, g - h);
+          roadless = Math.min(roadless, off);
+          if (r < ARM.pass.range[0] || off < 300) fail(`ground raised by ${(g - h).toFixed(2)} m at ${x}, ${z}, ${r.toFixed(0)} m from the bridge and ${off.toFixed(0)} m from a road`);
+        }
         if (g < h - 1e-6) {
           // (the valley beyond the arm: a sector from the bridge, a kilometre and more out)
           const [a, r] = place.bearing(x, z);
@@ -103,7 +116,7 @@ if (place) {
       }
     }
     if (nearest < ARM.guard[0]) fail(`ground lowered ${nearest.toFixed(2)} m from a solid edge`);
-    return `${((lowered * 625) / 1e4).toFixed(0)} ha lowered, by ${deepest.toFixed(0)} m at most, none nearer than ${nearest.toFixed(1)} m to an edge`;
+    return `${((lowered * 625) / 1e4).toFixed(0)} ha lowered, by ${deepest.toFixed(0)} m at most, none nearer than ${nearest.toFixed(1)} m to an edge; ${((raised * 625) / 1e4).toFixed(0)} ha raised in the valley beyond (spurs and the far range), by ${highest.toFixed(0)} m at most, none nearer than ${roadless.toFixed(0)} m to a road`;
   });
 
   test('the arm holds water and joins the lake', () => {
