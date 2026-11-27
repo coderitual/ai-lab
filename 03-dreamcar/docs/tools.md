@@ -486,6 +486,26 @@ Read this before believing anything above about a device.
   screen here; the esses were not looked at again (nothing of theirs changed). The rest of the playtest and the
   sound test were not run.
 
+- **The arm of the lake, fourth round** (2026-11-27: tone, paint and the shape of scenery only; the range as one
+  jagged massif, lit in paint; the far-shore trees and the bank's young growth and bushes darker, skirted and of
+  uneven size; the dark wood's mask whole from the waterline). `node tools/unit.mjs`: 11 files passed. The
+  playtest's `keys`, `photo` and `determinism` sections against the final build: 58 checks, 0 failed. Stills in
+  the same run before (e0b0b36) and after at `medium` 1280x720: `?photo=r1` 0.016 % of pixels differ at all (none
+  by more than 8 in 255); `?photo=r2` 0.052 % (0.002 %); `?photo=d1` 3.2 % (0.42 %: the car's paint and a few
+  levels on the asphalt); `?photo=d3` 12.6 % (3.7 %): the massif stands on its horizon between the boards and the
+  trees, small and pale, and was looked at there. Looked at: `?photo=r4` by day, at golden hour, at night and on
+  `low`; the chase view on an upright phone's shape at lap 1:17.8, 1:20.8 and 1:23.8. Found by hiding meshes and
+  by painting each source of trees its own colour in a throw-away build: the pale patches left at the far
+  waterline were vertices of the shore's patch whose forest mask came out at 1.0, between the lap's wood and the
+  place's dark wood, so that neither painted them (now the far shores' mask is 1.5 from the waterline, whatever
+  the land's own); the bright trees on the near left shore were toned already, but not enough for crowns in full
+  sun. Against the photograph, as shares of the sky's luminance: near wooded slope 0.09 (0.05), middle spur 0.20
+  (0.10), far range 0.96 (0.96), water 0.42 (0.46). Costs at t = 84, 87 and 90 are the third round's to within
+  1 k triangles (spec.md). Regenerated: `lake-arm.jpg`. Not verified: the `high` tier; anything in motion; the
+  range's paint at golden hour and at night beyond one still of each (it is paint for the day's sun); a real GPU;
+  the crest and the plunge were not shot again (the range's shape changed, its place did not). The rest of the
+  playtest and the sound test were not run in this round (the lead ran both on the third round's tree).
+
 - **The return to main's version with fixes only** (2026-11-23 to 26: the far land's hole, no ground, structure or
   furniture over the road or inside its edges, the tree shadows' casters in split screen, the pad where the thumb
   lands and the pedal gauge, the quality ladder, the upscale and the readout). `node tools/unit.mjs`: 8 files passed;

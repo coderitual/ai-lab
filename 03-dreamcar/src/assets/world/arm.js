@@ -92,8 +92,10 @@ export const ARM = {
    * [root angle, root distance, tip angle, tip distance, its crest's height at the root (m), half its width at the
    * root (m)]: the crest falls from root to tip, unevenly, and the flanks fall away from it. Behind them a range
    * of bare peaks closes the valley `range.at` m out (wandering by `wander`), `half` m from foot to crest, its
-   * crest `relief[0]` to `relief[0] + relief[1]` m high, between `angle` degrees; gullies run down its face
-   * (`gully`: degrees of bearing from one to the next, the share of the height they cut). Its snow is a dusting
+   * crest `relief[0]` to `relief[0] + relief[1]` m high, between `angle` degrees: one massif (`summit`: the
+   * bearing of its highest point and how wide it stands; `second`: a lesser summit's bearing, width and share;
+   * `low`: the shoulders' share far from both) with a jagged skyline; gullies branch down its face (`gully`:
+   * about how many degrees of bearing from one to the next, the share of the height they cut). Its snow is a dusting
    * that follows its own shape (`snow`: the share of a peak's height where it begins, and by how much that line
    * wanders along the range; `dust`: it thins out over this much below the line and thickens over this much
    * above it): it reaches lower in the gullies, lies thin on steep rock, thickest at the crests. The spurs are
@@ -105,7 +107,7 @@ export const ARM = {
     [45, 2350, 5, 2450, 330, 470],
     [-16, 3250, 9, 2950, 380, 520],
   ],
-  range: { at: 4050, wander: 170, half: 540, relief: [230, 380], angle: [-26, -12, 46, 60], gully: [2.3, 0.14], snow: [0.5, 0.2], dust: [0.22, 0.36] },
+  range: { at: 4050, wander: 170, half: 560, relief: [150, 560], angle: [-26, -12, 46, 60], summit: [13, 8], second: [-6, 5, 0.6], low: 0.3, gully: [3.1, 0.24], snow: [0.46, 0.18], dust: [0.24, 0.36] },
   /**
    * The open bank: beside the road from `open[0]` to `open[1]` m from the section's start, on the left, the lap's
    * woods give way as far as the water (and no further than `reach` m beyond the edge): grass, a fence, young
@@ -127,14 +129,16 @@ export const ARM = {
   fine: [110, 200],
   /**
    * What forest.js plants. `shore`: the wood on the far shores (from this many metres back from the water, this
-   * far up the hill, lattice, share planted, share of conifers, its tone over the trees' greens). `groups`: young
+   * far up the hill, lattice, share planted, share of conifers, its tone over the trees' greens; every tree of it,
+   * and every tree of the lap's that stands there, `sink` of its height under the ground and `wide` times as wide,
+   * skirted to the grass, and the lap's between `size` times their height: no two alike). `groups`: young
    * growth on the open bank: [metres from the section's start, metres beyond the left edge, how many, spread (m)],
    * birch and lime saplings sunk to their crowns, never taller than `young` m.
    */
   planting: {
-    shore: { from: 5, reach: 260, lattice: 6.2, density: 0.85, conifer: 0.6, tone: [0.3, 0.4, 0.44] },
+    shore: { from: 5, reach: 260, lattice: 6.2, density: 0.85, conifer: 0.6, tone: [0.14, 0.21, 0.2], sink: 0.2, wide: 1.35, size: [0.6, 1.15] },
     /** The young growth's tone and how wide each stands (irregular: no two alike). */
-    youngTone: [0.44, 0.5, 0.52],
+    youngTone: [0.15, 0.2, 0.17],
     /**
      * The massif's foot on the right of the road, from `along[0]` to `along[1]` m from the section's start: the dark
      * wood carried up the slope behind the lap's own rows, from `beyond[0]` to `beyond[1]` m beyond the right edge,
@@ -164,6 +168,8 @@ export const ARM = {
   fence: { from: -2, to: 168, beyond: 3.2 },
   /** The long grass (the approach meadow's cards): cards per metre of road as a share of the meadow's, their tint. */
   grass: { share: 1.4, tint: [1.15, 1.0, 0.7] },
+  /** The lap's low bushes on the open bank: a tint over their green (olive, in the bank's own tone; they were lit lime). */
+  bush: [2.1, 1.7, 1.1],
 };
 
 /**
@@ -316,17 +322,25 @@ function build(track, rng, section) {
     if (w <= 0) return peak;
     const across = 1 - Math.abs(r - (K.at + K.wander * Math.sin(a * 0.19 + 2))) / K.half;
     if (across <= 0) return peak;
-    // great peaks and saddles along the ridge, smaller peaks of uneven height between them
-    const crest = 0.58 * noise.ridged(a / 7.5 + 9, 3.3, 3) + 0.42 * noise.ridged(a / 2.3 + 4, 7.7, 2);
-    // ribs across its face, and gullies down it (they run down the fall line: along r, so they are a pattern of
-    // the bearing alone), deepest on the middle of the face
-    const rib = 0.74 + 0.26 * noise.fbm(a / 2.2, r / 240, 2);
-    const gully = noise.ridged(a / K.gully[0] + 1.7, 5.1, 2);
-    // (its foot is a long apron and its upper face steep: the height goes with the distance in from the foot
-    // to the power 1.5, buttresses standing out of it)
-    const butt = 0.85 + 0.3 * noise.fbm(a / 4.3 + 2, r / 420 + 1, 2);
-    const shape = w * Math.min(1, across * butt) ** 1.5 * rib * ((K.relief[0] + K.relief[1] * crest) / (K.relief[0] + K.relief[1]));
-    const up = shape * (1 - K.gully[1] * gully * smoothstep(0.04, 0.3, shape) * (1 - 0.6 * shape));
+    // One massif, not a row of peaks: a dominant summit off the middle of the view (`summit`: its bearing, how
+    // wide it stands, in degrees) with lower shoulders stepping away on either side, and a second, lesser one.
+    const main = Math.exp(-(((a - K.summit[0]) / K.summit[1]) ** 2));
+    const second = Math.exp(-(((a - K.second[0]) / K.second[1]) ** 2));
+    const massif = K.low + (1 - K.low) * Math.max(main, K.second[2] * second);
+    // its skyline: sharp peaks of uneven spacing and width (a ridge noise read at a bearing that is itself
+    // pushed about, raised to a power: narrow points, wide saddles), small teeth on them
+    const aw = a + 3.2 * (noise.fbm(a / 6.1 + 3, 1.9, 2) - 0.5) + 1.1 * (noise.fbm(a / 1.7 + 8, 4.4, 2) - 0.5);
+    const crest = (0.62 * noise.ridged(aw / 5.2 + 9, 3.3, 4) ** 1.7 + 0.26 * noise.ridged(aw / 1.9 + 4, 7.7, 3) ** 1.4 + 0.12 * noise.ridged(aw / 0.7 + 2, 1.2, 2)) * massif;
+    // its face: a long apron under a steep upper wall and a sharp crest line (no flat top), buttresses standing
+    // out of it, and gullies that begin under the crest and branch on the way down: a ridge noise of the bearing
+    // whose bearing is bent by the height, so that two gullies run together lower down and none is parallel to
+    // the next
+    const butt = 0.82 + 0.36 * noise.fbm(a / 4.3 + 2, r / 420 + 1, 2);
+    const face = across ** 1.35 * butt;
+    const ab = aw + (1 - across) * 2.6 * (noise.fbm(a / 2.9 + 5, 6.2, 2) - 0.5);
+    const gully = Math.max(noise.ridged(ab / K.gully[0] + 1.7, 5.1 + across * 0.8, 3) ** 1.5, 0.7 * noise.ridged(ab / (K.gully[0] * 0.37) + 6.3, 2.2 + across * 1.7, 2) ** 2);
+    const shape = w * face * ((K.relief[0] + K.relief[1] * crest) / (K.relief[0] + K.relief[1]));
+    const up = shape * (1 - K.gully[1] * gully * smoothstep(0.03, 0.22, shape) * (1 - 0.45 * across));
     peak.h = up * (K.relief[0] + K.relief[1]);
     peak.up = up;
     peak.gully = gully;
@@ -442,9 +456,9 @@ function build(track, rng, section) {
       // between a vertex in the water and one on the bank is then wooded to the waterline, not bare outcrop)
       if (q > -3) return 1.5 * (1 - o);
       const P = A.planting.shore;
-      const far = 0.92 * smoothstep(2, 7, -q) * (1 - smoothstep(P.reach, P.reach + 120, -q));
-      // (the wood on the far shores is the dark wood too)
-      return (Math.max(f, far) + 0.6 * far * (f <= 1 ? 1 : 0)) * (1 - o);
+      // (the wood on the far shores is the dark wood too, from the waterline: whatever the land's own mask is)
+      const far = 1 - smoothstep(P.reach, P.reach + 120, -q);
+      return Math.max(f, 1.5 * far) * (1 - o);
     },
 
     /** 0..1 how much of the ground at a point is the arm's own fine ground (terrain.js draws it there). */

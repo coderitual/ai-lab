@@ -480,7 +480,7 @@ export function createGroundCover({ track, terrain, tier, rng, atmosphere, unifo
         const v = r.range(0.7, 1.2);
         // (on the lakeside's meadow the lap's own bushes are the meadow's: lit, warm, not the wood's dark green)
         // (in the golden wood they have turned with it: ochre and rust, not the wood's dark green)
-        const lit = terrain.lakeside?.open(s, side) || terrain.arm?.opens(s, side) ? [5, 4.2, 2.6] : goldwood?.here(s) ? GOLDWOOD.bush : [1, 1, 1];
+        const lit = terrain.arm?.opens(s, side) ? ARM.bush : terrain.lakeside?.open(s, side) ? [5, 4.2, 2.6] : goldwood?.here(s) ? GOLDWOOD.bush : [1, 1, 1];
         const bush = make(point.x, y - 0.1, point.z, r.range(0, Math.PI), [h * 1.4, h, h * 1.4], GRASS.bush.map((c, k) => c * v * lit[k]), h);
         // (ref lane: none on a tunnel's meadow, which is open grass to the fence; the numbers are drawn all the same)
         if (!((terrain.placeAt?.(point.x, point.z)?.meadow ?? 0) > 0.5)) bushItems.push(bush);

@@ -21,6 +21,7 @@ import { fieldTexture, gradientField, normalTexture, valueField, worleyField } f
 import { extend, withBake } from './shading.js';
 import { GOLDWOOD } from './goldwood.js';
 import { ARM } from './arm.js';
+import { TIMES } from './lighting.js';
 
 /**
  * (finish lane) The one green of the grass, linear albedo: the meadow (lush where it is damp, drier and a little
@@ -390,8 +391,8 @@ if ( gDark > 0.0 ) {
   float dCrown = texture2D( uLarge, vGroundPos.xz / 47.0 + vec2( 0.55, 0.17 ) ).b;
   float dClear = smoothstep( 0.66, 0.76, texture2D( uLarge, vGroundPos.xz / 137.0 + vec2( 0.77, 0.31 ) ).g );
   float dGully = texture2D( uLarge, vec2( ( vGroundPos.x * 0.6 + vGroundPos.z * 0.8 ) / 90.0, vGroundPos.y / 260.0 ) ).a;
-  vec3 wood = vec3( 0.0085, 0.017, 0.0105 ) * ( 0.62 + 0.5 * dStand + 0.45 * dCrown ) * ( 1.0 - 0.35 * smoothstep( 0.55, 0.8, dGully ) );
-  wood = mix( wood, vec3( 0.017, 0.028, 0.014 ) * ( 0.8 + 0.4 * dCrown ), dClear * 0.6 );
+  vec3 wood = vec3( 0.0095, 0.019, 0.0118 ) * ( 0.8 + 0.24 * dStand + 0.2 * dCrown ) * ( 1.0 - 0.3 * smoothstep( 0.55, 0.8, dGully ) );
+  wood = mix( wood, vec3( 0.015, 0.025, 0.013 ) * ( 0.85 + 0.3 * dCrown ), dClear * 0.5 );
   float dAir = smoothstep( 1100.0, 3400.0, length( vGroundPos.xz - uArmEye ) );
   wood = mix( wood, vec3( 0.055, 0.075, 0.105 ), dAir * 0.62 );
   gCanopy = mix( gCanopy, wood, gDark );
@@ -533,10 +534,17 @@ if ( gRange > 0.0 ) {
   float crease2 = texture2D( uLarge, vec2( ra * 53.0, rr / 900.0 ) ).r;
   float grain = texture2D( uLarge, vGroundPos.xz / 71.0 + vec2( 0.3, 0.8 ) ).g;
   float bed = texture2D( uLarge, vec2( ra * 9.0, vGroundPos.y / 190.0 ) ).b;
-  vec3 rock = mix( vec3( 0.165, 0.152, 0.134 ), vec3( 0.31, 0.288, 0.248 ), smoothstep( 0.3, 0.72, 0.34 * crease + 0.22 * crease2 + 0.22 * bed + 0.22 * grain ) ) * ( 0.86 + 0.28 * grain );
+  // (how squarely a face stands to the day's sun, lighting.js: its sunward faces are bleached, paler and warmer,
+  // and carry the dusting further down; the faces turned from it are greyer. This is paint, the same at every
+  // time of day: the light on it is the frame's own.)
+  float sunward = smoothstep( -0.15, 0.55, dot( gN, ${v3(TIMES.day.sun.dir)} ) );
+  // (ridges the 42 m cells round off: small aretes painted across the face, light on their sunward side)
+  float arete = texture2D( uLarge, vec2( ra * 31.0 + vGroundPos.y / 520.0, rr / 1500.0 + vGroundPos.y / 310.0 ) ).g;
+  float edge = smoothstep( 0.5, 0.62, arete ) - smoothstep( 0.62, 0.78, arete );
+  vec3 rock = mix( vec3( 0.19, 0.176, 0.156 ), vec3( 0.37, 0.343, 0.297 ), smoothstep( 0.3, 0.72, 0.34 * crease + 0.22 * crease2 + 0.22 * bed + 0.22 * grain ) ) * ( 0.86 + 0.28 * grain );
+  rock *= mix( vec3( 0.82, 0.86, 0.94 ), vec3( 1.3, 1.24, 1.1 ), sunward ) * ( 1.0 + 0.22 * edge * ( sunward - 0.35 ) );
   float ask = clamp( vMask.y - 5.0, 0.0, 1.0 );
-  // (a dusting: where the place asks for little it lies only in the creases, in flecks; higher up it closes, and
-  // the rock still shows through it in the creases' own pattern)
+  ask = clamp( ask + 0.3 * sunward * step( 0.02, ask ) * ( 1.0 - ask ) + 0.12 * edge, 0.0, 1.0 );
   // (its lower edge breaks up in flecks, by a grain with no direction: an edge broken along the creases hangs
   // like paint running down)
   float fleck = 0.5 * grain + 0.5 * texture2D( uLarge, vGroundPos.xz / 29.0 + vec2( 0.9, 0.4 ) ).r;
@@ -544,6 +552,8 @@ if ( gRange > 0.0 ) {
   snow *= 1.0 - 0.85 * smoothstep( 0.56, 0.7, 0.55 * crease + 0.45 * crease2 ) * ( 1.0 - 0.5 * ask );
   gSnow = snow * ( 0.5 + 0.3 * ask );
   gAlbedo = mix( rock, gSnowCol, gSnow );
+  // (the air in front of it: four kilometres of the day's haze lift it towards the sky's own tone)
+  gAlbedo = mix( gAlbedo, vec3( 0.46, 0.5, 0.57 ), 0.24 );
 }
 diffuseColor.rgb *= gAlbedo;
 // Seen against a low sun a plain rough surface glares (its Fresnel term goes to one at a grazing angle): rock and

@@ -962,11 +962,17 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
       if (!arm.moved(t.x, t.z)) continue;
       // (the lap's own trees that stay on the far shores take the shore wood's dark tone, and none of them has turned)
       const m = -arm.shore(t.x, t.z);
-      if (m > 0 && m < P.shore.reach + 60) {
+      if (m > 0 && m < P.shore.reach + 60 && !t.shore) {
         track.locate(t.x, t.z, -1, spot);
-        if (spot.lat > 0 && spot.lat - track.edgeAt(spot.s, 1) > ARM.reach * 0.5) {
+        // (every tree across the water from the road, and those further than half the bank's reach from it: sunk and
+        // widened, skirted to the grass, and of uneven height, by the number each drew when it was planted)
+        if (spot.lat > 0 && (spot.lat - track.edgeAt(spot.s, 1) > ARM.reach * 0.5 || arm.frame.toV(t.x, t.z) > ARM.tongueBox[2])) {
           t.tone = P.shore.tone;
           t.turned = 0;
+          t.h *= P.shore.size[0] + (P.shore.size[1] - P.shore.size[0]) * t.rank;
+          t.y -= P.shore.sink * t.h;
+          t.slim = (t.slim ?? 1) * P.shore.wide;
+          t.shore = true;
         }
       }
       if (lakeside?.moved(t.x, t.z)) continue;
@@ -1015,12 +1021,12 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
         if (roll > W.density * (1 - 0.5 * smoothstep(W.reach * 0.5, W.reach, m))) continue;
         if (arm.clears(px, pz) || blocked(px, pz, 2.5) || !free(px, pz, 2.8)) continue;
         // (only on the far side of the water from the road: the lap's own woods stand everywhere else)
-        if (spot.lat <= 0 || Math.abs(spot.lat) - track.edgeAt(spot.s, 1) < ARM.reach * 0.5) continue;
+        if (spot.lat <= 0 || (Math.abs(spot.lat) - track.edgeAt(spot.s, 1) < ARM.reach * 0.5 && arm.frame.toV(px, pz) <= ARM.tongueBox[2])) continue;
         const y = seat(px, pz);
         if (y < arm.level + 0.4) continue;
         const edge = m < W.from + 14;
         const species = edge ? (kind < 0.3 ? BIRCH : kind < 0.45 ? LIME : kind < 0.6 ? HORNBEAM : kind < 0.8 ? FIR : NEEDLE[0]) : kind < W.conifer ? NEEDLE[kind < W.conifer * 0.6 ? 0 : 1] : kind < W.conifer + 0.18 ? BIRCH : kind < W.conifer + 0.32 ? LIME : kind < W.conifer + 0.42 ? HORNBEAM : MAPLE;
-        addTree(px, y - 0.3, pz, species, { road: false, turned: 0, inside: edge ? 0.3 : 0.7, detail: edge ? 0.8 : 0.5, from: ar, tone: W.tone, crownSun: true });
+        addTree(px, y - 0.3, pz, species, { road: false, turned: 0, inside: edge ? 0.3 : 0.7, detail: edge ? 0.8 : 0.5, from: ar, tone: W.tone, crownSun: true, sink: W.sink, slim: W.wide, young: 0.6 + 0.55 * kind });
       }
     }
     // the massif's foot on the right of the road: the dark wood carried up the slope behind the lap's own rows

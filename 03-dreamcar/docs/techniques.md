@@ -900,11 +900,19 @@ bed off the far shores carries the mask too, so that the strip between a
 vertex in the water and one on the bank is wood to the waterline (it was
 pale outcrop: the "blobs" at the shore).
 
-**The range.** A ridge across the valley 4 km out (`peakAt`): great peaks
-and smaller ones between them from two ridged noises of the bearing, a long
-apron under a steep upper face, ribs across the face and gullies down it.
-The gullies are a function of the bearing alone, because the fall line of a
-range that lies across the valley is the line from the eye. Its rock and
+**The range.** A ridge across the valley 4 km out (`peakAt`), composed as
+one massif: an envelope with a dominant summit off the view's middle, a
+lesser one and low shoulders. Its skyline is ridge noise raised to a power
+(narrow points, wide saddles) and read at a bearing that is itself pushed
+about by a slower noise, so that no two peaks are the same width or the
+same distance apart; a first version, two ridged noises of the plain
+bearing under a flat-topped profile, made a row of sugar loaves. The face
+is a long apron under a steep wall with a sharp crest line. The gullies are
+a pattern of the bearing (the fall line of a range that lies across the
+valley is the line from the eye), but the bearing they are read at is bent
+by the height on the face, so they run together on the way down instead of
+hanging parallel.
+Its rock and
 snow are not the lakeside's negative forest mask (whose streaks are laid
 out round the lakeside's own eye: here they hung down the face like paint).
 The patch's vertices carry `aMask.y = 5 + ask`: 5 says "the arm's range",
@@ -914,7 +922,15 @@ range, more in the gullies, less on steep rock. The material paints pale
 warm grey rock, darker in creases laid out in polar coordinates round the
 valley's eye (fine across the bearing, long down the fall line), and lays
 the snow where `ask` says, with its edge broken in flecks by a grain that
-has no direction and the rock left showing in the creases.
+has no direction and the rock left showing in the creases. The range
+faces away from the day's sun and stood at 0.7 of the sky's brightness
+where the photograph's is nearly the sky's: its rock is paler and warmer
+on the faces square to the day's sun (the sun's direction from
+`lighting.js`, as paint: the same at every time of day) and greyer on
+those turned from it, small aretes are painted across the face where the
+42 m cells round the ridges off, the dusting reaches further down the
+sunward faces, and the whole is mixed a quarter of the way to the air's
+tone, as four kilometres of haze would.
 
 **Fine ground for the valley.** The spurs and the range were the far land's
 100 m facets: flat planes with ruler-straight creases. A second patch
