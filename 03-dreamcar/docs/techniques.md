@@ -892,11 +892,37 @@ tip with knobs and saddles (ridged noise along it), its flanks fall away
 from the crest, gullied; they come from the left and the right by turns,
 each behind the one before, the first down to the arm's shore. Their forest
 mask is over 1, which the ground's material reads as dark wood: the canopy's
-colour darker and bluer, and no bare rock on steep ground under it. The
-range is the lakeside's (`peakAt`): a ridge of peaks across the valley 4 km
-out, bare, with snow in streaks high up where the mask is negative. All of
-it is the far land's 100 m lattice, lit, baked and hazed like the rest; the
-haze is what makes each spur paler than the one in front.
+colour replaced by a painted wood (stands and crowns at two scales,
+clearings, gullies' shade), no bare rock or scree on steep ground under it,
+and a tint towards the air's blue by the distance from the valley's eye:
+the day's haze alone left two spurs a kilometre apart the same tone. The
+bed off the far shores carries the mask too, so that the strip between a
+vertex in the water and one on the bank is wood to the waterline (it was
+pale outcrop: the "blobs" at the shore).
+
+**The range.** A ridge across the valley 4 km out (`peakAt`): great peaks
+and smaller ones between them from two ridged noises of the bearing, a long
+apron under a steep upper face, ribs across the face and gullies down it.
+The gullies are a function of the bearing alone, because the fall line of a
+range that lies across the valley is the line from the eye. Its rock and
+snow are not the lakeside's negative forest mask (whose streaks are laid
+out round the lakeside's own eye: here they hung down the face like paint).
+The patch's vertices carry `aMask.y = 5 + ask`: 5 says "the arm's range",
+`ask` is how much snow the place wants there, worked out from the range's
+own shape: the height up the peak against a line that wanders along the
+range, more in the gullies, less on steep rock. The material paints pale
+warm grey rock, darker in creases laid out in polar coordinates round the
+valley's eye (fine across the bearing, long down the fall line), and lays
+the snow where `ask` says, with its edge broken in flecks by a grain that
+has no direction and the rock left showing in the creases.
+
+**Fine ground for the valley.** The spurs and the range were the far land's
+100 m facets: flat planes with ruler-straight creases. A second patch
+(`terrain-arm-valley`, 42 m cells, 84 m on low: about 18 k and 4.5 k
+triangles, one draw call) draws them from the same functions; it is made
+by the same code as the shore's patch (`finePatch`), each told of the
+other: where both are whole the valley's patch draws nothing, and where
+one is whole the other does not ease onto a lattice that is sunk there.
 
 **Fine ground for the shore.** The arm lies where the terrain's grid eases
 onto the far land's lattice, and its southern half beyond the grid, where a
@@ -917,8 +943,8 @@ the long right as an arc, so that only the water's side of the road is
 painted): the lakeside's structure of swells, sward and tussocks in two
 darker, greyer greens. The first version marked the bank's vertices as the
 approach's meadow instead, which read as a lawn with an edge wherever a
-triangle ended. A strip of pale stones lies along the water (`aMask.y` as
-loose stone within a few metres of the shore line).
+triangle ended. (A strip of pale stones along the water was tried and
+taken out: on 14 m cells it was a row of pale blobs.)
 
 **One sheet of water.** The arm is the lake's own level, so it is the lake's
 own sheet: `terrain.lake.sheet` grows the sheet's box over the arm by whole

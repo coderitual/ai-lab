@@ -35,7 +35,7 @@ import { planeNoise, smoothstep, withBake } from './shading.js';
 import { CANOPY, canopyOpen } from './canopy.js';
 import { createLakeside } from './lakeside.js';
 import { goldwoodOf } from './goldwood.js';
-import { createArm } from './arm.js';
+import { ARM, createArm } from './arm.js';
 import { APPROACH, approachAt, approachesOf, beforeFace, behindFace, coverOver, meadowAt, rise as approachRise, woodAt as approachWood } from './approach.js';
 
 // The Track's EDGE and SURFACE values (the world never imports from game/).
@@ -965,8 +965,6 @@ const FOOT = 0.8;
           mask[v * 2 + 1] = smoothstep(0.6, 0.9, 1 - inv) * 0.5;
           const p = s === null ? null : placeOf(s, gLat[k], d);
           if (p && p.meadow > 0) mask[v * 2 + 1] = -p.meadow;
-          // (the arm of the lake: a strip of pale stones along its water's edge)
-          if (arm && !(p && p.meadow > 0)) mask[v * 2 + 1] = Math.max(mask[v * 2 + 1], 0.9 * arm.shingle(x, z));
           if (lakeside && !(p && p.meadow > 0) && s !== null && 1 - inv > SPUR_STEEP && lakeside.spur(x, z, s, gLat[k]) > 0.5) mask[v * 2 + 1] = 3;
         }
       }
@@ -1039,7 +1037,7 @@ const FOOT = 0.8;
         pos[v * 3] = x;
         pos[v * 3 + 1] = moved ? bilinear(heights, m, m, x0, z0, FAR_CELL, x, z) : heights[v];
         // (under the arm of the lake's fine ground the lattice is out of the way: armPatch below draws that ground)
-        if (arm && arm.fine(x, z) >= 1) pos[v * 3 + 1] -= ARM_SINK;
+        if (arm && (arm.fine(x, z) >= 1 || arm.valleyFine(x, z) >= 1)) pos[v * 3 + 1] -= ARM_SINK;
         pos[v * 3 + 2] = z;
         const h0 = heights[v] + 2;
         bake[v * 4] = marchSun(x, z, h0, dirs[0], 4000);
@@ -1094,29 +1092,41 @@ const FOOT = 0.8;
     return { level: lakeLevel, extent: base, sheet: { extent, cell: CELL, within } };
   }
 
-  // ---- the arm of the lake's fine ground (arm.js `fine`). The arm lies where the grid eases onto the far land and
-  // beyond it, on the 100 m lattice, where a shore is straight in pieces. Beyond the grid's rectangle a patch on a
-  // fine grid of its own draws the arm's own heights where the place says so, easing onto the lattice's facets at
-  // its rim (the grid does the same inside its rectangle, above; the lattice under the patch is sunk). Its lines
-  // lie on the grid's border, where both have the same height.
-  let armPatch = null;
-  if (arm) {
-    const c = tier === 'low' ? 28 : 14;
-    const e = arm.extent;
-    const pad = 240;
-    const px0 = minX - c * Math.ceil((minX - (e.x0 - pad)) / c);
-    const pz0 = minZ - c * Math.ceil((minZ - (e.z0 - pad)) / c);
-    const pw = Math.ceil((e.x1 + pad - px0) / c) + 1;
-    const ph = Math.ceil((e.z1 + pad - pz0) / c) + 1;
+  // ---- the arm of the lake's fine ground (arm.js `fine`, `valleyFine`). The arm lies where the grid eases onto the
+  // far land and beyond it, on the 100 m lattice, where a shore is straight in pieces and a spur is three flat
+  // planes. Beyond the grid's rectangle a patch on a fine grid of its own draws the land's own heights where the
+  // place says so, easing onto the lattice's facets at its rim (the grid does the same inside its rectangle, above;
+  // the lattice under a patch is sunk). Its lines lie on the grid's border, where both have the same height. Two
+  // patches: round the arm's shore (14 m cells), and the valley's spurs and range (42 m).
+  const finePatches = [];
+  /**
+   * @param {(x: number, z: number) => number} weight 0..1 how much of the ground is the patch's
+   * @param {{ x0: number, x1: number, z0: number, z1: number }} box where to look for it
+   * @param {number} c its cell (m)
+   * @param {(x: number, z: number, y: number, steep: number) => number} stone the patch's aMask.y
+   * @param {(x: number, z: number) => number} other the other patch's weight: where that one is whole the lattice is
+   *   sunk under it, so this one keeps to the land's own heights there instead of easing onto the lattice, and
+   *   where `yields` is set draws nothing that the other covers whole
+   * @param {boolean} yields
+   */
+  function finePatch(weight, box, c, stone, other, yields) {
+    const px0 = minX - c * Math.ceil((minX - box.x0) / c);
+    const pz0 = minZ - c * Math.ceil((minZ - box.z0) / c);
+    const pw = Math.ceil((box.x1 - px0) / c) + 1;
+    const ph = Math.ceil((box.z1 - pz0) / c) + 1;
     const lattice = (x, z) => bilinear(farHeight, farN, farN, farX0, farZ0, FAR_CELL, x, z);
     const fine = new Float32Array(pw * ph);
     const high = new Float32Array(pw * ph);
+    const covered = new Uint8Array(pw * ph);
     for (let j = 0; j < ph; j++) {
       for (let i = 0; i < pw; i++) {
         const x = px0 + i * c;
         const z = pz0 + j * c;
-        const w = arm.fine(x, z);
-        fine[j * pw + i] = w;
+        const own = weight(x, z);
+        const o = own > 0 || yields ? other(x, z) : 0;
+        const w = Math.max(own, own > 0 ? o : 0);
+        fine[j * pw + i] = own;
+        covered[j * pw + i] = yields && o >= 1 ? 1 : 0;
         // (at its rim the patch lies a little under the lattice's facets, so that the two never share a surface)
         const l = lattice(x, z);
         high[j * pw + i] = (w > 0 ? l + (heightAt(x, z) - l) * w : l) - 1.5 * (1 - smoothstep(0, 0.3, w));
@@ -1146,7 +1156,7 @@ const FOOT = 0.8;
       const own = forestOf(x, z, y, steep, null, 0, 0);
       const wooded = y < lakeLevel + 0.6 ? 0 : smoothstep(0.1, 0.26, noise.fbm(x / 230 + 11, z / 230, 4)) * (1 - smoothstep(0.55, 0.8, steep));
       // (open where the place says its bank is open: own is 0 there by the place's word, not for want of a wood)
-      mask.push(own < 0 ? own : arm.open(x, z) > 0.5 || arm.shore(x, z) > -3 ? own : Math.max(own, wooded), Math.max(smoothstep(0.6, 0.9, steep) * 0.5, 0.9 * arm.shingle(x, z)));
+      mask.push(own < 0 ? own : arm.open(x, z) > 0.5 || arm.shore(x, z) > -3 ? own : Math.max(own, wooded), stone(x, z, y, steep));
       slot[k] = pos.length / 3 - 1;
       return slot[k];
     };
@@ -1154,6 +1164,7 @@ const FOOT = 0.8;
       for (let i = 0; i < pw - 1; i++) {
         const k = j * pw + i;
         if (!(fine[k] > 0 || fine[k + 1] > 0 || fine[k + pw] > 0 || fine[k + pw + 1] > 0)) continue;
+        if (covered[k] && covered[k + 1] && covered[k + pw] && covered[k + pw + 1]) continue;
         // (inside the grid's rectangle the grid is the ground)
         if (inRect(px0 + (i + 0.5) * c, pz0 + (j + 0.5) * c)) continue;
         const a = at(i, j);
@@ -1163,15 +1174,28 @@ const FOOT = 0.8;
         index.push(a, d, b, b, d, f);
       }
     }
-    if (index.length) {
-      armPatch = new THREE.BufferGeometry();
-      armPatch.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      armPatch.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      armPatch.setAttribute('aBake', new THREE.Float32BufferAttribute(bake, 4));
-      armPatch.setAttribute('aMask', new THREE.Float32BufferAttribute(mask, 2));
-      armPatch.setIndex(index);
-      armPatch.computeBoundingSphere();
-    }
+    if (!index.length) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geometry.setAttribute('aBake', new THREE.Float32BufferAttribute(bake, 4));
+    geometry.setAttribute('aMask', new THREE.Float32BufferAttribute(mask, 2));
+    geometry.setIndex(index);
+    geometry.computeBoundingSphere();
+    finePatches.push(geometry);
+  }
+  if (arm) {
+    const e = arm.extent;
+    const pad = 240;
+    finePatch((x, z) => arm.fine(x, z), { x0: e.x0 - pad, x1: e.x1 + pad, z0: e.z0 - pad, z1: e.z1 + pad }, tier === 'low' ? 28 : 14, (x, z, y, steep) => smoothstep(0.6, 0.9, steep) * 0.5, (x, z) => arm.valleyFine(x, z), false);
+    // (the range's rock and snow are the ground material's: aMask.y = 5 marks them, plus how much snow the place
+    // asks for there: thickest at the crests, reaching lower in the gullies, thin on steep rock)
+    const D = ARM.range.dust;
+    finePatch((x, z) => arm.valleyFine(x, z), arm.valleyBox, tier === 'low' ? 84 : 42, (x, z, y, steep) => {
+      const k = arm.rangeAt(x, z);
+      if (!k) return smoothstep(0.6, 0.9, steep) * 0.5;
+      return 5 + smoothstep(k.line - D[0], k.line + D[1], k.up + 0.22 * (k.gully - 0.45)) * (1 - 0.75 * smoothstep(0.4, 0.62, steep));
+    }, (x, z) => arm.fine(x, z), true);
   }
 
   // ---- assembled
@@ -1185,13 +1209,13 @@ const FOOT = 0.8;
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
   }
-  if (armPatch) {
-    const mesh = new THREE.Mesh(armPatch, material);
-    mesh.name = 'terrain-arm';
+  finePatches.forEach((geometry, k) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = k ? 'terrain-arm-valley' : 'terrain-arm';
     mesh.receiveShadow = true;
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
-  }
+  });
   const far = new THREE.Mesh(farGeometry, material);
   far.name = 'terrain-far';
   far.receiveShadow = true;

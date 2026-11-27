@@ -32,12 +32,11 @@ comparison stills and strike what is done.
   above the walls are single crowns from far off, not a closed wood.
 - **The arm of the lake against its photograph** (design.md, "The arm of the
   lake"): the light is the sunny day's, so the spurs are hazy blue-grey
-  where the photograph's are near black; the spurs and the range are the far
-  land's 100 m facets (smooth planes with straight creases, no trees drawn
-  on them), and the snow's lower edge hangs in streaks that do not follow
-  the range's own gullies; the lap's lime-green rows on the right of the
-  bridge's end are the brightest thing near the road; from the bridge the
-  foreground is a parapet, not a verge.
+  where the photograph's are near black, and the range stands in its own
+  shade; its peaks are round at 42 m a cell and its gullies evenly spaced;
+  the spurs' wood is painted, with no trees on their skylines; from the
+  bridge the foreground is a parapet, not a verge; one pale patch is left
+  on the far bank at the water.
 - **The ground beside the sky road** reads from above as a pale, rippled
   bare slope (`docs/images/sky-road.jpg`), not the wooded valley under the
   columns of frame A.

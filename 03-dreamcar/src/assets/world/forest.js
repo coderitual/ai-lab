@@ -929,6 +929,35 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
     const P = ARM.planting;
     const ar = rng.fork('arm');
     const kept = trees.filter((t) => !arm.clears(t.x, t.z));
+    // The lap's own wood on the right of the road, from the bridge's end round the first of the long right, stands
+    // beside the bank in every view of the place. It stays what it is, but its broadleaves take an olive tone (in
+    // full sun their lime green was the brightest thing in the picture) and its conifers, which stood on tall bare
+    // stems, stand deeper and wider: skirted to the ground.
+    {
+      const R = P.right;
+      const b0 = [1e9, 1e9, -1e9, -1e9];
+      for (let d = R.along[0]; d <= R.along[1]; d += 10) {
+        track.pointAt(track.wrap(arm.s0 + d), 0, point);
+        b0[0] = Math.min(b0[0], point.x);
+        b0[1] = Math.min(b0[1], point.z);
+        b0[2] = Math.max(b0[2], point.x);
+        b0[3] = Math.max(b0[3], point.z);
+      }
+      for (const t of kept) {
+        if (t.x < b0[0] - R.reach || t.x > b0[2] + R.reach || t.z < b0[1] - R.reach || t.z > b0[3] + R.reach) continue;
+        track.locate(t.x, t.z, -1, spot);
+        const d = arm.along(spot.s);
+        if (spot.lat >= 0 || d < R.along[0] || d > R.along[1] || -spot.lat - track.edgeAt(spot.s, -1) > R.reach) continue;
+        if (SPECIES_DATA[VARIANTS[t.variant].species].autumn.length && VARIANTS[t.variant].species !== 'larch') {
+          if (!t.tone) t.tone = R.tone;
+        } else if (!t.sunk) {
+          t.y -= R.sink * t.h;
+          t.slim = (t.slim ?? 1) * R.wide;
+          t.sunk = true;
+          if (!t.tone) t.tone = R.dark;
+        }
+      }
+    }
     for (const t of kept) {
       if (!arm.moved(t.x, t.z)) continue;
       // (the lap's own trees that stay on the far shores take the shore wood's dark tone, and none of them has turned)
@@ -1016,7 +1045,7 @@ export function createForest({ renderer, track, terrain, tier, caps = null, cove
           if (y > lakeLevel + F.top || y < lakeLevel + 1) continue;
           const slope = Math.max(Math.abs(terrain.heightAt(px + 2, pz) - y), Math.abs(terrain.heightAt(px, pz + 2) - y)) / 2;
           if (slope > 1.4) continue;
-          addTree(px, y - 0.3 - slope * 1.2, pz, kind < 0.65 ? NEEDLE[0] : NEEDLE[1], { road: false, turned: 0, inside: 0.6, detail: 0.5, height: [13, 22], slim: 1.4, sink: 0.14, from: fr, tone: F.tone, crownSun: true });
+          addTree(px, y - 0.3 - slope * 1.2, pz, kind < 0.65 ? NEEDLE[0] : NEEDLE[1], { road: false, turned: 0, inside: 0.6, detail: 0.5, height: [13, 22], slim: 1.5, sink: 0.24, from: fr, tone: F.tone, crownSun: true });
         }
       }
     }

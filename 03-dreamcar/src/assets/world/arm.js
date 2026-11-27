@@ -9,7 +9,7 @@
 //   terrain.js      ground(): the arm's basin and its banks, beyond the left
 //                   edge only, and the valley beyond with its spurs and its
 //                   range; wood(): where its shores and spurs are wooded;
-//                   fine() and shingle(): the fine ground round the shore
+//                   fine(), valleyFine(): where it draws fine ground
 //   groundMaterial.js  paint: the bank's grass, per pixel from the frame
 //   index.js        the arm's sheet of water (lake.js), at the lake's own level
 //   forest.js       clears(): where the lap's own trees give way; the young
@@ -92,9 +92,12 @@ export const ARM = {
    * [root angle, root distance, tip angle, tip distance, its crest's height at the root (m), half its width at the
    * root (m)]: the crest falls from root to tip, unevenly, and the flanks fall away from it. Behind them a range
    * of bare peaks closes the valley `range.at` m out (wandering by `wander`), `half` m from foot to crest, its
-   * crest `relief[0]` to `relief[0] + relief[1]` m high, between `angle` degrees, with snow in streaks on the
-   * upper part of each peak (`snow`: from, full, and `most` of it at the top; the ground's material draws it where the forest mask is
-   * negative, as for the lakeside's range). The spurs are wooded darkly (a forest mask over 1).
+   * crest `relief[0]` to `relief[0] + relief[1]` m high, between `angle` degrees; gullies run down its face
+   * (`gully`: degrees of bearing from one to the next, the share of the height they cut). Its snow is a dusting
+   * that follows its own shape (`snow`: the share of a peak's height where it begins, and by how much that line
+   * wanders along the range; `dust`: it thins out over this much below the line and thickens over this much
+   * above it): it reaches lower in the gullies, lies thin on steep rock, thickest at the crests. The spurs are
+   * wooded darkly (a forest mask over 1).
    */
   spurs: [
     [46.6, 1240, 7.9, 1090, 175, 360],
@@ -102,7 +105,7 @@ export const ARM = {
     [45, 2350, 5, 2450, 330, 470],
     [-16, 3250, 9, 2950, 380, 520],
   ],
-  range: { at: 4050, wander: 170, half: 430, relief: [230, 360], angle: [-26, -12, 46, 60], snow: [0.3, 0.92], most: 0.9 },
+  range: { at: 4050, wander: 170, half: 540, relief: [230, 380], angle: [-26, -12, 46, 60], gully: [2.3, 0.14], snow: [0.5, 0.2], dust: [0.22, 0.36] },
   /**
    * The open bank: beside the road from `open[0]` to `open[1]` m from the section's start, on the left, the lap's
    * woods give way as far as the water (and no further than `reach` m beyond the edge): grass, a fence, young
@@ -114,11 +117,9 @@ export const ARM = {
   /**
    * The bank's grass (groundMaterial.js): long, uneven, darker and greyer than the lap's mown verges, lighter on
    * its rises (`lit`) and darker in its hollows (`hollow`), linear albedo; painted over the frame's box `box`
-   * (u from, to; v up to) on the water's side of the road, from `clear` m beyond the centre line. `shingle`: the
-   * strip of pale stones along the water's edge (metres below and above the shore line).
+   * (u from, to; v up to) on the water's side of the road, from `clear` m beyond the centre line.
    */
-  paint: { lit: [0.105, 0.1, 0.036], hollow: [0.032, 0.046, 0.022], box: [-40, 720, 190], clear: [9, 22] },
-  shingle: [3, 6],
+  paint: { lit: [0.105, 0.1, 0.036], hollow: [0.032, 0.046, 0.022], box: [-40, 620, 125], clear: [9, 22] },
   /**
    * Fine ground: within `fine[0]` m of the shore the terrain draws the arm's own heights on a fine grid (the place
    * lies on the far land's 100 m lattice, where a shore is straight in pieces), easing onto the lattice by `fine[1]`.
@@ -140,6 +141,12 @@ export const ARM = {
      * no higher than `top` m over the lake.
      */
     foot: { along: [-200, 330], beyond: [34, 230], lattice: 6.4, density: 0.8, top: 175, tone: [0.4, 0.5, 0.58] },
+    /**
+     * The lap's own wood on the right of the road beside the place (`along` m from the section's start, to `reach`
+     * m beyond the right edge): its broadleaves' tone (an olive gold: darker, less green), and its conifers `sink`
+     * of their height deeper and `wide` times as wide, toned `dark`.
+     */
+    right: { along: [-380, 420], reach: 260, tone: [0.5, 0.39, 0.42], sink: 0.24, wide: 1.5, dark: [0.5, 0.58, 0.62] },
     groups: [
       [18, 13, 4, 5],
       [62, 24, 5, 6],
@@ -301,20 +308,28 @@ function build(track, rng, section) {
     return spur;
   }
   /** The range that closes the valley at a bearing and a distance: metres over the floor, and how far up its peak that is. */
-  const peak = { h: 0, up: 0 };
+  const peak = { h: 0, up: 0, gully: 0 };
   function peakAt(a, r) {
     const K = A.range;
-    peak.h = peak.up = 0;
+    peak.h = peak.up = peak.gully = 0;
     const w = smoothstep(K.angle[0], K.angle[1], a) * (1 - smoothstep(K.angle[2], K.angle[3], a));
     if (w <= 0) return peak;
     const across = 1 - Math.abs(r - (K.at + K.wander * Math.sin(a * 0.19 + 2))) / K.half;
     if (across <= 0) return peak;
-    // peaks and saddles along the ridge, a rib or two down its face
-    const crest = noise.ridged(a / 7.5 + 9, 3.3, 3);
-    const rib = 0.72 + 0.28 * noise.fbm(a / 2.2, r / 240, 2);
-    const up = w * across * rib * ((K.relief[0] + K.relief[1] * crest) / (K.relief[0] + K.relief[1]));
+    // great peaks and saddles along the ridge, smaller peaks of uneven height between them
+    const crest = 0.58 * noise.ridged(a / 7.5 + 9, 3.3, 3) + 0.42 * noise.ridged(a / 2.3 + 4, 7.7, 2);
+    // ribs across its face, and gullies down it (they run down the fall line: along r, so they are a pattern of
+    // the bearing alone), deepest on the middle of the face
+    const rib = 0.74 + 0.26 * noise.fbm(a / 2.2, r / 240, 2);
+    const gully = noise.ridged(a / K.gully[0] + 1.7, 5.1, 2);
+    // (its foot is a long apron and its upper face steep: the height goes with the distance in from the foot
+    // to the power 1.5, buttresses standing out of it)
+    const butt = 0.85 + 0.3 * noise.fbm(a / 4.3 + 2, r / 420 + 1, 2);
+    const shape = w * Math.min(1, across * butt) ** 1.5 * rib * ((K.relief[0] + K.relief[1] * crest) / (K.relief[0] + K.relief[1]));
+    const up = shape * (1 - K.gully[1] * gully * smoothstep(0.04, 0.3, shape) * (1 - 0.6 * shape));
     peak.h = up * (K.relief[0] + K.relief[1]);
     peak.up = up;
+    peak.gully = gully;
     return peak;
   }
   /** False nearer than the valley's first ground (a cheap test), or behind the bridge. */
@@ -358,7 +373,8 @@ function build(track, rng, section) {
     const w = stretch(s);
     if (w <= 0) return 0;
     const beyond = lat - track.edgeAt(s, 1);
-    return w * (1 - smoothstep(A.reach - 40, A.reach, beyond));
+    // (and only on the road's side of the water: the shore across the arm is the far shore, wooded)
+    return w * (1 - smoothstep(A.reach - 40, A.reach, beyond)) * (1 - smoothstep(A.tongueBox[2] - 30, A.tongueBox[2], toV(x, z)));
   }
 
   return {
@@ -409,18 +425,22 @@ function build(track, rng, section) {
         const r = Math.hypot(du, dv);
         if (inValley(du, r) && f >= 0) {
           const k = peakAt((Math.atan2(dv, du) * 180) / Math.PI, r);
-          if (k.up > 0.1 && k.h >= spurAt(du, dv).h) {
-            const snow = smoothstep(A.range.snow[0], A.range.snow[1], k.up);
-            return snow > 0.02 ? -snow * A.range.most : f * (1 - smoothstep(0.1, 0.25, k.up));
-          }
-          const on = smoothstep(0.03, 0.2, spurAt(du, dv).up) * smoothstep(A.pass.range[0], A.pass.range[0] + 160, r);
+          // (bare: its rock and its snow are the ground material's, from `rangeAt`)
+          if (k.up > 0.06 && k.h >= spurAt(du, dv).h) return f * (1 - smoothstep(0.06, 0.2, k.up));
+          // (and the valley's floor between them is the same dark wood, thinner: no bright meadow in the distance)
+          const P = A.pass;
+          const pa = (Math.atan2(dv, du) * 180) / Math.PI;
+          const floor = smoothstep(P.angle[0], P.angle[1], pa) * (1 - smoothstep(P.angle[2], P.angle[3], pa)) * smoothstep(P.range[0], P.range[0] + 200, r) * (1 - smoothstep(P.range[2], P.range[3], r));
+          const on = Math.max(smoothstep(0.03, 0.2, spurAt(du, dv).up) * smoothstep(P.range[0], P.range[0] + 160, r), 0.75 * floor);
           if (on > 0 && (!near(x, z) || shore(x, z) < -8)) f = Math.max(f, 0.9 * on) + 0.8 * on;
         }
       }
       if (!near(x, z)) return f;
       const q = shore(x, z);
-      if (q > -3) return 0;
       const o = open(x, z, s, lat);
+      // (the bed off the far shores carries the wood's mask too: no one sees it under the water, and the ground
+      // between a vertex in the water and one on the bank is then wooded to the waterline, not bare outcrop)
+      if (q > -3) return 1.5 * (1 - o);
       const P = A.planting.shore;
       const far = 0.92 * smoothstep(2, 7, -q) * (1 - smoothstep(P.reach, P.reach + 120, -q));
       // (the wood on the far shores is the dark wood too)
@@ -433,11 +453,63 @@ function build(track, rng, section) {
       return 1 - smoothstep(A.fine[0], A.fine[1], -shore(x, z));
     },
 
-    /** 0..1 the strip of pale stones along the water's edge. */
-    shingle(x, z) {
-      if (!near(x, z)) return 0;
-      const q = shore(x, z);
-      return 0.55 * smoothstep(-A.shingle[1], -A.shingle[1] * 0.4, q) * (1 - smoothstep(A.shingle[0] * 0.3, A.shingle[0], q));
+    /**
+     * 0..1 how much of the ground at a point is the valley's own fine ground: its spurs and its range, which the
+     * far land's 100 m facets drew as flat planes with straight creases.
+     */
+    valleyFine(x, z) {
+      const du = toU(x, z) - A.pass.eye[0];
+      const dv = toV(x, z) - A.pass.eye[1];
+      const r = Math.hypot(du, dv);
+      if (!inValley(du, r)) return 0;
+      const a = (Math.atan2(dv, du) * 180) / Math.PI;
+      const K = A.range;
+      const band = (1 - smoothstep(K.half * 0.98, K.half * 1.2, Math.abs(r - (K.at + K.wander * Math.sin(a * 0.19 + 2))))) * smoothstep(K.angle[0] - 4, K.angle[0], a) * (1 - smoothstep(K.angle[3], K.angle[3] + 4, a));
+      let on = band;
+      for (const S of spurs) {
+        const t = Math.min(1, Math.max(0, ((du - S.ax) * S.dx + (dv - S.ay) * S.dy) / S.len2));
+        const d = Math.hypot(du - S.ax - S.dx * t, dv - S.ay - S.dy * t);
+        on = Math.max(on, 1 - smoothstep(S.half * 0.95, S.half * 1.25, d));
+      }
+      return on * smoothstep(A.pass.range[0], A.pass.range[0] + 120, r);
+    },
+
+    /**
+     * The range at a point: null off it, or how far up its peak the point is (0 at the foot, 1 on the highest
+     * crest), how deep in a gully of its face (0..1), and the height share where its snow begins there (it
+     * wanders along the range).
+     */
+    rangeAt(x, z) {
+      const du = toU(x, z) - A.pass.eye[0];
+      const dv = toV(x, z) - A.pass.eye[1];
+      const r = Math.hypot(du, dv);
+      if (!inValley(du, r)) return null;
+      const a = (Math.atan2(dv, du) * 180) / Math.PI;
+      const k = peakAt(a, r);
+      if (k.up <= 0.02 || k.h < spurAt(du, dv).h) return null;
+      return { up: k.up, gully: k.gully, line: A.range.snow[0] + A.range.snow[1] * (noise.fbm(a / 11 + 3, 0.7, 2) - 0.5) };
+    },
+
+    /** Where the valley's fine ground lies (world x and z). */
+    get valleyBox() {
+      let x0 = 1e9;
+      let x1 = -1e9;
+      let z0 = 1e9;
+      let z1 = -1e9;
+      const K = A.range;
+      const add = (a, r) => {
+        const u = A.pass.eye[0] + Math.cos(a * DEG) * r;
+        const v = A.pass.eye[1] + Math.sin(a * DEG) * r;
+        const x = ox + tx * u + lx * v;
+        const z = oz + tz * u + lz * v;
+        x0 = Math.min(x0, x);
+        x1 = Math.max(x1, x);
+        z0 = Math.min(z0, z);
+        z1 = Math.max(z1, z);
+      };
+      for (let a = K.angle[0] - 5; a <= K.angle[3] + 5; a += 2) for (const r of [K.at - K.wander - K.half * 1.3, K.at + K.wander + K.half * 1.3]) add(a, r);
+      for (const [a0, r0, a1, r1, , half] of A.spurs) for (const [a, r] of [[a0, r0], [a1, r1]]) for (const da of [-1, 1]) for (const dr of [-1, 1]) add(a + da * ((half * 1.3) / r / DEG), r + dr * half * 1.3);
+      return { x0, x1, z0, z1 };
     },
 
     /** What the ground's material needs to paint the bank: the frame, the bank's box in it, where the long right's arc lies. */
@@ -457,7 +529,8 @@ function build(track, rng, section) {
           break;
         }
       }
-      return { ox, oz, tx, tz, level, begin, radius, ...A.paint };
+      const [ex, ez] = [ox + tx * A.pass.eye[0] + lx * A.pass.eye[1], oz + tz * A.pass.eye[0] + lz * A.pass.eye[1]];
+      return { ox, oz, tx, tz, level, begin, radius, eye: [ex, ez], ...A.paint };
     },
 
     /** True where one of the lap's own trees gives way to the place: in the water and on its beach, and on the open bank. */

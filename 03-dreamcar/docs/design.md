@@ -683,21 +683,26 @@ module describes it (`src/assets/world/arm.js`).
   the rail and down the bank, a stock fence on weathered posts along its top
   for the first 170 m, and groups of dark, irregular birch saplings no
   taller than 5 m, so that nothing stands between the road and the water.
-  On the other side of the road dark spruce and fir are carried up the foot
-  of the massif behind the lap's own rows. The rail, the tyre wall and the
+  On the other side of the road the lap's own wood stays, toned to an
+  olive gold so that it sits with the bank (in full sun its lime green was
+  the brightest thing in the view), its conifers skirted to the ground, and
+  dark spruce and fir are carried up the foot of the massif behind it. The rail, the tyre wall and the
   boards on the outside of the bend are the circuit's own.
 - **The far shores.** West of the arm the hills rise straight from the
   water under a dark wood (conifers mostly; the lap's own trees that stand
   there take its tone), with the pale hall of frame D3 on its hilltop
-  behind them. A strip of pale stones lies along the water's edge, and the
-  shore is a curve with coves, not the far land's straight facets.
+  behind them. The wood comes down to the waterline, and the shore is a
+  curve with coves, not the far land's straight facets.
 - **The valley beyond.** South of the arm the land that closed the view is
   a valley floor now, and on it stand the photograph's spurs: four dark
   wooded ridges with uneven, falling crests that come down into the valley
-  from the left and the right by turns, the first to the arm's shore, each
-  behind and paler than the one before. Behind them a range of bare peaks
-  with snow in streaks closes the valley four kilometres off, the palest
-  thing below the sky.
+  from the left and the right by turns, the first to the arm's shore. Each
+  is a forested slope (darker and lighter stands, a clearing here and
+  there, shaded gullies), and each is paler and bluer than the one before.
+  Behind them a range of many uneven peaks closes the valley four
+  kilometres off: pale warm grey rock with darker gullies down its face and
+  a thin, broken dusting of snow that is thickest on the crests and
+  reaches down the gullies, the palest thing below the sky.
 - **The light** is the day's own: the sun 16 degrees up on the right of the
   descent, so the bank below the road is in its own shade, and the water,
   the western shore and the ridges beyond are lit.
@@ -708,25 +713,22 @@ end, a long lens (24 degrees) down the road, the car behind the camera.
 What still differs from the photograph (tools.md): the photograph is a dim,
 overcast, nearly colourless exposure and ours is the lap's sunny day, which
 is not this place's to change. As shares of the sky's luminance: the near
-wooded slope 0.10 (the photograph 0.05), the spur behind it 0.15 (0.10), the
-far range 0.68 (0.96), the water 0.42 (0.46). The order is the photograph's,
+wooded slope 0.10 (the photograph 0.05), the spur behind it 0.19 (0.10), the
+far range 0.70 (0.96), the water 0.42 (0.46). The order is the photograph's,
 dark to pale with distance, but the day's haze lifts the near spurs (they
-cannot be darker than the air in front of them) and the range, grey rock
-under snow in streaks seen in its own shade, is not the brightest thing in
-the frame as the photograph's sunlit massif is. The spurs and the range are
-the far land's 100 m facets: planes with straight creases and no trees on
-them, where the photograph has gullied, wooded flanks; the snow's lower
-edge hangs in streaks. The foreground is the bridge's parapet and the lap's
-asphalt, not a gravel verge with dry grass (the long grass and the fence
-begin where the bridge ends); there is no dark band of wood before the
-water, no sign, no centre line; the road bends right, not left; the lap's
-lime-green rows on the right of the bridge's end are brighter than anything
-in the photograph, and a faintly paler band lies along the foot of the far
-bank.
+cannot be darker than the air in front of them) and the range, seen in its
+own shade with only its right-hand faces in the sun, is not as bright as
+the photograph's sunlit massif. The range's peaks are rounder than rock
+(a 42 m grid) and its gullies are regular; the spurs' wood is paint, with
+no trees on their skylines. The foreground is the bridge's parapet and the
+lap's asphalt, not a gravel verge with dry grass (the long grass and the
+fence begin where the bridge ends); there is no dark band of wood before
+the water, no sign, no centre line; the road bends right, not left; one
+small pale patch is left on the far bank at the waterline.
 
 Seen from elsewhere: the ledge's first bend (frame D3) looks the same way,
 and where a dark ridge closed its view behind the boards it now has the
-valley's spurs and the snow range, with a sliver of the arm under them; the
+valley's spurs and the range, with a sliver of the arm under them; the
 hall on its hilltop and everything nearer are unchanged. From the straight
 at night the village across the lake has its western third on lower ground
 than it had (the valley floor), its lamps mirrored nearer the shore, and the

@@ -146,6 +146,8 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
     uArmFrame: { value: new THREE.Vector4(0, 0, 1, 0) },
     uArmBox: { value: new THREE.Vector4(0, 0, 0, -1e4) },
     uArmArc: { value: new THREE.Vector4(0, 1, 0, 1) },
+    /** The eye of its valley (x, z): the spurs' and the range's patterns are laid out round it. */
+    uArmEye: { value: new THREE.Vector2() },
   };
 
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
@@ -204,6 +206,7 @@ export function createGroundMaterial({ caps, tier, atmosphere }) {
       uniforms.uArmFrame.value.set(paint.ox, paint.oz, paint.tx, paint.tz);
       uniforms.uArmBox.value.set(paint.box[0], paint.box[1], paint.box[2], paint.level);
       uniforms.uArmArc.value.set(paint.begin, paint.radius, paint.clear[0], paint.clear[1]);
+      uniforms.uArmEye.value.fromArray(paint.eye);
     },
     textures: [detail, detailNormal, rockNormal, large],
     dispose() {
@@ -228,6 +231,7 @@ uniform vec2 uSideEye;
 uniform vec4 uArmFrame;
 uniform vec4 uArmBox;
 uniform vec4 uArmArc;
+uniform vec2 uArmEye;
 varying vec2 vMask;
 varying vec4 vVerge;  // the band beside the road: m beyond the margin, s, m beyond the barrier, 0 (1 elsewhere)
 varying vec3 vGroundPos;
@@ -375,8 +379,23 @@ float gArm = 0.0;
 vec3 gFloor = vec3( 0.04, 0.034, 0.024 ) * ( 0.7 + 0.6 * gDet.a );
 vec3 gCanopy = vec3( 0.02, 0.034, 0.017 ) * ( 0.7 + 0.5 * gLarge.b ) * ( 0.75 + 0.5 * gMid.r );
 // (the arm of the lake: a forest mask over 1 is its dark wood, on the far shores and the spurs beyond: conifers
-// seen from far off, darker and bluer than the lap's broadleaf canopy)
-gCanopy *= mix( vec3( 1.0 ), vec3( 0.42, 0.5, 0.62 ), smoothstep( 1.02, 1.3, vMask.x ) );
+// seen from far off, darker and bluer than the lap's broadleaf canopy. No trees are drawn that far out, so the wood
+// is painted: stands of darker and lighter crowns at two scales, clearings of a paler green, and the shade of the
+// gullies that run down the slope. Each spur further up the valley is paler and bluer than the one before it: the
+// air between, laid on by hand over the distance from the valley's eye, because the day's haze alone leaves two
+// spurs a kilometre apart the same tone.)
+float gDark = smoothstep( 1.02, 1.3, vMask.x );
+if ( gDark > 0.0 ) {
+  float dStand = texture2D( uLarge, vGroundPos.xz / 173.0 + vec2( 0.21, 0.63 ) ).r;
+  float dCrown = texture2D( uLarge, vGroundPos.xz / 47.0 + vec2( 0.55, 0.17 ) ).b;
+  float dClear = smoothstep( 0.66, 0.76, texture2D( uLarge, vGroundPos.xz / 137.0 + vec2( 0.77, 0.31 ) ).g );
+  float dGully = texture2D( uLarge, vec2( ( vGroundPos.x * 0.6 + vGroundPos.z * 0.8 ) / 90.0, vGroundPos.y / 260.0 ) ).a;
+  vec3 wood = vec3( 0.0085, 0.017, 0.0105 ) * ( 0.62 + 0.5 * dStand + 0.45 * dCrown ) * ( 1.0 - 0.35 * smoothstep( 0.55, 0.8, dGully ) );
+  wood = mix( wood, vec3( 0.017, 0.028, 0.014 ) * ( 0.8 + 0.4 * dCrown ), dClear * 0.6 );
+  float dAir = smoothstep( 1100.0, 3400.0, length( vGroundPos.xz - uArmEye ) );
+  wood = mix( wood, vec3( 0.055, 0.075, 0.105 ), dAir * 0.62 );
+  gCanopy = mix( gCanopy, wood, gDark );
+}
 vec3 gForestCol = mix( gFloor, gCanopy, smoothstep( 120.0, 400.0, gDist ) );
 vec3 gScreeCol = vec3( 0.17, 0.162, 0.145 ) * ( 0.6 + 0.8 * gDet.b );
 vec4 gDetRock = mix( vec4( 0.5 ), groundSample( uDetail, vGroundPos, gN, ${(DETAIL_SCALE * 2.7).toFixed(2)} ), 0.4 + 0.6 * gFade );
@@ -500,10 +519,36 @@ gAlbedo = mix( gAlbedo, gCanopy * 1.3, gClump * ( 1.0 - clamp( vMask.x * 3.0, 0.
 gAlbedo = mix( gAlbedo, gScreeCol, gScree );
 gAlbedo = mix( gAlbedo, gRockCol, gRock );
 gAlbedo = mix( gAlbedo, gSnowCol, gSnow );
+// (the arm of the lake) the range that closes its valley: aMask.y = 5 marks it, plus how much snow the place asks
+// for (arm.js rangeAt: from its own shape). Pale warm grey rock, darker in the creases that run down its
+// face (a pattern laid out round the valley's eye: fine across the bearing, long down the fall line), and snow as
+// a thin broken dusting: it lies where the place asks, breaks up along the same creases and at the detail's grain,
+// and has a hard edge.
+float gRange = step( 4.5, vMask.y );
+if ( gRange > 0.0 ) {
+  vec2 rd = vGroundPos.xz - uArmEye;
+  float ra = atan( rd.y, rd.x );
+  float rr = length( rd );
+  float crease = texture2D( uLarge, vec2( ra * 19.0, rr / 2100.0 ) ).a;
+  float crease2 = texture2D( uLarge, vec2( ra * 53.0, rr / 900.0 ) ).r;
+  float grain = texture2D( uLarge, vGroundPos.xz / 71.0 + vec2( 0.3, 0.8 ) ).g;
+  float bed = texture2D( uLarge, vec2( ra * 9.0, vGroundPos.y / 190.0 ) ).b;
+  vec3 rock = mix( vec3( 0.165, 0.152, 0.134 ), vec3( 0.31, 0.288, 0.248 ), smoothstep( 0.3, 0.72, 0.34 * crease + 0.22 * crease2 + 0.22 * bed + 0.22 * grain ) ) * ( 0.86 + 0.28 * grain );
+  float ask = clamp( vMask.y - 5.0, 0.0, 1.0 );
+  // (a dusting: where the place asks for little it lies only in the creases, in flecks; higher up it closes, and
+  // the rock still shows through it in the creases' own pattern)
+  // (its lower edge breaks up in flecks, by a grain with no direction: an edge broken along the creases hangs
+  // like paint running down)
+  float fleck = 0.5 * grain + 0.5 * texture2D( uLarge, vGroundPos.xz / 29.0 + vec2( 0.9, 0.4 ) ).r;
+  float snow = smoothstep( 0.46, 0.54, ask * 1.15 + 0.7 * ( fleck - 0.5 ) * ( 1.0 - 0.45 * ask ) ) * step( 0.02, ask );
+  snow *= 1.0 - 0.85 * smoothstep( 0.56, 0.7, 0.55 * crease + 0.45 * crease2 ) * ( 1.0 - 0.5 * ask );
+  gSnow = snow * ( 0.5 + 0.3 * ask );
+  gAlbedo = mix( rock, gSnowCol, gSnow );
+}
 diffuseColor.rgb *= gAlbedo;
 // Seen against a low sun a plain rough surface glares (its Fresnel term goes to one at a grazing angle): rock and
 // stones do, a little; turf and tree crowns do not (the far land under the massif stood as a white band in the haze)
-groundSheen = 1.0 - 0.85 * max( groundGrass, gForest * ( 1.0 - gRock ) ) - 0.5 * gVergeEarth;
+groundSheen = ( 1.0 - 0.85 * max( groundGrass, gForest * ( 1.0 - gRock ) ) - 0.5 * gVergeEarth ) * ( 1.0 - 0.7 * gRange );
 groundRoughness = mix( mix( 1.0, 0.92, gScree ), 0.82, gRock );
 groundRoughness = mix( groundRoughness, 0.55, gSnow );
 `;

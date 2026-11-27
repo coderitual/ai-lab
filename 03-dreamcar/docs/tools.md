@@ -466,6 +466,26 @@ Read this before believing anything above about a device.
   rim on a real GPU's depth precision; the spurs from the crest and the plunge, which also look that way; any
   frame rate. The rest of the playtest and the sound test were not run.
 
+- **The arm of the lake, third round** (2026-11-27, after the lead's second review: the range's shape, rock and
+  snow, the spurs' fine ground and painted wood, the far bank's pale patches, the lap's wood on the right of the
+  bridge's end). `node tools/unit.mjs`: 11 files passed on the final tree. The playtest's `keys`, `photo` and
+  `determinism` sections against the final build: 58 checks, 0 failed. Stills in the same run before (e0b0b36) and
+  after at `medium` 1280x720: `?photo=r1` 0.016 % of pixels differ at all (none by more than 8 in 255);
+  `?photo=r2` 0.052 % (0.002 %); `?photo=d1` 3.2 % (0.41 %: the car's paint and a few levels on the asphalt);
+  `?photo=d3` 15.6 % (5.0 %): the valley's spurs and range are its far skyline, and the lap's wood beside the
+  bridge, toned, is in its middle distance. Looked at: `?photo=r4` by day, at golden hour, at night and on `low`;
+  the chase view on an upright phone's shape at lap 1:17.8, 1:20.8 and 1:23.8; the chase view from the crest
+  (lap 1:03.8: the range is a small pale ridge on the left horizon) and from the plunge (1:07.8: the trees hide
+  it). Found with the scene's meshes hidden one at a time: the pale patches on the far bank were the shore's
+  stones and, under them, bare outcrop between the last vertex in the water and the first on the bank; a bright
+  green wedge beyond the water was the shore patch easing onto a lattice that the valley's patch had sunk. Against
+  the photograph, as shares of the sky's luminance: near wooded slope 0.10 (0.05), middle spur 0.19 (0.10), far
+  range 0.70 (0.96), water 0.42 (0.46). Costs are in spec.md. Regenerated: `lake-arm.jpg`. Not verified: the
+  `high` tier; anything in motion (whether the range's fine ground and the far land's sunk lattice ever show a
+  seam as the camera moves; whether the painted wood's grain crawls); a real GPU's precision at 4 km; split
+  screen here; the esses were not looked at again (nothing of theirs changed). The rest of the playtest and the
+  sound test were not run.
+
 - **The return to main's version with fixes only** (2026-11-23 to 26: the far land's hole, no ground, structure or
   furniture over the road or inside its edges, the tree shadows' casters in split screen, the pad where the thumb
   lands and the pedal gauge, the quality ladder, the upscale and the readout). `node tools/unit.mjs`: 8 files passed;

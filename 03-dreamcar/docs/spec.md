@@ -117,10 +117,11 @@ road's heading there and v to its left.
 | the ground | only ever lowered, on the left of the road beside s = 3785 to 4945 m (eased over 60 m), from 1.5 m beyond the solid edge (all of it from 52 m), within 240 m of the shore (all of it within 140 m): no higher than a beach of 0.11 per metre for 7 m and a bank of 0.36 per metre on the far shores, 0.1 per metre on the land between the water and the road (90 to 690 m along, up to 150 m left), with knolls of 3 m; 74 ha lowered round the water, by 105 m at most (the hill that closed the valley south of the long right) |
 | the valley beyond | seen from the bridge (150 m before its end), between 20 degrees right (all of it from 10) and 54 degrees left (all of it to 40) of the road and from 900 m (all of it from 1400) to 5300 m (all of it to 4500), the land keeps 22 % of what it stood over 14 m |
 | its spurs | four, each [root: degrees left of the road, metres out; tip: the same; crest at the root, m; half width at the root, m]: [46.6, 1240; 7.9, 1090; 175; 360] (down to the arm's shore), [-14, 2100; 2, 1350; 250; 400], [45, 2350; 5, 2450; 330; 470], [-16, 3250; 9, 2950; 380; 520]; crests fall to 6 % at the tip, 0.78 to 1.18 times that along the way; forest mask up to 1.7 (dark wood) |
-| its range | across the valley 4050 m out (wandering by 170 m), 430 m from foot to crest, crests 230 to 590 m over the floor before the 100 m lattice samples them, between 26 degrees right (all of it from 12) and 60 left (all of it to 46); bare, snow on the upper part of each peak (from 30 % of its height, all of it by 92 %, at most 0.9) |
-| fine ground | within 110 m of the shore (gone by 200 m) the terrain draws the arm's own heights: inside the grid's rectangle by not easing onto the far land there, beyond it on a patch of 14 m cells (low: 28 m), `terrain-arm`, one draw call; the lattice under it sunk 60 m |
-| the open bank | on the left beside s = 4095 to 4495 m (eased over 30 m), to 330 m beyond the edge: no wood (the Track's `lowDown` and `lowRun` woods are cleared there); its grass painted per pixel between [0.032, 0.046, 0.022] and [0.105, 0.1, 0.036] from 9 m (all of it from 22 m) beyond the road's centre line on the water's side, 40 m before the bridge's end to 720 m after it and up to 190 m left of the frame's axis; pale stones from 6 m above the shore line to 3 m below it |
-| trees | the lap's own cleared in the water, on its beach and on the open bank; planted: nine groups of four to seven birch saplings (a hornbeam in five) on the bank, 2.6 to 5.2 m over the ground, three tenths of each under it, 1.1 to 2 times as wide, toned [0.44, 0.5, 0.52]; a wood on the far shores from 5 m back from the water to 260 m (lattice 6.2 m, 85 % planted, six in ten conifers, toned [0.3, 0.4, 0.44]; the lap's own trees that stand there take the tone and none has turned), only where the forest draws trees at all (within 250 m of the course's bounds) and no nearer than 165 m to the road; on the right of the road from 200 m before the bridge's end to 330 m after it, spruce and fir 13 to 22 m tall on a 6.4 m lattice from 34 to 230 m beyond the edge, up to 175 m over the lake, toned [0.4, 0.5, 0.58] |
+| its range | across the valley 4050 m out (wandering by 170 m), 540 m from foot to crest, a long apron under a steep upper face (height as the distance in from the foot to the power 1.5), crests 230 to 610 m over the floor: great peaks every 7.5 degrees of bearing and smaller ones every 2.3; gullies down its face every 2.3 degrees, 14 % of the height deep; between 26 degrees right (all of it from 12) and 60 left (all of it to 46). Rock [0.165, 0.152, 0.134] to [0.31, 0.288, 0.248]; snow asked for from 50 % of a peak's height (the line wanders by 20 %), thinning over 22 % below it and closing over 36 % above, 22 % lower in the gullies and a quarter as much on steep rock; drawn at 0.5 to 0.8 of white, broken in flecks at its edge, with the rock showing in the creases |
+| fine ground | two patches beyond the grid's rectangle, one draw call each, the lattice under them sunk 60 m: `terrain-arm`, within 110 m of the shore (gone by 200 m), 14 m cells (low: 28 m), 2.9 k triangles on medium (inside the rectangle the grid does not ease onto the far land there); `terrain-arm-valley`, the spurs to 1.25 times their half width and the range, 42 m cells (low: 84 m), about 18 k triangles on medium and 4.5 k on low |
+| the spurs' wood | painted where the forest mask is over 1: [0.0085, 0.017, 0.0105] in stands at 173 m and crowns at 47 m, clearings [0.017, 0.028, 0.014] at 137 m, gullies 35 % darker; towards [0.055, 0.075, 0.105] by up to 62 % between 1100 and 3400 m from the valley's eye; no rock or scree under it; the bed off the far shores carries the mask too |
+| the open bank | on the left beside s = 4095 to 4495 m (eased over 30 m), to 330 m beyond the edge: no wood (the Track's `lowDown` and `lowRun` woods are cleared there), and only on the road's side of the water (up to 150 m left of the frame's axis); its grass painted per pixel between [0.032, 0.046, 0.022] and [0.105, 0.1, 0.036] from 9 m (all of it from 22 m) beyond the road's centre line on the water's side, 40 m before the bridge's end to 620 m after it and up to 125 m left of the frame's axis |
+| trees | the lap's own cleared in the water, on its beach and on the open bank; planted: nine groups of four to seven birch saplings (a hornbeam in five) on the bank, 2.6 to 5.2 m over the ground, three tenths of each under it, 1.1 to 2 times as wide, toned [0.44, 0.5, 0.52]; a wood on the far shores from 5 m back from the water to 260 m (lattice 6.2 m, 85 % planted, six in ten conifers, toned [0.3, 0.4, 0.44]; the lap's own trees that stand there take the tone and none has turned), only where the forest draws trees at all (within 250 m of the course's bounds) and no nearer than 165 m to the road; on the right of the road from 200 m before the bridge's end to 330 m after it, spruce and fir 13 to 22 m tall on a 6.4 m lattice from 34 to 230 m beyond the edge, up to 175 m over the lake, a quarter of each under the ground and 1.5 times as wide, toned [0.4, 0.5, 0.58]; the lap's own trees on the right from 380 m before the bridge's end to 420 m after it, to 260 m beyond the edge: broadleaves toned [0.5, 0.39, 0.42], conifers 24 % of their height deeper and 1.5 times as wide, toned [0.5, 0.58, 0.62] |
 | ground cover | long grass (`cover-meadow`, tinted [1.15, 1.0, 0.7]) 3.5 / 16.8 / 22.4 a metre of road (low / medium / high) on the left of the open bank's stretch, 55 % of it within 1.6 m before and 3.8 m behind the barrier, the rest down the bank to 44 m; none of the lap's dark tufts there |
 | the fence | posts every 2.6 m (low: 5.2 m) 3.2 m beyond the left solid edge from the bridge's end to 168 m after it, three wires (low: one); in the lakeside fence's one mesh |
 
@@ -660,22 +661,23 @@ gully bridge, t = 90 the start of the long right):
 | low, t = 22 | 125 | 121 | 316 k | 306 k | 0 / 39 / 1407 | 0 / 27 / 1204 |
 | low, t = 26 | 153 | 151 | 340 k | 352 k | 0 / 37 / 1045 | 0 / 31 / 1128 |
 | low, t = 30 | 120 | 120 | 290 k | 288 k | 0 / 53 / 1624 | 0 / 27 / 1614 |
-| low, t = 84 | 101 | 104 | 228 k | 229 k | 0 / 0 / 1209 | 0 / 0 / 702 |
-| low, t = 87 | 112 | 114 | 265 k | 263 k | 0 / 4 / 1578 | 0 / 3 / 755 |
-| low, t = 90 | 107 | 109 | 299 k | 292 k | 0 / 43 / 1144 | 0 / 35 / 604 |
+| low, t = 84 | 101 | 105 | 228 k | 237 k | 0 / 0 / 1209 | 0 / 0 / 702 |
+| low, t = 87 | 112 | 115 | 265 k | 270 k | 0 / 4 / 1578 | 0 / 3 / 755 |
+| low, t = 90 | 107 | 110 | 299 k | 300 k | 0 / 43 / 1144 | 0 / 35 / 604 |
 | medium, t = 22 | 164 | 154 | 992 k | 961 k | 36 / 42 / 3160 | 30 / 45 / 2926 |
 | medium, t = 26 | 210 | 200 | 1090 k | 1165 k | 30 / 48 / 2739 | 32 / 40 / 2965 |
 | medium, t = 30 | 165 | 157 | 1012 k | 928 k | 49 / 54 / 2736 | 27 / 46 / 2742 |
-| medium, t = 84 | 125 | 129 | 649 k | 659 k | 0 / 0 / 2904 | 0 / 0 / 1563 |
-| medium, t = 87 | 151 | 151 | 811 k | 785 k | 6 / 35 / 2864 | 7 / 18 / 1328 |
-| medium, t = 90 | 147 | 150 | 949 k | 886 k | 40 / 56 / 1768 | 31 / 35 / 941 |
+| medium, t = 84 | 125 | 131 | 649 k | 686 k | 0 / 0 / 2904 | 0 / 0 / 1563 |
+| medium, t = 87 | 151 | 152 | 811 k | 811 k | 6 / 35 / 2864 | 7 / 18 / 1328 |
+| medium, t = 90 | 147 | 151 | 949 k | 917 k | 40 / 56 / 1768 | 31 / 35 / 941 |
 
 In the esses both tiers now cost what they did within a few per cent (low -3 to +4 % of the triangles, medium -8
 to +7 %): the walls' first two rows keep the full form about as far as the lap's trees do and the three behind
 only the reduced one (a first version kept the full form further out and cost 10 to 22 % more on medium). At the
-arm of the lake both tiers cost what they did within 2 % at the bridge and a little less in the long right: the
-wood on the bank is gone, the water is the lake's own sheet, and the fine ground, the fence and the far shores'
-wood add two to four draw calls.
+arm of the lake the bridge costs 4 to 6 % more triangles than before the place (the valley's fine ground, 18 k
+triangles on medium and 4.5 k on low when it is in view) and the long right the same or less: the wood on the bank
+is gone, the water is the lake's own sheet, and the two patches of fine ground, the fence and the far shores' wood
+add three to six draw calls. (The trees' counts at t = 84 to 90 are from the second round; the third changed none.)
 
 ## Sound
 
